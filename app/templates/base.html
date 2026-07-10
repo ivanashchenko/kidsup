@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}KidsUp Analytics{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">🎈 KidsUp <span>Analytics</span></div>
+  <nav>
+    <a href="/" class="{{ 'active' if active == 'dashboard' }}">Дашборд</a>
+    <a href="/students" class="{{ 'active' if active == 'students' }}">Ученики</a>
+    <a href="/payments" class="{{ 'active' if active == 'payments' }}">Платежи</a>
+    <a href="/groups" class="{{ 'active' if active == 'groups' }}">Группы</a>
+    <a href="/settings" class="{{ 'active' if active == 'settings' }}">Настройки</a>
+  </nav>
+  <div class="sync-block">
+    {% if last_sync %}<span class="muted small">Синхр.: {{ last_sync }}</span>{% endif %}
+    <button id="sync-btn" class="btn btn-primary" {% if not has_api_key %}disabled title="Укажите API-ключ в настройках"{% endif %}>
+      Синхронизировать
+    </button>
+  </div>
+</header>
+
+<div id="sync-status" class="sync-status" hidden></div>
+
+<main>
+{% if not has_api_key and active != 'settings' %}
+  <div class="notice">
+    Чтобы выгрузить данные из МойКласс, укажите API-ключ на странице
+    <a href="/settings">Настройки</a>. Ключ создаётся в CRM:
+    <em>Настройки → API</em>.
+  </div>
+{% elif not has_data and active != 'settings' %}
+  <div class="notice">
+    Данных пока нет — нажмите «Синхронизировать», чтобы выгрузить базу из МойКласс.
+  </div>
+{% endif %}
+{% block content %}{% endblock %}
+</main>
+
+<script src="/static/charts.js"></script>
+<script>
+(function () {
+  const btn = document.getElementById('sync-btn');
+  const box = document.getElementById('sync-status');
+  let timer = null;
+
+  async function poll() {
+    try {
+      const st = await (await fetch('/api/sync/status')).json();
+      if (st.running) {
+        box.hidden = false;
+        box.className = 'sync-status running';
+        box.textContent = '⏳ ' + (st.stage || 'Синхронизация…') +
+          (st.detail ? ' — ' + st.detail : '');
+      } else {
+        clearInterval(timer); timer = null;
+        if (st.error) {
+          box.hidden = false;
+          box.className = 'sync-status error';
+          box.textContent = '⚠️ Ошибка синхронизации: ' + st.error;
+        } else if (box.classList.contains('running')) {
+          box.className = 'sync-status done';
+          box.textContent = '✅ Синхронизация завершена. Обновляем страницу…';
+          setTimeout(() => location.reload(), 1200);
+        }
+      }
+    } catch (e) { /* сеть моргнула — попробуем в следующий раз */ }
+  }
+
+  if (btn) btn.addEventListener('click', async () => {
+    const r = await fetch('/api/sync/start', {method: 'POST'});
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      box.hidden = false;
+      box.className = 'sync-status error';
+      box.textContent = '⚠️ ' + (data.error || 'Не удалось запустить синхронизацию');
+      return;
+    }
+    box.hidden = false;
+    box.className = 'sync-status running';
+    box.textContent = '⏳ Синхронизация запущена…';
+    if (!timer) timer = setInterval(poll, 1500);
+  });
+
+  // если синхронизация уже шла при открытии страницы — показываем прогресс
+  poll().then(() => {
+    if (!box.hidden && box.classList.contains('running') && !timer) {
+      timer = setInterval(poll, 1500);
+    }
+  });
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

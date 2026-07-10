@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Платежи — KidsUp Analytics{% endblock %}
+{% block content %}
+<h1>Платежи</h1>
+
+<form class="filters" method="get" action="/payments">
+  <label>С даты <input type="date" name="date_from" value="{{ date_from }}"></label>
+  <label>По дату <input type="date" name="date_to" value="{{ date_to }}"></label>
+  <label>Тип операции
+    <select name="optype">
+      <option value="" {{ 'selected' if not optype }}>Все</option>
+      <option value="income" {{ 'selected' if optype == 'income' }}>Оплаты (income)</option>
+      <option value="debit" {{ 'selected' if optype == 'debit' }}>Списания (debit)</option>
+      <option value="refund" {{ 'selected' if optype == 'refund' }}>Возвраты (refund)</option>
+    </select>
+  </label>
+  <button class="btn btn-primary" type="submit">Показать</button>
+  <a class="btn" href="/export/payments.csv?date_from={{ date_from }}&date_to={{ date_to }}">⬇ Экспорт в CSV</a>
+</form>
+
+<div class="kpi-grid">
+  {% for t in totals %}
+  <div class="kpi">
+    <div class="label">{{ {'income': 'Оплаты', 'debit': 'Списания', 'refund': 'Возвраты'}.get(t.optype, t.optype or 'другое') }}</div>
+    <div class="value {{ 'green' if t.optype == 'income' else ('red' if t.optype == 'refund' else '') }}">
+      {{ "{:,.0f}".format(t.s or 0).replace(",", " ") }} ₽
+    </div>
+    <div class="sub">{{ t.c }} операций</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if payments %}
+<div class="card">
+  <table>
+    <tr><th>Дата</th><th>Ученик</th><th class="num">Сумма, ₽</th><th>Тип</th><th>Комментарий</th></tr>
+    {% for p in payments %}
+    <tr>
+      <td class="muted">{{ (p.date or "")[:16].replace("T", " ") }}</td>
+      <td>{{ p.user_name or "—" }}</td>
+      <td class="num">{{ "{:,.0f}".format(p.summa or 0).replace(",", " ") }}</td>
+      <td><span class="badge {{ p.optype }}">{{ p.optype }}</span></td>
+      <td class="muted">{{ p.comment or "" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if payments | length == 1000 %}
+  <p class="muted small">Показаны первые 1000 операций — сузьте период или используйте экспорт в CSV.</p>
+  {% endif %}
+</div>
+{% else %}
+<p class="muted">За выбранный период платежей нет.</p>
+{% endif %}
+{% endblock %}

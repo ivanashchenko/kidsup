@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — KidsUp Analytics{% endblock %}
+{% block content %}
+<h1>Дашборд</h1>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Всего учеников в базе</div>
+    <div class="value">{{ kpis.total_students }}</div>
+    <div class="sub">+{{ kpis.new_month }} в этом месяце</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Активные ученики (30 дней)</div>
+    <div class="value">{{ kpis.active_students }}</div>
+    <div class="sub">посещали занятия</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Оплаты в этом месяце</div>
+    <div class="value green">{{ "{:,.0f}".format(kpis.income_month).replace(",", " ") }} ₽</div>
+    <div class="sub">возвраты: {{ "{:,.0f}".format(kpis.refund_month).replace(",", " ") }} ₽</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Списано за занятия (месяц)</div>
+    <div class="value">{{ "{:,.0f}".format(kpis.debit_month).replace(",", " ") }} ₽</div>
+    <div class="sub">признанная выручка</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Посещаемость (30 дней)</div>
+    <div class="value">{{ kpis.attendance_30d ~ "%" if kpis.attendance_30d is not none else "—" }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Должники</div>
+    <div class="value red">{{ kpis.debtors }}</div>
+    <div class="sub">на сумму {{ "{:,.0f}".format(kpis.debt_sum).replace(",", " ") }} ₽</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Деньги по месяцам, ₽</h2>
+  <div id="chart-revenue"></div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Новые ученики по месяцам</h2>
+    <div id="chart-new-students"></div>
+  </div>
+  <div class="card">
+    <h2>Посещаемость по месяцам, %</h2>
+    <div id="chart-attendance"></div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2>Операции за 12 месяцев</h2>
+    <div id="chart-optypes"></div>
+  </div>
+  <div class="card">
+    <h2>Топ должников</h2>
+    {% if debtors %}
+    <table>
+      <tr><th>Ученик</th><th>Телефон</th><th class="num">Баланс, ₽</th></tr>
+      {% for d in debtors[:10] %}
+      <tr>
+        <td>{{ d.name }}</td>
+        <td>{{ d.phone or "—" }}</td>
+        <td class="num neg">{{ "{:,.0f}".format(d.balance).replace(",", " ") }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">Должников нет 🎉</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Группы: посещаемость и заполненность (90 дней)</h2>
+  {% if groups %}
+  <table>
+    <tr>
+      <th>Группа</th><th class="num">Занятий</th><th class="num">Учеников</th>
+      <th class="num">В среднем на занятии</th><th class="num">Посещаемость</th>
+      <th class="num">Заполненность</th>
+    </tr>
+    {% for g in groups %}
+    <tr>
+      <td>{{ g.name }}</td>
+      <td class="num">{{ g.lessons_cnt }}</td>
+      <td class="num">{{ g.students_cnt }}</td>
+      <td class="num">{{ g.avg_per_lesson if g.avg_per_lesson is not none else "—" }}</td>
+      <td class="num">{{ g.attendance ~ "%" if g.attendance is not none else "—" }}</td>
+      <td class="num">{{ g.fill_pct ~ "%" if g.fill_pct is not none else "—" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="muted">Нет данных по группам.</p>{% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const revenue = {{ revenue | tojson }};
+KCharts.bars(document.getElementById('chart-revenue'), {
+  labels: revenue.labels,
+  series: [
+    { name: 'Оплаты (income)', color: '#17a673', data: revenue.income },
+    { name: 'Списания за занятия (debit)', color: '#3861fb', data: revenue.debit },
+    { name: 'Возвраты (refund)', color: '#e05260', data: revenue.refund },
+  ],
+});
+
+const newStudents = {{ new_students | tojson }};
+KCharts.bars(document.getElementById('chart-new-students'), {
+  labels: newStudents.labels,
+  series: [{ name: 'Новые ученики', color: '#3861fb', data: newStudents.counts }],
+});
+
+const attendance = {{ attendance | tojson }};
+KCharts.line(document.getElementById('chart-attendance'), {
+  labels: attendance.labels, maxY: 100,
+  series: [{ name: 'Посещаемость, %', color: '#d99000', data: attendance.pct }],
+});
+
+const optypes = {{ payments_by_type | tojson }};
+const optypeNames = { income: 'Оплаты', debit: 'Списания', refund: 'Возвраты' };
+const optypeColors = { income: '#17a673', debit: '#3861fb', refund: '#e05260' };
+if (optypes.length) {
+  KCharts.donut(document.getElementById('chart-optypes'), {
+    items: optypes.map((o, i) => ({
+      label: optypeNames[o.optype] || o.optype || 'другое',
+      color: optypeColors[o.optype] || ['#8e6bd0', '#d99000'][i % 2],
+      value: o.s || 0,
+    })),
+  });
+} else {
+  document.getElementById('chart-optypes').innerHTML = '<p class="muted">Нет данных.</p>';
+}
+</script>
+{% endblock %}
