@@ -36,15 +36,15 @@ def kpis() -> dict:
         active_students = one(
             """SELECT COUNT(DISTINCT lr.user_id) FROM lesson_records lr
                JOIN lessons l ON l.id = lr.lesson_id
-               WHERE lr.visit = 1 AND l.date >= ?""", d30)
+               WHERE lr.visit = 1 AND l.status = 1 AND l.date >= ?""", d30)
         income_month = one(
-            "SELECT SUM(summa) FROM payments WHERE optype='income' AND substr(date,1,10) >= ?",
+            "SELECT SUM(ABS(summa)) FROM payments WHERE optype='income' AND substr(date,1,10) >= ?",
             month_start)
         refund_month = one(
-            "SELECT SUM(summa) FROM payments WHERE optype='refund' AND substr(date,1,10) >= ?",
+            "SELECT SUM(ABS(summa)) FROM payments WHERE optype='refund' AND substr(date,1,10) >= ?",
             month_start)
         debit_month = one(
-            "SELECT SUM(summa) FROM payments WHERE optype='debit' AND substr(date,1,10) >= ?",
+            "SELECT SUM(ABS(summa)) FROM payments WHERE optype='debit' AND substr(date,1,10) >= ?",
             month_start)
         debtors = one("SELECT COUNT(*) FROM users WHERE balance < 0")
         debt_sum = one("SELECT SUM(balance) FROM users WHERE balance < 0")
@@ -52,7 +52,7 @@ def kpis() -> dict:
         att = conn.execute(
             """SELECT SUM(lr.visit) v, COUNT(*) t FROM lesson_records lr
                JOIN lessons l ON l.id = lr.lesson_id
-               WHERE l.date >= ? AND l.date <= ?""",
+               WHERE l.status = 1 AND l.date >= ? AND l.date <= ?""",
             (d30, today.isoformat())).fetchone()
         attendance = round(100.0 * (att["v"] or 0) / att["t"], 1) if att and att["t"] else None
 
@@ -76,7 +76,7 @@ def revenue_by_month(months: int = 12) -> dict:
     refund = dict.fromkeys(labels, 0.0)
     with db.get_conn() as conn:
         rows = conn.execute(
-            """SELECT substr(date,1,7) m, optype, SUM(summa) s
+            """SELECT substr(date,1,7) m, optype, SUM(ABS(summa)) s
                FROM payments WHERE substr(date,1,7) >= ?
                GROUP BY m, optype""", (labels[0],)).fetchall()
     for r in rows:
@@ -112,7 +112,8 @@ def attendance_by_month(months: int = 12) -> dict:
         rows = conn.execute(
             """SELECT substr(l.date,1,7) m, SUM(lr.visit) v, COUNT(*) t
                FROM lesson_records lr JOIN lessons l ON l.id = lr.lesson_id
-               WHERE substr(l.date,1,7) >= ? AND l.date <= date('now')
+               WHERE l.status = 1 AND substr(l.date,1,7) >= ?
+                 AND l.date <= date('now')
                GROUP BY m""", (labels[0],)).fetchall()
     for r in rows:
         if r["m"] in pct and r["t"]:
@@ -124,7 +125,7 @@ def payments_by_type(days: int = 365) -> list[dict]:
     since = (date.today() - timedelta(days=days)).isoformat()
     with db.get_conn() as conn:
         rows = conn.execute(
-            """SELECT optype, COUNT(*) c, SUM(summa) s FROM payments
+            """SELECT optype, COUNT(*) c, SUM(ABS(summa)) s FROM payments
                WHERE substr(date,1,10) >= ? GROUP BY optype ORDER BY s DESC""",
             (since,)).fetchall()
     return [dict(r) for r in rows]
@@ -151,7 +152,7 @@ def group_stats() -> list[dict]:
                    COUNT(DISTINCT lr.user_id) students_cnt
             FROM classes c
             LEFT JOIN lessons l ON l.class_id = c.id
-                 AND l.date >= ? AND l.date <= date('now')
+                 AND l.status = 1 AND l.date >= ? AND l.date <= date('now')
             LEFT JOIN lesson_records lr ON lr.lesson_id = l.id
             GROUP BY c.id ORDER BY lessons_cnt DESC, c.name
             """, (since,)).fetchall()
@@ -178,7 +179,7 @@ def top_students_by_visits(days: int = 90, limit: int = 15) -> list[dict]:
                FROM lesson_records lr
                JOIN lessons l ON l.id = lr.lesson_id
                JOIN users u ON u.id = lr.user_id
-               WHERE l.date >= ? AND l.date <= date('now')
+               WHERE l.status = 1 AND l.date >= ? AND l.date <= date('now')
                GROUP BY u.id ORDER BY visits DESC LIMIT ?""",
             (since, limit)).fetchall()
     return [dict(r) for r in rows]
