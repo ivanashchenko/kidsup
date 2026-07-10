@@ -123,6 +123,30 @@ CREATE TABLE IF NOT EXISTS lessons (
     raw TEXT
 );
 
+CREATE TABLE IF NOT EXISTS client_statuses (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    raw TEXT
+);
+
+CREATE TABLE IF NOT EXISTS join_statuses (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    raw TEXT
+);
+
+CREATE TABLE IF NOT EXISTS payment_types (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    raw TEXT
+);
+
+CREATE TABLE IF NOT EXISTS rooms (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    raw TEXT
+);
+
 CREATE TABLE IF NOT EXISTS lesson_records (
     id INTEGER PRIMARY KEY,
     lesson_id INTEGER,
@@ -353,7 +377,8 @@ def save_lesson_records(items: list[dict]):
 def table_counts() -> dict:
     tables = ["users", "joins", "payments", "invoices", "classes", "courses",
               "filials", "managers", "subscriptions", "user_subscriptions",
-              "lessons", "lesson_records"]
+              "lessons", "lesson_records", "client_statuses", "join_statuses",
+              "payment_types", "rooms"]
     out = {}
     with get_conn() as conn:
         for t in tables:

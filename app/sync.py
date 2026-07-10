@@ -87,6 +87,13 @@ def _run_sync(history_months: int | None):
         db.save_classes(client.fetch_optional("/v1/company/classes", ["classes"]))
         db.save_simple("subscriptions",
                        client.fetch_optional("/v1/company/subscriptions", ["subscriptions"]))
+        db.save_simple("client_statuses",
+                       client.fetch_optional("/v1/company/clientStatuses", ["clientStatuses"]))
+        db.save_simple("join_statuses",
+                       client.fetch_optional("/v1/company/joinStatuses", ["joinStatuses"]))
+        db.save_simple("payment_types",
+                       client.fetch_optional("/v1/company/paymentTypes", ["paymentTypes"]))
+        db.save_simple("rooms", client.fetch_optional("/v1/company/rooms", ["rooms"]))
 
         _stage("Ученики")
         users = client.fetch_all("/v1/company/users", ["users"],
