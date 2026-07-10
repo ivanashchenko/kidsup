@@ -18,7 +18,7 @@ from . import config
 
 log = logging.getLogger("kidsup.moyklass")
 
-PAGE_LIMIT = 100
+PAGE_LIMIT = 500
 
 
 class MoyklassError(Exception):

@@ -150,11 +150,9 @@ def test_connection(api_key: str) -> tuple[bool, str]:
     try:
         client = MoyklassClient(api_key)
         client.authenticate()
-        info = client.get("/v1/company/company")
-        name = ""
-        if isinstance(info, dict):
-            name = info.get("name") or ""
-        return True, f"Подключение успешно. Компания: {name}" if name else "Подключение успешно."
+        filials = client.get("/v1/company/filials")
+        n = len(filials) if isinstance(filials, list) else 0
+        return True, f"Подключение успешно. Филиалов в CRM: {n}."
     except MoyklassError as e:
         return False, str(e)
     except Exception as e:  # noqa: BLE001
