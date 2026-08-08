@@ -14,7 +14,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import analytics, config, db, sync
+from . import analytics, config, db, leads, sync
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -158,6 +158,101 @@ def settings_test():
     ok, message = sync.test_connection(key)
     return RedirectResponse(
         f"/settings?ok={1 if ok else 0}&msg={message}", status_code=303)
+
+
+# --- Захват лидов с офлайн-каналов (QR) ------------------------------------
+
+LEAD_TITLES = {
+    "lottery": ("Участвуйте в лотерее! 🎁",
+                "Заполните анкету — и ребёнок получит подарок. А мы подберём занятия по вашему запросу."),
+    "promoter": ("Запишитесь на бесплатную диагностику",
+                 "Оставьте контакты — подберём программу под вашего ребёнка и подарим диагностику."),
+    "yantar": ("KidsUP — прямо напротив «Янтаря»",
+               "Оставьте контакты и получите бесплатную диагностику для ребёнка."),
+    "flyer": ("Набор на 2026/27 учебный год",
+              "Оставьте контакты — расскажем о группах и подарим бесплатную диагностику."),
+    "screen": ("Набор в детский центр и сад KidsUP",
+               "Оставьте контакты — подберём занятия и подарим диагностику."),
+    "metro": ("Промокод МЕТРО: −10% на первый абонемент",
+              "Оставьте контакты — закрепим скидку и подберём группу."),
+    "trailer": ("KidsUP: детский центр и сад рядом с домом",
+                "Оставьте контакты — расскажем о наборе и подарим диагностику."),
+    "chat": ("KidsUP для семей вашего ЖК",
+             "Оставьте контакты — подберём занятия и подарим бесплатную диагностику."),
+    "partner": ("Специальное предложение от партнёра KidsUP",
+                "Оставьте контакты — активируем ваш бонус и подберём занятия."),
+}
+
+
+@app.get("/q/{source}", response_class=HTMLResponse)
+def lead_form(request: Request, source: str, promo: str = ""):
+    """Публичная форма по QR-коду. Пример: /q/lottery?promo=DR2908"""
+    title, subtitle = LEAD_TITLES.get(source, LEAD_TITLES["promoter"])
+    return templates.TemplateResponse(request, "lead_form.html", {
+        "source": source, "promo": promo, "title": title, "subtitle": subtitle,
+        "interests": leads.INTERESTS, "done": False, "error": "",
+    })
+
+
+@app.post("/lead", response_class=HTMLResponse)
+async def lead_submit(request: Request):
+    form = await request.form()
+    data = {
+        "source": form.get("source", "other"),
+        "promo": form.get("promo", ""),
+        "parent_name": form.get("parent_name", ""),
+        "phone": form.get("phone", ""),
+        "child_name": form.get("child_name", ""),
+        "child_age": form.get("child_age", ""),
+        "interests": form.getlist("interests"),
+        "comment": form.get("comment", ""),
+        "consent_pd": form.get("consent_pd"),
+        "consent_ads": form.get("consent_ads"),
+    }
+    if not data["consent_pd"] or not data["phone"].strip():
+        title, subtitle = LEAD_TITLES.get(data["source"], LEAD_TITLES["promoter"])
+        return templates.TemplateResponse(request, "lead_form.html", {
+            "source": data["source"], "promo": data["promo"], "title": title,
+            "subtitle": subtitle, "interests": leads.INTERESTS, "done": False,
+            "error": "Укажите телефон и подтвердите согласие на обработку данных.",
+        })
+    lead_id = leads.save_lead(data)
+    # пытаемся сразу отправить в CRM, но форму не роняем при ошибке
+    try:
+        leads.push_to_crm(lead_id)
+    except Exception:  # noqa: BLE001
+        pass
+    return templates.TemplateResponse(request, "lead_form.html", {
+        "done": True, "parent_name": data["parent_name"],
+        "interests": leads.INTERESTS, "source": data["source"],
+        "promo": data["promo"], "title": "", "subtitle": "", "error": "",
+    })
+
+
+@app.get("/leads", response_class=HTMLResponse, dependencies=AUTH)
+def leads_page(request: Request):
+    return render(request, "leads.html", active="leads",
+                  stats=leads.stats_by_source(), rows=leads.recent(),
+                  sources=leads.SOURCES)
+
+
+@app.post("/leads/push/{lead_id}", dependencies=AUTH)
+def leads_push(lead_id: int):
+    ok, msg = leads.push_to_crm(lead_id)
+    return {"ok": ok, "message": msg}
+
+
+@app.get("/export/leads.csv", dependencies=AUTH)
+def export_leads():
+    rows = leads.recent(limit=10000)
+    return _csv_response(
+        "leads.csv",
+        ["ID", "Дата", "Источник", "Промокод", "Родитель", "Телефон",
+         "Ребёнок", "Возраст", "Интересы", "Комментарий", "В CRM"],
+        [(r["id"], r["created_at"], leads.SOURCES.get(r["source"], r["source"]),
+          r["promo"], r["parent_name"], r["phone"], r["child_name"], r["child_age"],
+          r["interests"], r["comment"], "да" if r["pushed_to_crm"] else "нет")
+         for r in rows])
 
 
 # --- API: синхронизация ----------------------------------------------------

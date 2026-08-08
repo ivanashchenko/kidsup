@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Лиды с каналов — KidsUP Analytics{% endblock %}
+{% block content %}
+<h1>Лиды с офлайн-каналов</h1>
+
+<div class="card">
+  <h2>По источникам</h2>
+  {% if stats %}
+  <table>
+    <tr><th>Источник</th><th>Промокод</th><th class="num">Лидов</th><th class="num">В CRM</th><th>Первый</th><th>Последний</th></tr>
+    {% for s in stats %}
+    <tr>
+      <td>{{ s.source_label }}</td>
+      <td class="muted">{{ s.promo or "—" }}</td>
+      <td class="num"><b>{{ s.c }}</b></td>
+      <td class="num">{{ s.pushed or 0 }}</td>
+      <td class="muted small">{{ (s.first_at or "")[:16].replace("T", " ") }}</td>
+      <td class="muted small">{{ (s.last_at or "")[:16].replace("T", " ") }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Лидов пока нет. Раздайте QR-ссылки промоутерам и на мероприятия.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>QR-ссылки для каналов</h2>
+  <p class="muted small">Каждому каналу — своя ссылка. Промокод после <code>?promo=</code> попадёт в карточку лида.</p>
+  <table>
+    <tr><th>Канал</th><th>Ссылка для QR-кода</th></tr>
+    {% for key, label in sources.items() %}
+    <tr>
+      <td>{{ label }}</td>
+      <td class="muted small"><code>/q/{{ key }}?promo=КОД</code></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Последние лиды</h2>
+  <div class="export-links" style="margin-bottom:12px">
+    <a class="btn" href="/export/leads.csv">⬇ Экспорт в CSV</a>
+  </div>
+  {% if rows %}
+  <table>
+    <tr><th>Дата</th><th>Источник</th><th>Родитель</th><th>Телефон</th><th>Ребёнок</th><th>Интересы</th><th>CRM</th></tr>
+    {% for r in rows %}
+    <tr>
+      <td class="muted small">{{ (r.created_at or "")[:16].replace("T", " ") }}</td>
+      <td>{{ sources.get(r.source, r.source) }}{% if r.promo %} <span class="muted small">/ {{ r.promo }}</span>{% endif %}</td>
+      <td>{{ r.parent_name }}</td>
+      <td>{{ r.phone }}</td>
+      <td>{{ r.child_name }}{% if r.child_age %} <span class="muted small">({{ r.child_age }})</span>{% endif %}</td>
+      <td class="muted small">{{ r.interests }}</td>
+      <td>{% if r.pushed_to_crm %}<span class="badge income">✓</span>{% else %}<span class="badge refund">—</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Пока пусто.</p>
+  {% endif %}
+</div>
+{% endblock %}
