@@ -109,6 +109,33 @@ class MoyklassClient:
     def get(self, path: str, params: dict | None = None):
         return self._request("GET", path, params)
 
+    def post(self, path: str, body: dict | None = None, retries: int = 4):
+        """POST с телом JSON (создание задач, комментариев, смена статусов)."""
+        if not self._token:
+            self.authenticate()
+        last_error = None
+        for attempt in range(retries + 1):
+            self._throttle()
+            try:
+                resp = self._client.post(
+                    f"{self.base_url}{path}", json=body,
+                    headers={"x-access-token": self._token},
+                )
+            except httpx.HTTPError as e:
+                last_error = e
+                time.sleep(2 ** attempt)
+                continue
+            if resp.status_code == 401:
+                self.authenticate()
+                continue
+            if resp.status_code == 429 or resp.status_code >= 500:
+                last_error = MoyklassError(f"HTTP {resp.status_code} для {path}")
+                time.sleep(2 ** attempt)
+                continue
+            resp.raise_for_status()
+            return resp.json() if resp.text else {}
+        raise MoyklassError(f"POST {path} не удался после повторов: {last_error}")
+
     # --- выгрузка списков --------------------------------------------------
 
     @staticmethod
