@@ -329,6 +329,25 @@ def daily_digest() -> None:
         _wa(phone, text)
 
 
+def _retry_forwards() -> None:
+    """Дослать события Wazzup в МойКласс, не ушедшие с первого раза."""
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                "SELECT id, payload FROM wazzup_fwd_queue ORDER BY id LIMIT 20").fetchall()
+        except Exception:
+            return
+    if not rows:
+        return
+    from .main import wazzup_forward
+    for rid, payload in rows:
+        if wazzup_forward(json.loads(payload)):
+            with db.get_conn() as conn:
+                conn.execute("DELETE FROM wazzup_fwd_queue WHERE id = ?", (rid,))
+        else:
+            break  # МойКласс недоступен — попробуем через минуту
+
+
 # --- планировщик ---------------------------------------------------------
 
 def _loop() -> None:
@@ -357,6 +376,7 @@ def _loop() -> None:
                     morning_tasks(mk)
                 finally:
                     mk.close()
+            _retry_forwards()
             if hhmm == "19:45" and _mark("areject", str(date.today())):
                 mk = _client()
                 try:

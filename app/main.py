@@ -375,30 +375,46 @@ def export_raw(table: str):
     )
 
 
-# --- Wazzup webhook: помечаем канал, в котором клиент отвечает ------------
+# --- Wazzup webhook: метка канала + пересылка событий в МойКласс -----------
 
 CHANNEL_TAG = {"whatsapp": 117413, "telegram": 117414, "max": 117415}
+MK_HOOK_DEFAULT = ("https://api.moyklass.com/v1/hooks/wazzupEvents/"
+                   "1-e174eb5b2ce14848dbe1910ba2af6ab4")
 
 
-@app.post("/wazzup/webhook")
-async def wazzup_webhook(request: Request):
-    """Входящее сообщение клиента -> тег «Отвечает: <канал>» в МойКласс."""
-    try:
-        payload = await request.json()
-    except Exception:
-        return {"ok": False}
+def _fwd_store(payload: dict) -> None:
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_fwd_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT, ts TEXT)""")
+        conn.execute("INSERT INTO wazzup_fwd_queue (payload, ts) VALUES (?, datetime('now'))",
+                     (json.dumps(payload),))
+
+
+def wazzup_forward(payload: dict) -> bool:
+    """Переслать событие в МойКласс (их вебхук — чтобы чаты в CRM жили)."""
+    import httpx
+    url = db.get_setting("wazzup_forward_url", MK_HOOK_DEFAULT)
+    for attempt in range(3):
+        try:
+            r = httpx.post(url, json=payload, timeout=15)
+            if r.status_code < 500:
+                return True
+        except httpx.HTTPError:
+            pass
+    return False
+
+
+def _wazzup_tag(payload: dict) -> None:
     for msg in payload.get("messages", []):
-        if msg.get("isEcho"):        # исходящие от нас пропускаем
+        if msg.get("isEcho"):
             continue
-        chat_type = (msg.get("chatType") or "").lower()
-        tag_id = CHANNEL_TAG.get(chat_type)
+        tag_id = CHANNEL_TAG.get((msg.get("chatType") or "").lower())
         phone = "".join(ch for ch in str(msg.get("chatId") or "") if ch.isdigit())
         if not tag_id or len(phone) < 10:
             continue
         try:
             from .moyklass_client import MoyklassClient
-            from .sync import get_api_key
-            mk = MoyklassClient(get_api_key())
+            mk = MoyklassClient(sync.get_api_key())
             try:
                 found = mk.get("/v1/company/users", {"phone": phone[-10:], "limit": 5})
                 users = found.get("users", found) if isinstance(found, dict) else found
@@ -410,5 +426,29 @@ async def wazzup_webhook(request: Request):
             finally:
                 mk.close()
         except Exception:
-            logging.getLogger("kidsup.wazzup").exception("webhook: не смогли пометить %s", phone)
+            logging.getLogger("kidsup.wazzup").exception("тег канала: не вышло для %s", phone)
+
+
+def _wazzup_process(payload: dict) -> None:
+    if not wazzup_forward(payload):
+        _fwd_store(payload)  # автопилот дошлёт позже
+        logging.getLogger("kidsup.wazzup").warning("пересылка в МойКласс не удалась — в очередь")
+    _wazzup_tag(payload)
+
+
+@app.get("/wazzup/webhook")
+async def wazzup_webhook_check():
+    return {"ok": True}
+
+
+@app.post("/wazzup/webhook")
+async def wazzup_webhook(request: Request):
+    """Принимаем событие, отвечаем 200 сразу; работа — в фоне."""
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"ok": True}
+    if payload:
+        import threading
+        threading.Thread(target=_wazzup_process, args=(payload,), daemon=True).start()
     return {"ok": True}
