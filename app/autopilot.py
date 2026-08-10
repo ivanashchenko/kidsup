@@ -74,7 +74,7 @@ def _task(mk: MoyklassClient, manager_id: int, user_id: int | None,
     d = (day or date.today()).isoformat()
     payload = {"body": body, "beginDate": f"{d}T09:00:00+03:00",
                "endDate": f"{d}T20:00:00+03:00",
-               "isAllDay": True, "managerId": manager_id}
+               "isAllDay": True, "managerIds": [manager_id]}
     if user_id:
         payload["userId"] = user_id
     mk.post("/v1/company/tasks", payload)
