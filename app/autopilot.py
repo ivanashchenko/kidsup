@@ -37,10 +37,14 @@ from .sync import get_api_key
 
 log = logging.getLogger("kidsup.autopilot")
 
-# терминальные/нерабочие статусы: таким утренние задачи не создаём
-SKIP_STATES = {125952, 125953, 125954, 125955, 125957, 146950,
-               146328, 215202, 146330, 146513}
-NEW_JOIN_STATUS = 50509  # «1. Новая заявка»
+# статусы, по которым утренние задачи не создаём: терминальные, «не звонить»
+# и активная воронка, где следующий шаг назначает сам админ
+SKIP_STATES = {125954, 125955, 125957,            # Некачественный, Клиент, Отказ
+               146328, 215202, 146330, 146513,    # 0.1-0.2, переехал, 13+
+               146950, 125952, 125953, 345767}    # думает/записался/посетил/думает-2
+NEW_JOIN_STATUS = 50509   # «1. Новая заявка»
+ST_NEDOZVON = 345768      # «2. Недозвон (в работе)»
+ST_REJECT = 125957        # «Отказ»
 
 
 def _client() -> MoyklassClient:
@@ -185,16 +189,59 @@ def morning_tasks(mk: MoyklassClient) -> None:
         for uid in queues.get(idx, []):
             if made >= per_admin:
                 break
-            if not _mark("call_task", str(uid)):
-                continue  # задача этому клиенту уже создавалась
             user = mk.get(f"/v1/company/users/{uid}")
-            if user.get("clientStateId") in SKIP_STATES:
+            state = user.get("clientStateId")
+            if state in SKIP_STATES:
+                continue
+            if not _mark("call_task", str(uid)):
+                # повтор для недозвона: новая задача раз в 2 дня, до 3 раз
+                if state != ST_NEDOZVON:
+                    continue
+                retry = next((i for i in range(1, 4)
+                              if _mark("retry_task", f"{uid}:{i}:{date.today().toordinal() // 2}")), None)
+                if retry is None:
+                    continue
+                _task(mk, adm["managerId"], uid,
+                      f"Недозвон — попытка в другое время дня (повтор №{retry}). "
+                      "После разговора поставь статус.")
+                made += 1
                 continue
             _task(mk, adm["managerId"], uid,
                   "Обзвон набора 2026/27: открой карточку, прочитай подсказку 🎯, "
                   "позвони кнопкой и поставь статус по итогу.")
             made += 1
         log.info("morning_tasks: %s — %d задач", adm["name"], made)
+
+
+def auto_reject(mk: MoyklassClient) -> None:
+    """6+ попыток дозвона без ответа за 14 дней -> «Отказ» (для статуса Недозвон)."""
+    limit = int(db.get_setting("missed_reject_attempts", "6") or 6)
+    counts: dict[str, int] = {}
+    answered: set[str] = set()
+    try:
+        rows = mango.calls(datetime.now() - timedelta(days=14), datetime.now())
+    except Exception as e:
+        log.warning("auto_reject: mango недоступен: %s", e)
+        return
+    for r in rows:
+        if not r["from_ext"]:
+            continue
+        num = r["to_num"][-10:]
+        if r["answer"]:
+            answered.add(num)
+        else:
+            counts[num] = counts.get(num, 0) + 1
+    with db.get_conn() as conn:
+        users = conn.execute(
+            "SELECT id, phone FROM users WHERE client_state_id = ?", (ST_NEDOZVON,)).fetchall()
+    for uid, phone in users:
+        p = "".join(ch for ch in str(phone or "") if ch.isdigit())[-10:]
+        if not p or p in answered or counts.get(p, 0) < limit:
+            continue
+        if not _mark("auto_reject", str(uid)):
+            continue
+        mk.post(f"/v1/company/users/{uid}/status", {"statusId": ST_REJECT})
+        log.info("auto_reject: %s (%d попыток) -> Отказ", uid, counts.get(p, 0))
 
 
 def daily_digest() -> None:
@@ -252,6 +299,12 @@ def _loop() -> None:
                 mk = _client()
                 try:
                     morning_tasks(mk)
+                finally:
+                    mk.close()
+            if hhmm == "19:45" and _mark("areject", str(date.today())):
+                mk = _client()
+                try:
+                    auto_reject(mk)
                 finally:
                     mk.close()
             if hhmm == "20:00" and _mark("digest", str(date.today())):
