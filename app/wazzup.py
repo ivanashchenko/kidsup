@@ -18,11 +18,11 @@ from . import db
 
 API = "https://api.wazzup24.com/v3"
 
-# приоритет транспортов для каскада (у Wazzup телеграм-канал зовётся tgapi);
-# whatsapp-канал 79165610077 заблокирован — предпочитаем 79199683507
+# приоритет транспортов (у Wazzup телеграм-канал зовётся tgapi);
+# основной канал 79165610077 снова активен — шлём с него, запасной 79199683507
 CASCADE = ["whatsapp", "tgapi", "max"]
 CHAT_TYPE = {"whatsapp": "whatsapp", "tgapi": "telegram", "max": "max", "vk": "vk"}
-WHATSAPP_PREFERRED = "79199683507"
+WHATSAPP_PREFERRED = "79165610077"
 
 TEMPLATES = {
     "nedozvon": (

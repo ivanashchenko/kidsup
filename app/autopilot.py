@@ -75,10 +75,11 @@ def _task(mk: MoyklassClient, manager_id: int, user_id: int | None,
     mk.post("/v1/company/tasks", payload)
 
 
-def _wa(phone: str, text: str) -> None:
+def _wa(phone: str, text: str, mode: str = "broadcast") -> None:
+    """broadcast — во все мессенджеры (WhatsApp+Telegram+MAX): у кого какой есть."""
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
     try:
-        for line in wazzup.send(phone, text, dry_run=dry):
+        for line in wazzup.send(phone, text, mode=mode, dry_run=dry):
             log.info("wazzup: %s", line)
     except Exception as e:  # ключа может не быть — сценарии не должны падать
         log.warning("wazzup недоступен: %s", e)
@@ -166,9 +167,10 @@ def _queues() -> dict[int, list[int]]:
     fams: dict[str, list[int]] = {}
     for u in sorted(wave):
         fams.setdefault(phones.get(u) or f"x{u}", []).append(u)
+    n = max(1, len(_admins()))
     out: dict[int, list[int]] = {}
     for i, fam in enumerate(fams.values()):
-        out.setdefault(i % 3, []).extend(fam)
+        out.setdefault(i % n, []).extend(fam)
     return out
 
 
@@ -178,7 +180,7 @@ def morning_tasks(mk: MoyklassClient) -> None:
         return
     per_admin = int(db.get_setting("daily_tasks_per_admin", "40") or 40)
     queues = _queues()
-    for idx, adm in enumerate(admins[:3]):
+    for idx, adm in enumerate(admins):
         made = 0
         for uid in queues.get(idx, []):
             if made >= per_admin:
