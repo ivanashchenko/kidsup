@@ -72,7 +72,8 @@ def _mark(kind: str, key: str) -> bool:
 def _task(mk: MoyklassClient, manager_id: int, user_id: int | None,
           body: str, day: date | None = None) -> None:
     d = (day or date.today()).isoformat()
-    payload = {"body": body, "beginDate": f"{d} 09:00", "endDate": f"{d} 20:00",
+    payload = {"body": body, "beginDate": f"{d}T09:00:00+03:00",
+               "endDate": f"{d}T20:00:00+03:00",
                "isAllDay": True, "managerId": manager_id}
     if user_id:
         payload["userId"] = user_id
@@ -101,11 +102,16 @@ def speed_to_lead(mk: MoyklassClient) -> None:
     joins = mk.fetch_all("/v1/company/joins", ["joins"], params={
         "statusId": NEW_JOIN_STATUS, "createdAt": [today, tomorrow]})
     for j in joins:
-        if not _mark("lead_task", str(j["id"])):
+        with db.get_conn() as conn:
+            seen = conn.execute(
+                "SELECT 1 FROM autopilot_state WHERE kind='lead_task' AND key=?",
+                (str(j["id"]),)).fetchone()
+        if seen:
             continue
         _task(mk, duty["managerId"], j.get("userId"),
               "🔥 НОВАЯ ЗАЯВКА — позвонить в течение 5 минут! "
               "Свежий лид конвертируется в разы лучше.")
+        _mark("lead_task", str(j["id"]))  # метка только после успешного создания
         log.info("speed_to_lead: задача по заявке %s → %s", j["id"], duty["name"])
 
 
