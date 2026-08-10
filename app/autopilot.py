@@ -97,8 +97,9 @@ def speed_to_lead(mk: MoyklassClient) -> None:
         return
     duty = admins[date.today().toordinal() % len(admins)]  # дежурный по дню
     today = date.today().isoformat()
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
     joins = mk.fetch_all("/v1/company/joins", ["joins"], params={
-        "statusId": NEW_JOIN_STATUS, "createdAt": [today, today]})
+        "statusId": NEW_JOIN_STATUS, "createdAt": [today, tomorrow]})
     for j in joins:
         if not _mark("lead_task", str(j["id"])):
             continue
