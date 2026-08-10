@@ -373,3 +373,42 @@ def export_raw(table: str):
         iter([payload.encode()]), media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{table}.json"'},
     )
+
+
+# --- Wazzup webhook: помечаем канал, в котором клиент отвечает ------------
+
+CHANNEL_TAG = {"whatsapp": 117413, "telegram": 117414, "max": 117415}
+
+
+@app.post("/wazzup/webhook")
+async def wazzup_webhook(request: Request):
+    """Входящее сообщение клиента -> тег «Отвечает: <канал>» в МойКласс."""
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"ok": False}
+    for msg in payload.get("messages", []):
+        if msg.get("isEcho"):        # исходящие от нас пропускаем
+            continue
+        chat_type = (msg.get("chatType") or "").lower()
+        tag_id = CHANNEL_TAG.get(chat_type)
+        phone = "".join(ch for ch in str(msg.get("chatId") or "") if ch.isdigit())
+        if not tag_id or len(phone) < 10:
+            continue
+        try:
+            from .moyklass_client import MoyklassClient
+            from .sync import get_api_key
+            mk = MoyklassClient(get_api_key())
+            try:
+                found = mk.get("/v1/company/users", {"phone": phone[-10:], "limit": 5})
+                users = found.get("users", found) if isinstance(found, dict) else found
+                for u in users:
+                    tags = [t["id"] if isinstance(t, dict) else t for t in (u.get("tags") or [])]
+                    if tag_id not in tags:
+                        mk.post(f"/v1/company/users/{u['id']}/tags",
+                                {"tags": sorted(set(tags) | {tag_id})})
+            finally:
+                mk.close()
+        except Exception:
+            logging.getLogger("kidsup.wazzup").exception("webhook: не смогли пометить %s", phone)
+    return {"ok": True}
