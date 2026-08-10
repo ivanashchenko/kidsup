@@ -90,6 +90,50 @@ def _wa(phone: str, text: str, mode: str = "broadcast") -> None:
         log.warning("wazzup недоступен: %s", e)
 
 
+def _age_years(user: dict) -> float | None:
+    for a in user.get("attributes") or []:
+        if a.get("attributeAlias") == "birthday" and a.get("value"):
+            try:
+                y, m, d0 = map(int, a["value"][:10].split("-"))
+                t = date.today()
+                return (t.year - y) + (t.month - m) / 12
+            except ValueError:
+                return None
+    return None
+
+
+def _hint_for_lead(mk: MoyklassClient, user_id: int, join: dict) -> None:
+    """Подсказка 🎯 в карточку нового лида: возраст + программа заявки."""
+    user = mk.get(f"/v1/company/users/{user_id}")
+    ag = _age_years(user)
+    with db.get_conn() as conn:
+        row = conn.execute("""SELECT co.name FROM classes cl
+            LEFT JOIN courses co ON co.id = cl.course_id WHERE cl.id = ?""",
+            (join.get("classId"),)).fetchone()
+    course = row[0] if row else None
+    if ag is None:
+        main = "уточнить возраст; до 3 лет — МсМ/раннее развитие, 4–6 — подготовка к школе + английский, 7+ — английский/менталка/скорочтение"
+    elif ag < 3:
+        main = "Музыка с мамой (по возрасту) или Раннее развитие ур.1"
+    elif ag < 4:
+        main = "Английский детский сад (гр. 3–4) или Раннее развитие ур.2; вторым — танцы/ИЗО"
+    elif ag < 5.5:
+        main = "Подготовка к школе + английский; вторым — менталка 4–7, шахматы"
+    elif ag < 7:
+        main = "Нулевой класс (полный день) или ПШ; вторым — менталка/скорочтение"
+    else:
+        main = "Английский по уровню + менталка 7–12/скорочтение; вторым — шахматы/робо"
+    age_s = f"{ag:.1f} лет" if ag else "возраст неизвестен"
+    lines = [
+        "🎯 ПОДСКАЗКА ДЛЯ ЗВОНКА (новый лид, сформирована автоматически)",
+        f"Возраст: {age_s}." + (f" Заявка на: {course}." if course else " Источник заявки — уточните в карточке."),
+        f"Предлагать: {main}.",
+        "Не забудьте акцию: до 30.08 фиксируем цену прошлого года на весь учебный год.",
+    ]
+    mk.post("/v1/company/userComments",
+            {"userId": user_id, "comment": "\n".join(lines), "showToUser": False})
+
+
 # --- сценарии ------------------------------------------------------------
 
 def speed_to_lead(mk: MoyklassClient) -> None:
@@ -111,6 +155,11 @@ def speed_to_lead(mk: MoyklassClient) -> None:
         _task(mk, duty["managerId"], j.get("userId"),
               "🔥 НОВАЯ ЗАЯВКА — позвонить в течение 5 минут! "
               "Свежий лид конвертируется в разы лучше.")
+        if j.get("userId") and _mark("lead_hint", str(j["userId"])):
+            try:
+                _hint_for_lead(mk, j["userId"], j)
+            except Exception:
+                log.exception("speed_to_lead: подсказка не создана для %s", j["userId"])
         _mark("lead_task", str(j["id"]))  # метка только после успешного создания
         log.info("speed_to_lead: задача по заявке %s → %s", j["id"], duty["name"])
 
