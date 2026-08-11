@@ -51,12 +51,38 @@ log = logging.getLogger("kidsup.autopilot")
 
 # статусы, по которым утренние задачи не создаём: терминальные, «не звонить»
 # и активная воронка, где следующий шаг назначает сам админ
-SKIP_STATES = {125954, 125955, 125957,            # Некачественный, Клиент, Отказ
-               146328, 215202, 146330, 146513,    # 0.1-0.2, переехал, 13+
-               146950, 125952, 125953, 345767}    # думает/записался/посетил/думает-2
+SKIP_HARD = {125954, 125957,                      # Некачественный, Отказ
+             146328, 215202, 146330, 146513}      # 0.1-0.2, переехал, 13+
+SKIP_FUNNEL = {146950, 125952, 125953, 345767}    # думает/записался/посетил/думает-2
+ST_CLIENT = 125955        # «Клиент»: для летних семей НЕ повод пропускать —
+                          # лагерь закончился, это самые тёплые продажи набора
+SKIP_STATES = SKIP_HARD | SKIP_FUNNEL | {ST_CLIENT}
 NEW_JOIN_STATUS = 50509   # «1. Новая заявка»
 ST_NEDOZVON = 345768      # «2. Недозвон (в работе)»
 ST_REJECT = 125957        # «Отказ»
+
+CAMP_COURSE = "Английский летний клуб"
+
+
+def _summer_kinds() -> dict[int, str]:
+    """user_id -> 'camp' (только летний лагерь) или 'regular' (МсМ/логопед/сад…).
+
+    Лагерные семьи в CRM стоят как «Клиент», но лагерь закончился — им нужен
+    продающий звонок про учебный год. Регулярным летним — звонок на продление.
+    """
+    with db.get_conn() as conn:
+        rows = conn.execute("""SELECT lr.user_id, co.name FROM lesson_records lr
+            JOIN lessons l ON l.id = lr.lesson_id
+            LEFT JOIN classes cl ON cl.id = l.class_id
+            LEFT JOIN courses co ON co.id = cl.course_id
+            WHERE lr.visit = 1 AND l.date >= '2026-06-01'""").fetchall()
+    kinds: dict[int, str] = {}
+    for uid, cname in rows:
+        if cname == CAMP_COURSE:
+            kinds.setdefault(uid, "camp")
+        else:
+            kinds[uid] = "regular"
+    return kinds
 
 
 def _client() -> MoyklassClient:
@@ -249,7 +275,8 @@ def _queues() -> dict[int, list[int]]:
     else:
         wave = y2425 | y2526 | summer  # добираем хвосты
     fams: dict[str, list[int]] = {}
-    for u in sorted(wave):
+    # летние семьи — первыми в очереди: они самые тёплые для набора
+    for u in sorted(wave & summer) + sorted(wave - summer):
         fams.setdefault(phones.get(u) or f"x{u}", []).append(u)
     n = max(1, len(_admins()))
     out: dict[int, list[int]] = {}
@@ -264,6 +291,16 @@ def morning_tasks(mk: MoyklassClient) -> None:
         return
     per_admin = int(db.get_setting("daily_tasks_per_admin", "40") or 40)
     queues = _queues()
+    kinds = _summer_kinds()
+    TEXT_CAMP = ("🔥 Летний лагерь закончился — продающий звонок про учебный год: "
+                 "«вы уже видели центр изнутри — тот же английский круглый год, "
+                 "плюс направления по возрасту». Зови на Неделю открытых уроков "
+                 "31.08–06.09 (KidsUPweek.ru); до 30.08 сентябрь по старым ценам.")
+    TEXT_RENEW = ("Продление: семья занимается у нас летом (МсМ/логопед/сад). "
+                  "Подтверди продолжение с сентября и предложи второй предмет "
+                  "по возрасту из подсказки 🎯. До 30.08 сентябрь по старым ценам.")
+    TEXT_COLD = ("Обзвон набора 2026/27: открой карточку, прочитай подсказку 🎯, "
+                 "позвони кнопкой и поставь статус по итогу.")
     for idx, adm in enumerate(admins):
         made = 0
         errors = 0
@@ -272,9 +309,12 @@ def morning_tasks(mk: MoyklassClient) -> None:
                 break
             # одна плохая карточка/сбой API не должны ронять всю порцию
             try:
+                kind = kinds.get(uid)
+                # летним (лагерь/регулярные) статус «Клиент» не помеха
+                skip = (SKIP_HARD | SKIP_FUNNEL) if kind else SKIP_STATES
                 user = mk.get(f"/v1/company/users/{uid}")
                 state = user.get("clientStateId")
-                if state in SKIP_STATES:
+                if state in skip:
                     continue
                 if not _mark("call_task", str(uid)):
                     # повтор для недозвона: новая задача раз в 2 дня, до 3 раз
@@ -290,8 +330,8 @@ def morning_tasks(mk: MoyklassClient) -> None:
                     made += 1
                     continue
                 _task(mk, adm["managerId"], uid,
-                      "Обзвон набора 2026/27: открой карточку, прочитай подсказку 🎯, "
-                      "позвони кнопкой и поставь статус по итогу.")
+                      TEXT_CAMP if kind == "camp" else
+                      TEXT_RENEW if kind == "regular" else TEXT_COLD)
                 made += 1
             except Exception:
                 errors += 1
