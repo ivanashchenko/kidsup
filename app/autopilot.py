@@ -7,10 +7,10 @@
                                 задача админу + WhatsApp «перенесём?»
   missed_calls    каждый час    недозвоны за день (Mango) → WhatsApp-догон
                   (10:00–20:00) (не чаще одного сообщения номеру в день)
-  morning_tasks   в 08:00       порция задач на день каждому звонящему админу
+  morning_tasks   с 08:00 МСК   порция задач на день каждому звонящему админу
                                 из его очереди (сегменты A/B/C по фактическим
                                 визитам, семьи не разрываются)
-  daily_digest    в 20:00       сводка руководителю: звонки по админам, записи
+  daily_digest    в 20:00 МСК   сводка руководителю: звонки по админам, записи
                                 за день, задачи, недозвоны
 
 Настройки (таблица settings):
@@ -30,10 +30,22 @@ import logging
 import threading
 import time
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from . import db, mango, wazzup
 from .moyklass_client import MoyklassClient
 from .sync import get_api_key
+
+MSK = ZoneInfo("Europe/Moscow")
+
+
+def _now() -> datetime:
+    """Московское время — расписание не зависит от таймзоны сервера."""
+    return datetime.now(MSK)
+
+
+def _today() -> date:
+    return _now().date()
 
 log = logging.getLogger("kidsup.autopilot")
 
@@ -65,13 +77,13 @@ def _mark(kind: str, key: str) -> bool:
             kind TEXT, key TEXT, ts TEXT, PRIMARY KEY (kind, key))""")
         cur = conn.execute(
             "INSERT OR IGNORE INTO autopilot_state VALUES (?, ?, ?)",
-            (kind, key, datetime.now().isoformat(timespec="seconds")))
+            (kind, key, _now().isoformat(timespec="seconds")))
         return cur.rowcount > 0
 
 
 def _task(mk: MoyklassClient, manager_id: int, user_id: int | None,
           body: str, day: date | None = None) -> None:
-    d = (day or date.today()).isoformat()
+    d = (day or _today()).isoformat()
     payload = {"body": body, "beginDate": f"{d}T09:00:00+03:00",
                "endDate": f"{d}T20:00:00+03:00",
                "isAllDay": True, "managerIds": [manager_id]}
@@ -95,7 +107,7 @@ def _age_years(user: dict) -> float | None:
         if a.get("attributeAlias") == "birthday" and a.get("value"):
             try:
                 y, m, d0 = map(int, a["value"][:10].split("-"))
-                t = date.today()
+                t = _today()
                 return (t.year - y) + (t.month - m) / 12
             except ValueError:
                 return None
@@ -140,9 +152,9 @@ def speed_to_lead(mk: MoyklassClient) -> None:
     admins = _admins()
     if not admins:
         return
-    duty = admins[date.today().toordinal() % len(admins)]  # дежурный по дню
-    today = date.today().isoformat()
-    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    duty = admins[_today().toordinal() % len(admins)]  # дежурный по дню
+    today = _today().isoformat()
+    tomorrow = (_today() + timedelta(days=1)).isoformat()
     joins = mk.fetch_all("/v1/company/joins", ["joins"], params={
         "statusId": NEW_JOIN_STATUS, "createdAt": [today, tomorrow]})
     for j in joins:
@@ -166,9 +178,9 @@ def speed_to_lead(mk: MoyklassClient) -> None:
 
 def no_show(mk: MoyklassClient) -> None:
     admins = _admins()
-    now = datetime.now()
+    now = _now()
     recs = mk.fetch_all("/v1/company/lessonRecords", ["lessonRecords"], params={
-        "date": date.today().isoformat(), "test": "true", "visit": "false",
+        "date": _today().isoformat(), "test": "true", "visit": "false",
         "includeLessons": "true"})
     for r in recs:
         lesson = r.get("lesson") or {}
@@ -196,7 +208,7 @@ def no_show(mk: MoyklassClient) -> None:
 
 
 def missed_calls() -> None:
-    today = date.today().isoformat()
+    today = _today().isoformat()
     for m in mango.missed():
         phone = m["phone"]
         if len(phone) < 10 or not _mark("missed_wa", f"{today}:{phone}"):
@@ -217,7 +229,7 @@ def _queues() -> dict[int, list[int]]:
         y2425 = {r[0] for r in conn.execute(base + " SELECT DISTINCT u FROM v WHERE d>='2024-09-01' AND d<'2025-09-01'")} - summer - y2526
         phones = dict(conn.execute("SELECT id, phone FROM users"))
     # волна по календарю: пн-вт стартовой недели — A, дальше B, с 17.08 — C
-    today = date.today()
+    today = _today()
     if today <= date(2026, 8, 11):
         wave = summer
     elif today <= date(2026, 8, 16):
@@ -254,7 +266,7 @@ def morning_tasks(mk: MoyklassClient) -> None:
                 if state != ST_NEDOZVON:
                     continue
                 retry = next((i for i in range(1, 4)
-                              if _mark("retry_task", f"{uid}:{i}:{date.today().toordinal() // 2}")), None)
+                              if _mark("retry_task", f"{uid}:{i}:{_today().toordinal() // 2}")), None)
                 if retry is None:
                     continue
                 _task(mk, adm["managerId"], uid,
@@ -275,7 +287,7 @@ def auto_reject(mk: MoyklassClient) -> None:
     counts: dict[str, int] = {}
     answered: set[str] = set()
     try:
-        rows = mango.calls(datetime.now() - timedelta(days=14), datetime.now())
+        rows = mango.calls(_now() - timedelta(days=14), _now())
     except Exception as e:
         log.warning("auto_reject: mango недоступен: %s", e)
         return
@@ -301,10 +313,10 @@ def auto_reject(mk: MoyklassClient) -> None:
 
 
 def daily_digest() -> None:
-    day = date.today().isoformat()
+    day = _today().isoformat()
     try:
-        rows = mango.calls(datetime.now().replace(hour=0, minute=0, second=0),
-                           datetime.now())
+        rows = mango.calls(_now().replace(hour=0, minute=0, second=0),
+                           _now())
         rep = mango.report(rows=rows)
         missed_n = len(mango.missed(rows=rows))
     except Exception as e:
@@ -357,8 +369,7 @@ def _loop() -> None:
             if db.get_setting("autopilot", "off") != "on":
                 time.sleep(60)
                 continue
-            now = datetime.now()
-            hhmm = now.strftime("%H:%M")
+            now = _now()
             if time.monotonic() - last3 >= 180:
                 last3 = time.monotonic()
                 mk = _client()
@@ -370,20 +381,22 @@ def _loop() -> None:
                     mk.close()
                 if now.minute < 3 and 10 <= now.hour <= 20:
                     missed_calls()
-            if hhmm == "08:00" and _mark("morning", str(date.today())):
+            # окна вместо точной минуты: тик может пропустить минуту, а при
+            # рестарте днём порции всё равно должны создаться (догон)
+            if 8 <= now.hour < 19 and _mark("morning", str(_today())):
                 mk = _client()
                 try:
                     morning_tasks(mk)
                 finally:
                     mk.close()
             _retry_forwards()
-            if hhmm == "19:45" and _mark("areject", str(date.today())):
+            if (now.hour, now.minute) >= (19, 45) and _mark("areject", str(_today())):
                 mk = _client()
                 try:
                     auto_reject(mk)
                 finally:
                     mk.close()
-            if hhmm == "20:00" and _mark("digest", str(date.today())):
+            if now.hour >= 20 and _mark("digest", str(_today())):
                 daily_digest()
         except Exception:
             log.exception("autopilot: ошибка цикла")
