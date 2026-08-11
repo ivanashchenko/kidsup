@@ -436,6 +436,38 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
+APP_VERSION = "2026-08-11.2"  # видно в /api/health — чтобы проверять, что обновление применилось
+
+
+@app.get("/api/health")
+async def health():
+    from . import autopilot
+    today = autopilot._today().isoformat()
+    return {"ok": True, "version": APP_VERSION,
+            "msk": autopilot._now().isoformat(timespec="seconds"),
+            "morning_done": autopilot._has_mark("morning", today)}
+
+
+@app.post("/api/autopilot/morning", dependencies=AUTH)
+async def run_morning_now():
+    """Принудительно создать/досоздать утренние порции (идемпотентно)."""
+    from . import autopilot
+
+    def _run() -> None:
+        mk = autopilot._client()
+        try:
+            autopilot.morning_tasks(mk)
+            autopilot._mark("morning", str(autopilot._today()))
+        except Exception:
+            logging.getLogger("kidsup.autopilot").exception("ручной запуск порций упал")
+        finally:
+            mk.close()
+
+    import threading
+    threading.Thread(target=_run, daemon=True).start()
+    return {"started": True}
+
+
 @app.get("/wazzup/webhook")
 async def wazzup_webhook_check():
     return {"ok": True}

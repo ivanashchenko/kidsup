@@ -70,6 +70,16 @@ def _admins() -> list[dict]:
         return []
 
 
+def _has_mark(kind: str, key: str) -> bool:
+    with db.get_conn() as conn:
+        try:
+            return conn.execute(
+                "SELECT 1 FROM autopilot_state WHERE kind=? AND key=?",
+                (kind, key)).fetchone() is not None
+        except Exception:
+            return False
+
+
 def _mark(kind: str, key: str) -> bool:
     """True, если ключ новый (и помечает его). False — уже обрабатывали."""
     with db.get_conn() as conn:
@@ -254,31 +264,39 @@ def morning_tasks(mk: MoyklassClient) -> None:
     queues = _queues()
     for idx, adm in enumerate(admins):
         made = 0
+        errors = 0
         for uid in queues.get(idx, []):
             if made >= per_admin:
                 break
-            user = mk.get(f"/v1/company/users/{uid}")
-            state = user.get("clientStateId")
-            if state in SKIP_STATES:
-                continue
-            if not _mark("call_task", str(uid)):
-                # повтор для недозвона: новая задача раз в 2 дня, до 3 раз
-                if state != ST_NEDOZVON:
+            # одна плохая карточка/сбой API не должны ронять всю порцию
+            try:
+                user = mk.get(f"/v1/company/users/{uid}")
+                state = user.get("clientStateId")
+                if state in SKIP_STATES:
                     continue
-                retry = next((i for i in range(1, 4)
-                              if _mark("retry_task", f"{uid}:{i}:{_today().toordinal() // 2}")), None)
-                if retry is None:
+                if not _mark("call_task", str(uid)):
+                    # повтор для недозвона: новая задача раз в 2 дня, до 3 раз
+                    if state != ST_NEDOZVON:
+                        continue
+                    retry = next((i for i in range(1, 4)
+                                  if _mark("retry_task", f"{uid}:{i}:{_today().toordinal() // 2}")), None)
+                    if retry is None:
+                        continue
+                    _task(mk, adm["managerId"], uid,
+                          f"Недозвон — попытка в другое время дня (повтор №{retry}). "
+                          "После разговора поставь статус.")
+                    made += 1
                     continue
                 _task(mk, adm["managerId"], uid,
-                      f"Недозвон — попытка в другое время дня (повтор №{retry}). "
-                      "После разговора поставь статус.")
+                      "Обзвон набора 2026/27: открой карточку, прочитай подсказку 🎯, "
+                      "позвони кнопкой и поставь статус по итогу.")
                 made += 1
-                continue
-            _task(mk, adm["managerId"], uid,
-                  "Обзвон набора 2026/27: открой карточку, прочитай подсказку 🎯, "
-                  "позвони кнопкой и поставь статус по итогу.")
-            made += 1
-        log.info("morning_tasks: %s — %d задач", adm["name"], made)
+            except Exception:
+                errors += 1
+                log.exception("morning_tasks: сбой на клиенте %s — пропускаю", uid)
+                if errors >= 15:  # МойКласс лежит — нет смысла молотить дальше
+                    raise
+        log.info("morning_tasks: %s — %d задач (ошибок: %d)", adm["name"], made, errors)
 
 
 def auto_reject(mk: MoyklassClient) -> None:
@@ -382,11 +400,14 @@ def _loop() -> None:
                 if now.minute < 3 and 10 <= now.hour <= 20:
                     missed_calls()
             # окна вместо точной минуты: тик может пропустить минуту, а при
-            # рестарте днём порции всё равно должны создаться (догон)
-            if 8 <= now.hour < 19 and _mark("morning", str(_today())):
+            # рестарте днём порции всё равно должны создаться (догон).
+            # отметка ставится ТОЛЬКО после успеха: упавшая порция
+            # доделается на следующем тике (call_task-метки защищают от дублей)
+            if 8 <= now.hour < 19 and not _has_mark("morning", str(_today())):
                 mk = _client()
                 try:
                     morning_tasks(mk)
+                    _mark("morning", str(_today()))
                 finally:
                     mk.close()
             _retry_forwards()
