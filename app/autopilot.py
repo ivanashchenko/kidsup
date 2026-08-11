@@ -89,6 +89,101 @@ def _client() -> MoyklassClient:
     return MoyklassClient(get_api_key())
 
 
+# --- кампании рассылок ----------------------------------------------------
+
+def _bq_init(conn) -> None:
+    conn.execute("""CREATE TABLE IF NOT EXISTS broadcast_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        campaign TEXT, phone TEXT, child TEXT, text TEXT,
+        status TEXT DEFAULT 'pending', created TEXT, sent TEXT)""")
+
+
+def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
+    """Ставит кампанию в очередь. Сегменты: contin (уч. год 25/26), camp
+    (летний лагерь), regular (летние регулярные), y2425 (давние), warm (все
+    перечисленные). Плейсхолдер {имя} = имя ребёнка из CRM. Один номер — одно
+    сообщение за кампанию; жёсткие статусы (отказ/не звонить) исключаются."""
+    kinds = _summer_kinds()
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        base = """WITH v AS (SELECT lr.user_id u, l.date d FROM lesson_records lr
+                  JOIN lessons l ON l.id = lr.lesson_id WHERE lr.visit = 1)"""
+        summer = {r[0] for r in conn.execute(base + " SELECT DISTINCT u FROM v WHERE d>='2026-06-01'")}
+        y2526 = {r[0] for r in conn.execute(base + " SELECT DISTINCT u FROM v WHERE d>='2025-09-01' AND d<'2026-06-01'")} - summer
+        y2425 = {r[0] for r in conn.execute(base + " SELECT DISTINCT u FROM v WHERE d>='2024-09-01' AND d<'2025-09-01'")} - summer - y2526
+        pick: set[int] = set()
+        if segment in ("contin", "warm"):
+            pick |= y2526
+        if segment in ("camp", "warm"):
+            pick |= {u for u in summer if kinds.get(u) == "camp"}
+        if segment in ("regular", "warm"):
+            pick |= {u for u in summer if kinds.get(u) == "regular"}
+        if segment in ("y2425", "warm"):
+            pick |= y2425
+        seen_phones: set[str] = set()
+        n = 0
+        now = _now().isoformat(timespec="seconds")
+        for uid in sorted(pick):
+            row = conn.execute("SELECT name, phone, raw FROM users WHERE id=?",
+                               (uid,)).fetchone()
+            if not row or not row[1] or row[1] in seen_phones:
+                continue
+            try:
+                state = json.loads(row[2] or "{}").get("clientStateId")
+            except ValueError:
+                state = None
+            if state in SKIP_HARD:
+                continue
+            seen_phones.add(row[1])
+            child = (row[0] or "").split()[0] if row[0] else ""
+            conn.execute("INSERT INTO broadcast_queue (campaign, phone, child, text, created) "
+                         "VALUES (?, ?, ?, ?, ?)",
+                         (campaign, row[1], child, text, now))
+            n += 1
+    log.info("broadcast: кампания %s (%s) — %d получателей", campaign, segment, n)
+    return {"campaign": campaign, "segment": segment, "queued": n}
+
+
+def broadcast_status() -> dict:
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        rows = conn.execute("SELECT campaign, status, COUNT(*) FROM broadcast_queue "
+                            "GROUP BY campaign, status").fetchall()
+    out: dict = {}
+    for camp, status, cnt in rows:
+        out.setdefault(camp, {})[status] = cnt
+    return out
+
+
+def broadcast_cancel(campaign: str | None = None) -> int:
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        cur = conn.execute(
+            "UPDATE broadcast_queue SET status='cancelled' WHERE status='pending'"
+            + (" AND campaign=?" if campaign else ""),
+            (campaign,) if campaign else ())
+        return cur.rowcount
+
+
+def _broadcast_tick() -> None:
+    """Раз в минуту: отправляет порцию из очереди. Темп broadcast_per_hour
+    (по умолчанию 60/час), окно 10:00–19:00 МСК."""
+    if not (10 <= _now().hour < 19):
+        return
+    per_min = max(1, int(db.get_setting("broadcast_per_hour", "60") or 60) // 60)
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        rows = conn.execute("SELECT id, phone, child, text FROM broadcast_queue "
+                            "WHERE status='pending' ORDER BY id LIMIT ?",
+                            (per_min,)).fetchall()
+    for rid, phone, child, text in rows:
+        msg = text.replace("{имя}", child or "ваш ребёнок")
+        _wa(phone, msg)
+        with db.get_conn() as conn:
+            conn.execute("UPDATE broadcast_queue SET status='sent', sent=? WHERE id=?",
+                         (_now().isoformat(timespec="seconds"), rid))
+
+
 def _admins() -> list[dict]:
     try:
         return json.loads(db.get_setting("call_admins") or "[]")
@@ -464,6 +559,10 @@ def _loop() -> None:
                 finally:
                     mk.close()
             _retry_forwards()
+            try:
+                _broadcast_tick()
+            except Exception:
+                log.exception("broadcast_tick упал — продолжаем")
             if (now.hour, now.minute) >= (19, 45) and _mark("areject", str(_today())):
                 mk = _client()
                 try:

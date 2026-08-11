@@ -130,6 +130,56 @@ def groups_page(request: Request):
                   top_students=analytics.top_students_by_visits())
 
 
+@app.get("/enrollment", response_class=HTMLResponse, dependencies=AUTH)
+def enrollment_page(request: Request, course: str = "", day: str = "", free: int = 0):
+    """Набор 2026/27: все группы «2627_…» с заполненностью — рабочий экран админа."""
+    with db.get_conn() as conn:
+        rows = conn.execute("""
+            SELECT cl.id, cl.name, cl.max_students, co.name course,
+                   COUNT(DISTINCT j.user_id) enrolled,
+                   COUNT(DISTINCT CASE WHEN j.created_at >= datetime('now', '-7 day')
+                                       THEN j.user_id END) fresh
+            FROM classes cl
+            LEFT JOIN courses co ON co.id = cl.course_id
+            LEFT JOIN joins j ON j.class_id = cl.id
+            WHERE cl.name LIKE '2627%'
+            GROUP BY cl.id ORDER BY co.name, cl.name""").fetchall()
+    groups = []
+    for r in rows:
+        parts = (r["name"] or "").split("_")
+        g_day = parts[2] if len(parts) > 2 else "—"
+        g_time = parts[3] if len(parts) > 3 else "—"
+        cap = r["max_students"] or 8
+        enrolled = r["enrolled"] or 0
+        fill = min(100, round(enrolled * 100 / cap)) if cap else 0
+        groups.append({
+            "name": r["name"], "course": r["course"] or (parts[1] if len(parts) > 1 else "?"),
+            "day": g_day, "time": g_time, "enrolled": enrolled, "capacity": cap,
+            "free": max(0, cap - enrolled), "fresh": r["fresh"] or 0, "fill_pct": fill,
+            "color": "#A33B2E" if fill >= 100 else "#B97D00" if fill >= 75 else "#2e7d32",
+        })
+    courses_list = sorted({g["course"] for g in groups})
+    days_list = [d for d in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+                 if any(g["day"] == d for g in groups)]
+    if course:
+        groups = [g for g in groups if g["course"] == course]
+    if day:
+        groups = [g for g in groups if g["day"] == day]
+    if free:
+        groups = [g for g in groups if g["free"] > 0]
+    summary = {}
+    for g in groups:
+        s = summary.setdefault(g["course"], {"course": g["course"], "groups": 0,
+                                             "enrolled": 0, "capacity": 0, "free": 0})
+        s["groups"] += 1; s["enrolled"] += g["enrolled"]
+        s["capacity"] += g["capacity"]; s["free"] += g["free"]
+    for s in summary.values():
+        s["fill_pct"] = round(s["enrolled"] * 100 / s["capacity"]) if s["capacity"] else 0
+    return render(request, "enrollment.html", active="enrollment",
+                  groups=groups, summary=sorted(summary.values(), key=lambda s: -s["fill_pct"]),
+                  courses=courses_list, days=days_list, course=course, day=day, free=free)
+
+
 @app.get("/settings", response_class=HTMLResponse, dependencies=AUTH)
 def settings_page(request: Request, msg: str = "", ok: int = 1):
     key = sync.get_api_key()
@@ -436,7 +486,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-11.5"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-12.1"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -446,6 +496,31 @@ async def health():
     return {"ok": True, "version": APP_VERSION,
             "msk": autopilot._now().isoformat(timespec="seconds"),
             "morning_done": autopilot._has_mark("morning", today)}
+
+
+@app.post("/api/broadcast", dependencies=AUTH)
+async def api_broadcast(payload: dict):
+    """Кампания рассылки: {"campaign": "no1_digest", "segment": "warm|contin|camp|regular|y2425",
+    "text": "..., {имя} = имя ребёнка"}. Отправка — постепенно, темп broadcast_per_hour."""
+    from . import autopilot
+    campaign = (payload.get("campaign") or "").strip()
+    segment = (payload.get("segment") or "").strip()
+    text = (payload.get("text") or "").strip()
+    if not campaign or not text or segment not in ("warm", "contin", "camp", "regular", "y2425"):
+        raise HTTPException(400, "нужны campaign, text и segment из списка")
+    return autopilot.enqueue_broadcast(campaign, segment, text)
+
+
+@app.get("/api/broadcast/status", dependencies=AUTH)
+async def api_broadcast_status():
+    from . import autopilot
+    return autopilot.broadcast_status()
+
+
+@app.post("/api/broadcast/cancel", dependencies=AUTH)
+async def api_broadcast_cancel(payload: dict = None):
+    from . import autopilot
+    return {"cancelled": autopilot.broadcast_cancel((payload or {}).get("campaign"))}
 
 
 @app.post("/api/autopilot/morning", dependencies=AUTH)

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Набор 2026/27 — KidsUp Analytics{% endblock %}
+{% block content %}
+<h1>Набор групп 2026/27</h1>
+<p class="muted">Все группы нового учебного года (по префиксу «2627_» в МойКласс). Обновляется при каждой синхронизации.
+Цвет: <span style="color:#2e7d32">◼</span> есть места · <span style="color:#B97D00">◼</span> почти полна · <span style="color:#A33B2E">◼</span> полна.</p>
+
+<div class="card">
+  <form method="get" style="margin-bottom:12px">
+    <label>Направление:
+      <select name="course" onchange="this.form.submit()">
+        <option value="">— все —</option>
+        {% for c in courses %}
+        <option value="{{ c }}" {% if c == course %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label style="margin-left:14px">День:
+      <select name="day" onchange="this.form.submit()">
+        <option value="">— все —</option>
+        {% for d in days %}
+        <option value="{{ d }}" {% if d == day %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label style="margin-left:14px"><input type="checkbox" name="free" value="1"
+      {% if free %}checked{% endif %} onchange="this.form.submit()"> только со свободными местами</label>
+  </form>
+
+  <table>
+    <tr>
+      <th>Группа</th><th>Направление</th><th>День</th><th>Время</th>
+      <th class="num">Записано</th><th class="num">Мест</th><th class="num">Свободно</th>
+      <th>Заполненность</th><th class="num">+ за 7 дней</th>
+    </tr>
+    {% for g in groups %}
+    <tr>
+      <td><b>{{ g.name }}</b></td>
+      <td>{{ g.course }}</td>
+      <td>{{ g.day }}</td>
+      <td>{{ g.time }}</td>
+      <td class="num">{{ g.enrolled }}</td>
+      <td class="num">{{ g.capacity }}</td>
+      <td class="num"><b>{{ g.free }}</b></td>
+      <td>
+        <div style="background:#eee;border-radius:6px;width:120px;height:14px;overflow:hidden">
+          <div style="height:14px;width:{{ g.fill_pct }}%;background:{{ g.color }}"></div>
+        </div>
+        <span class="muted" style="font-size:12px">{{ g.fill_pct }}%</span>
+      </td>
+      <td class="num">{{ "+" ~ g.fresh if g.fresh else "—" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not groups %}<p class="muted">Группы с префиксом «2627_» не найдены — проверьте синхронизацию.</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Сводка по направлениям</h2>
+  <table>
+    <tr><th>Направление</th><th class="num">Групп</th><th class="num">Записано</th><th class="num">Всего мест</th><th class="num">Свободно</th><th class="num">Заполненность</th></tr>
+    {% for s in summary %}
+    <tr>
+      <td>{{ s.course }}</td><td class="num">{{ s.groups }}</td><td class="num">{{ s.enrolled }}</td>
+      <td class="num">{{ s.capacity }}</td><td class="num"><b>{{ s.free }}</b></td><td class="num">{{ s.fill_pct }}%</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
