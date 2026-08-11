@@ -191,6 +191,22 @@ def _admins() -> list[dict]:
         return []
 
 
+def _admins_today() -> list[dict]:
+    """Кто сегодня на смене. Настройка admin_schedule: {"2026-08-12": 232805, ...}
+    (дата -> managerId). Нет записи на сегодня — работают все из call_admins."""
+    admins = _admins()
+    try:
+        sched = json.loads(db.get_setting("admin_schedule") or "{}")
+    except ValueError:
+        sched = {}
+    mid = sched.get(_today().isoformat())
+    if mid:
+        onduty = [a for a in admins if a.get("managerId") == mid]
+        if onduty:
+            return onduty
+    return admins
+
+
 def _has_mark(kind: str, key: str) -> bool:
     with db.get_conn() as conn:
         try:
@@ -282,7 +298,7 @@ def _hint_for_lead(mk: MoyklassClient, user_id: int, join: dict) -> None:
 # --- сценарии ------------------------------------------------------------
 
 def speed_to_lead(mk: MoyklassClient) -> None:
-    admins = _admins()
+    admins = _admins_today()
     if not admins:
         return
     duty = admins[_today().toordinal() % len(admins)]  # дежурный по дню
@@ -310,7 +326,7 @@ def speed_to_lead(mk: MoyklassClient) -> None:
 
 
 def no_show(mk: MoyklassClient) -> None:
-    admins = _admins()
+    admins = _admins_today()
     now = _now()
     recs = mk.fetch_all("/v1/company/lessonRecords", ["lessonRecords"], params={
         "date": _today().isoformat(), "test": "true", "visit": "false",
@@ -389,7 +405,7 @@ def _queues() -> tuple[dict[int, list[int]], dict[int, str]]:
 
 
 def morning_tasks(mk: MoyklassClient) -> None:
-    admins = _admins()
+    admins = _admins_today()
     if not admins:
         return
     per_admin = int(db.get_setting("daily_tasks_per_admin", "40") or 40)

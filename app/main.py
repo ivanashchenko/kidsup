@@ -486,7 +486,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-12.1"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-12.2"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -496,6 +496,25 @@ async def health():
     return {"ok": True, "version": APP_VERSION,
             "msk": autopilot._now().isoformat(timespec="seconds"),
             "morning_done": autopilot._has_mark("morning", today)}
+
+
+SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour",
+            "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts"}
+
+
+@app.get("/api/settings", dependencies=AUTH)
+async def api_get_settings():
+    return {k: db.get_setting(k) for k in sorted(SETTABLE)}
+
+
+@app.post("/api/settings", dependencies=AUTH)
+async def api_set_setting(payload: dict):
+    """{"key": "...", "value": "..."} — только ключи из SETTABLE."""
+    key, value = (payload.get("key") or "").strip(), payload.get("value")
+    if key not in SETTABLE or value is None:
+        raise HTTPException(400, f"key должен быть одним из {sorted(SETTABLE)}")
+    db.set_setting(key, str(value))
+    return {"ok": True, key: db.get_setting(key)}
 
 
 @app.post("/api/broadcast", dependencies=AUTH)
