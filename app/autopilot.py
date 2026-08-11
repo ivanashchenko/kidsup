@@ -257,8 +257,13 @@ def missed_calls() -> None:
                    "Или просто ответьте здесь — подберём группу в переписке 😊")
 
 
-def _queues() -> dict[int, list[int]]:
-    """Очереди обзвона по фактическим визитам: admin_index -> [user_id, ...]."""
+def _queues() -> tuple[dict[int, list[int]], dict[int, str]]:
+    """Очереди обзвона: (admin_index -> [user_id, ...], user_id -> тип звонка).
+
+    Приоритет по решению руководителя: сначала прошлый учебный год
+    (продолжение занятий), затем лето (лагерь — продажа, регулярные —
+    продление), затем позапрошлый год (давние).
+    """
     with db.get_conn() as conn:
         base = """WITH v AS (SELECT lr.user_id u, l.date d FROM lesson_records lr
                   JOIN lessons l ON l.id = lr.lesson_id WHERE lr.visit = 1)"""
@@ -266,23 +271,26 @@ def _queues() -> dict[int, list[int]]:
         y2526 = {r[0] for r in conn.execute(base + " SELECT DISTINCT u FROM v WHERE d>='2025-09-01' AND d<'2026-06-01'")} - summer
         y2425 = {r[0] for r in conn.execute(base + " SELECT DISTINCT u FROM v WHERE d>='2024-09-01' AND d<'2025-09-01'")} - summer - y2526
         phones = dict(conn.execute("SELECT id, phone FROM users"))
-    # волна по календарю: пн-вт стартовой недели — A, дальше B, с 17.08 — C
+    kinds = _summer_kinds()                      # camp / regular (лето)
+    for u in y2526:
+        kinds.setdefault(u, "contin")            # продолжение занятий
     today = _today()
     if today <= date(2026, 8, 11):
         wave = summer
     elif today <= date(2026, 8, 16):
-        wave = y2526 | summer          # добираем хвост A
+        wave = y2526 | summer
     else:
-        wave = y2425 | y2526 | summer  # добираем хвосты
+        wave = y2425 | y2526 | summer            # добираем хвосты
     fams: dict[str, list[int]] = {}
-    # летние семьи — первыми в очереди: они самые тёплые для набора
-    for u in sorted(wave & summer) + sorted(wave - summer):
+    order = (sorted(wave & y2526) + sorted(wave & summer)
+             + sorted(wave - y2526 - summer))
+    for u in order:
         fams.setdefault(phones.get(u) or f"x{u}", []).append(u)
     n = max(1, len(_admins()))
     out: dict[int, list[int]] = {}
     for i, fam in enumerate(fams.values()):
         out.setdefault(i % n, []).extend(fam)
-    return out
+    return out, kinds
 
 
 def morning_tasks(mk: MoyklassClient) -> None:
@@ -290,8 +298,11 @@ def morning_tasks(mk: MoyklassClient) -> None:
     if not admins:
         return
     per_admin = int(db.get_setting("daily_tasks_per_admin", "40") or 40)
-    queues = _queues()
-    kinds = _summer_kinds()
+    queues, kinds = _queues()
+    TEXT_CONTIN = ("Продолжение занятий 2026/27: в подсказке 🎯 — чем занимался "
+                   "ребёнок в прошлом году. Предложи продолжить в новой группе. "
+                   "Если пошёл в школу — вместо подготовки к школе предлагай "
+                   "каллиграфию, скорочтение, менталку. До 30.08 сентябрь по старым ценам.")
     TEXT_CAMP = ("🔥 Летний лагерь закончился — продающий звонок про учебный год: "
                  "«вы уже видели центр изнутри — тот же английский круглый год, "
                  "плюс направления по возрасту». Зови на Неделю открытых уроков "
@@ -301,6 +312,7 @@ def morning_tasks(mk: MoyklassClient) -> None:
                   "по возрасту из подсказки 🎯. До 30.08 сентябрь по старым ценам.")
     TEXT_COLD = ("Обзвон набора 2026/27: открой карточку, прочитай подсказку 🎯, "
                  "позвони кнопкой и поставь статус по итогу.")
+    TEXTS = {"contin": TEXT_CONTIN, "camp": TEXT_CAMP, "regular": TEXT_RENEW}
     for idx, adm in enumerate(admins):
         made = 0
         errors = 0
@@ -311,7 +323,8 @@ def morning_tasks(mk: MoyklassClient) -> None:
             try:
                 kind = kinds.get(uid)
                 # летним (лагерь/регулярные) статус «Клиент» не помеха
-                skip = (SKIP_HARD | SKIP_FUNNEL) if kind else SKIP_STATES
+                skip = (SKIP_HARD | SKIP_FUNNEL) if kind in ("camp", "regular") \
+                    else SKIP_STATES
                 user = mk.get(f"/v1/company/users/{uid}")
                 state = user.get("clientStateId")
                 if state in skip:
@@ -329,9 +342,7 @@ def morning_tasks(mk: MoyklassClient) -> None:
                           "После разговора поставь статус.")
                     made += 1
                     continue
-                _task(mk, adm["managerId"], uid,
-                      TEXT_CAMP if kind == "camp" else
-                      TEXT_RENEW if kind == "regular" else TEXT_COLD)
+                _task(mk, adm["managerId"], uid, TEXTS.get(kind, TEXT_COLD))
                 made += 1
             except Exception:
                 errors += 1
