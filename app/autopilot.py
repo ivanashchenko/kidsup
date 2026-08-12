@@ -257,9 +257,17 @@ def _broadcast_tick() -> None:
                             "WHERE status='pending' "
                             "ORDER BY campaign = 'no1_apology' DESC, id LIMIT ?",
                             (per_min,)).fetchall()
+    transports = [x.strip() for x in
+                  (db.get_setting("broadcast_transports", "tgapi") or "tgapi").split(",") if x.strip()]
+    dry = db.get_setting("wazzup_dry_run", "1") == "1"
     for rid, phone, child, text in rows:
         msg = _fill_name(text, child)
-        _wa(phone, msg)
+        try:
+            for line in wazzup.send(phone, msg, mode="broadcast", dry_run=dry,
+                                    transports=transports):
+                log.info("wazzup: %s", line)
+        except Exception as e:
+            log.warning("wazzup недоступен: %s", e)
         with db.get_conn() as conn:
             conn.execute("UPDATE broadcast_queue SET status='sent', sent=? WHERE id=?",
                          (_now().isoformat(timespec="seconds"), rid))
@@ -648,6 +656,18 @@ APOLOGY_TEXT = (
 
 def _migrations() -> None:
     """Одноразовые правки данных, приезжают вместе с кодом."""
+    if _mark("migration", "no1_resume_tg_v1"):
+        # WhatsApp 0077 заблокирован за массовость: остаток рассылки — только
+        # Telegram (настройка broadcast_transports); заморозку вернуть в очередь
+        if not db.get_setting("broadcast_transports"):
+            db.set_setting("broadcast_transports", "tgapi")
+        with db.get_conn() as conn:
+            _bq_init(conn)
+            cur = conn.execute(
+                "UPDATE broadcast_queue SET status='pending' "
+                "WHERE campaign='no1_digest' AND status='cancelled'")
+            log.info("миграция no1_resume_tg_v1: %d сообщений обратно в очередь (только TG)",
+                     cur.rowcount)
     if _mark("migration", "no1_apology_v1"):
         # тем, кому утром ушёл текст с фамилией, — извинение (уходит первым,
         # см. приоритет кампании в _broadcast_tick)

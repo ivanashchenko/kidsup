@@ -543,7 +543,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-12.12"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-12.13"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -555,7 +555,7 @@ async def health():
             "morning_done": autopilot._has_mark("morning", today)}
 
 
-SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour",
+SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts"}
 
 

@@ -62,13 +62,14 @@ def _pick(chans: list[dict], transport: str) -> dict | None:
     return cand[0] if cand else None
 
 
-def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True) -> list[str]:
-    """Отправка сообщения. Возвращает журнал попыток по каналам."""
+def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
+         transports: list[str] | None = None) -> list[str]:
+    """Отправка сообщения. transports ограничивает каналы (например ["tgapi"])."""
     phone = "".join(ch for ch in phone if ch.isdigit())
     if phone.startswith("8") and len(phone) == 11:
         phone = "7" + phone[1:]
     log, chans = [], channels()
-    order = CASCADE if mode == "cascade" else CASCADE  # broadcast шлёт во все
+    order = transports or CASCADE  # broadcast шлёт во все перечисленные
     for transport in order:
         ch = _pick(chans, transport)
         if not ch:
