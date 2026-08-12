@@ -604,9 +604,37 @@ async def api_broadcast_cancel(payload: dict = None):
 @app.post("/api/broadcast/requeue-undelivered", dependencies=AUTH)
 async def api_broadcast_requeue(payload: dict = None):
     """Вернуть в очередь недоставленное в Telegram/MAX (доставка упала после
-    ответа API). Опционально {"day": "2026-08-12"} — по умолчанию сегодня."""
+    ответа API). Опционально {"day": "2026-08-12"} — по умолчанию сегодня.
+    Ответившие (wazzup_inbox) не дублируются."""
     from . import autopilot
     return autopilot.broadcast_requeue_undelivered((payload or {}).get("day"))
+
+
+@app.post("/api/wazzup/mark-replied", dependencies=AUTH)
+async def api_wazzup_mark_replied(payload: dict):
+    """Ручная отметка ответивших (пока вебхук Wazzup не настроен): ответы,
+    увиденные в чатах, фиксируются как доставленные. {"phones": ["79...", ...],
+    "note": "MAX 12.08"}. Такие телефоны: идут первыми в обзвоне, исключаются
+    из повторной отправки, в статистике считаются delivered_replied."""
+    phones = [p for p in (payload or {}).get("phones", []) if p]
+    note = (payload or {}).get("note", "manual")
+    ts = __import__("datetime").datetime.now().isoformat(timespec="seconds")
+    added = 0
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_inbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+            chat_type TEXT, text TEXT, message_id TEXT UNIQUE)""")
+        for p in phones:
+            digits = "".join(ch for ch in str(p) if ch.isdigit())
+            try:
+                conn.execute(
+                    "INSERT OR IGNORE INTO wazzup_inbox (ts, phone, chat_type, text, message_id) "
+                    "VALUES (?, ?, 'manual', ?, ?)",
+                    (ts, digits, note, f"manual-{digits}"))
+                added += 1
+            except Exception:
+                pass
+    return {"marked": added, "phones": phones}
 
 
 @app.get("/api/replies", dependencies=AUTH)

@@ -237,16 +237,24 @@ def broadcast_status() -> dict:
     with db.get_conn() as conn:
         _bq_init(conn)
         try:
+            def _n(p):
+                return "".join(ch for ch in str(p or "") if ch.isdigit())[-10:]
+            try:
+                replied = {_n(r[0]) for r in conn.execute("SELECT phone FROM wazzup_inbox")}
+            except Exception:
+                replied = set()
             dl = conn.execute(
                 "SELECT campaign, COUNT(*) FROM broadcast_queue WHERE status='sent' "
                 "AND COALESCE(tried,'') LIKE '%whatsapp=ok%' GROUP BY campaign").fetchall()
             ph = conn.execute(
-                "SELECT campaign, COUNT(*) FROM broadcast_queue WHERE status='sent' "
-                "AND COALESCE(tried,'') NOT LIKE '%whatsapp=ok%' GROUP BY campaign").fetchall()
+                "SELECT campaign, phone FROM broadcast_queue WHERE status='sent' "
+                "AND COALESCE(tried,'') NOT LIKE '%whatsapp=ok%'").fetchall()
             for camp, cnt in dl:
                 out.setdefault(camp, {})["delivered_whatsapp"] = cnt
-            for camp, cnt in ph:
-                out.setdefault(camp, {})["phantom_tg_max"] = cnt
+            for camp, phone in ph:
+                key = ("delivered_replied" if _n(phone) in replied
+                       else "phantom_tg_max")
+                out.setdefault(camp, {})[key] = out.setdefault(camp, {}).get(key, 0) + 1
         except Exception:
             pass
     out["_diag"] = {"last_tick": db.get_setting("broadcast_last_tick"),
@@ -271,6 +279,12 @@ def broadcast_requeue_undelivered(day: str | None = None) -> dict:
             conn.execute("ALTER TABLE broadcast_queue ADD COLUMN tried TEXT DEFAULT ''")
         except Exception:
             pass
+        def _n(p):
+            return "".join(ch for ch in str(p or "") if ch.isdigit())[-10:]
+        try:
+            replied = {_n(r[0]) for r in conn.execute("SELECT phone FROM wazzup_inbox")}
+        except Exception:
+            replied = set()
         rows = conn.execute(
             "SELECT id, phone, COALESCE(tried,''), status FROM broadcast_queue "
             "WHERE created LIKE ? OR sent LIKE ?", (d + "%", d + "%")).fetchall()
@@ -280,6 +294,8 @@ def broadcast_requeue_undelivered(day: str | None = None) -> dict:
         for phone, rs in byphone.items():
             if any("whatsapp=ok" in r[2] for r in rs):
                 continue                       # семья получила в WhatsApp
+            if _n(phone) in replied:
+                continue                       # ответили (MAX/ТГ доставил) — не дублируем
             if not any(("tgapi=ok" in r[2]) or ("max=ok" in r[2]) for r in rs):
                 continue                       # мнимых отправок нет
             keep = min(rs, key=lambda r: r[0])
