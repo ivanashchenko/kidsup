@@ -486,9 +486,25 @@ def _queues() -> tuple[dict[int, list[int]], dict[int, str]]:
              + sorted(wave - y2526 - summer))
     for u in order:
         fams.setdefault(phones.get(u) or f"x{u}", []).append(u)
+    # прогретые рассылкой — первыми: сначала ответившие, потом получившие
+    def _norm(p):
+        return "".join(ch for ch in str(p or "") if ch.isdigit())[-10:]
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        sent_ph = {_norm(r[0]) for r in conn.execute(
+            "SELECT phone FROM broadcast_queue WHERE status='sent'")}
+        try:
+            replied_ph = {_norm(r[0]) for r in conn.execute(
+                "SELECT phone FROM wazzup_inbox")}
+        except Exception:
+            replied_ph = set()
+    def _warmth(phone):
+        p = _norm(phone)
+        return 0 if p in replied_ph else 1 if p in sent_ph else 2
+    fam_items = sorted(fams.items(), key=lambda kv: _warmth(kv[0]))  # stable
     n = max(1, len(_admins()))
     out: dict[int, list[int]] = {}
-    for i, fam in enumerate(fams.values()):
+    for i, (_, fam) in enumerate(fam_items):
         out.setdefault(i % n, []).extend(fam)
     return out, kinds
 

@@ -543,7 +543,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-12.13"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-12.14"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -641,6 +641,47 @@ async def run_morning_now():
     import threading
     threading.Thread(target=_run, daemon=True).start()
     return {"started": True}
+
+
+MARQUIZ_KEY = "mqz-KdsUp-2026-hQ7rT"  # секрет в URL вебхука Марквиза
+
+
+@app.post("/marquiz/webhook")
+async def marquiz_webhook(request: Request, key: str = ""):
+    """Заявки из квизов Марквиз → лид + клиент/заявка в МойКласс.
+
+    В панели Марквиза: Интеграции → Вебхук →
+    https://app.kidsup.ru/marquiz/webhook?key=<секрет>"""
+    if key != MARQUIZ_KEY:
+        raise HTTPException(403)
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "нужен JSON")
+    contacts = payload.get("contacts") or {}
+    phone = str(contacts.get("phone") or payload.get("phone") or "").strip()
+    if not phone:
+        return {"ok": False, "error": "нет телефона"}
+    name = str(contacts.get("name") or payload.get("name") or "").strip()
+    quiz = ((payload.get("quiz") or {}).get("name")
+            or payload.get("quizName") or "квиз")
+    answers = payload.get("answers") or []
+    qa = "; ".join(
+        f"{a.get('q') or a.get('question') or ''}: {a.get('a') or a.get('answer') or ''}".strip(": ")
+        for a in answers if isinstance(a, dict))[:800]
+    lead_id = leads.save_lead({
+        "source": "marquiz", "promo": "", "parent_name": name, "phone": phone,
+        "child_name": "", "child_age": "", "interests": [],
+        "comment": f"Марквиз «{quiz}». {qa}".strip(),
+        "consent_pd": "on", "consent_ads": None,
+    })
+    try:
+        ok, msg = leads.push_to_crm(lead_id)
+    except Exception as e:  # noqa: BLE001
+        ok, msg = False, str(e)
+    logging.getLogger("kidsup.marquiz").info("заявка %s (%s): crm=%s %s",
+                                             name, phone, ok, msg)
+    return {"ok": True, "lead_id": lead_id, "crm": ok}
 
 
 @app.get("/wazzup/webhook")
