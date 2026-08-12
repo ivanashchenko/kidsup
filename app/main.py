@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import logging
+import re
 import secrets
 from datetime import date, timedelta
 from pathlib import Path
@@ -130,6 +131,21 @@ def groups_page(request: Request):
                   top_students=analytics.top_students_by_visits())
 
 
+DAY_ORDER = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+DAY_LABEL = dict(zip(DAY_ORDER, ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]))
+_DAY_RE = re.compile(r"(?<![а-яё])(пн|вт|ср|чт|пт|сб|вс)(?![а-яё])")
+_TIME_RE = re.compile(r"\d{1,2}:\d{2}")
+
+
+def _name_days(name: str) -> list[str]:
+    """Дни недели из названия группы: «вт-чт», «пн 19:00 + сб 12:00» → [вт, сб]."""
+    days = []
+    for m in _DAY_RE.finditer((name or "").lower()):
+        if m.group(1) not in days:
+            days.append(m.group(1))
+    return sorted(days, key=DAY_ORDER.index)
+
+
 @app.get("/enrollment", response_class=HTMLResponse, dependencies=AUTH)
 def enrollment_page(request: Request, course: str = "", day: str = "", free: int = 0):
     """Набор 2026/27: все группы «2627_…» с заполненностью — рабочий экран админа."""
@@ -146,27 +162,39 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
             GROUP BY cl.id ORDER BY co.name, cl.name""").fetchall()
     groups = []
     for r in rows:
-        parts = (r["name"] or "").split("_")
-        g_day = parts[2] if len(parts) > 2 else "—"
-        g_time = parts[3] if len(parts) > 3 else "—"
+        name = r["name"] or ""
+        parts = name.split("_")
+        g_days = _name_days(name)
+        times = _TIME_RE.findall(name)
         cap = r["max_students"] or 8
         enrolled = r["enrolled"] or 0
         fill = min(100, round(enrolled * 100 / cap)) if cap else 0
         groups.append({
-            "name": r["name"], "course": r["course"] or (parts[1] if len(parts) > 1 else "?"),
-            "day": g_day, "time": g_time, "enrolled": enrolled, "capacity": cap,
+            "name": name, "course": r["course"] or (parts[1] if len(parts) > 1 else "?"),
+            "days": g_days,
+            "day": " · ".join(DAY_LABEL[d] for d in g_days) or "—",
+            "time": " · ".join(times[:2]) or "—",
+            "enrolled": enrolled, "capacity": cap,
             "free": max(0, cap - enrolled), "fresh": r["fresh"] or 0, "fill_pct": fill,
             "color": "#A33B2E" if fill >= 100 else "#B97D00" if fill >= 75 else "#2e7d32",
         })
     courses_list = sorted({g["course"] for g in groups})
-    days_list = [d for d in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-                 if any(g["day"] == d for g in groups)]
     if course:
         groups = [g for g in groups if g["course"] == course]
+    # дни — только те, что реально есть в группах выбранного направления
+    day = day.strip().lower()
+    days_list = [{"value": d, "label": DAY_LABEL[d],
+                  "n": sum(1 for g in groups if d in g["days"])}
+                 for d in DAY_ORDER if any(d in g["days"] for g in groups)]
+    if day and day not in {d["value"] for d in days_list}:
+        day = ""  # при смене направления невозможный день сбрасываем, а не показываем пусто
     if day:
-        groups = [g for g in groups if g["day"] == day]
+        groups = [g for g in groups if day in g["days"]]
     if free:
         groups = [g for g in groups if g["free"] > 0]
+    groups.sort(key=lambda g: (g["course"],
+                               DAY_ORDER.index(g["days"][0]) if g["days"] else 9,
+                               g["time"]))
     summary = {}
     for g in groups:
         s = summary.setdefault(g["course"], {"course": g["course"], "groups": 0,
@@ -486,7 +514,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-12.2"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-12.3"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")

@@ -19,7 +19,7 @@
       <select name="day" onchange="this.form.submit()">
         <option value="">— все —</option>
         {% for d in days %}
-        <option value="{{ d }}" {% if d == day %}selected{% endif %}>{{ d }}</option>
+        <option value="{{ d.value }}" {% if d.value == day %}selected{% endif %}>{{ d.label }} ({{ d.n }})</option>
         {% endfor %}
       </select>
     </label>
@@ -52,7 +52,7 @@
     </tr>
     {% endfor %}
   </table>
-  {% if not groups %}<p class="muted">Группы с префиксом «2627_» не найдены — проверьте синхронизацию.</p>{% endif %}
+  {% if not groups %}<p class="muted">{% if course or day or free %}Под выбранные фильтры групп не нашлось — снимите фильтр или посмотрите другой день.{% else %}Группы с префиксом «2627_» не найдены — проверьте синхронизацию.{% endif %}</p>{% endif %}
 </div>
 
 <div class="card">
