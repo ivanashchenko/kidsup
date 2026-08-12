@@ -543,7 +543,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-12.14"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-12.15"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -556,7 +556,7 @@ async def health():
 
 
 SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
-            "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts"}
+            "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap"}
 
 
 @app.get("/api/settings", dependencies=AUTH)

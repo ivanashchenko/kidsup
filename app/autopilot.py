@@ -246,31 +246,70 @@ def broadcast_cancel(campaign: str | None = None) -> int:
 
 
 def _broadcast_tick() -> None:
-    """Раз в минуту: отправляет порцию из очереди. Темп broadcast_per_hour
-    (по умолчанию 60/час), окно 10:00–19:00 МСК."""
-    if not (10 <= _now().hour < 19):
+    """Раз в минуту: каскадная доставка очереди. Порядок каналов —
+    настройка broadcast_transports (по умолчанию "tgapi,whatsapp,max").
+    Telegram — общий темп (broadcast_per_hour, 60/час), WhatsApp — щадяще:
+    не чаще 15/час и не больше 50/день (после бана 0077), MAX — 30/час.
+    Строка уходит в ПЕРВЫЙ доставивший канал; недоставленное копит попытки
+    в колонке tried и ждёт своего канала."""
+    now = _now()
+    if not (10 <= now.hour < 19):
         return
-    per_min = max(1, int(db.get_setting("broadcast_per_hour", "60") or 60) // 60)
-    with db.get_conn() as conn:
-        _bq_init(conn)
-        rows = conn.execute("SELECT id, phone, child, text FROM broadcast_queue "
-                            "WHERE status='pending' "
-                            "ORDER BY campaign = 'no1_apology' DESC, id LIMIT ?",
-                            (per_min,)).fetchall()
     transports = [x.strip() for x in
                   (db.get_setting("broadcast_transports", "tgapi") or "tgapi").split(",") if x.strip()]
+    budgets = {"tgapi": max(1, int(db.get_setting("broadcast_per_hour", "60") or 60) // 60)}
+    if now.minute % 4 == 0:
+        budgets["whatsapp"] = 1   # 15/час
+    if now.minute % 2 == 0:
+        budgets["max"] = 1        # 30/час
+    day = now.strftime("%Y-%m-%d")
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        try:
+            conn.execute("ALTER TABLE broadcast_queue ADD COLUMN tried TEXT DEFAULT ''")
+        except Exception:
+            pass
+        wa_today = conn.execute(
+            "SELECT COUNT(*) FROM broadcast_queue WHERE status='sent' "
+            "AND sent LIKE ? AND tried LIKE '%whatsapp=ok%'", (day + "%",)).fetchone()[0]
+        if wa_today >= int(db.get_setting("wa_daily_cap", "50") or 50):
+            budgets.pop("whatsapp", None)
+        rows = conn.execute(
+            "SELECT id, phone, child, text, COALESCE(tried,'') FROM broadcast_queue "
+            "WHERE status='pending' "
+            "ORDER BY campaign = 'no1_apology' DESC, id LIMIT 30").fetchall()
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
-    for rid, phone, child, text in rows:
+    for rid, phone, child, text, tried in rows:
+        if not budgets:
+            break
+        # канал N доступен строке только после неудачи всех предыдущих —
+        # WhatsApp-лимит тратим лишь на тех, кому Telegram не доставил
+        target = next((tr for i, tr in enumerate(transports)
+                       if tr in budgets and f"{tr}=" not in tried
+                       and all(f"{p}=" in tried for p in transports[:i])), None)
+        if target is None:
+            # все доступные сейчас каналы уже пробованы этой строкой
+            if all(f"{tr}=" in tried for tr in transports):
+                with db.get_conn() as conn:
+                    conn.execute("UPDATE broadcast_queue SET status='undeliverable' WHERE id=?", (rid,))
+            continue
         msg = _fill_name(text, child)
         try:
-            for line in wazzup.send(phone, msg, mode="broadcast", dry_run=dry,
-                                    transports=transports):
-                log.info("wazzup: %s", line)
+            ok = wazzup.send_via(target, phone, msg, dry_run=dry)
         except Exception as e:
-            log.warning("wazzup недоступен: %s", e)
+            log.warning("wazzup %s недоступен: %s", target, e)
+            ok = False
+        budgets[target] -= 1
+        if budgets[target] <= 0:
+            budgets.pop(target)
+        mark = f"{target}={'ok' if ok else 'fail'};"
         with db.get_conn() as conn:
-            conn.execute("UPDATE broadcast_queue SET status='sent', sent=? WHERE id=?",
-                         (_now().isoformat(timespec="seconds"), rid))
+            if ok:
+                conn.execute("UPDATE broadcast_queue SET status='sent', sent=?, tried=COALESCE(tried,'')||? WHERE id=?",
+                             (_now().isoformat(timespec="seconds"), mark, rid))
+            else:
+                conn.execute("UPDATE broadcast_queue SET tried=COALESCE(tried,'')||? WHERE id=?", (mark, rid))
+        log.info("broadcast: #%s %s -> %s %s", rid, phone[-4:], target, "ok" if ok else "fail")
 
 
 def _admins() -> list[dict]:

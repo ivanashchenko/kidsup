@@ -90,6 +90,24 @@ def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
     return log
 
 
+
+
+def send_via(transport: str, phone: str, text: str, dry_run: bool = True) -> bool:
+    """Отправка строго через один канал. True = принял к доставке."""
+    phone = "".join(ch for ch in phone if ch.isdigit())
+    if phone.startswith("8") and len(phone) == 11:
+        phone = "7" + phone[1:]
+    ch = _pick(channels(), transport)
+    if not ch:
+        return False
+    if dry_run:
+        return True
+    r = httpx.post(f"{API}/message", headers=_headers(), json={
+        "channelId": ch["channelId"], "chatType": CHAT_TYPE.get(transport, transport),
+        "chatId": phone, "text": text,
+    }, timeout=30)
+    return r.status_code in (200, 201)
+
 def main():
     ap = argparse.ArgumentParser(description="Wazzup-рассылки KidsUP")
     ap.add_argument("command", choices=["channels", "send"])
