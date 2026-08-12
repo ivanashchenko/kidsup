@@ -27,6 +27,7 @@
 
 import json
 import logging
+import re
 import threading
 import time
 from datetime import date, datetime, timedelta
@@ -89,6 +90,77 @@ def _client() -> MoyklassClient:
     return MoyklassClient(get_api_key())
 
 
+# --- имена детей для рассылок ----------------------------------------------
+# В CRM имя чаще «Фамилия Имя (пометки)». Берём слово из словаря имён; если
+# уверенного имени нет — нейтральный запасной вариант, а не фамилия.
+
+GIVEN_NAMES = set("""
+александр алексей андрей антон арсений артем артемий артур богдан вадим
+валентин валерий василий виктор виталий владимир владислав всеволод вячеслав
+георгий герман глеб григорий давид дамир даниил данил данила даниэль демид
+демир денис дмитрий добрыня егор елисей ждан иван игнат игорь илья кирилл
+клим константин лев леон леонид лука макар максим марат марк матвей мирон
+михаил назар никита николай олег оскар павел петр платон прохор роберт роман
+ростислав савва савелий святослав семен сергей степан тамерлан тимофей тимур
+тихон федор филипп эмиль эрик юрий ярослав амир адам али карим рамиль руслан
+рустам салах самир умар эмир янис
+агата аглая аделина адель алевтина александра алина алиса алла амелия амина
+анастасия ангелина анна антонина арина ася божена валентина валерия варвара
+василиса вера вероника виктория виолетта влада владислава галина дарина дарья
+диана ева евангелина евгения екатерина елена елизавета есения жанна злата зоя
+ирина инга инна карина кира кристина ксения лада лариса лидия лилия лия
+любовь людмила майя маргарита марина мария марта марьяна мила милана милица
+мира мирослава моника надежда наталья нелли ника николь нина оксана олеся
+ольга полина рада раиса регина римма роза сабина сафия светлана серафима
+снежана софия софья стефания таисия тамара татьяна ульяна устинья фаина
+эвелина элина эльвира эмилия эмма юлия яна ярослава
+""".split())
+
+FEM_SOFT = {"любовь"}                            # женские на -ь: Любови
+INDECLINABLE = {"николь", "адель", "нелли"}      # не склоняются
+GEN_SPECIAL = {"лев": "Льва", "павел": "Павла"}  # беглые гласные
+
+
+def _genitive(name: str) -> str:
+    """Родительный падеж имени: Аглая → Аглаи, Марк → Марка, Игорь → Игоря."""
+    low = name.lower()
+    if low in GEN_SPECIAL:
+        return GEN_SPECIAL[low]
+    if low in INDECLINABLE:
+        return name
+    if low in FEM_SOFT:
+        return name[:-1] + "и"
+    if low.endswith("ия"):
+        return name[:-1] + "и"
+    if low.endswith(("га", "ка", "ха", "жа", "ша", "ча", "ща")):
+        return name[:-1] + "и"
+    if low.endswith("а"):
+        return name[:-1] + "ы"
+    if low.endswith("я"):
+        return name[:-1] + "и"
+    if low.endswith(("й", "ь")):
+        return name[:-1] + "я"
+    if low[-1] in "бвгджзклмнпрстфхцчшщ":
+        return name + "а"
+    return name  # несклоняемые (Лео, Отто…)
+
+
+def _child_name(full: str) -> str | None:
+    """Имя ребёнка из строки CRM или None, если уверенного имени нет."""
+    clean = re.sub(r"\([^)]*\)", " ", full or "")
+    for w in clean.split():
+        if w.lower().replace("ё", "е") in GIVEN_NAMES:
+            return w.capitalize()
+    return None
+
+
+def _fill_name(text: str, full_name: str) -> str:
+    """Плейсхолдеры: {имя} — именительный, {имя_р} — родительный падеж."""
+    child = _child_name(full_name)
+    text = text.replace("{имя}", child or "ваш ребёнок")
+    return text.replace("{имя_р}", _genitive(child) if child else "вашего ребёнка")
+
+
 # --- кампании рассылок ----------------------------------------------------
 
 def _bq_init(conn) -> None:
@@ -135,7 +207,7 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
             if state in SKIP_HARD:
                 continue
             seen_phones.add(row[1])
-            child = (row[0] or "").split()[0] if row[0] else ""
+            child = row[0] or ""  # полное имя из CRM; имя ребёнка выделяется при отправке
             conn.execute("INSERT INTO broadcast_queue (campaign, phone, child, text, created) "
                          "VALUES (?, ?, ?, ?, ?)",
                          (campaign, row[1], child, text, now))
@@ -177,7 +249,7 @@ def _broadcast_tick() -> None:
                             "WHERE status='pending' ORDER BY id LIMIT ?",
                             (per_min,)).fetchall()
     for rid, phone, child, text in rows:
-        msg = text.replace("{имя}", child or "ваш ребёнок")
+        msg = _fill_name(text, child)
         _wa(phone, msg)
         with db.get_conn() as conn:
             conn.execute("UPDATE broadcast_queue SET status='sent', sent=? WHERE id=?",
@@ -544,6 +616,35 @@ def _retry_forwards() -> None:
 
 # --- планировщик ---------------------------------------------------------
 
+NO1_TEXT_V2 = (
+    "Здравствуйте! ☀️ Это KidsUP на Рокоссовского. Как вы? Как прошло лето "
+    "у {имя_р}? Мы уже готовимся к сентябрю: обновили программы и придумали "
+    "особенное на конец августа — 29.08 (сб.) праздник с аниматорами и "
+    "беспроигрышной лотереей в парке «Янтарная горка» (у ЖК Богородский) "
+    "в честь дня рождения KidsUP, 30.08 (вс.) День открытых дверей, "
+    "с 31.08 Неделя открытых уроков (всё бесплатно). Скоро расскажем "
+    "подробнее 💛 И маленький вопрос: какие у вас планы — 🌊 ещё отдыхаем "
+    "или 🏫 уже думаем про сентябрь? Можно просто смайликом 🙂")
+
+
+def _migrations() -> None:
+    """Одноразовые правки данных, приезжают вместе с кодом."""
+    if _mark("migration", "no1_text_v2"):
+        # рассылка №1: остановленным сообщениям — новый текст, полное имя
+        # из CRM (для склонения) и обратно в очередь
+        with db.get_conn() as conn:
+            _bq_init(conn)
+            cur = conn.execute("""
+                UPDATE broadcast_queue SET
+                    text = ?,
+                    child = COALESCE((SELECT u.name FROM users u
+                                      WHERE u.phone = broadcast_queue.phone), child),
+                    status = 'pending'
+                WHERE campaign = 'no1_digest' AND status IN ('cancelled', 'pending')""",
+                (NO1_TEXT_V2,))
+            log.info("миграция no1_text_v2: обновлено %d сообщений", cur.rowcount)
+
+
 def _loop() -> None:
     last3 = 0.0
     while True:
@@ -551,6 +652,7 @@ def _loop() -> None:
             if db.get_setting("autopilot", "off") != "on":
                 time.sleep(60)
                 continue
+            _migrations()
             now = _now()
             if time.monotonic() - last3 >= 180:
                 last3 = time.monotonic()
