@@ -232,9 +232,27 @@ def broadcast_status() -> dict:
         out.setdefault(camp, {})[status] = cnt
     for camp, status, cnt in ps:
         out.setdefault(camp, {})[f"{status}_eng_ps"] = cnt
+    # честная разбивка: sent ≠ доставлено — Telegram/MAX принимаются Wazzup-ом,
+    # но не доставляются незнакомым номерам
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        try:
+            dl = conn.execute(
+                "SELECT campaign, COUNT(*) FROM broadcast_queue WHERE status='sent' "
+                "AND COALESCE(tried,'') LIKE '%whatsapp=ok%' GROUP BY campaign").fetchall()
+            ph = conn.execute(
+                "SELECT campaign, COUNT(*) FROM broadcast_queue WHERE status='sent' "
+                "AND COALESCE(tried,'') NOT LIKE '%whatsapp=ok%' GROUP BY campaign").fetchall()
+            for camp, cnt in dl:
+                out.setdefault(camp, {})["delivered_whatsapp"] = cnt
+            for camp, cnt in ph:
+                out.setdefault(camp, {})["phantom_tg_max"] = cnt
+        except Exception:
+            pass
     out["_diag"] = {"last_tick": db.get_setting("broadcast_last_tick"),
                     "last_error": db.get_setting("broadcast_last_error"),
-                    "transports": db.get_setting("broadcast_transports", "tgapi")}
+                    "transports": db.get_setting("broadcast_transports", "whatsapp"),
+                    "wa_senders": db.get_setting("wa_senders", wazzup.WHATSAPP_PREFERRED)}
     return out
 
 
@@ -580,8 +598,11 @@ def _queues() -> tuple[dict[int, list[int]], dict[int, str]]:
         return "".join(ch for ch in str(p or "") if ch.isdigit())[-10:]
     with db.get_conn() as conn:
         _bq_init(conn)
+        # «прогретые» = реально доставленные (WhatsApp); мнимые отправки в
+        # Telegram/MAX (Wazzup принял, доставка упала) прогревом не считаются
         sent_ph = {_norm(r[0]) for r in conn.execute(
-            "SELECT phone FROM broadcast_queue WHERE status='sent'")}
+            "SELECT phone FROM broadcast_queue WHERE status='sent' "
+            "AND COALESCE(tried,'') LIKE '%whatsapp=ok%'")}
         try:
             replied_ph = {_norm(r[0]) for r in conn.execute(
                 "SELECT phone FROM wazzup_inbox")}

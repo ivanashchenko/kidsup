@@ -27,7 +27,9 @@ API = "https://api.wazzup24.com/v3"
 # явной отправки через send_via (например, ответ в уже открытый диалог).
 CASCADE = ["whatsapp"]
 CHAT_TYPE = {"whatsapp": "whatsapp", "tgapi": "telegram", "max": "max", "vk": "vk"}
-WHATSAPP_PREFERRED = "79165610077"
+# Порядок предпочтения WhatsApp-номеров (настройка wa_senders, через запятую).
+# Основной 0077 в ограничении → активным окажется первый живой резервный.
+WHATSAPP_PREFERRED = "79165610077,79199683507,79160170918"
 
 TEMPLATES = {
     "nedozvon": (
@@ -63,7 +65,11 @@ def channels() -> list[dict]:
 
 def _pick(chans: list[dict], transport: str) -> dict | None:
     cand = [c for c in chans if c.get("transport") == transport]
-    cand.sort(key=lambda c: c.get("plainId") != WHATSAPP_PREFERRED)
+    if transport == "whatsapp":
+        pref = [p.strip() for p in
+                (db.get_setting("wa_senders", WHATSAPP_PREFERRED) or WHATSAPP_PREFERRED).split(",")]
+        cand.sort(key=lambda c: pref.index(c.get("plainId"))
+                  if c.get("plainId") in pref else len(pref))
     return cand[0] if cand else None
 
 

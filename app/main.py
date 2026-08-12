@@ -620,7 +620,9 @@ async def api_replies(since: str = ""):
             "SELECT ts, phone, chat_type, text FROM wazzup_inbox "
             "WHERE ts >= ? ORDER BY ts", (since or "2026-01-01",)).fetchall()
         sent = {"".join(ch for ch in (r[0] or "") if ch.isdigit())[-10:]
-                for r in conn.execute("SELECT phone FROM broadcast_queue WHERE status='sent'")}
+                for r in conn.execute(
+                    "SELECT phone FROM broadcast_queue WHERE status='sent' "
+                    "AND COALESCE(tried,'') LIKE '%whatsapp=ok%'")}
         names = {}
         for uid, name, phone in conn.execute("SELECT id, name, phone FROM users WHERE phone IS NOT NULL"):
             names["".join(ch for ch in str(phone) if ch.isdigit())[-10:]] = name
