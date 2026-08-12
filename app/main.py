@@ -514,7 +514,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-12.8"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-12.9"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
