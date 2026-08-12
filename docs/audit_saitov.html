@@ -1,0 +1,168 @@
+<title>Аудит сайтов KidsUP</title>
+<style>
+:root{
+  --paper:#F6F8FB; --card:#FFFFFF; --ink:#212A3A; --muted:#67748A;
+  --accent:#1B8CC0; --accent-soft:#E5F4FB; --amber:#B97D00; --amber-soft:#FDF3DE;
+  --line:#E5EAF2; --danger:#C63B31; --danger-soft:#FCE8E8; --green:#3C7A22; --green-soft:#EAF6E3;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#171C1F; --card:#1F262B; --ink:#E8EAE6; --muted:#9FADB4;
+    --accent:#5BB9E8; --accent-soft:#1C2E38; --amber:#E3B34C; --amber-soft:#33290F;
+    --line:#333B41; --danger:#E28578; --danger-soft:#3A2422; --green:#8FCE6F; --green-soft:#22301C;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#171C1F; --card:#1F262B; --ink:#E8EAE6; --muted:#9FADB4;
+  --accent:#5BB9E8; --accent-soft:#1C2E38; --amber:#E3B34C; --amber-soft:#33290F;
+  --line:#333B41; --danger:#E28578; --danger-soft:#3A2422; --green:#8FCE6F; --green-soft:#22301C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:920px;margin:0 auto;padding:32px 20px 80px}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;text-wrap:balance;line-height:1.2}
+h1{font-size:32px;margin:6px 0 4px} h2{font-size:24px;margin:0 0 10px} h3{font-size:17.5px;margin:0 0 6px}
+.sub{color:var(--muted);margin:0 0 8px;max-width:68ch}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
+section{margin-top:42px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-top:14px}
+.crit{border-left:4px solid var(--danger)}
+.tablewrap{overflow-x:auto;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:640px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.p{display:inline-block;font-weight:700;border-radius:99px;padding:1px 10px;font-size:12px;white-space:nowrap}
+.pa{background:var(--danger-soft);color:var(--danger)}
+.pb{background:var(--amber-soft);color:var(--amber)}
+.pc{background:var(--green-soft);color:var(--green)}
+ul.tight{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.note{font-size:14px;color:var(--muted)}
+blockquote{margin:10px 0;padding:10px 15px;background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;font-size:14.5px}
+.footer{margin-top:56px;color:var(--muted);font-size:13.5px;border-top:1px solid var(--line);padding-top:16px}
+a{color:var(--accent)}
+code{background:var(--accent-soft);padding:1px 6px;border-radius:6px;font-size:13.5px}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">KidsUP · аудит сайтов · 12.08.2026</div>
+  <h1>Аудит kidsup.ru, kidsupday.ru, kidsupweek.ru</h1>
+  <p class="sub">Проверены: контент и офферы, конверсионные элементы, SEO-теги, техника и скорость, аналитика (Метрика, GA, Roistat, VK-пиксель), robots/sitemap, прайс. Приоритеты: <span class="p pa">A — чинить до 20.08</span> <span class="p pb">B — до 30.08</span> <span class="p pc">C — сентябрь</span>.</p>
+
+  <section>
+    <h2>Резюме: 7 правок, которые дадут больше всего</h2>
+    <div class="card crit">
+      <ol class="tight" style="list-style:decimal;padding-left:22px">
+        <li><span class="p pa">A</span> <b>Заявки с сайтов не доходят до сквозной аналитики.</b> Счётчики Roistat стоят на всех трёх сайтах, визиты считаются (~470 за 30 дней), но заявок в Roistat — ноль. Формы Tilda не передают лиды. Включить в Tilda у каждой формы приёмщик Roistat (или вебхук на app.kidsup.ru) + цели Метрики на отправку форм — иначе весь маркетинг набора вслепую.</li>
+        <li><span class="p pa">A</span> <b>kidsupday.ru: в поисковой выдаче — прошлогодняя дата.</b> Meta description: «Приглашаем 3 сентября…». Человек в Яндексе увидит не ту дату. Заменить на «30 августа 2026».</li>
+        <li><span class="p pa">A</span> <b>kidsupweek.ru: то же самое.</b> Description: «…с 4 по 10 сентября» (прошлый год). Заменить на «31 августа – 6 сентября 2026». На самой странице год 2026 тоже не указан — добавить.</li>
+        <li><span class="p pa">A</span> <b>Противоречивый главный оффер на kidsup.ru:</b> кнопка «БЕСПЛАТНЫЙ день и пробная неделя на полный день за 15 800 руб» — «бесплатный» и «за 15 800» в одной фразе ломают доверие за секунду. Разделить: «Бесплатный пробный день в саду» и отдельно «Пробная неделя — 15 800 ₽ (зачтём при покупке месяца)».</li>
+        <li><span class="p pb">B</span> <b>На главной нет ни дедлайна, ни событий.</b> Добавить баннер/поп-ап: «До 30.08 — сентябрь по ценам прошлого года» + блок трёх событий (29.08 праздник · 30.08 ДОД · 31.08–06.09 Неделя уроков) со ссылками на day/week. Это главный конверсионный рычаг августа.</li>
+        <li><span class="p pb">B</span> <b>На day/week нет телефона кликом.</b> Ни одной <code>tel:</code>-ссылки — с телефона позвонить нельзя, только форма. Добавить кликабельный номер в шапку и футер + sticky-кнопку «Позвонить/WhatsApp» на мобильных (стандарт для событийных лендингов).</li>
+        <li><span class="p pb">B</span> <b>Квиз Марквиз не встроен ни на один сайт</b> — а он у вас есть и работает. Встроить как «второй шаг» для тех, кто не готов звонить: на главной («Подберите занятия за 1 минуту») и на week. Квиз-заявки теперь падают в CRM автоматически.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <h2>kidsup.ru — главный сайт</h2>
+    <div class="card">
+      <h3>Конверсия (первый экран и путь клиента)</h3>
+      <div class="tablewrap"><table>
+        <tr><th>Что сейчас</th><th>Что сделать</th><th></th></tr>
+        <tr><td>H1 «Детский центр и сад KidsUP» — без выгоды и локации (и с мусорным <code>&lt;br/&gt;</code> внутри)</td><td>H1 по формуле «что + для кого + где»: «Детский центр и английский сад у м. Бульвар Рокоссовского — идёт набор 2026/27». Подзаголовок: возраст 10 мес–12 лет, лицензия, с 2008 года</td><td><span class="p pb">B</span></td></tr>
+        <tr><td>Один оффер-кнопка с противоречием («бесплатный… за 15 800»)</td><td>Три входа разной готовности (мировая практика): «Записаться на пробное» / «Скачать расписание и цены» (лид-магнит) / «Пройти квиз-подбор». Каждый — отдельная кнопка</td><td><span class="p pa">A</span></td></tr>
+        <tr><td>Нет дедлайна и событий августа</td><td>Баннер-лента вверху: «До 30.08 сентябрь по ценам прошлого года» + блок «3 способа познакомиться бесплатно» со ссылками на day/week</td><td><span class="p pb">B</span></td></tr>
+        <tr><td>В коде осталась заглушка телефона <code>+7 (000) 000-00-00</code></td><td>Найти блок в Tilda и удалить/заменить на 8 (495) 120-90-24</td><td><span class="p pb">B</span></td></tr>
+        <tr><td>Отзывы, лицензия, карта — есть ✓</td><td>Усилить цифрами: «с 2008 · 550+ выпускников · рейтинг на Яндекс.Картах ★» с живой ссылкой на отзывы</td><td><span class="p pc">C</span></td></tr>
+        <tr><td>Мессенджер-кнопки WhatsApp/TG/MAX — есть ✓</td><td>Оставить; проверить, что MAX-ссылка ведёт на живой канал (номер переавторизуется)</td><td><span class="p pc">C</span></td></tr>
+      </table></div>
+    </div>
+    <div class="card">
+      <h3>Контент и структура (29 страниц в sitemap)</h3>
+      <ul class="tight">
+        <li><span class="p pb">B</span> <b>Страницы направлений</b> (english, schoolpreparation1-2, arithmetic и т.д.) — привести к единому продающему шаблону: заголовок-результат («Читает через 3 месяца — методика Буракова»), педагог с фото, программа, расписание + цена, форма «Записаться на пробное этого направления» (не общая!). Сейчас формы общие — теряется контекст заявки.</li>
+        <li><span class="p pb">B</span> <b>/english переписать под перезапуск</b>: уровни Cambridge, языковой паспорт, видео раз в 2 месяца, спикинг-клубы, экзамен в формате YLE — всё, что уже обещано в рассылке. Это страница, куда пойдут проверять обещание.</li>
+        <li><span class="p pc">C</span> <b>/summercamp</b> — лагерь прошёл: перевести в режим «Лагерь-2027: оставьте контакт — откроем запись первыми» (собирает базу на год вперёд).</li>
+        <li><span class="p pc">C</span> <b>/newyear2024</b> — устаревшая страница в sitemap: закрыть от индексации или обновить (мусор в выдаче).</li>
+        <li><span class="p pc">C</span> Технические URL вида /page73646033.html в sitemap — дать человекочитаемые адреса или исключить.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>SEO и техника</h3>
+      <ul class="tight">
+        <li><span class="p pb">B</span> Description главной — общие слова («ваш выбор для качественного образования»). Переписать по формуле «услуга + гео + возраст + CTA»: «Детский центр и английский детский сад у метро Бульвар Рокоссовского (ЖК Богородский). Подготовка к школе, английский, логопед — дети от 10 месяцев до 12 лет. Запишитесь на бесплатное пробное».</li>
+        <li><span class="p pb">B</span> <b>Скорость:</b> HTML главной 319 КБ, 56 изображений, ленивая загрузка только у 6. В Tilda: Настройки сайта → Ещё → включить Lazy Load; пережать обложки первого экрана (это главный фактор LCP — скорости первого экрана, которую Яндекс и Google учитывают в ранжировании).</li>
+        <li><span class="p pc">C</span> Разметка LocalBusiness (schema.org): проверить полноту — адрес, часы, телефон, geo, ссылки на соцсети; добавить рейтинг. Даёт расширенный сниппет в выдаче.</li>
+        <li><span class="p pc">C</span> Alt-тексты картинок направлений («подготовка к школе метро бульвар рокоссовского») — бесплатный локальный SEO-трафик с картинок.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Аналитика</h3>
+      <ul class="tight">
+        <li><span class="p pa">A</span> Метрика ✓, GA ✓, Roistat ✓, VK-пиксель ✓ — счётчики стоят. Но: <b>формы не передают заявки в Roistat</b> (0 лидов за 30 дней) и, судя по этому, цели в Метрике на формы тоже не настроены. Включить: в Tilda у каждой формы — приёмщик данных Roistat; в Метрике — JS-цели на успешную отправку.</li>
+        <li><span class="p pb">B</span> <b>Коллтрекинг:</b> начать со статического — один подменный номер на все сайты (~1–2 тыс ₽/мес в Roistat) → сразу видно долю звонков «с сайта». Динамический — только вместе с запуском Яндекс.Директа.</li>
+        <li><span class="p pc">C</span> 01.09 — обновить /price на новые цены (сейчас прошлогодние — до 30.08 это правильно) и добавить на прайс баннер «оплатите сентябрь до 30.08 — по этим ценам».</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>kidsupday.ru — День открытых дверей (30.08)</h2>
+    <div class="card">
+      <ul class="tight">
+        <li><span class="p pa">A</span> <b>Description с прошлогодней датой «3 сентября»</b> — заменить: «День открытых дверей в KidsUP — 30 августа 2026, м. Бульвар Рокоссовского: мастер-классы, экскурсии по саду, розыгрыш призов. Бесплатно, по регистрации».</li>
+        <li><span class="p pa">A</span> <b>Нет телефона</b> (0 tel-ссылок) — добавить кликабельный номер + sticky-кнопку на мобильных.</li>
+        <li><span class="p pb">B</span> <b>Нет программы дня.</b> Лучшая практика событ十йного лендинга: тайм-лайн (10:30 открытие → мастер-классы по возрастам → экскурсии по саду каждые 30 мин → 13:00 розыгрыш), блок «как это устроено» (мы делаем игровой маршрут с печатями — это и есть уникальность, покажите её!), FAQ (сколько по времени, с какого возраста, нужна ли сменка).</li>
+        <li><span class="p pb">B</span> <b>Оффер дня не указан:</b> добавить «Оформите абонемент в день ДОД — −15% на первый месяц» — это причина покупать на месте.</li>
+        <li><span class="p pb">B</span> В форму регистрации добавить <b>возраст ребёнка</b> (нужен для рассадки по мастер-классам, и админ звонит уже подготовленным).</li>
+        <li><span class="p pc">C</span> Schema.org <b>Event</b> (название, дата, место, бесплатно) — расширенный сниппет с датой прямо в выдаче. Кнопка «Добавить в календарь» и обратный отсчёт (стандартные блоки Tilda).</li>
+        <li><span class="p pc">C</span> Lazy load: 0 из 26 изображений.</li>
+      </ul>
+      <blockquote>Дата на самой странице уже верная (30 августа 2026) — молодцы, что обновили. Проблема только в мета-тегах и глубине контента.</blockquote>
+    </div>
+  </section>
+
+  <section>
+    <h2>kidsupweek.ru — Неделя открытых уроков (31.08–06.09)</h2>
+    <div class="card">
+      <ul class="tight">
+        <li><span class="p pa">A</span> <b>Description с прошлогодними датами «4–10 сентября»</b> — заменить на «31 августа – 6 сентября 2026». На странице год не указан нигде — добавить «2026».</li>
+        <li><span class="p pa">A</span> <b>Главный пробел — нет расписания уроков.</b> Ядро такой страницы по мировой практике — сетка: день × время × направление × возраст, и запись на <b>конкретный урок</b>, а не общая форма «оставьте телефон». Плюс честный дефицит: «на уроке 6–8 мест» (у нас это правда). Расписание уже есть в CRM — могу выгрузить готовую таблицу для Tilda.</li>
+        <li><span class="p pa">A</span> <b>Нет телефона</b> — как на day: tel-ссылка + sticky-кнопка.</li>
+        <li><span class="p pb">B</span> Блок «что будет после урока»: обратная связь педагога + подбор группы + «−15% при оформлении в день урока» — закрывает вопрос «а дальше что».</li>
+        <li><span class="p pb">B</span> Отдельный акцент на перезапущенный английский (главная витрина обещаний рассылки): «уроки по уровням Cambridge — приходите послушать».</li>
+        <li><span class="p pc">C</span> Schema Event, lazy load (0 из 52 изображений — страница тяжёлая), обратный отсчёт.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Сквозное (все три сайта)</h2>
+    <div class="card">
+      <ul class="tight">
+        <li><span class="p pb">B</span> <b>Перелинковка:</b> главная должна вести на day/week (блок событий), а day/week — обратно на kidsup.ru (в направления и прайс) и друг на друга («не успеваете 30-го? Приходите на открытый урок 31.08–06.09»). Сейчас связки нет — каждая страница живёт отдельно.</li>
+        <li><span class="p pb">B</span> <b>UTM-дисциплина:</b> все ссылки из рассылок, листовок и соцсетей — с utm_source/medium/campaign (рассылка №2, чаты ЖК, промоутер). Без этого Roistat не разделит каналы даже после починки форм.</li>
+        <li><span class="p pc">C</span> Единая шапка-идентичность: логотип + телефон + адрес на всех трёх сайтах в одном стиле (сейчас day/week выглядят «отвязанными» от бренда).</li>
+        <li><span class="p pc">C</span> Ретаргетинг: VK-пиксель стоит на главной — проверить, что он же на day/week; аудитории «был на day/week, не оставил заявку» — самые дешёвые показы конца августа.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Порядок работ</h2>
+    <div class="card">
+      <div class="tablewrap"><table>
+        <tr><th>Когда</th><th>Работы</th><th>Часов</th></tr>
+        <tr><td><b>До 15.08</b></td><td>Приоритет A: descriptions на day/week; телефоны tel: на day/week; формы → Roistat + цели Метрики; развести «бесплатный день» и «пробную неделю»; встроить квиз на главную</td><td>~3–4</td></tr>
+        <tr><td><b>До 20.08</b></td><td>Приоритет B: баннер дедлайна + блок событий на главной; программа дня на day; сетка расписания на week (таблицу дам); H1/description главной; заглушка телефона; возраст в формах; lazy load</td><td>~5–6</td></tr>
+        <tr><td><b>До 30.08</b></td><td>Оффер −15% на day/week; перелинковка; UTM в рассылке №2; статический коллтрекинг</td><td>~2–3</td></tr>
+        <tr><td><b>01–10.09</b></td><td>Приоритет C: новые цены на /price; /english под перезапуск; /summercamp → лист ожидания 2027; schema Event/LocalBusiness; alt-тексты; ретаргет-аудитории</td><td>~4–5</td></tr>
+      </table></div>
+      <p class="note">Все правки — внутри Tilda, программист не нужен. Что могу сделать я: тексты всех блоков и мета-тегов (пришлю по первому запросу), таблица расписания уроков для week из CRM, проверка форм → Roistat после включения (увижу лиды в API), контроль после каждого этапа.</p>
+    </div>
+  </section>
+
+  <div class="footer">
+    Аудит сайтов KidsUP · 12.08.2026 · проверено программно: HTML, мета-теги, счётчики (Метрика/GA/Roistat/VK), robots.txt, sitemap (29 страниц), формы, телефоны, изображения и lazy load, прайс · сверено с данными Roistat API (визиты есть, лидов 0) и лучшими практиками конверсионных страниц детских центров («Яркие мы», урок 4: агрегаторы и сайт).
+  </div>
+</div>
