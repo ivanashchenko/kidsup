@@ -666,8 +666,10 @@ def _migrations() -> None:
                 WHERE campaign = 'no1_digest' AND status IN ('cancelled', 'pending')""",
                 (NO1_TEXT_V2,))
             log.info("миграция no1_text_v2: обновлено %d сообщений", cur.rowcount)
-    if _mark("migration", "no1_eng_ps_v1"):
-        # выпускникам английского прошлых лет — P.S. про новый формат курса
+    if _mark("migration", "no1_eng_ps_v2"):
+        # выпускникам английского прошлых лет — P.S. про новый формат курса:
+        # и в основной рассылке, и в извинениях (утренним 83 основное письмо
+        # повторно не уходит, P.S. едет с извинением)
         with db.get_conn() as conn:
             _bq_init(conn)
             phones = _eng_alumni_phones(conn)
@@ -677,10 +679,11 @@ def _migrations() -> None:
                 marks = ",".join("?" * len(chunk))
                 cur = conn.execute(
                     f"""UPDATE broadcast_queue SET text = text || ?
-                        WHERE campaign = 'no1_digest' AND status = 'pending'
+                        WHERE campaign IN ('no1_digest', 'no1_apology')
+                          AND status = 'pending' AND text NOT LIKE '%перезапустили английский%'
                           AND phone IN ({marks})""", (ENG_PS, *chunk))
                 n += cur.rowcount
-            log.info("миграция no1_eng_ps_v1: P.S. про английский у %d сообщений", n)
+            log.info("миграция no1_eng_ps_v2: P.S. про английский у %d сообщений", n)
 
 
 ENG_PS = (
