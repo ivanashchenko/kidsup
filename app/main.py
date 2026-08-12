@@ -601,6 +601,14 @@ async def api_broadcast_cancel(payload: dict = None):
     return {"cancelled": autopilot.broadcast_cancel((payload or {}).get("campaign"))}
 
 
+@app.post("/api/broadcast/requeue-undelivered", dependencies=AUTH)
+async def api_broadcast_requeue(payload: dict = None):
+    """Вернуть в очередь недоставленное в Telegram/MAX (доставка упала после
+    ответа API). Опционально {"day": "2026-08-12"} — по умолчанию сегодня."""
+    from . import autopilot
+    return autopilot.broadcast_requeue_undelivered((payload or {}).get("day"))
+
+
 @app.get("/api/replies", dependencies=AUTH)
 async def api_replies(since: str = ""):
     """Кто ответил в мессенджерах (с момента установки учёта). since=YYYY-MM-DD."""

@@ -238,6 +238,47 @@ def broadcast_status() -> dict:
     return out
 
 
+def broadcast_requeue_undelivered(day: str | None = None) -> dict:
+    """Вернуть в очередь «мнимо-отправленное»: строки, ушедшие в Telegram/MAX
+    со статусом sent, реально не доставились (Wazzup отвечает 200, а доставка
+    падает уже после — красный «!» в чате). Для каждого телефона: если ни одна
+    строка дня не доставлена в WhatsApp — исходная (первая) кампания
+    возвращается в pending, остальные строки дня помечаются skipped_dup,
+    чтобы семья в итоге получила ровно одно сообщение."""
+    d = day or _today().isoformat()
+    requeued = skipped = 0
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        try:
+            conn.execute("ALTER TABLE broadcast_queue ADD COLUMN tried TEXT DEFAULT ''")
+        except Exception:
+            pass
+        rows = conn.execute(
+            "SELECT id, phone, COALESCE(tried,''), status FROM broadcast_queue "
+            "WHERE created LIKE ? OR sent LIKE ?", (d + "%", d + "%")).fetchall()
+        byphone: dict[str, list] = {}
+        for r in rows:
+            byphone.setdefault(r[1], []).append(r)
+        for phone, rs in byphone.items():
+            if any("whatsapp=ok" in r[2] for r in rs):
+                continue                       # семья получила в WhatsApp
+            if not any(("tgapi=ok" in r[2]) or ("max=ok" in r[2]) for r in rs):
+                continue                       # мнимых отправок нет
+            keep = min(rs, key=lambda r: r[0])
+            for r in rs:
+                if r[0] == keep[0]:
+                    conn.execute("UPDATE broadcast_queue SET status='pending', "
+                                 "tried='', sent=NULL WHERE id=?", (r[0],))
+                    requeued += 1
+                elif r[3] in ("sent", "pending"):
+                    conn.execute("UPDATE broadcast_queue SET status='skipped_dup' "
+                                 "WHERE id=?", (r[0],))
+                    skipped += 1
+    log.info("broadcast: requeue %s — %d строк в очередь, %d дублей снято",
+             d, requeued, skipped)
+    return {"day": d, "requeued": requeued, "duplicates_skipped": skipped}
+
+
 def broadcast_cancel(campaign: str | None = None) -> int:
     with db.get_conn() as conn:
         _bq_init(conn)
@@ -259,13 +300,18 @@ def _broadcast_tick() -> None:
     db.set_setting("broadcast_last_tick", now.isoformat(timespec="seconds"))
     if not (10 <= now.hour < 19):
         return
-    transports = [x.strip() for x in
-                  (db.get_setting("broadcast_transports", "tgapi") or "tgapi").split(",") if x.strip()]
-    budgets = {"tgapi": max(1, int(db.get_setting("broadcast_per_hour", "60") or 60) // 60)}
-    if now.minute % 4 == 0:
-        budgets["whatsapp"] = 1   # 15/час
-    if now.minute % 2 == 0:
-        budgets["max"] = 1        # 30/час
+    # 12.08: инициирующие рассылки — только WhatsApp, независимо от настройки.
+    # Telegram «принимается» Wazzup-ом, но не доставляется незнакомым номерам
+    # (упали все 100% отправок), MAX заблокирован. Настройка broadcast_transports
+    # может лишь сузить (выключить и WhatsApp), но не вернуть tgapi/max.
+    setting = [x.strip() for x in
+               (db.get_setting("broadcast_transports", "whatsapp") or "whatsapp").split(",") if x.strip()]
+    transports = ["whatsapp"] if "whatsapp" in setting else []
+    if not transports:
+        return
+    budgets = {}
+    if now.minute % 10 == 0:
+        budgets["whatsapp"] = 1   # 6/час — щадящий темп после блокировки 0077
     day = now.strftime("%Y-%m-%d")
     with db.get_conn() as conn:
         _bq_init(conn)
@@ -276,7 +322,7 @@ def _broadcast_tick() -> None:
         wa_today = conn.execute(
             "SELECT COUNT(*) FROM broadcast_queue WHERE status='sent' "
             "AND sent LIKE ? AND tried LIKE '%whatsapp=ok%'", (day + "%",)).fetchone()[0]
-        if wa_today >= int(db.get_setting("wa_daily_cap", "50") or 50):
+        if wa_today >= int(db.get_setting("wa_daily_cap", "25") or 25):
             budgets.pop("whatsapp", None)
         rows = conn.execute(
             "SELECT id, phone, child, text, COALESCE(tried,'') FROM broadcast_queue "
