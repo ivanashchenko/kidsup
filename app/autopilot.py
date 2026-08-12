@@ -863,6 +863,16 @@ def _migrations() -> None:
         db.set_setting("broadcast_transports", "whatsapp")
         res = broadcast_requeue_undelivered("2026-08-12")
         log.info("миграция replied_requeue_v1: 20 ответивших отмечено, requeue: %s", res)
+    if _mark("migration", "anna_away_v1"):
+        # Анна отсутствует 13–15.08 — утренние порции только Дарье
+        try:
+            sched = json.loads(db.get_setting("admin_schedule") or "{}")
+        except ValueError:
+            sched = {}
+        for d in ("2026-08-13", "2026-08-14", "2026-08-15"):
+            sched[d] = 232763  # Дарья Чистякова
+        db.set_setting("admin_schedule", json.dumps(sched))
+        log.info("миграция anna_away_v1: смены 13–15.08 закреплены за Дарьей")
     if _mark("migration", "no1_eng_ps_v3"):
         # выпускникам английского прошлых лет — P.S. про новый формат курса:
         # и в основной рассылке, и в извинениях. Телефоны сравниваем по
