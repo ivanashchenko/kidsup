@@ -829,6 +829,15 @@ def _loop() -> None:
                 finally:
                     mk.close()
             _retry_forwards()
+            # автосинхронизация с МойКласс каждые 30 минут (08:00-20:00),
+            # чтобы /enrollment не отставал от записей админов
+            if 8 <= now.hour < 20 and now.minute in (0, 30) \
+                    and _mark("autosync", now.strftime("%Y-%m-%d %H:%M")):
+                try:
+                    from . import sync as _sync
+                    _sync.start_sync()
+                except Exception:
+                    log.exception("автосинк не запустился")
             try:
                 _broadcast_tick()
             except Exception:

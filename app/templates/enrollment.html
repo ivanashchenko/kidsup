@@ -5,7 +5,7 @@
 <p class="muted">Все группы нового учебного года (по префиксу «2627_» в МойКласс). Обновляется при каждой синхронизации.
 Цвет: <span style="color:#2e7d32">◼</span> есть места · <span style="color:#B97D00">◼</span> почти полна · <span style="color:#A33B2E">◼</span> полна.</p>
 
-<div class="card">
+<div class="card" style="overflow-x:auto">
   <form method="get" style="margin-bottom:12px">
     <label>Направление:
       <select name="course" onchange="this.form.submit()">
@@ -55,7 +55,7 @@
   {% if not groups %}<p class="muted">{% if course or day or free %}Под выбранные фильтры групп не нашлось — снимите фильтр или посмотрите другой день.{% else %}Группы с префиксом «2627_» не найдены — проверьте синхронизацию.{% endif %}</p>{% endif %}
 </div>
 
-<div class="card">
+<div class="card" style="overflow-x:auto">
   <h2>Сводка по направлениям</h2>
   <table>
     <tr><th>Направление</th><th class="num">Групп</th><th class="num">Записано</th><th class="num">Всего мест</th><th class="num">Свободно</th><th class="num">Заполненность</th></tr>
