@@ -246,7 +246,8 @@ def _broadcast_tick() -> None:
     with db.get_conn() as conn:
         _bq_init(conn)
         rows = conn.execute("SELECT id, phone, child, text FROM broadcast_queue "
-                            "WHERE status='pending' ORDER BY id LIMIT ?",
+                            "WHERE status='pending' "
+                            "ORDER BY campaign = 'no1_apology' DESC, id LIMIT ?",
                             (per_min,)).fetchall()
     for rid, phone, child, text in rows:
         msg = _fill_name(text, child)
@@ -627,8 +628,30 @@ NO1_TEXT_V2 = (
     "или 🏫 уже думаем про сентябрь? Можно просто смайликом 🙂")
 
 
+APOLOGY_TEXT = (
+    "Ой, неловко вышло 🙈 Это снова KidsUP. Утром наша автоматическая "
+    "рассылка сглючила и перепутала имя — обратилась к вам по фамилии. "
+    "Простите! Робота мы уже починили, а всё остальное в сообщении — "
+    "чистая правда: 29.08 (сб.) праздник с аниматорами и беспроигрышной "
+    "лотереей в парке «Янтарная горка», 30.08 (вс.) День открытых дверей, "
+    "с 31.08 Неделя открытых уроков — всё бесплатно. Хорошего остатка "
+    "лета вашей семье! 💛")
+
+
 def _migrations() -> None:
     """Одноразовые правки данных, приезжают вместе с кодом."""
+    if _mark("migration", "no1_apology_v1"):
+        # тем, кому утром ушёл текст с фамилией, — извинение (уходит первым,
+        # см. приоритет кампании в _broadcast_tick)
+        with db.get_conn() as conn:
+            _bq_init(conn)
+            cur = conn.execute("""
+                INSERT INTO broadcast_queue (campaign, phone, child, text, created)
+                SELECT 'no1_apology', phone, child, ?, ?
+                FROM broadcast_queue
+                WHERE campaign = 'no1_digest' AND status = 'sent'""",
+                (APOLOGY_TEXT, _now().isoformat(timespec="seconds")))
+            log.info("миграция no1_apology_v1: %d извинений в очереди", cur.rowcount)
     if _mark("migration", "no1_text_v2"):
         # рассылка №1: остановленным сообщениям — новый текст, полное имя
         # из CRM (для склонения) и обратно в очередь
