@@ -666,6 +666,43 @@ def _migrations() -> None:
                 WHERE campaign = 'no1_digest' AND status IN ('cancelled', 'pending')""",
                 (NO1_TEXT_V2,))
             log.info("миграция no1_text_v2: обновлено %d сообщений", cur.rowcount)
+    if _mark("migration", "no1_eng_ps_v1"):
+        # выпускникам английского прошлых лет — P.S. про новый формат курса
+        with db.get_conn() as conn:
+            _bq_init(conn)
+            phones = _eng_alumni_phones(conn)
+            n = 0
+            for i in range(0, len(phones), 400):
+                chunk = phones[i:i + 400]
+                marks = ",".join("?" * len(chunk))
+                cur = conn.execute(
+                    f"""UPDATE broadcast_queue SET text = text || ?
+                        WHERE campaign = 'no1_digest' AND status = 'pending'
+                          AND phone IN ({marks})""", (ENG_PS, *chunk))
+                n += cur.rowcount
+            log.info("миграция no1_eng_ps_v1: P.S. про английский у %d сообщений", n)
+
+
+ENG_PS = (
+    "\n\nP.S. И отдельная новость для вас: мы полностью перезапустили "
+    "английский. Группы теперь строго по уровням Cambridge — начинающих "
+    "и продолжающих не смешиваем; у каждого ученика — языковой паспорт "
+    "с замерами прогресса три раза в год, а раз в два месяца родители "
+    "получают видео, где ребёнок говорит по-английски. На Неделе открытых "
+    "уроков (31.08–06.09) покажем новый формат в деле — приходите 🇬🇧")
+
+ENG_COURSE_ID = 82621  # «Английский язык»
+
+
+def _eng_alumni_phones(conn) -> list[str]:
+    """Телефоны семей, чьи дети ходили на курсовой английский с осени 2024."""
+    return [r[0] for r in conn.execute("""
+        SELECT DISTINCT u.phone FROM users u
+        JOIN lesson_records lr ON lr.user_id = u.id
+        JOIN lessons l ON l.id = lr.lesson_id
+        JOIN classes cl ON cl.id = l.class_id
+        WHERE cl.course_id = ? AND lr.visit = 1 AND l.date >= '2024-09-01'
+          AND u.phone IS NOT NULL AND u.phone != ''""", (ENG_COURSE_ID,))]
 
 
 def _loop() -> None:
