@@ -114,10 +114,13 @@ GIVEN_NAMES = set("""
 ольга полина рада раиса регина римма роза сабина сафия светлана серафима
 снежана софия софья стефания таисия тамара татьяна ульяна устинья фаина
 эвелина элина эльвира эмилия эмма юлия яна ярослава
+алена агния дания радислав джамаль бектур аннур велислава евдокия
+пелагея аглаида мирон дарий люция азалия марьям анаит айлин мадлен
 """.split())
 
 FEM_SOFT = {"любовь"}                            # женские на -ь: Любови
-INDECLINABLE = {"николь", "адель", "нелли"}      # не склоняются
+INDECLINABLE = {"николь", "адель", "нелли",      # не склоняются
+                "марьям", "анаит", "айлин", "мадлен"}
 GEN_SPECIAL = {"лев": "Льва", "павел": "Павла"}  # беглые гласные
 
 
@@ -221,9 +224,14 @@ def broadcast_status() -> dict:
         _bq_init(conn)
         rows = conn.execute("SELECT campaign, status, COUNT(*) FROM broadcast_queue "
                             "GROUP BY campaign, status").fetchall()
+        ps = conn.execute("SELECT campaign, status, COUNT(*) FROM broadcast_queue "
+                          "WHERE text LIKE '%перезапустили английский%' "
+                          "GROUP BY campaign, status").fetchall()
     out: dict = {}
     for camp, status, cnt in rows:
         out.setdefault(camp, {})[status] = cnt
+    for camp, status, cnt in ps:
+        out.setdefault(camp, {})[f"{status}_eng_ps"] = cnt
     return out
 
 
@@ -666,24 +674,28 @@ def _migrations() -> None:
                 WHERE campaign = 'no1_digest' AND status IN ('cancelled', 'pending')""",
                 (NO1_TEXT_V2,))
             log.info("миграция no1_text_v2: обновлено %d сообщений", cur.rowcount)
-    if _mark("migration", "no1_eng_ps_v2"):
+    if _mark("migration", "no1_eng_ps_v3"):
         # выпускникам английского прошлых лет — P.S. про новый формат курса:
-        # и в основной рассылке, и в извинениях (утренним 83 основное письмо
-        # повторно не уходит, P.S. едет с извинением)
+        # и в основной рассылке, и в извинениях. Телефоны сравниваем по
+        # последним 10 цифрам — формат в очереди и в users может отличаться
         with db.get_conn() as conn:
             _bq_init(conn)
-            phones = _eng_alumni_phones(conn)
-            n = 0
-            for i in range(0, len(phones), 400):
-                chunk = phones[i:i + 400]
-                marks = ",".join("?" * len(chunk))
-                cur = conn.execute(
-                    f"""UPDATE broadcast_queue SET text = text || ?
-                        WHERE campaign IN ('no1_digest', 'no1_apology')
-                          AND status = 'pending' AND text NOT LIKE '%перезапустили английский%'
-                          AND phone IN ({marks})""", (ENG_PS, *chunk))
-                n += cur.rowcount
-            log.info("миграция no1_eng_ps_v2: P.S. про английский у %d сообщений", n)
+            def norm(p):
+                return "".join(ch for ch in (p or "") if ch.isdigit())[-10:]
+            alumni = {norm(p) for p in _eng_alumni_phones(conn)}
+            alumni.discard("")
+            rows = conn.execute(
+                "SELECT id, phone FROM broadcast_queue "
+                "WHERE campaign IN ('no1_digest', 'no1_apology') AND status = 'pending' "
+                "AND text NOT LIKE '%перезапустили английский%'").fetchall()
+            ids = [r[0] for r in rows if norm(r[1]) in alumni]
+            for i in range(0, len(ids), 400):
+                chunk = ids[i:i + 400]
+                conn.execute(
+                    f"UPDATE broadcast_queue SET text = text || ? "
+                    f"WHERE id IN ({','.join('?' * len(chunk))})", (ENG_PS, *chunk))
+            log.info("миграция no1_eng_ps_v3: P.S. про английский у %d сообщений "
+                     "(выпускников в базе: %d)", len(ids), len(alumni))
 
 
 ENG_PS = (
