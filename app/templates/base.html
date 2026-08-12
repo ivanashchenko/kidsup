@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}KidsUp Analytics{% endblock %}</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">🎈 KidsUp <span>Analytics</span></div>
+  <div class="brand"><img src="/static/logo.svg" alt="KidsUP"> KidsUP <span>Analytics</span></div>
   <nav>
     <a href="/" class="{{ 'active' if active == 'dashboard' }}">Дашборд</a>
     <a href="/students" class="{{ 'active' if active == 'students' }}">Ученики</a>

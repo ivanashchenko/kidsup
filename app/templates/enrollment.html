@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Набор групп 2026/27</h1>
 <p class="muted">Все группы нового учебного года (по префиксу «2627_» в МойКласс). Обновляется при каждой синхронизации.
-Цвет: <span style="color:#2e7d32">◼</span> есть места · <span style="color:#B97D00">◼</span> почти полна · <span style="color:#A33B2E">◼</span> полна.</p>
+Обновляется автоматически каждые 5 минут. <span class="chip free">есть места</span> <span class="chip warn">почти полна</span> <span class="chip full">полна</span></p>
 
 <div class="card" style="overflow-x:auto">
   <form method="get" style="margin-bottom:12px">
@@ -41,11 +41,9 @@
       <td>{{ g.time }}</td>
       <td class="num">{{ g.enrolled }}</td>
       <td class="num">{{ g.capacity }}</td>
-      <td class="num"><b>{{ g.free }}</b></td>
+      <td class="num"><span class="chip {{ 'full' if g.free == 0 else 'warn' if g.fill_pct >= 75 else 'free' }}">{{ g.free }}</span></td>
       <td>
-        <div style="background:#eee;border-radius:6px;width:120px;height:14px;overflow:hidden">
-          <div style="height:14px;width:{{ g.fill_pct }}%;background:{{ g.color }}"></div>
-        </div>
+        <div class="bar"><div style="width:{{ g.fill_pct }}%;background:{{ g.color }}"></div></div>
         <span class="muted" style="font-size:12px">{{ g.fill_pct }}%</span>
       </td>
       <td class="num">{{ "+" ~ g.fresh if g.fresh else "—" }}</td>

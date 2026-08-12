@@ -167,3 +167,20 @@ def test_connection(api_key: str) -> tuple[bool, str]:
     finally:
         if client is not None:
             client.close()
+
+
+def light_sync() -> None:
+    """Быстрое обновление только групп и записей (для «Набора 26/27»).
+
+    Полная синхронизация тяжёлая (уроки, платежи, визиты), а записи в группы
+    меняются каждый час — обновляем их отдельно раз в 5 минут."""
+    if sync_running():
+        return
+    from .moyklass_client import MoyklassClient
+    client = MoyklassClient(get_api_key())
+    try:
+        db.save_classes(client.fetch_optional("/v1/company/classes", ["classes"]))
+        db.save_joins(client.fetch_optional("/v1/company/joins", ["joins"]))
+        db.set_state("last_light_sync", __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    finally:
+        client.close()

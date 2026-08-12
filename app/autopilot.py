@@ -711,6 +711,9 @@ APOLOGY_TEXT = (
 
 def _migrations() -> None:
     """Одноразовые правки данных, приезжают вместе с кодом."""
+    if _mark("migration", "roistat_project_v1"):
+        if not db.get_setting("roistat_project"):
+            db.set_setting("roistat_project", "228571")  # Kids UP в Roistat
     if _mark("migration", "no1_resume_tg_v1"):
         # WhatsApp 0077 заблокирован за массовость: остаток рассылки — только
         # Telegram (настройка broadcast_transports); заморозку вернуть в очередь
@@ -829,15 +832,22 @@ def _loop() -> None:
                 finally:
                     mk.close()
             _retry_forwards()
-            # автосинхронизация с МойКласс каждые 30 минут (08:00-20:00),
-            # чтобы /enrollment не отставал от записей админов
-            if 8 <= now.hour < 20 and now.minute in (0, 30) \
-                    and _mark("autosync", now.strftime("%Y-%m-%d %H:%M")):
+            # лёгкий синк групп и записей каждые 5 минут (08:00-21:00) —
+            # «Набор 26/27» видит новые записи почти сразу; полный синк —
+            # раз в день утром и по кнопке
+            if 8 <= now.hour < 21 and now.minute % 5 == 0 \
+                    and _mark("lightsync", now.strftime("%Y-%m-%d %H:%M")):
+                try:
+                    from . import sync as _sync
+                    threading.Thread(target=_sync.light_sync, daemon=True).start()
+                except Exception:
+                    log.exception("лёгкий синк не запустился")
+            if now.hour == 7 and now.minute < 2 and _mark("fullsync", str(_today())):
                 try:
                     from . import sync as _sync
                     _sync.start_sync()
                 except Exception:
-                    log.exception("автосинк не запустился")
+                    log.exception("полный автосинк не запустился")
             try:
                 _broadcast_tick()
             except Exception:
@@ -850,6 +860,13 @@ def _loop() -> None:
                     mk.close()
             if now.hour >= 20 and _mark("digest", str(_today())):
                 daily_digest()
+            if now.hour >= 21 and _mark("roistat", str(_today())):
+                try:
+                    from . import roistat as _ro
+                    from datetime import timedelta as _td
+                    _ro.push(since=(_today() - _td(days=2)).isoformat(), dry_run=False)
+                except Exception:
+                    log.exception("roistat push не удался")
         except Exception:
             log.exception("autopilot: ошибка цикла")
         time.sleep(60)

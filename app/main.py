@@ -176,7 +176,7 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
             "time": " · ".join(times[:2]) or "—",
             "enrolled": enrolled, "capacity": cap,
             "free": max(0, cap - enrolled), "fresh": r["fresh"] or 0, "fill_pct": fill,
-            "color": "#A33B2E" if fill >= 100 else "#B97D00" if fill >= 75 else "#2e7d32",
+            "color": "#E5232A" if fill >= 100 else "#F5A81C" if fill >= 75 else "#5FB53B",
         })
     courses_list = sorted({g["course"] for g in groups})
     if course:
@@ -543,7 +543,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-12.16"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-12.17"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
