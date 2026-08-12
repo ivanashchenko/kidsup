@@ -166,12 +166,13 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         parts = name.split("_")
         g_days = _name_days(name)
         times = _TIME_RE.findall(name)
+        buffer = "аявк" in name  # группы «Заявки» — буфер без лимита мест
         cap = r["max_students"] or 8
         enrolled = r["enrolled"] or 0
-        fill = min(100, round(enrolled * 100 / cap)) if cap else 0
+        fill = 0 if buffer else (min(100, round(enrolled * 100 / cap)) if cap else 0)
         groups.append({
             "name": name, "course": r["course"] or (parts[1] if len(parts) > 1 else "?"),
-            "days": g_days,
+            "days": g_days, "buffer": buffer,
             "day": " · ".join(DAY_LABEL[d] for d in g_days) or "—",
             "time": " · ".join(times[:2]) or "—",
             "enrolled": enrolled, "capacity": cap,
@@ -200,7 +201,8 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         s = summary.setdefault(g["course"], {"course": g["course"], "groups": 0,
                                              "enrolled": 0, "capacity": 0, "free": 0})
         s["groups"] += 1; s["enrolled"] += g["enrolled"]
-        s["capacity"] += g["capacity"]; s["free"] += g["free"]
+        if not g["buffer"]:
+            s["capacity"] += g["capacity"]; s["free"] += g["free"]
     for s in summary.values():
         s["fill_pct"] = round(s["enrolled"] * 100 / s["capacity"]) if s["capacity"] else 0
     return render(request, "enrollment.html", active="enrollment",
@@ -543,7 +545,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-12.17"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-12.18"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")

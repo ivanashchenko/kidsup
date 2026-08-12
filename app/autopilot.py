@@ -232,6 +232,9 @@ def broadcast_status() -> dict:
         out.setdefault(camp, {})[status] = cnt
     for camp, status, cnt in ps:
         out.setdefault(camp, {})[f"{status}_eng_ps"] = cnt
+    out["_diag"] = {"last_tick": db.get_setting("broadcast_last_tick"),
+                    "last_error": db.get_setting("broadcast_last_error"),
+                    "transports": db.get_setting("broadcast_transports", "tgapi")}
     return out
 
 
@@ -253,6 +256,7 @@ def _broadcast_tick() -> None:
     Строка уходит в ПЕРВЫЙ доставивший канал; недоставленное копит попытки
     в колонке tried и ждёт своего канала."""
     now = _now()
+    db.set_setting("broadcast_last_tick", now.isoformat(timespec="seconds"))
     if not (10 <= now.hour < 19):
         return
     transports = [x.strip() for x in
@@ -850,8 +854,13 @@ def _loop() -> None:
                     log.exception("полный автосинк не запустился")
             try:
                 _broadcast_tick()
-            except Exception:
+            except Exception as e:
                 log.exception("broadcast_tick упал — продолжаем")
+                try:
+                    db.set_setting("broadcast_last_error",
+                                   f"{_now().isoformat(timespec='seconds')}: {type(e).__name__}: {e}"[:300])
+                except Exception:
+                    pass
             if (now.hour, now.minute) >= (19, 45) and _mark("areject", str(_today())):
                 mk = _client()
                 try:
