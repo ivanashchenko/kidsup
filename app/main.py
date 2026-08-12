@@ -507,14 +507,43 @@ def _wazzup_tag(payload: dict) -> None:
             logging.getLogger("kidsup.wazzup").exception("тег канала: не вышло для %s", phone)
 
 
+def _inbox_store(payload: dict) -> None:
+    """Входящие сообщения — в свою таблицу: кто и что ответил (для /api/replies)."""
+    from . import autopilot
+    rows = []
+    for msg in payload.get("messages", []):
+        if msg.get("isEcho"):
+            continue  # наши исходящие
+        phone = "".join(ch for ch in str(msg.get("chatId") or "") if ch.isdigit())
+        if len(phone) < 10:
+            continue
+        text = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
+        rows.append((autopilot._now().isoformat(timespec="seconds"), phone,
+                     (msg.get("chatType") or "")[:12], text[:500],
+                     str(msg.get("messageId") or "")))
+    if not rows:
+        return
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_inbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+            chat_type TEXT, text TEXT, message_id TEXT UNIQUE)""")
+        conn.executemany(
+            "INSERT OR IGNORE INTO wazzup_inbox (ts, phone, chat_type, text, message_id) "
+            "VALUES (?, ?, ?, ?, ?)", rows)
+
+
 def _wazzup_process(payload: dict) -> None:
+    try:
+        _inbox_store(payload)
+    except Exception:
+        logging.getLogger("kidsup.wazzup").exception("inbox: не сохранилось")
     if not wazzup_forward(payload):
         _fwd_store(payload)  # автопилот дошлёт позже
         logging.getLogger("kidsup.wazzup").warning("пересылка в МойКласс не удалась — в очередь")
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-12.11"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-12.12"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -568,6 +597,30 @@ async def api_broadcast_status():
 async def api_broadcast_cancel(payload: dict = None):
     from . import autopilot
     return {"cancelled": autopilot.broadcast_cancel((payload or {}).get("campaign"))}
+
+
+@app.get("/api/replies", dependencies=AUTH)
+async def api_replies(since: str = ""):
+    """Кто ответил в мессенджерах (с момента установки учёта). since=YYYY-MM-DD."""
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_inbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+            chat_type TEXT, text TEXT, message_id TEXT UNIQUE)""")
+        rows = conn.execute(
+            "SELECT ts, phone, chat_type, text FROM wazzup_inbox "
+            "WHERE ts >= ? ORDER BY ts", (since or "2026-01-01",)).fetchall()
+        sent = {"".join(ch for ch in (r[0] or "") if ch.isdigit())[-10:]
+                for r in conn.execute("SELECT phone FROM broadcast_queue WHERE status='sent'")}
+        names = {}
+        for uid, name, phone in conn.execute("SELECT id, name, phone FROM users WHERE phone IS NOT NULL"):
+            names["".join(ch for ch in str(phone) if ch.isdigit())[-10:]] = name
+    out = []
+    for ts, phone, chat_type, text in rows:
+        p10 = phone[-10:]
+        out.append({"ts": ts, "phone": phone, "name": names.get(p10),
+                    "channel": chat_type, "text": text,
+                    "got_broadcast": p10 in sent})
+    return {"count": len(out), "replies": out}
 
 
 @app.post("/api/autopilot/morning", dependencies=AUTH)
