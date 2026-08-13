@@ -338,7 +338,13 @@ def _broadcast_tick() -> None:
     в колонке tried и ждёт своего канала."""
     now = _now()
     db.set_setting("broadcast_last_tick", now.isoformat(timespec="seconds"))
-    if not (10 <= now.hour < 19):
+    # окно отправки: с 10:00 до broadcast_until (по умолчанию 19:00)
+    until = (db.get_setting("broadcast_until", "19:00") or "19:00").strip()
+    try:
+        uh, um = (int(x) for x in until.split(":"))
+    except Exception:
+        uh, um = 19, 0
+    if now.hour < 10 or (now.hour, now.minute) >= (uh, um):
         return
     # 12.08: инициирующие рассылки — только WhatsApp, независимо от настройки.
     # Telegram «принимается» Wazzup-ом, но не доставляется незнакомым номерам
