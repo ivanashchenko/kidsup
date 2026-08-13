@@ -13,7 +13,7 @@ th{background:var(--fill);text-align:left;font-size:.68rem;letter-spacing:.04em;
 td{padding:.38rem .6rem;border-top:1px solid var(--line);vertical-align:top}td.w{white-space:nowrap;font-weight:650}
 .note{border-left:3px solid var(--accent);background:var(--asoft);padding:.5rem .8rem;border-radius:0 8px 8px 0;margin:.6rem 0}
 .warn{border-left:3px solid var(--risk);background:var(--rsoft);padding:.5rem .8rem;border-radius:0 8px 8px 0;margin:.6rem 0}
-.q{background:var(--fill);border:1px solid var(--line);border-radius:8px;padding:.45rem .7rem;margin:.35rem 0;font-style:italic;font-size:.86rem}
+.q{display:block;background:var(--fill);border:1px solid var(--line);border-radius:8px;padding:.45rem .7rem;margin:.35rem 0;font-style:italic;font-size:.86rem}
 strong{font-weight:700}.small{font-size:.78rem;color:var(--muted)}
 .grid2{display:grid;gap:.5rem;grid-template-columns:1fr 1fr;margin:.5rem 0}
 .card{border:1px solid var(--line);border-radius:8px;padding:.5rem .7rem;font-size:.85rem}
@@ -38,7 +38,7 @@ strong{font-weight:700}.small{font-size:.78rem;color:var(--muted)}
 <li>Дефицит только настоящий: цифру мест берём из enrollment. Выдуманное «осталось 2 места» запрещено.</li>
 <li>Не звоним номеру дважды в один час. Недозвон = статус, система догонит сама.</li>
 <li>Два «нет» — благодарим, тепло прощаемся; причина отказа — в карточку обязательно.</li>
-<li>Исходящие незнакомым — только WhatsApp. В Telegram лишь отвечаем написавшим; MAX не используем.</li>
+<li>Исходящие незнакомым — только WhatsApp. В Telegram и MAX первыми не пишем — только отвечаем написавшим.</li>
 </ul>
 <div class="note"><strong>Статусы воронки (после звонка ставим ровно один):</strong> лид приходит как «1. Новый лид» → «2. Недозвон (в работе)» — система догонит сама · «3. Думает (разговор состоялся)» — система напомнит перезвонить · «4. Записался на пробное» · «5. Посетил пробное» — ставим после визита · «6. Думает после пробного» → купил = запись в группу · «Отказ» — после двух «нет», всегда с причиной. Старые статусы («Клиент», «Неактивный») не используем — всё в «0. Архив набора до 2026».</div>
 <div class="warn"><strong>Причины — всегда и точно (по ним считается вся аналитика):</strong> «Отказался» → одна из: Дорого · Расписание/далеко · Другой центр · Переехали · Возраст · Болезни · Не понравилось на пробном · Передумали · Недозвон (6) · Ошибка базы. «Завершил» → «Перевод: …» (остался у нас / доучился) или «Ушёл: …» (дорого / расписание / переезд / болезни / нет результата / другой центр). «Иная» ≤ 5% и только с комментарием. Причина = слова родителя после уточняющего вопроса, не догадка.</div>
