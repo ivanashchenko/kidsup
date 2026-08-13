@@ -545,7 +545,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-12.18"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-13.19"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -574,6 +574,36 @@ async def api_set_setting(payload: dict):
         raise HTTPException(400, f"key должен быть одним из {sorted(SETTABLE)}")
     db.set_setting(key, str(value))
     return {"ok": True, key: db.get_setting(key)}
+
+
+@app.post("/api/deploy", dependencies=AUTH)
+async def api_deploy(request: Request):
+    """Самообновление: тело запроса — tar.gz с app/ и requirements.txt.
+    Распаковывает в корень проекта и перезапускает службу через 2 секунды.
+    Допустимы только относительные пути внутри app/ и requirements.txt."""
+    import tarfile
+    import threading
+    import subprocess
+    data = await request.body()
+    if len(data) < 1000 or len(data) > 50_000_000:
+        raise HTTPException(400, "подозрительный размер архива")
+    root = Path(__file__).resolve().parent.parent
+    try:
+        tar = tarfile.open(fileobj=io.BytesIO(data), mode="r:gz")
+    except tarfile.TarError as e:
+        raise HTTPException(400, f"не tar.gz: {e}")
+    names = tar.getnames()
+    for n in names:
+        p = Path(n)
+        if p.is_absolute() or ".." in p.parts or \
+                not (n == "requirements.txt" or n == "app" or n.startswith("app/")):
+            raise HTTPException(400, f"недопустимый путь в архиве: {n}")
+    tar.extractall(root)  # noqa: S202 — пути проверены выше
+    log.info("deploy: распаковано %d файлов, перезапуск через 2 с", len(names))
+    threading.Timer(2.0, lambda: subprocess.Popen(
+        ["systemctl", "restart", "kidsup"])).start()
+    return {"ok": True, "files": len(names), "restarting": True,
+            "hint": "через ~10 секунд проверьте /api/health — version должна смениться"}
 
 
 @app.post("/api/broadcast", dependencies=AUTH)
