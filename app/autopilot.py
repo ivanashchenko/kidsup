@@ -225,6 +225,28 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
     return {"campaign": campaign, "segment": segment, "queued": n}
 
 
+def broadcast_add(campaign: str, text: str, recipients: list) -> dict:
+    """Добавляет явный список получателей [{phone, child}] в кампанию.
+    Телефоны, уже присутствующие в кампании, пропускаются."""
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        existing = {r[0] for r in conn.execute(
+            "SELECT phone FROM broadcast_queue WHERE campaign=?", (campaign,))}
+        now = _now().isoformat(timespec="seconds")
+        n = 0
+        for r in recipients:
+            phone = str((r or {}).get("phone") or "").strip()
+            if not phone or phone in existing:
+                continue
+            existing.add(phone)
+            conn.execute("INSERT INTO broadcast_queue (campaign, phone, child, text, created) "
+                         "VALUES (?, ?, ?, ?, ?)",
+                         (campaign, phone, str((r or {}).get("child") or "")[:120], text, now))
+            n += 1
+    log.info("broadcast_add: кампания %s — добавлено %d", campaign, n)
+    return {"campaign": campaign, "added": n}
+
+
 def broadcast_status() -> dict:
     with db.get_conn() as conn:
         _bq_init(conn)

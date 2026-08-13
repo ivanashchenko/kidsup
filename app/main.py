@@ -558,7 +558,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-13.24"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-13.25"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -642,6 +642,19 @@ async def api_broadcast(payload: dict):
     if not campaign or not text or segment not in ("warm", "contin", "camp", "regular", "y2425", "camp_past"):
         raise HTTPException(400, "нужны campaign, text и segment из списка")
     return autopilot.enqueue_broadcast(campaign, segment, text)
+
+
+@app.post("/api/broadcast/add", dependencies=AUTH)
+async def api_broadcast_add(payload: dict):
+    """{"campaign": "...", "text": "...", "recipients": [{"phone","child"},…]} —
+    добавить явный список получателей в кампанию (дубли телефонов пропускаются)."""
+    from . import autopilot
+    campaign = (payload.get("campaign") or "").strip()
+    text = (payload.get("text") or "").strip()
+    recips = payload.get("recipients")
+    if not campaign or not text or not isinstance(recips, list) or not recips:
+        raise HTTPException(400, "нужны campaign, text и непустой recipients")
+    return autopilot.broadcast_add(campaign, text, recips)
 
 
 @app.get("/api/broadcast/status", dependencies=AUTH)
