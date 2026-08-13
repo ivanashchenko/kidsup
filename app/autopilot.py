@@ -195,6 +195,12 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
             pick |= {u for u in summer if kinds.get(u) == "regular"}
         if segment in ("y2425", "warm"):
             pick |= y2425
+        if segment == "camp_past":
+            # лето 2024/2025 (лагерь и летние занятия), но НЕ были летом 2026
+            past = {r[0] for r in conn.execute(base + """
+                SELECT DISTINCT u FROM v WHERE (d>='2024-06-01' AND d<'2024-09-01')
+                OR (d>='2025-06-01' AND d<'2025-09-01')""")}
+            pick |= past - summer
         seen_phones: set[str] = set()
         n = 0
         now = _now().isoformat(timespec="seconds")
