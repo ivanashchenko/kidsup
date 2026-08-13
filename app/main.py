@@ -513,9 +513,16 @@ def _inbox_store(payload: dict) -> None:
     """Входящие сообщения — в свою таблицу: кто и что ответил (для /api/replies)."""
     from . import autopilot
     rows = []
+    echo_rows = []
     for msg in payload.get("messages", []):
         if msg.get("isEcho"):
-            continue  # наши исходящие
+            # наши исходящие (в т.ч. ручные ответы админов из МойКласс) —
+            # в журнал outbox: по нему понимаем, отвечен ли клиент
+            phone = "".join(ch for ch in str(msg.get("chatId") or "") if ch.isdigit())
+            if len(phone) >= 10:
+                echo_rows.append((autopilot._now().isoformat(timespec="seconds"),
+                                  phone[-10:]))
+            continue
         phone = "".join(ch for ch in str(msg.get("chatId") or "") if ch.isdigit())
         if len(phone) < 10:
             continue
@@ -523,15 +530,21 @@ def _inbox_store(payload: dict) -> None:
         rows.append((autopilot._now().isoformat(timespec="seconds"), phone,
                      (msg.get("chatType") or "")[:12], text[:500],
                      str(msg.get("messageId") or "")))
-    if not rows:
+    if not rows and not echo_rows:
         return
     with db.get_conn() as conn:
         conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_inbox (
             id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
             chat_type TEXT, text TEXT, message_id TEXT UNIQUE)""")
-        conn.executemany(
-            "INSERT OR IGNORE INTO wazzup_inbox (ts, phone, chat_type, text, message_id) "
-            "VALUES (?, ?, ?, ?, ?)", rows)
+        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_outbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT)""")
+        if rows:
+            conn.executemany(
+                "INSERT OR IGNORE INTO wazzup_inbox (ts, phone, chat_type, text, message_id) "
+                "VALUES (?, ?, ?, ?, ?)", rows)
+        if echo_rows:
+            conn.executemany(
+                "INSERT INTO wazzup_outbox (ts, phone) VALUES (?, ?)", echo_rows)
 
 
 def _wazzup_process(payload: dict) -> None:
@@ -545,7 +558,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-13.21"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-13.22"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")

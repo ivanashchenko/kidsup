@@ -394,6 +394,8 @@ def _broadcast_tick() -> None:
                 conn.execute("UPDATE broadcast_queue SET status='undeliverable' "
                              "WHERE id=?", (rid,))
             continue
+        if _wa_unanswered(phone):
+            continue  # ждёт ответа админа — не сбрасываем непрочитанное, вернёмся позже
         msg = _fill_name(text, child)
         try:
             ok = wazzup.send_via("whatsapp", phone, msg, dry_run=dry, sender=sender)
@@ -469,8 +471,33 @@ def _task(mk: MoyklassClient, manager_id: int, user_id: int | None,
     mk.post("/v1/company/tasks", payload)
 
 
+def _wa_unanswered(phone: str) -> bool:
+    """Клиент написал нам, а мы (люди или робот) ещё не ответили после этого.
+    Автосообщения таким не шлём: исходящее сбрасывает непрочитанное в Wazzup,
+    и админ не увидит, что клиент ждёт ответа."""
+    p = "".join(ch for ch in str(phone or "") if ch.isdigit())[-10:]
+    if len(p) < 10:
+        return False
+    with db.get_conn() as conn:
+        try:
+            last_in = conn.execute(
+                "SELECT MAX(ts) FROM wazzup_inbox WHERE substr(phone,-10)=? "
+                "AND chat_type!='manual'", (p,)).fetchone()[0]
+            if not last_in:
+                return False
+            last_out = conn.execute(
+                "SELECT MAX(ts) FROM wazzup_outbox WHERE substr(phone,-10)=?",
+                (p,)).fetchone()[0]
+        except Exception:
+            return False
+    return not last_out or last_in > last_out
+
+
 def _wa(phone: str, text: str, mode: str = "broadcast") -> None:
     """broadcast — во все мессенджеры (WhatsApp+Telegram+MAX): у кого какой есть."""
+    if phone != (db.get_setting("digest_phone") or "") and _wa_unanswered(phone):
+        log.info("wazzup: %s ждёт ответа админа — автосообщение отложено", phone[-4:])
+        return
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
     try:
         for line in wazzup.send(phone, text, mode=mode, dry_run=dry):
@@ -584,6 +611,46 @@ def no_show(mk: MoyklassClient) -> None:
                        "что не получилось! Давайте подберём другой день? "
                        "Ответьте на это сообщение, и мы всё устроим 🌿")
         log.info("no_show: запись %s, ученик %s", r["id"], uid)
+
+
+def missed_inbound(mk: MoyklassClient) -> None:
+    """Пропущенные ВХОДЯЩИЕ: клиент звонил, никто не взял, и мы не перезвонили
+    с ответом — срочная задача дежурному админу (раз в день на номер) +
+    мягкое сообщение в WhatsApp."""
+    today = _today().isoformat()
+    try:
+        rows = mango.calls(_now().replace(hour=0, minute=0, second=0), _now())
+    except Exception as e:
+        log.warning("missed_inbound: mango недоступен: %s", e)
+        return
+    answered_back: set[str] = set()
+    missed: dict[str, int] = {}
+    for r in rows:
+        num = (r.get("from_num") if not r.get("from_ext") else r.get("to_num")) or ""
+        num = "".join(ch for ch in str(num) if ch.isdigit())[-10:]
+        if len(num) < 10:
+            continue
+        if r.get("answer"):
+            answered_back.add(num)          # поговорили (в любую сторону)
+        elif not r.get("from_ext"):
+            missed[num] = missed.get(num, 0) + 1
+    admins = _admins_today() or _admins()
+    if not admins:
+        return
+    with db.get_conn() as conn:
+        phone_uid = { "".join(ch for ch in str(p or "") if ch.isdigit())[-10:]: uid
+                      for uid, p in conn.execute("SELECT id, phone FROM users") }
+    for num in missed:
+        if num in answered_back or not _mark("missed_in_task", f"{today}:{num}"):
+            continue
+        uid = phone_uid.get(num)
+        _task(mk, admins[0]["managerId"], uid,
+              f"🔥 ПРОПУЩЕННЫЙ ЗВОНОК от +7{num} — перезвонить в течение 15 минут! "
+              "Клиент звонил сам — самый горячий контакт дня.")
+        _wa("7" + num, "Здравствуйте! Это детский центр KidsUP (Бульвар Рокоссовского) — "
+            "видели ваш звонок, простите, что не успели ответить! Уже перезваниваем. "
+            "Или напишите здесь, что подсказать? 😊", mode="cascade")
+        log.info("missed_inbound: +7%s — задача и сообщение", num)
 
 
 def missed_calls() -> None:
@@ -955,6 +1022,10 @@ def _loop() -> None:
                     speed_to_lead(mk)
                     if now.minute < 3 and 9 <= now.hour <= 20:  # раз в час
                         no_show(mk)
+                    # пропущенные входящие: каждые 15 мин в рабочие часы —
+                    # клиент, до которого не перезвонили, остывает быстро
+                    if now.minute % 15 < 3 and 9 <= now.hour <= 20:
+                        missed_inbound(mk)
                 finally:
                     mk.close()
                 if now.minute < 3 and 10 <= now.hour <= 20:
