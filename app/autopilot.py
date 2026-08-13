@@ -27,6 +27,7 @@
 
 import json
 import logging
+import random
 import re
 import threading
 import time
@@ -379,6 +380,10 @@ def _broadcast_tick() -> None:
     # темп: wa_per_hour сообщений в час суммарно (по умолчанию 6)
     per_hour = max(1, min(30, int(db.get_setting("wa_per_hour", "6") or 6)))
     if now.minute % max(1, 60 // per_hour) != 0:
+        return
+    # джиттер: ~20% слотов пропускаем, чтобы отправки не шли строго по
+    # расписанию (ровный интервал — признак бота для антиспама WhatsApp)
+    if random.random() < 0.2:
         return
     # ротация номеров: каждому активному WhatsApp-номеру — свой дневной
     # лимит wa_daily_cap (по умолчанию 25); шлём с наименее загруженного
