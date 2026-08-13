@@ -493,14 +493,51 @@ def _mark(kind: str, key: str) -> bool:
         return cur.rowcount > 0
 
 
+# виды задач в МойКласс (справочник taskCategories). Категория отвечает на
+# вопрос «как быстро и каким навыком это делать», а не «про какого клиента».
+CAT_URGENT = 44337   # 🔥 Срочно (15 минут): свежий лид, пропущенный, готовы платить
+CAT_CHAT = 104575    # 💬 Ответить в чате: переписка, SLA 30 минут (умеет и Лиза)
+CAT_CALL = 104576    # 📞 Прозвон базы: плановые продающие звонки блоками
+CAT_PUSH = 104577    # 🔁 Дожим: повторное касание, контроль обещания
+CAT_ORG = 104578     # 🏢 Организационное: внутренние дела, мёртвые часы
+CAT_PLAIN = 44336    # Обычная — запасная
+
+
+def _task_category(body: str, user_id: int | None) -> int:
+    """Вид задачи по её тексту. Порядок правил = порядок приоритета."""
+    b = (body or "").lower()
+
+    def has(*keys: str) -> bool:
+        return any(k in b for k in keys)
+
+    if not user_id and has("объявление", "промоутер", "яндекс.бизнес", "2гис", "zoon",
+                           "карточки на картах", "дизайн", "распечат", "печать",
+                           "инвентар", "договор", "прицеп", "юрпакет"):
+        return CAT_ORG
+    if has("новая заявка", "свежая заявка", "заявка с вечера", "без звонка",
+           "пропущенный звонок", "готовы оплатить", "запись+оплата", "данные пришли",
+           "марквиз", "новый контакт"):
+        return CAT_URGENT
+    if has("недозвон", "повторн", "не взял трубку", "дожать", "дожим", "думает",
+           "не пришёл", "не пришел", "no-show", "контроль:", "дедлайн обещания"):
+        return CAT_PUSH
+    if has("whatsapp", "wazzup", "в чате", "непрочитанное", "написать",
+           "отправить расписание", "ответить", "переписк", "мониторить ответы",
+           "ответ в", "ответ на рассылку", "(max", "max,"):
+        return CAT_CHAT
+    if has("продолжение занятий", "обзвон", "продающий звонок", "продление",
+           "тёплый", "теплый", "позвонить", "звонок", "прозвон"):
+        return CAT_CALL
+    return CAT_PLAIN
+
+
 def _task(mk: MoyklassClient, manager_id: int, user_id: int | None,
           body: str, day: date | None = None) -> None:
     d = (day or _today()).isoformat()
-    # категория из справочника taskCategories: 🔥 в тексте → «Важная», иначе «Обычная»
     payload = {"body": body, "beginDate": f"{d}T09:00:00+03:00",
                "endDate": f"{d}T20:00:00+03:00",
                "isAllDay": True, "managerIds": [manager_id],
-               "categoryId": 44337 if "🔥" in body else 44336}
+               "categoryId": _task_category(body, user_id)}
     if user_id:
         payload["userId"] = user_id
     mk.post("/v1/company/tasks", payload)
