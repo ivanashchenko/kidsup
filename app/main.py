@@ -545,7 +545,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-13.19"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-13.20"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -599,11 +599,22 @@ async def api_deploy(request: Request):
                 not (n == "requirements.txt" or n == "app" or n.startswith("app/")):
             raise HTTPException(400, f"недопустимый путь в архиве: {n}")
     tar.extractall(root)  # noqa: S202 — пути проверены выше
-    log.info("deploy: распаковано %d файлов, перезапуск через 2 с", len(names))
     threading.Timer(2.0, lambda: subprocess.Popen(
         ["systemctl", "restart", "kidsup"])).start()
+    logging.getLogger("kidsup.deploy").info(
+        "deploy: распаковано %d файлов, перезапуск через 2 с", len(names))
     return {"ok": True, "files": len(names), "restarting": True,
             "hint": "через ~10 секунд проверьте /api/health — version должна смениться"}
+
+
+@app.post("/api/restart", dependencies=AUTH)
+async def api_restart():
+    """Перезапуск службы (после deploy или при зависании фоновых потоков)."""
+    import threading
+    import subprocess
+    threading.Timer(1.0, lambda: subprocess.Popen(
+        ["systemctl", "restart", "kidsup"])).start()
+    return {"ok": True, "restarting": True}
 
 
 @app.post("/api/broadcast", dependencies=AUTH)
