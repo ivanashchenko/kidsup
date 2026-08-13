@@ -103,12 +103,17 @@ def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
 
 
 
-def send_via(transport: str, phone: str, text: str, dry_run: bool = True) -> bool:
-    """Отправка строго через один канал. True = принял к доставке."""
+def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
+             sender: str | None = None) -> bool:
+    """Отправка строго через один канал. sender — plainId конкретного номера
+    (для ротации WhatsApp). True = принял к доставке."""
     phone = "".join(ch for ch in phone if ch.isdigit())
     if phone.startswith("8") and len(phone) == 11:
         phone = "7" + phone[1:]
-    ch = _pick(channels(), transport)
+    chans = channels()
+    if sender:
+        chans = [c for c in chans if c.get("plainId") == sender] or chans
+    ch = _pick(chans, transport)
     if not ch:
         return False
     if dry_run:

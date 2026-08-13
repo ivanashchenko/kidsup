@@ -346,60 +346,72 @@ def _broadcast_tick() -> None:
     # может лишь сузить (выключить и WhatsApp), но не вернуть tgapi/max.
     setting = [x.strip() for x in
                (db.get_setting("broadcast_transports", "whatsapp") or "whatsapp").split(",") if x.strip()]
-    transports = ["whatsapp"] if "whatsapp" in setting else []
-    if not transports:
+    if "whatsapp" not in setting:
         return
-    budgets = {}
-    if now.minute % 10 == 0:
-        budgets["whatsapp"] = 1   # 6/час — щадящий темп после блокировки 0077
+    # темп: wa_per_hour сообщений в час суммарно (по умолчанию 6)
+    per_hour = max(1, min(30, int(db.get_setting("wa_per_hour", "6") or 6)))
+    if now.minute % max(1, 60 // per_hour) != 0:
+        return
+    # ротация номеров: каждому активному WhatsApp-номеру — свой дневной
+    # лимит wa_daily_cap (по умолчанию 25); шлём с наименее загруженного
+    try:
+        chans = wazzup.channels()
+    except Exception as e:
+        log.warning("wazzup channels недоступны: %s", e)
+        return
+    active = [c.get("plainId") for c in chans if c.get("transport") == "whatsapp"]
+    pref = [p.strip() for p in (db.get_setting(
+        "wa_senders", wazzup.WHATSAPP_PREFERRED) or "").split(",") if p.strip()]
+    active = [p for p in pref if p in active] or active
+    if not active:
+        return
+    cap = int(db.get_setting("wa_daily_cap", "25") or 25)
     day = now.strftime("%Y-%m-%d")
     with db.get_conn() as conn:
         _bq_init(conn)
-        try:
-            conn.execute("ALTER TABLE broadcast_queue ADD COLUMN tried TEXT DEFAULT ''")
-        except Exception:
-            pass
-        wa_today = conn.execute(
-            "SELECT COUNT(*) FROM broadcast_queue WHERE status='sent' "
-            "AND sent LIKE ? AND tried LIKE '%whatsapp=ok%'", (day + "%",)).fetchone()[0]
-        if wa_today >= int(db.get_setting("wa_daily_cap", "25") or 25):
-            budgets.pop("whatsapp", None)
+        for ddl in ("ALTER TABLE broadcast_queue ADD COLUMN tried TEXT DEFAULT ''",
+                    "ALTER TABLE broadcast_queue ADD COLUMN sender TEXT"):
+            try:
+                conn.execute(ddl)
+            except Exception:
+                pass
+        counts = dict(conn.execute(
+            "SELECT COALESCE(sender,''), COUNT(*) FROM broadcast_queue "
+            "WHERE status='sent' AND sent LIKE ? GROUP BY COALESCE(sender,'')",
+            (day + "%",)).fetchall())
+        legacy = counts.get("", 0)  # строки до ротации — вешаем на первый номер
+        sender = min(active, key=lambda p: counts.get(p, 0) + (legacy if p == active[0] else 0))
+        if counts.get(sender, 0) + (legacy if sender == active[0] else 0) >= cap:
+            return                      # все номера выбрали дневной лимит
         rows = conn.execute(
             "SELECT id, phone, child, text, COALESCE(tried,'') FROM broadcast_queue "
             "WHERE status='pending' "
             "ORDER BY campaign = 'no1_apology' DESC, id LIMIT 30").fetchall()
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
     for rid, phone, child, text, tried in rows:
-        if not budgets:
-            break
-        # канал N доступен строке только после неудачи всех предыдущих —
-        # WhatsApp-лимит тратим лишь на тех, кому Telegram не доставил
-        target = next((tr for i, tr in enumerate(transports)
-                       if tr in budgets and f"{tr}=" not in tried
-                       and all(f"{p}=" in tried for p in transports[:i])), None)
-        if target is None:
-            # все доступные сейчас каналы уже пробованы этой строкой
-            if all(f"{tr}=" in tried for tr in transports):
-                with db.get_conn() as conn:
-                    conn.execute("UPDATE broadcast_queue SET status='undeliverable' WHERE id=?", (rid,))
+        if "whatsapp=" in tried:
+            with db.get_conn() as conn:
+                conn.execute("UPDATE broadcast_queue SET status='undeliverable' "
+                             "WHERE id=?", (rid,))
             continue
         msg = _fill_name(text, child)
         try:
-            ok = wazzup.send_via(target, phone, msg, dry_run=dry)
+            ok = wazzup.send_via("whatsapp", phone, msg, dry_run=dry, sender=sender)
         except Exception as e:
-            log.warning("wazzup %s недоступен: %s", target, e)
+            log.warning("wazzup whatsapp недоступен: %s", e)
             ok = False
-        budgets[target] -= 1
-        if budgets[target] <= 0:
-            budgets.pop(target)
-        mark = f"{target}={'ok' if ok else 'fail'};"
+        mark = f"whatsapp={'ok' if ok else 'fail'};"
         with db.get_conn() as conn:
             if ok:
-                conn.execute("UPDATE broadcast_queue SET status='sent', sent=?, tried=COALESCE(tried,'')||? WHERE id=?",
-                             (_now().isoformat(timespec="seconds"), mark, rid))
+                conn.execute("UPDATE broadcast_queue SET status='sent', sent=?, sender=?, "
+                             "tried=COALESCE(tried,'')||? WHERE id=?",
+                             (_now().isoformat(timespec="seconds"), sender, mark, rid))
             else:
-                conn.execute("UPDATE broadcast_queue SET tried=COALESCE(tried,'')||? WHERE id=?", (mark, rid))
-        log.info("broadcast: #%s %s -> %s %s", rid, phone[-4:], target, "ok" if ok else "fail")
+                conn.execute("UPDATE broadcast_queue SET tried=COALESCE(tried,'')||? "
+                             "WHERE id=?", (mark, rid))
+        log.info("broadcast: #%s %s -> whatsapp(%s) %s", rid, phone[-4:],
+                 sender[-4:], "ok" if ok else "fail")
+        break                           # одна отправка за тик — темп держит wa_per_hour
 
 
 def _admins() -> list[dict]:
