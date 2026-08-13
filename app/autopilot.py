@@ -496,9 +496,11 @@ def _mark(kind: str, key: str) -> bool:
 def _task(mk: MoyklassClient, manager_id: int, user_id: int | None,
           body: str, day: date | None = None) -> None:
     d = (day or _today()).isoformat()
+    # категория из справочника taskCategories: 🔥 в тексте → «Важная», иначе «Обычная»
     payload = {"body": body, "beginDate": f"{d}T09:00:00+03:00",
                "endDate": f"{d}T20:00:00+03:00",
-               "isAllDay": True, "managerIds": [manager_id]}
+               "isAllDay": True, "managerIds": [manager_id],
+               "categoryId": 44337 if "🔥" in body else 44336}
     if user_id:
         payload["userId"] = user_id
     mk.post("/v1/company/tasks", payload)
