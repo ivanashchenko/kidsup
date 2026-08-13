@@ -558,7 +558,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-13.22"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-13.23"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -638,7 +638,7 @@ async def api_broadcast(payload: dict):
     campaign = (payload.get("campaign") or "").strip()
     segment = (payload.get("segment") or "").strip()
     text = (payload.get("text") or "").strip()
-    if not campaign or not text or segment not in ("warm", "contin", "camp", "regular", "y2425"):
+    if not campaign or not text or segment not in ("warm", "contin", "camp", "regular", "y2425", "camp_past"):
         raise HTTPException(400, "нужны campaign, text и segment из списка")
     return autopilot.enqueue_broadcast(campaign, segment, text)
 
