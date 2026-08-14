@@ -78,7 +78,7 @@
     <tr>
       <th>Группа</th><th>Предмет</th><th>Возраст</th><th>Особенности</th><th>День</th><th>Время</th>
       <th class="num">Записано</th><th class="num">Мест</th><th class="num">Свободно</th>
-      <th>Заполненность</th><th class="num">Цена с 01.09</th><th class="num">+ за 7 дней</th><th>Действия</th>
+      <th>Заполненность</th><th class="num">Цена с 01.09</th><th class="num">Пробные</th><th class="num">+ за 7 дней</th><th>Действия</th>
     </tr>
     {% for g in groups %}
     <tr>
@@ -103,9 +103,22 @@
       </td>
       {% endif %}
       <td class="num">{% if g.price_new %}{{ "{:,}".format(g.price_new).replace(",", " ") }} ₽{% else %}—{% endif %}</td>
+      <td class="num">{{ g.trials or "—" }}</td>
       <td class="num">{{ "+" ~ g.fresh if g.fresh else "—" }}</td>
       <td style="white-space:nowrap">
         <a href="{{ g.crm_url }}" target="_blank" rel="noopener">Записать</a>
+        {% if not g.buffer and g.free == 0 %}
+        <details style="display:inline-block;margin-left:6px">
+          <summary class="muted small">в лист ожидания</summary>
+          <form method="post" action="/waitlist/add" style="margin-top:4px">
+            <input type="hidden" name="class_id" value="{{ g.id }}">
+            <input type="hidden" name="class_name" value="{{ g.name }}">
+            <input type="text" name="name" placeholder="имя ребёнка" size="12" required>
+            <input type="text" name="phone" placeholder="телефон" size="12" required>
+            <button type="submit">добавить</button>
+          </form>
+        </details>
+        {% endif %}
         <button type="button" class="copy" style="margin-left:6px"
                 data-text="Записываю [ребёнка] в группу «{{ g.course }}», {{ g.day }} в {{ g.time }}{% if g.age != '—' %}, возраст {{ g.age }}{% endif %}. Адрес: б-р Маршала Рокоссовского, 6 к1В (напротив ТЦ «Янтарь»). Абонемент 8 занятий — {{ g.price_new or '—' }} ₽ с 01.09. Первое занятие пробное и бесплатное — приходите, посмотрите педагога 💛">текст клиенту</button>
       </td>
@@ -136,6 +149,67 @@
   </details>
   {% endfor %}
 </div>
+
+
+{% if waitlist %}
+<div class="card" style="overflow-x:auto">
+  <h2>Лист ожидания ({{ waitlist|length }})</h2>
+  <p class="muted" style="margin-top:0">Заполненные группы: кому позвонить первым, когда освободится место или откроем вторую группу.</p>
+  <table>
+    <tr><th>Когда</th><th>Группа</th><th>Ребёнок</th><th>Телефон</th><th></th></tr>
+    {% for w in waitlist %}
+    <tr>
+      <td class="small">{{ w.ts[5:16].replace('T', ' ') }}</td>
+      <td class="small">{{ w.class_name }}</td>
+      <td>{{ w.name }}</td>
+      <td>{% if w.phone %}<a href="tel:+{{ w.phone }}">{{ w.phone }}</a>{% endif %}</td>
+      <td><form method="post" action="/waitlist/close/{{ w.id }}"><button type="submit" class="muted small">снять</button></form></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Калькулятор для родителя</h2>
+  <p class="muted" style="margin-top:0">Отметьте предметы — посчитает абонементы за месяц. Скидки: многодетным 10%, ученикам подготовки к школе 10% на второй предмет.</p>
+  <div id="calc" style="display:flex;flex-wrap:wrap;gap:10px">
+    {% for p in prices %}
+      {% if p.lines %}
+      <label style="min-width:15rem"><input type="checkbox" class="calcitem" data-price="{{ p.lines[0][2] }}" data-name="{{ p.course }}">
+        {{ p.course }} <span class="muted small">{{ "{:,}".format(p.lines[0][2]).replace(",", " ") }} ₽</span></label>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <p style="margin-top:10px">
+    <label><input type="checkbox" id="mnog"> многодетная семья (−10%)</label>
+    <label style="margin-left:16px"><input type="checkbox" id="psh"> ученик подготовки к школе (−10%)</label>
+  </p>
+  <p style="font-size:1.15rem"><b>Итого в месяц: <span id="total">0</span> ₽</b>
+     <span class="muted small" id="detail"></span></p>
+  <button type="button" class="copy" id="calccopy" data-text="">скопировать расчёт клиенту</button>
+</div>
+
+<script>
+function recalc() {
+  var sum = 0, names = [];
+  document.querySelectorAll('.calcitem:checked').forEach(function (c) {
+    sum += parseInt(c.dataset.price, 10); names.push(c.dataset.name);
+  });
+  var disc = 0;
+  if (document.getElementById('mnog').checked) disc += 10;
+  if (document.getElementById('psh').checked) disc += 10;
+  var total = Math.round(sum * (100 - disc) / 100);
+  document.getElementById('total').textContent = total.toLocaleString('ru-RU');
+  document.getElementById('detail').textContent = disc ? ('(без скидки ' + sum.toLocaleString('ru-RU') + ' ₽, скидка ' + disc + '%)') : '';
+  document.getElementById('calccopy').dataset.text =
+    'Расчёт на месяц: ' + names.join(' + ') + (disc ? (', со скидкой ' + disc + '%') : '') +
+    ' — ' + total.toLocaleString('ru-RU') + ' ₽. Первое занятие по каждому направлению — бесплатное пробное.';
+}
+document.addEventListener('change', function (e) {
+  if (e.target.matches('.calcitem, #mnog, #psh')) recalc();
+});
+</script>
 
 <div class="card" style="overflow-x:auto">
   <h2>Сводка по предметам</h2>

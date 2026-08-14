@@ -333,7 +333,8 @@ SLOT_LABEL = {"morning": "утро (до 13:00)", "day": "день (13–17)", "
 
 @app.get("/enrollment", response_class=HTMLResponse, dependencies=AUTH)
 def enrollment_page(request: Request, course: str = "", day: str = "", free: int = 0,
-                    age: str = "", slot: str = "", feature: str = "", q: str = ""):
+                    age: str = "", slot: str = "", feature: str = "", q: str = "",
+                    waitlist: int = 0):
     """Набор 2026/27: все группы «2627_…» с заполненностью — рабочий экран админа.
 
     Фильтры: направление, день, возраст ребёнка, время дня, особенность группы,
@@ -446,13 +447,172 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         else:
             g["urgency"] = ""
     pitches = [{"course": c, **PITCH[c]} for c in PITCH if not course or c == course]
+    # сколько пробных уже назначено на будущие занятия группы
+    with db.get_conn() as conn:
+        trials = dict(conn.execute("""
+            SELECT l.class_id, COUNT(*) FROM lesson_records lr
+            JOIN lessons l ON l.id = lr.lesson_id
+            WHERE l.date >= date('now') AND lr.raw LIKE '%"test": true%'
+            GROUP BY l.class_id""").fetchall())
+    for g in groups:
+        g["trials"] = trials.get(g["id"], 0)
     return render(request, "enrollment.html", active="enrollment",
                   groups=groups, courses=courses_list, course=course,
                   days=days_list, day=day, free=free,
                   age=age, slots=slots_list, slot=slot,
                   features=features_list, feature=feature, q=q,
-                  prices=price_blocks, pitches=pitches,
+                  prices=price_blocks, pitches=pitches, waitlist=_waitlist_rows(),
                   summary=sorted(summary.values(), key=lambda x: -x["free"]))
+
+
+
+# --- план обзвона: кого перезаписать на 2026/27 ---------------------------
+
+def _age_from_raw(raw: str) -> float | None:
+    """Возраст ребёнка из атрибута birthday в карточке МойКласс."""
+    try:
+        j = json.loads(raw or "{}")
+    except ValueError:
+        return None
+    for a in j.get("attributes") or []:
+        if a.get("attributeAlias") == "birthday" and a.get("value"):
+            try:
+                y, m, _d = (int(x) for x in str(a["value"])[:10].split("-"))
+            except ValueError:
+                return None
+            t = date.today()
+            return round((t.year - y) + (t.month - m) / 12, 1)
+    return None
+
+
+CALL_SEGMENTS = {
+    "summer": "Ходили этим летом (самые тёплые)",
+    "year": "Учебный год 25/26",
+    "old": "Ходили давно (до сентября 25)",
+}
+
+
+
+# --- лист ожидания на заполненные группы ----------------------------------
+
+def _waitlist_init(conn) -> None:
+    conn.execute("""CREATE TABLE IF NOT EXISTS waitlist (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, class_id INTEGER,
+        class_name TEXT, name TEXT, phone TEXT, note TEXT,
+        status TEXT DEFAULT 'open')""")
+
+
+@app.post("/waitlist/add", dependencies=AUTH)
+async def waitlist_add(class_id: int = Form(...), class_name: str = Form(""),
+                       name: str = Form(""), phone: str = Form(""), note: str = Form("")):
+    """Записать клиента в лист ожидания по заполненной группе."""
+    from . import autopilot
+    with db.get_conn() as conn:
+        _waitlist_init(conn)
+        conn.execute("INSERT INTO waitlist (ts, class_id, class_name, name, phone, note) "
+                     "VALUES (?, ?, ?, ?, ?, ?)",
+                     (autopilot._now().isoformat(timespec="seconds"), class_id,
+                      class_name[:120], name[:80], phone[:20], note[:200]))
+    return RedirectResponse("/enrollment?waitlist=1", status_code=303)
+
+
+@app.post("/waitlist/close/{row_id}", dependencies=AUTH)
+async def waitlist_close(row_id: int):
+    with db.get_conn() as conn:
+        _waitlist_init(conn)
+        conn.execute("UPDATE waitlist SET status='closed' WHERE id=?", (row_id,))
+    return RedirectResponse("/enrollment", status_code=303)
+
+
+def _waitlist_rows() -> list[dict]:
+    with db.get_conn() as conn:
+        _waitlist_init(conn)
+        return [{"id": r[0], "ts": r[1], "class_name": r[3], "name": r[4],
+                 "phone": r[5], "note": r[6]}
+                for r in conn.execute(
+                    "SELECT id, ts, class_id, class_name, name, phone, note FROM waitlist "
+                    "WHERE status='open' ORDER BY id DESC LIMIT 100")]
+
+
+@app.get("/callplan", response_class=HTMLResponse, dependencies=AUTH)
+def callplan_page(request: Request, segment: str = "summer", q: str = "",
+                  done: int = 0, limit: int = 150):
+    """Кого обзвонить: семьи прошлых лет, ещё не записанные в группы 2026/27."""
+    with db.get_conn() as conn:
+        enrolled = {r[0] for r in conn.execute(
+            "SELECT DISTINCT j.user_id FROM joins j JOIN classes cl ON cl.id = j.class_id "
+            "WHERE cl.name LIKE '2627%'")}
+        base = """SELECT lr.user_id u, MAX(l.date) last, co.name course FROM lesson_records lr
+                  JOIN lessons l ON l.id = lr.lesson_id
+                  LEFT JOIN classes cl ON cl.id = l.class_id
+                  LEFT JOIN courses co ON co.id = cl.course_id
+                  WHERE lr.visit = 1 AND l.date >= ? AND l.date < ?
+                  GROUP BY lr.user_id, co.name"""
+        ranges = {"summer": ("2026-06-01", "2026-12-31"),
+                  "year": ("2025-09-01", "2026-06-01"),
+                  "old": ("2024-01-01", "2025-09-01")}
+        d1, d2 = ranges.get(segment, ranges["summer"])
+        rows = conn.execute(base, (d1, d2)).fetchall()
+        seen_all = {"summer": set(), "year": set(), "old": set()}
+        for key, (a, b) in ranges.items():
+            seen_all[key] = {r[0] for r in conn.execute(base, (a, b)).fetchall()}
+        people: dict[int, dict] = {}
+        for uid, last, course in rows:
+            p = people.setdefault(uid, {"id": uid, "last": last, "courses": set()})
+            p["last"] = max(p["last"], last)
+            if course:
+                p["courses"].add(course)
+        # сегменты не пересекаются: год без летних, «давно» без первых двух
+        if segment == "year":
+            people = {k: v for k, v in people.items() if k not in seen_all["summer"]}
+        if segment == "old":
+            people = {k: v for k, v in people.items()
+                      if k not in seen_all["summer"] and k not in seen_all["year"]}
+        out = []
+        for uid, p in people.items():
+            row = conn.execute("SELECT name, phone, client_state_id, raw FROM users WHERE id=?",
+                               (uid,)).fetchone()
+            if not row:
+                continue
+            name, phone, state, raw = row
+            if state in (125954, 125957, 146328, 215202, 146330, 146513):
+                continue  # отказ / не звонить / не наш возраст
+            is_done = uid in enrolled
+            if not done and is_done:
+                continue
+            if q and q.lower() not in (name or "").lower() and q not in (phone or ""):
+                continue
+            age = _age_from_raw(raw)
+            out.append({"id": uid, "name": name or "—", "phone": phone or "",
+                        "age": age, "last": p["last"], "enrolled": is_done,
+                        "courses": ", ".join(sorted(p["courses"]))[:60],
+                        "crm": f"https://app.moyklass.com/client/{uid}",
+                        "suggest": _suggest_by_age(age)})
+    # сначала не записанные, внутри — кто был у нас недавно
+    out.sort(key=lambda x: (x["enrolled"], x["last"] or ""), reverse=True)
+    out.sort(key=lambda x: x["enrolled"])
+    total = len(out)
+    return render(request, "callplan.html", active="callplan",
+                  people=out[:max(10, min(500, limit))], total=total,
+                  segment=segment, segments=CALL_SEGMENTS, q=q, done=done,
+                  enrolled_n=len([x for x in out if x["enrolled"]]))
+
+
+def _suggest_by_age(age: float | None) -> str:
+    """Что предлагать по возрасту — матрица из методички."""
+    if age is None:
+        return "уточнить возраст"
+    if age < 2:
+        return "Музыка и речь · Первая школа"
+    if age < 3:
+        return "Мини-сад ГКП · Музыка и речь · логопед"
+    if age < 4:
+        return "Мини-сад ГКП · Лицей для малышей · логопед, ИЗО"
+    if age < 7:
+        return "Нулевой класс · Подготовка к школе · английский, шахматы, ИЗО"
+    if age < 13:
+        return "Английский · скорочтение, каллиграфия, менталка, шахматы, ИЗО"
+    return "13+ — не наш возраст"
 
 
 @app.get("/leads", response_class=HTMLResponse, dependencies=AUTH)
@@ -721,7 +881,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-14.12"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-14.14"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")

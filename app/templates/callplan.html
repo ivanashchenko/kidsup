@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Кого обзвонить — KidsUp Analytics{% endblock %}
+{% block content %}
+<h1>Кого обзвонить: перезапись на 2026/27</h1>
+<p class="muted">Семьи, которые у нас занимались, но ещё <b>не записаны ни в одну группу нового года</b>.
+Записался — исчезает из списка. Порядок: сначала тёплые (были недавно).</p>
+
+<div class="card">
+  <form method="get">
+    <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
+      <label>Сегмент<br>
+        <select name="segment" onchange="this.form.submit()">
+          {% for k, v in segments.items() %}
+          <option value="{{ k }}" {% if k == segment %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Поиск (имя или телефон)<br>
+        <input type="text" name="q" value="{{ q }}" size="18">
+      </label>
+      <label style="padding-bottom:6px"><input type="checkbox" name="done" value="1"
+        {% if done %}checked{% endif %} onchange="this.form.submit()"> показывать уже записанных</label>
+      <span class="muted" style="padding-bottom:8px">в списке: <b>{{ total }}</b>{% if enrolled_n %} · из них уже записаны: {{ enrolled_n }}{% endif %}</span>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="overflow-x:auto">
+  <table>
+    <tr>
+      <th>Клиент</th><th class="num">Возраст</th><th>Что посещал</th><th>Последнее занятие</th>
+      <th>Что предложить по возрасту</th><th>Статус 26/27</th><th>Действия</th>
+    </tr>
+    {% for p in people %}
+    <tr>
+      <td><a href="{{ p.crm }}" target="_blank" rel="noopener"><b>{{ p.name }}</b></a><br>
+          <span class="muted small">{{ p.phone }}</span></td>
+      <td class="num">{{ p.age if p.age else "—" }}</td>
+      <td class="small">{{ p.courses or "—" }}</td>
+      <td class="small">{{ p.last }}</td>
+      <td class="small">{{ p.suggest }}</td>
+      <td>{% if p.enrolled %}<span class="chip free">записан</span>{% else %}<span class="chip warn">не записан</span>{% endif %}</td>
+      <td style="white-space:nowrap">
+        {% if p.phone %}<a href="tel:+{{ p.phone }}">Позвонить</a>{% endif %}
+        <a href="/enrollment?age={{ p.age or '' }}&free=1" style="margin-left:6px" target="_blank">Подобрать группу</a>
+        <button type="button" class="copy" style="margin-left:6px"
+          data-text="Здравствуйте! Это KidsUP на Рокоссовского. {{ p.name.split(' ')[-1] if ' ' in p.name else p.name }} занимался(ась) у нас{% if p.courses %} ({{ p.courses }}){% endif %}. Формируем группы на новый учебный год — хотим сохранить место. По возрасту сейчас подходит: {{ p.suggest }}. Прислать расписание и удобное время?">текст клиенту</button>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not people %}<p class="muted">Никого не нашлось — либо все записаны, либо снимите фильтры.</p>{% endif %}
+</div>
+
+<script>
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('.copy');
+  if (!b) return;
+  navigator.clipboard.writeText(b.dataset.text).then(function () {
+    var old = b.textContent; b.textContent = 'скопировано ✓';
+    setTimeout(function () { b.textContent = old; }, 1500);
+  });
+});
+</script>
+{% endblock %}
