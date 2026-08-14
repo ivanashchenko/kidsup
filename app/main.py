@@ -602,7 +602,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-14.09"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-14.10"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -773,6 +773,27 @@ async def api_wazzup_raw(limit: int = 40, kind: str = ""):
                 pass
         return {"count": len(events), "top_keys": cnt.most_common()}
     return {"count": len(events), "events": events}
+
+
+@app.get("/api/duty", dependencies=AUTH)
+async def api_duty(day: str = ""):
+    """Кто сегодня в смене: звонящий админ (по admin_schedule или очереди
+    call_admins) и админ переписки. Нужно, чтобы задачи из разбора звонков и
+    переписок падали на того, кто реально работает."""
+    from . import autopilot
+    admins = autopilot._admins()
+    try:
+        sched = json.loads(db.get_setting("admin_schedule") or "{}")
+    except ValueError:
+        sched = {}
+    d = day or autopilot._today().isoformat()
+    mid = sched.get(d)
+    onduty = [a for a in admins if a.get("managerId") == mid] if mid else []
+    if not onduty and admins:
+        onduty = [admins[(autopilot._today().toordinal()) % len(admins)]]
+    chat = db.get_setting("chat_admin", "")
+    return {"date": d, "duty": onduty, "chat_admin": int(chat) if chat else None,
+            "all_admins": admins, "schedule": sched}
 
 
 @app.get("/api/dialogs", dependencies=AUTH)
