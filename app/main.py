@@ -146,9 +146,100 @@ def _name_days(name: str) -> list[str]:
     return sorted(days, key=DAY_ORDER.index)
 
 
+
+# --- цены 2026/27 (источник: kidsup.ru/price, новые с 01.09) ---------------
+PRICES = {
+    "Английский детский сад": {
+        "title": "Мини-сад ГКП 9:00–13:00 · Нулевой класс 10:00–14:00",
+        "lines": [("Мини-сад, 20 посещений", 34500, 35900),
+                  ("Мини-сад, 16 посещений", 32000, 33300),
+                  ("Мини-сад, 12 посещений", 25800, 26800),
+                  ("Мини-сад, 8 посещений", 19000, 19800),
+                  ("Нулевой класс, 20 посещений", 34500, 35900),
+                  ("Нулевой класс, 12 посещений", 25800, 26800),
+                  ("Разовое посещение", 2700, 2700)]},
+    "Английский язык": {"title": "8 занятий по 50 мин",
+                        "lines": [("Абонемент 8 занятий", 8200, 8550)]},
+    "Подготовка к школе": {"title": "8 занятий по 50 мин",
+                           "lines": [("Абонемент 8 занятий", 8200, 8550)]},
+    "Раннее развитие с Еленой. Музыка и речь": {"title": "8 занятий по 50 мин",
+                                                "lines": [("Абонемент 8 занятий", 8200, 8550)]},
+    "Раннее развитие с Ириной. Первая школа": {"title": "8 занятий по 45 мин",
+                                               "lines": [("Абонемент 8 занятий", 7600, 7900)]},
+    "Лицей для малышей": {"title": "8 занятий по 45 мин",
+                          "lines": [("Абонемент 8 занятий", 7600, 7900)]},
+    "Ментальная арифметика": {"title": "4 занятия по 90 мин",
+                              "lines": [("Абонемент 4 занятия", 8000, 8300)]},
+    "ИЗО-студия": {"title": "4 занятия · пробное 850 ₽",
+                   "lines": [("Абонемент 4 занятия", 6800, 7050),
+                             ("Пробное занятие", 850, 850)]},
+    "Шахматы": {"title": "4 занятия · пробное 850 ₽",
+                "lines": [("Абонемент 4 занятия", 6800, 7050),
+                          ("Пробное занятие", 850, 850)]},
+    "Логопед": {"title": "Индивидуально",
+                "lines": [("Консультация (первичная)", 2700, 2700),
+                          ("Консультация (повторная)", 2200, 2200),
+                          ("Абонемент 4 занятия", 8400, 8700)]},
+    "Робототехника": {"title": "4 занятия по 55 мин · партнёрский курс",
+                      "lines": [("Абонемент 4 занятия", 6400, 6400),
+                                ("Пробное занятие", 1100, 1100),
+                                ("Разовое занятие", 2000, 2000)]},
+}
+
+# особенности групп — по ключевым словам в названии
+FEATURES = [("продолжающие", "продолжающие"), ("начинающие", "начинающие"),
+            ("нечит", "нечитающие"), ("школьник", "школьники"),
+            ("лепка", "лепка"), ("живопись", "живопись"),
+            ("картины великих", "картины великих художников")]
+_AGE_RE = re.compile(r"(\d{1,2}(?:[.,]\d)?)\s*[-–]\s*(\d{1,2}(?:[.,]\d)?)")
+
+
+def _group_ages(name: str) -> tuple[float | None, float | None]:
+    """Возраст из названия: «5-6 лет», «1,3 - 1,8», «4-7» → (мин, макс).
+    Номера групп и время вырезаем, чтобы не принять их за возраст."""
+    clean = re.sub(r"Группа\s*\d+", " ", name or "", flags=re.I)
+    clean = _TIME_RE.sub(" ", clean).replace("_", " ")
+    m = _AGE_RE.search(clean)
+    if not m:
+        # одиночный возраст в хвосте: «…_16:00_4» → 4 года
+        one = re.search(r"(?:^|[\s_])(\d{1,2})(?:\s*лет|\s*года?)?\s*$", clean.strip())
+        if one and 1 <= int(one.group(1)) <= 12:
+            v = float(one.group(1))
+            return v, v
+        return None, None
+    try:
+        lo, hi = (float(x.replace(",", ".")) for x in m.groups())
+    except ValueError:
+        return None, None
+    return (lo, hi) if 0 < lo <= hi <= 16 else (None, None)
+
+
+def _group_features(name: str) -> list[str]:
+    low = (name or "").lower()
+    return [label for key, label in FEATURES if key in low]
+
+
+def _time_slot(times: list[str]) -> str:
+    """Утро / день / вечер по первому времени в названии."""
+    if not times:
+        return ""
+    try:
+        h = int(times[0].split(":")[0])
+    except ValueError:
+        return ""
+    return "morning" if h < 13 else "day" if h < 17 else "evening"
+
+
+SLOT_LABEL = {"morning": "утро (до 13:00)", "day": "день (13–17)", "evening": "вечер (17:00+)"}
+
+
 @app.get("/enrollment", response_class=HTMLResponse, dependencies=AUTH)
-def enrollment_page(request: Request, course: str = "", day: str = "", free: int = 0):
-    """Набор 2026/27: все группы «2627_…» с заполненностью — рабочий экран админа."""
+def enrollment_page(request: Request, course: str = "", day: str = "", free: int = 0,
+                    age: str = "", slot: str = "", feature: str = "", q: str = ""):
+    """Набор 2026/27: все группы «2627_…» с заполненностью — рабочий экран админа.
+
+    Фильтры: направление, день, возраст ребёнка, время дня, особенность группы,
+    поиск по названию, только со свободными местами."""
     with db.get_conn() as conn:
         rows = conn.execute("""
             SELECT cl.id, cl.name, cl.max_students, co.name course,
@@ -170,11 +261,15 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         cap = r["max_students"] or 8
         enrolled = r["enrolled"] or 0
         fill = 0 if buffer else (min(100, round(enrolled * 100 / cap)) if cap else 0)
+        age_lo, age_hi = _group_ages(name)
         groups.append({
             "name": name, "course": r["course"] or (parts[1] if len(parts) > 1 else "?"),
             "days": g_days, "buffer": buffer,
             "day": " · ".join(DAY_LABEL[d] for d in g_days) or "—",
             "time": " · ".join(times[:2]) or "—",
+            "slot": _time_slot(times), "features": _group_features(name),
+            "age_lo": age_lo, "age_hi": age_hi,
+            "age": (f"{age_lo:g}–{age_hi:g} лет" if age_lo else "—"),
             "enrolled": enrolled, "capacity": cap,
             "free": max(0, cap - enrolled), "fresh": r["fresh"] or 0, "fill_pct": fill,
             "color": "#E5232A" if fill >= 100 else "#F5A81C" if fill >= 75 else "#5FB53B",
@@ -191,6 +286,28 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         day = ""  # при смене направления невозможный день сбрасываем, а не показываем пусто
     if day:
         groups = [g for g in groups if day in g["days"]]
+    # возраст ребёнка: показываем группы, в диапазон которых он попадает
+    age = (age or "").strip().replace(",", ".")
+    age_val = None
+    try:
+        age_val = float(age) if age else None
+    except ValueError:
+        age_val = None
+    if age_val is not None:
+        groups = [g for g in groups
+                  if g["age_lo"] is None or (g["age_lo"] - 0.5 <= age_val <= g["age_hi"] + 0.5)]
+    slots_list = [{"value": k, "label": SLOT_LABEL[k],
+                   "n": sum(1 for g in groups if g["slot"] == k)}
+                  for k in ("morning", "day", "evening")
+                  if any(g["slot"] == k for g in groups)]
+    if slot:
+        groups = [g for g in groups if g["slot"] == slot]
+    features_list = sorted({f for g in groups for f in g["features"]})
+    if feature:
+        groups = [g for g in groups if feature in g["features"]]
+    if q:
+        ql = q.lower()
+        groups = [g for g in groups if ql in g["name"].lower() or ql in g["course"].lower()]
     if free:
         groups = [g for g in groups if g["free"] > 0]
     groups.sort(key=lambda g: (g["course"],
@@ -205,111 +322,18 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
             s["capacity"] += g["capacity"]; s["free"] += g["free"]
     for s in summary.values():
         s["fill_pct"] = round(s["enrolled"] * 100 / s["capacity"]) if s["capacity"] else 0
+        s["price"] = PRICES.get(s["course"])
+    # цены: показываем блок целиком либо только по выбранному направлению
+    price_blocks = [{"course": c, **PRICES[c]} for c in PRICES
+                    if not course or c == course] or \
+                   [{"course": c, **PRICES[c]} for c in PRICES]
     return render(request, "enrollment.html", active="enrollment",
-                  groups=groups, summary=sorted(summary.values(), key=lambda s: -s["fill_pct"]),
-                  courses=courses_list, days=days_list, course=course, day=day, free=free)
-
-
-@app.get("/settings", response_class=HTMLResponse, dependencies=AUTH)
-def settings_page(request: Request, msg: str = "", ok: int = 1):
-    key = sync.get_api_key()
-    masked = (key[:4] + "•" * 8 + key[-4:]) if len(key) > 8 else ("задан" if key else "")
-    return render(request, "settings.html", active="settings",
-                  masked_key=masked,
-                  key_from_env=bool(config.ENV_API_KEY),
-                  history_months=db.get_setting(
-                      "history_months", str(config.DEFAULT_HISTORY_MONTHS)),
-                  msg=msg, ok=ok,
-                  counts=db.table_counts())
-
-
-@app.post("/settings", dependencies=AUTH)
-def settings_save(api_key: str = Form(""), history_months: str = Form("24")):
-    if api_key.strip():
-        db.set_setting("moyklass_api_key", api_key.strip())
-    if history_months.strip().isdigit():
-        db.set_setting("history_months", history_months.strip())
-    return RedirectResponse("/settings?msg=Настройки+сохранены", status_code=303)
-
-
-@app.post("/settings/test", dependencies=AUTH)
-def settings_test():
-    key = sync.get_api_key()
-    if not key:
-        return RedirectResponse("/settings?ok=0&msg=Сначала+укажите+API-ключ",
-                                status_code=303)
-    ok, message = sync.test_connection(key)
-    return RedirectResponse(
-        f"/settings?ok={1 if ok else 0}&msg={message}", status_code=303)
-
-
-# --- Захват лидов с офлайн-каналов (QR) ------------------------------------
-
-LEAD_TITLES = {
-    "lottery": ("Участвуйте в лотерее! 🎁",
-                "Заполните анкету — и ребёнок получит подарок. А мы подберём занятия по вашему запросу."),
-    "promoter": ("Запишитесь на бесплатную диагностику",
-                 "Оставьте контакты — подберём программу под вашего ребёнка и подарим диагностику."),
-    "yantar": ("KidsUP — прямо напротив «Янтаря»",
-               "Оставьте контакты и получите бесплатную диагностику для ребёнка."),
-    "flyer": ("Набор на 2026/27 учебный год",
-              "Оставьте контакты — расскажем о группах и подарим бесплатную диагностику."),
-    "screen": ("Набор в детский центр и сад KidsUP",
-               "Оставьте контакты — подберём занятия и подарим диагностику."),
-    "metro": ("Промокод МЕТРО: −10% на первый абонемент",
-              "Оставьте контакты — закрепим скидку и подберём группу."),
-    "trailer": ("KidsUP: детский центр и сад рядом с домом",
-                "Оставьте контакты — расскажем о наборе и подарим диагностику."),
-    "chat": ("KidsUP для семей вашего ЖК",
-             "Оставьте контакты — подберём занятия и подарим бесплатную диагностику."),
-    "partner": ("Специальное предложение от партнёра KidsUP",
-                "Оставьте контакты — активируем ваш бонус и подберём занятия."),
-}
-
-
-@app.get("/q/{source}", response_class=HTMLResponse)
-def lead_form(request: Request, source: str, promo: str = ""):
-    """Публичная форма по QR-коду. Пример: /q/lottery?promo=DR2908"""
-    title, subtitle = LEAD_TITLES.get(source, LEAD_TITLES["promoter"])
-    return templates.TemplateResponse(request, "lead_form.html", {
-        "source": source, "promo": promo, "title": title, "subtitle": subtitle,
-        "interests": leads.INTERESTS, "done": False, "error": "",
-    })
-
-
-@app.post("/lead", response_class=HTMLResponse)
-async def lead_submit(request: Request):
-    form = await request.form()
-    data = {
-        "source": form.get("source", "other"),
-        "promo": form.get("promo", ""),
-        "parent_name": form.get("parent_name", ""),
-        "phone": form.get("phone", ""),
-        "child_name": form.get("child_name", ""),
-        "child_age": form.get("child_age", ""),
-        "interests": form.getlist("interests"),
-        "comment": form.get("comment", ""),
-        "consent_pd": form.get("consent_pd"),
-        "consent_ads": form.get("consent_ads"),
-    }
-    if not data["consent_pd"] or not data["phone"].strip():
-        title, subtitle = LEAD_TITLES.get(data["source"], LEAD_TITLES["promoter"])
-        return templates.TemplateResponse(request, "lead_form.html", {
-            "source": data["source"], "promo": data["promo"], "title": title,
-            "subtitle": subtitle, "interests": leads.INTERESTS, "done": False,
-            "error": "Укажите телефон и подтвердите согласие на обработку данных.",
-        })
-    lead_id = leads.save_lead(data)
-    # пытаемся сразу отправить в CRM, но форму не роняем при ошибке
-    try:
-        leads.push_to_crm(lead_id)
-    except Exception:  # noqa: BLE001
-        pass
-    return templates.TemplateResponse(request, "lead_form.html", {
-        "done": True, "parent_name": data["parent_name"],
-        "interests": leads.INTERESTS, "source": data["source"],
-        "promo": data["promo"], "title": "", "subtitle": "", "error": "",
-    })
+                  groups=groups, courses=courses_list, course=course,
+                  days=days_list, day=day, free=free,
+                  age=age, slots=slots_list, slot=slot,
+                  features=features_list, feature=feature, q=q,
+                  prices=price_blocks,
+                  summary=sorted(summary.values(), key=lambda x: -x["free"]))
 
 
 @app.get("/leads", response_class=HTMLResponse, dependencies=AUTH)
@@ -549,7 +573,25 @@ def _inbox_store(payload: dict) -> None:
                 "VALUES (?, ?, ?, ?)", echoes)
 
 
+def _wazzup_raw(payload: dict) -> None:
+    """Сырые события вебхука — чтобы видеть, что Wazzup реально присылает
+    (в частности, приходят ли isEcho-события об ответах сотрудников)."""
+    from . import autopilot
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_raw (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, body TEXT)""")
+        conn.execute("INSERT INTO wazzup_raw (ts, body) VALUES (?, ?)",
+                     (autopilot._now().isoformat(timespec="seconds"),
+                      json.dumps(payload, ensure_ascii=False)[:4000]))
+        conn.execute("DELETE FROM wazzup_raw WHERE id <= "
+                     "(SELECT MAX(id) - 300 FROM wazzup_raw)")
+
+
 def _wazzup_process(payload: dict) -> None:
+    try:
+        _wazzup_raw(payload)
+    except Exception:
+        logging.getLogger("kidsup.wazzup").exception("raw: не сохранилось")
     try:
         _inbox_store(payload)
     except Exception:
@@ -560,7 +602,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-14.05"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-14.07"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
@@ -705,6 +747,32 @@ async def api_wazzup_mark_replied(payload: dict):
             except Exception:
                 pass
     return {"marked": added, "phones": phones}
+
+
+@app.get("/api/wazzup/raw", dependencies=AUTH)
+async def api_wazzup_raw(limit: int = 40, kind: str = ""):
+    """Последние события вебхука Wazzup как есть. kind=echo — только события
+    с isEcho (ответы сотрудников), kind=keys — сводка по типам событий."""
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                "SELECT ts, body FROM wazzup_raw ORDER BY id DESC LIMIT ?",
+                (max(1, min(300, limit)),)).fetchall()
+        except Exception:
+            return {"count": 0, "events": [], "hint": "таблицы ещё нет — событий не было"}
+    events = [{"ts": ts, "body": body} for ts, body in rows]
+    if kind == "echo":
+        events = [e for e in events if '"isEcho":true' in e["body"].replace(" ", "")]
+    if kind == "keys":
+        from collections import Counter
+        cnt = Counter()
+        for e in events:
+            try:
+                cnt.update(json.loads(e["body"]).keys())
+            except Exception:
+                pass
+        return {"count": len(events), "top_keys": cnt.most_common()}
+    return {"count": len(events), "events": events}
 
 
 @app.get("/api/dialogs", dependencies=AUTH)

@@ -2,34 +2,57 @@
 {% block title %}Набор 2026/27 — KidsUp Analytics{% endblock %}
 {% block content %}
 <h1>Набор групп 2026/27</h1>
-<p class="muted">Все группы нового учебного года (по префиксу «2627_» в МойКласс). Обновляется при каждой синхронизации.
-Обновляется автоматически каждые 5 минут. <span class="chip free">есть места</span> <span class="chip warn">почти полна</span> <span class="chip full">полна</span></p>
+<p class="muted">Все группы нового учебного года (префикс «2627_» в МойКласс), обновление каждые 5 минут.
+<span class="chip free">есть места</span> <span class="chip warn">почти полна</span> <span class="chip full">полна</span></p>
+
+<div class="card">
+  <form method="get" id="f">
+    <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
+      <label>Направление<br>
+        <select name="course" onchange="this.form.submit()">
+          <option value="">— все —</option>
+          {% for c in courses %}<option value="{{ c }}" {% if c == course %}selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Возраст ребёнка<br>
+        <input type="text" name="age" value="{{ age }}" placeholder="напр. 5" size="6"
+               onchange="this.form.submit()">
+      </label>
+      <label>День<br>
+        <select name="day" onchange="this.form.submit()">
+          <option value="">— любой —</option>
+          {% for d in days %}<option value="{{ d.value }}" {% if d.value == day %}selected{% endif %}>{{ d.label }} ({{ d.n }})</option>{% endfor %}
+        </select>
+      </label>
+      <label>Время<br>
+        <select name="slot" onchange="this.form.submit()">
+          <option value="">— любое —</option>
+          {% for s in slots %}<option value="{{ s.value }}" {% if s.value == slot %}selected{% endif %}>{{ s.label }} ({{ s.n }})</option>{% endfor %}
+        </select>
+      </label>
+      <label>Особенность<br>
+        <select name="feature" onchange="this.form.submit()">
+          <option value="">— любая —</option>
+          {% for f in features %}<option value="{{ f }}" {% if f == feature %}selected{% endif %}>{{ f }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Поиск<br>
+        <input type="text" name="q" value="{{ q }}" placeholder="часть названия" size="14">
+      </label>
+      <label style="padding-bottom:6px"><input type="checkbox" name="free" value="1"
+        {% if free %}checked{% endif %} onchange="this.form.submit()"> только со свободными местами</label>
+      <a href="/enrollment" class="muted" style="padding-bottom:8px">сбросить</a>
+    </div>
+  </form>
+  <p class="muted" style="margin:10px 0 0;font-size:13px">
+    Найдено групп: <b>{{ groups|length }}</b>{% if age %} · подходят ребёнку {{ age }} лет (± полгода){% endif %}
+  </p>
+</div>
 
 <div class="card" style="overflow-x:auto">
-  <form method="get" style="margin-bottom:12px">
-    <label>Направление:
-      <select name="course" onchange="this.form.submit()">
-        <option value="">— все —</option>
-        {% for c in courses %}
-        <option value="{{ c }}" {% if c == course %}selected{% endif %}>{{ c }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label style="margin-left:14px">День:
-      <select name="day" onchange="this.form.submit()">
-        <option value="">— все —</option>
-        {% for d in days %}
-        <option value="{{ d.value }}" {% if d.value == day %}selected{% endif %}>{{ d.label }} ({{ d.n }})</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label style="margin-left:14px"><input type="checkbox" name="free" value="1"
-      {% if free %}checked{% endif %} onchange="this.form.submit()"> только со свободными местами</label>
-  </form>
-
   <table>
     <tr>
-      <th>Группа</th><th>Направление</th><th>День</th><th>Время</th>
+      <th>Группа</th><th>Направление</th><th>Возраст</th><th>Особенности</th><th>День</th><th>Время</th>
       <th class="num">Записано</th><th class="num">Мест</th><th class="num">Свободно</th>
       <th>Заполненность</th><th class="num">+ за 7 дней</th>
     </tr>
@@ -37,6 +60,8 @@
     <tr>
       <td><b>{{ g.name }}</b></td>
       <td>{{ g.course }}</td>
+      <td>{{ g.age }}</td>
+      <td>{% for f in g.features %}<span class="chip">{{ f }}</span> {% endfor %}</td>
       <td>{{ g.day }}</td>
       <td>{{ g.time }}</td>
       <td class="num">{{ g.enrolled }}</td>
@@ -56,17 +81,41 @@
     </tr>
     {% endfor %}
   </table>
-  {% if not groups %}<p class="muted">{% if course or day or free %}Под выбранные фильтры групп не нашлось — снимите фильтр или посмотрите другой день.{% else %}Группы с префиксом «2627_» не найдены — проверьте синхронизацию.{% endif %}</p>{% endif %}
+  {% if not groups %}<p class="muted">Под выбранные фильтры групп не нашлось — снимите фильтр или нажмите «сбросить».</p>{% endif %}
+</div>
+
+<div class="card" style="overflow-x:auto">
+  <h2>Цены</h2>
+  <p class="muted" style="margin-top:0">Слева — цена прошлого учебного года, справа — с 01.09.2026. Источник: kidsup.ru/price.
+  {% if course %}Показано выбранное направление.{% endif %}</p>
+  {% for p in prices %}
+  <details {% if course %}open{% endif %} style="margin-bottom:8px">
+    <summary><b>{{ p.course }}</b> <span class="muted">— {{ p.title }}</span></summary>
+    <table style="margin-top:6px">
+      <tr><th>Позиция</th><th class="num">Было (25/26)</th><th class="num">Стало (с 01.09)</th><th class="num">Разница</th></tr>
+      {% for line in p.lines %}
+      <tr>
+        <td>{{ line[0] }}</td>
+        <td class="num muted">{{ "{:,}".format(line[1]).replace(",", " ") }} ₽</td>
+        <td class="num"><b>{{ "{:,}".format(line[2]).replace(",", " ") }} ₽</b></td>
+        <td class="num">{% if line[2] > line[1] %}+{{ "{:,}".format(line[2] - line[1]).replace(",", " ") }} ₽{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </details>
+  {% endfor %}
 </div>
 
 <div class="card" style="overflow-x:auto">
   <h2>Сводка по направлениям</h2>
   <table>
-    <tr><th>Направление</th><th class="num">Групп</th><th class="num">Записано</th><th class="num">Всего мест</th><th class="num">Свободно</th><th class="num">Заполненность</th></tr>
+    <tr><th>Направление</th><th class="num">Групп</th><th class="num">Записано</th><th class="num">Всего мест</th><th class="num">Свободно</th><th class="num">Заполненность</th><th>Абонемент с 01.09</th></tr>
     {% for s in summary %}
     <tr>
       <td>{{ s.course }}</td><td class="num">{{ s.groups }}</td><td class="num">{{ s.enrolled }}</td>
       <td class="num">{{ s.capacity }}</td><td class="num"><b>{{ s.free }}</b></td><td class="num">{{ s.fill_pct }}%</td>
+      <td>{% if s.price %}{{ "{:,}".format(s.price.lines[0][2]).replace(",", " ") }} ₽
+          <span class="muted small">(было {{ "{:,}".format(s.price.lines[0][1]).replace(",", " ") }})</span>{% else %}—{% endif %}</td>
     </tr>
     {% endfor %}
   </table>
