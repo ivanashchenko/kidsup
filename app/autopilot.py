@@ -3,6 +3,8 @@
 Сценарии (все проверяются раз в минуту, каждый — по своему расписанию):
   speed_to_lead   каждые 3 мин  новая заявка/клиент в МойКласс → срочная
                                 задача дежурному админу «позвонить за 5 минут»
+  unanswered_inbound каждые 15 мин  клиент написал в Wazzup, 45 минут без
+                  (10:00–20:00)   нашего ответа → задача админу переписки
   no_show         каждый час    записан на пробное, занятие прошло, не пришёл →
                                 задача админу + WhatsApp «перенесём?»
   missed_calls    каждый час    недозвоны за день (Mango) → WhatsApp-догон
@@ -654,6 +656,66 @@ def speed_to_lead(mk: MoyklassClient) -> None:
         log.info("speed_to_lead: задача по заявке %s → %s", j["id"], duty["name"])
 
 
+# клиент написал — а мы молчим -----------------------------------------
+
+# служебные уведомления самого Wazzup — не клиентские сообщения
+_SERVICE_RE = re.compile(r"канал (заработал|не работает)", re.I)
+UNANSWERED_MIN = 45          # сколько минут ждём ответа админа, прежде чем звать
+HOT_WORDS = ("оплат", "запиш", "записать", "пришлите", "пришлите расписание",
+             "хотим", "можно", "когда можно", "давайте", "да,", "готовы")
+
+
+def _is_reaction(text: str) -> bool:
+    """Одни эмодзи/реакция без слов — отвечать не на что, задача не нужна."""
+    return not any(ch.isalnum() for ch in text or "")
+
+
+def unanswered_inbound(mk: MoyklassClient) -> None:
+    """Клиент написал в Wazzup, прошло UNANSWERED_MIN минут, ответа от нас нет →
+    задача админу переписки. Одна задача на номер в день; чистые реакции
+    (👍, ❤️) и служебные уведомления Wazzup пропускаем."""
+    now = _now()
+    if not (10 <= now.hour < 20):
+        return
+    cutoff = (now - timedelta(hours=24)).isoformat(timespec="seconds")
+    with db.get_conn() as conn:
+        try:
+            inbox = conn.execute(
+                "SELECT phone, MAX(ts), chat_type, text FROM wazzup_inbox "
+                "WHERE ts >= ? AND chat_type != 'manual' GROUP BY phone", (cutoff,)).fetchall()
+            outbox = dict(conn.execute(
+                "SELECT phone, MAX(ts) FROM wazzup_outbox GROUP BY phone").fetchall())
+        except Exception:
+            return  # таблиц ещё нет — вебхук не приносил сообщений
+    chat_admin = int(db.get_setting("chat_admin", "154181") or 154181)
+    admins = _admins_today()
+    fallback = admins[0]["managerId"] if admins else chat_admin
+    for phone, ts_in, _chat, text in inbox:
+        text = (text or "").strip()
+        if _is_reaction(text) or _SERVICE_RE.search(text):
+            continue
+        if ts_in > (now - timedelta(minutes=UNANSWERED_MIN)).isoformat(timespec="seconds"):
+            continue                      # ещё есть время ответить по-человечески
+        if outbox.get(phone, "") > ts_in:
+            continue                      # уже ответили
+        if not _mark("inbox_task", f"{_today().isoformat()}:{phone[-10:]}"):
+            continue                      # задача по этому номеру сегодня уже есть
+        uid, name = None, ""
+        try:
+            found = mk.get("/v1/company/users", {"phone": phone[-10:], "limit": 3})
+            users = found.get("users", found) if isinstance(found, dict) else found
+            if users:
+                uid, name = users[0].get("id"), (users[0].get("name") or "")[:28]
+        except Exception:
+            log.warning("unanswered_inbound: клиент по номеру %s не найден", phone[-10:])
+        hot = any(w in text.lower() for w in HOT_WORDS)
+        head = "🔥 КЛИЕНТ ЖДЁТ ОТВЕТА" if hot else "Клиент писал, ответа нет"
+        body = (f"{head} ({ts_in[11:16]}, +{phone[-11:]}{', ' + name if name else ''}): "
+                f"«{text[:90]}» — ответить в WhatsApp и поставить следующий шаг.")
+        _task(mk, chat_admin if chat_admin else fallback, uid, body[:250])
+        log.info("unanswered_inbound: задача по %s (%s)", phone[-10:], "горячий" if hot else "обычный")
+
+
 def no_show(mk: MoyklassClient) -> None:
     admins = _admins_today()
     now = _now()
@@ -1092,6 +1154,8 @@ def _loop() -> None:
                 mk = _client()
                 try:
                     speed_to_lead(mk)
+                    if now.minute % 15 < 3:      # каждые 15 минут
+                        unanswered_inbound(mk)
                     if now.minute < 3 and 9 <= now.hour <= 20:  # раз в час
                         no_show(mk)
                     # пропущенные входящие: каждые 15 мин в рабочие часы —

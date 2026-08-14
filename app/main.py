@@ -510,41 +510,38 @@ def _wazzup_tag(payload: dict) -> None:
 
 
 def _inbox_store(payload: dict) -> None:
-    """Входящие сообщения — в свою таблицу: кто и что ответил (для /api/replies)."""
+    """Входящие — в wazzup_inbox (для /api/replies и защиты рассылок),
+    наши исходящие (isEcho) — в wazzup_outbox: по ним видно, ответили ли мы."""
     from . import autopilot
-    rows = []
-    echo_rows = []
+    rows, echoes = [], []
     for msg in payload.get("messages", []):
-        if msg.get("isEcho"):
-            # наши исходящие (в т.ч. ручные ответы админов из МойКласс) —
-            # в журнал outbox: по нему понимаем, отвечен ли клиент
-            phone = "".join(ch for ch in str(msg.get("chatId") or "") if ch.isdigit())
-            if len(phone) >= 10:
-                echo_rows.append((autopilot._now().isoformat(timespec="seconds"),
-                                  phone[-10:]))
-            continue
         phone = "".join(ch for ch in str(msg.get("chatId") or "") if ch.isdigit())
         if len(phone) < 10:
             continue
+        ts = autopilot._now().isoformat(timespec="seconds")
+        if msg.get("isEcho"):
+            echoes.append((ts, phone, str(msg.get("messageId") or "")))
+            continue
         text = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
-        rows.append((autopilot._now().isoformat(timespec="seconds"), phone,
-                     (msg.get("chatType") or "")[:12], text[:500],
+        rows.append((ts, phone, (msg.get("chatType") or "")[:12], text[:500],
                      str(msg.get("messageId") or "")))
-    if not rows and not echo_rows:
+    if not rows and not echoes:
         return
     with db.get_conn() as conn:
         conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_inbox (
             id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
             chat_type TEXT, text TEXT, message_id TEXT UNIQUE)""")
         conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_outbox (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT)""")
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+            message_id TEXT UNIQUE)""")
         if rows:
             conn.executemany(
                 "INSERT OR IGNORE INTO wazzup_inbox (ts, phone, chat_type, text, message_id) "
                 "VALUES (?, ?, ?, ?, ?)", rows)
-        if echo_rows:
+        if echoes:
             conn.executemany(
-                "INSERT INTO wazzup_outbox (ts, phone) VALUES (?, ?)", echo_rows)
+                "INSERT OR IGNORE INTO wazzup_outbox (ts, phone, message_id) "
+                "VALUES (?, ?, ?)", echoes)
 
 
 def _wazzup_process(payload: dict) -> None:
@@ -558,7 +555,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-13.28"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-14.01"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/health")
