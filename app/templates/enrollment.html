@@ -172,7 +172,7 @@
 
 <div class="card">
   <h2>Калькулятор для родителя</h2>
-  <p class="muted" style="margin-top:0">Отметьте предметы — посчитает абонементы за месяц. Скидки: многодетным 10%, ученикам подготовки к школе 10% на второй предмет.</p>
+  <p class="muted" style="margin-top:0">Отметьте предметы — посчитает абонементы за месяц. Скидка 10% — многодетным или ученикам подготовки к школе. <b>Скидки не суммируются</b>: применяется одна.</p>
   <div id="calc" style="display:flex;flex-wrap:wrap;gap:10px">
     {% for p in prices %}
       {% if p.lines %}
@@ -196,9 +196,10 @@ function recalc() {
   document.querySelectorAll('.calcitem:checked').forEach(function (c) {
     sum += parseInt(c.dataset.price, 10); names.push(c.dataset.name);
   });
+  // скидки НЕ суммируются — берём одну, самую выгодную
   var disc = 0;
-  if (document.getElementById('mnog').checked) disc += 10;
-  if (document.getElementById('psh').checked) disc += 10;
+  if (document.getElementById('mnog').checked) disc = Math.max(disc, 10);
+  if (document.getElementById('psh').checked) disc = Math.max(disc, 10);
   var total = Math.round(sum * (100 - disc) / 100);
   document.getElementById('total').textContent = total.toLocaleString('ru-RU');
   document.getElementById('detail').textContent = disc ? ('(без скидки ' + sum.toLocaleString('ru-RU') + ' ₽, скидка ' + disc + '%)') : '';

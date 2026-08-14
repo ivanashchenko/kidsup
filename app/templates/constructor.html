@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Конструктор занятий — KidsUp Analytics{% endblock %}
+{% block content %}
+<h1>Конструктор: 2–3 предмета в один вечер</h1>
+<p class="muted">Родителю удобно приехать один раз и получить всё сразу. Здесь готовые связки занятий,
+идущие подряд в один день, без пересечений и с паузой не больше 30 минут. Цена — за месяц по всем предметам вместе.</p>
+
+<div class="card">
+  <form method="get">
+    <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
+      <label>Возраст ребёнка<br>
+        <input type="text" name="age" value="{{ age }}" placeholder="напр. 5" size="6" onchange="this.form.submit()">
+      </label>
+      <label>День<br>
+        <select name="day" onchange="this.form.submit()">
+          <option value="">— любой —</option>
+          {% for d in days %}<option value="{{ d.value }}" {% if d.value == day %}selected{% endif %}>{{ d.label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Сколько предметов<br>
+        <select name="size" onchange="this.form.submit()">
+          <option value="0" {% if not size %}selected{% endif %}>3 или 2</option>
+          <option value="3" {% if size == 3 %}selected{% endif %}>только 3</option>
+          <option value="2" {% if size == 2 %}selected{% endif %}>только 2</option>
+        </select>
+      </label>
+      <label>Скидка<br>
+        <select name="discount" onchange="this.form.submit()">
+          <option value="" {% if not discount %}selected{% endif %}>без скидки</option>
+          <option value="10" {% if discount %}selected{% endif %}>−10% (многодетным или ученикам ПШ)</option>
+        </select>
+      </label>
+      <label style="padding-bottom:6px"><input type="checkbox" name="free" value="1"
+        {% if free %}checked{% endif %} onchange="this.form.submit()"> только со свободными местами</label>
+      <a href="/constructor" class="muted" style="padding-bottom:8px">сбросить</a>
+    </div>
+  </form>
+  <p class="muted" style="margin:10px 0 0;font-size:13px">Найдено связок: <b>{{ found }}</b>{% if disc %} · цены показаны со скидкой {{ disc }}% (скидки не суммируются){% endif %}</p>
+</div>
+
+{% for c in combos %}
+<div class="card">
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;justify-content:space-between">
+    <h2 style="margin:0">{{ c.day_label }}, {{ c.begin }}–{{ c.finish }} · {{ c.n }} предмета</h2>
+    <div style="font-size:1.1rem"><b>{{ "{:,}".format(c.total_disc).replace(",", " ") }} ₽ / мес</b>
+      {% if disc %}<span class="muted small">(без скидки {{ "{:,}".format(c.total).replace(",", " ") }} ₽)</span>{% endif %}
+    </div>
+  </div>
+  <table style="margin-top:8px">
+    <tr><th>Время</th><th>Предмет</th><th>Группа</th><th class="num">Возраст</th><th class="num">Свободно</th><th class="num">Цена</th><th></th></tr>
+    {% for it in c.lessons %}
+    <tr>
+      <td><b>{{ it.time }}–{{ it.time_to }}</b></td>
+      <td>{{ it.course }}</td>
+      <td class="small">{{ it.name }}</td>
+      <td class="num">{{ it.age or "—" }}</td>
+      <td class="num"><span class="chip {{ 'warn' if it.free <= 2 else 'free' }}">{{ it.free }}</span></td>
+      <td class="num">{{ "{:,}".format(it.price).replace(",", " ") }} ₽</td>
+      <td><a href="{{ it.crm_url }}" target="_blank" rel="noopener">Записать</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p style="margin:8px 0 0">
+    <button type="button" class="copy" data-text="Смотрите, как можно уместить всё в один вечер — {{ c.day_label|lower }}:
+{% for it in c.lessons %}{{ it.time }}–{{ it.time_to }} — {{ it.course }}
+{% endfor %}Один приезд — {{ c.n }} занятия подряд, без беготни по разным дням. Итого {{ c.total_disc }} ₽ в месяц за все направления{% if disc %} (со скидкой {{ disc }}%){% endif %}. Первое занятие по каждому направлению — бесплатное пробное. Адрес: б-р Маршала Рокоссовского, 6 к1В (напротив ТЦ «Янтарь»). Записываю?">текст родителю</button>
+    <span class="muted small" style="margin-left:8px">
+      {% if c.gaps == 0 %}занятия идут подряд без пауз{% else %}паузы между занятиями: {{ c.gaps }} мин{% endif %}
+    </span>
+  </p>
+</div>
+{% endfor %}
+
+{% if not combos %}
+<div class="card"><p class="muted">Связок не нашлось. Попробуйте снять фильтр по дню или возрасту — либо выбрать «только 2» предмета.</p></div>
+{% endif %}
+
+<script>
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('.copy');
+  if (!b) return;
+  navigator.clipboard.writeText(b.dataset.text).then(function () {
+    var old = b.textContent; b.textContent = 'скопировано ✓';
+    setTimeout(function () { b.textContent = old; }, 1500);
+  });
+});
+</script>
+{% endblock %}

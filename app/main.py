@@ -535,23 +535,67 @@ def _waitlist_rows() -> list[dict]:
 
 
 
-def _slots(days: list[str], times: list[str]) -> list[dict]:
-    """Пары «день + время» для проверки пересечений в расписании ребёнка."""
+# --- конструктор: несколько предметов в один вечер --------------------------
+
+# длительность занятия по предмету (мин) — нужна, чтобы строить цепочки подряд
+DURATION = {"Ментальная арифметика": 90, "Робототехника": 55,
+            "Раннее развитие с Ириной. Первая школа": 45, "Лицей для малышей": 45,
+            "Английский детский сад": 240}
+DEFAULT_DURATION = 50
+MAX_GAP = 30          # максимальная пауза между занятиями, мин
+MAX_COMBOS = 24       # сколько связок показываем
+
+
+def _slots(days: list[str], times: list[str]) -> list[tuple[str, str]]:
+    """Пары «день + время»: «вт - чт 16:00» → оба дня в 16:00,
+    «чт 19:00 сб 11:00» → каждый день со своим временем."""
     if not days:
         return []
     if len(times) == len(days):
-        pairs = list(zip(days, times))
-    elif times:
-        pairs = [(d, times[0]) for d in days]
-    else:
-        pairs = [(d, "") for d in days]
-    return [{"day": d, "time": t} for d, t in pairs]
+        return list(zip(days, times))
+    if times:
+        return [(d, times[0]) for d in days]
+    return []
+
+
+def _minutes(hhmm: str) -> int | None:
+    try:
+        h, m = hhmm.split(":")
+        return int(h) * 60 + int(m)
+    except (ValueError, AttributeError):
+        return None
+
+
+def _chains(cands: list[dict], size: int) -> list[list[dict]]:
+    """Цепочки из size занятий подряд в один день: без пересечений,
+    пауза между занятиями не больше MAX_GAP, предметы разные."""
+    out: list[list[dict]] = []
+    cands = sorted(cands, key=lambda x: x["start"])
+
+    def walk(chain: list[dict]) -> None:
+        if len(chain) == size:
+            out.append(list(chain))
+            return
+        last = chain[-1]
+        for c in cands:
+            if c["start"] < last["end"] or c["start"] - last["end"] > MAX_GAP:
+                continue
+            if any(x["course"] == c["course"] for x in chain):
+                continue
+            chain.append(c)
+            walk(chain)
+            chain.pop()
+
+    for c in cands:
+        walk([c])
+    return out
 
 
 @app.get("/constructor", response_class=HTMLResponse, dependencies=AUTH)
-def constructor_page(request: Request, age: str = ""):
-    """Конструктор занятий для родителя: возраст → предметы → группы →
-    проверка пересечений по расписанию → стоимость в месяц → готовое сообщение."""
+def constructor_page(request: Request, age: str = "", day: str = "",
+                     free: int = 1, size: int = 0, discount: str = ""):
+    """Конструктор для родителя: 2–3 предмета в ОДИН день подряд, чтобы за
+    один приезд ребёнок успел всё. Показывает цепочки, время и цену за месяц."""
     with db.get_conn() as conn:
         rows = conn.execute("""
             SELECT cl.id, cl.name, cl.max_students, co.name course,
@@ -560,34 +604,73 @@ def constructor_page(request: Request, age: str = ""):
             LEFT JOIN courses co ON co.id = cl.course_id
             LEFT JOIN joins j ON j.class_id = cl.id
             WHERE cl.name LIKE '2627%' AND cl.name NOT LIKE '%аявк%'
-            GROUP BY cl.id ORDER BY co.name, cl.name""").fetchall()
+            GROUP BY cl.id""").fetchall()
     tpl = db.get_setting("moyklass_group_url",
                          "https://app.moyklass.com/class/{id}/joins")
-    groups = []
+    age_val = None
+    try:
+        age_val = float((age or "").replace(",", ".")) if age else None
+    except ValueError:
+        age_val = None
+
+    by_day: dict[str, list[dict]] = {d: [] for d in DAY_ORDER}
     for r in rows:
         name = r["name"] or ""
-        days = _name_days(name)
-        times = _TIME_RE.findall(name)
-        lo, hi = _group_ages(name)
-        cap = r["max_students"] or 8
-        enrolled = r["enrolled"] or 0
         course = r["course"] or "?"
+        cap, enrolled = (r["max_students"] or 8), (r["enrolled"] or 0)
+        free_n = max(0, cap - enrolled)
+        if free and free_n <= 0:
+            continue
+        lo, hi = _group_ages(name)
+        if age_val is not None and lo is not None and not (lo - 0.5 <= age_val <= hi + 0.5):
+            continue
         pr = PRICES.get(course)
-        groups.append({
-            "id": r["id"], "name": name, "course": course,
-            "day": " · ".join(DAY_LABEL[d] for d in days) or "—",
-            "time": " · ".join(times[:2]) or "—",
-            "slots": _slots(days, times),
-            "age_lo": lo, "age_hi": hi,
-            "age": (f"{lo:g}–{hi:g} лет" if lo else ""),
-            "free": max(0, cap - enrolled),
-            "price": pr["lines"][0][2] if pr else 0,
-            "price_label": pr["lines"][0][0] if pr else "",
-            "crm_url": tpl.replace("{id}", str(r["id"])),
-        })
+        for d, t in _slots(_name_days(name), _TIME_RE.findall(name)):
+            st = _minutes(t)
+            if st is None:
+                continue
+            dur = DURATION.get(course, DEFAULT_DURATION)
+            by_day[d].append({
+                "id": r["id"], "name": name, "course": course, "day": d,
+                "start": st, "end": st + dur, "time": t,
+                "time_to": f"{(st + dur) // 60:02d}:{(st + dur) % 60:02d}",
+                "free": free_n, "age": (f"{lo:g}–{hi:g}" if lo else ""),
+                "price": pr["lines"][0][2] if pr else 0,
+                "crm_url": tpl.replace("{id}", str(r["id"])),
+            })
+
+    sizes = [size] if size in (2, 3) else [3, 2]
+    combos = []
+    for d in DAY_ORDER:
+        if day and d != day:
+            continue
+        for n in sizes:
+            for ch in _chains(by_day[d], n):
+                total = sum(c["price"] for c in ch)
+                gaps = sum(ch[i + 1]["start"] - ch[i]["end"] for i in range(len(ch) - 1))
+                combos.append({"day": d, "day_label": DAY_LABEL[d], "lessons": ch,
+                               "total": total, "gaps": gaps, "n": len(ch),
+                               "begin": ch[0]["time"], "finish": ch[-1]["time_to"]})
+    # сначала больше предметов, потом меньше «окон», потом раньше начало
+    combos.sort(key=lambda c: (-c["n"], c["gaps"], c["begin"]))
+    seen, uniq = set(), []
+    for c in combos:
+        key = (c["day"], tuple(sorted(x["id"] for x in c["lessons"])))
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(c)
+        if len(uniq) >= MAX_COMBOS:
+            break
+    # скидки НЕ суммируются — применяем одну, самую выгодную
+    disc = 10 if discount else 0
+    for c in uniq:
+        c["total_disc"] = round(c["total"] * (100 - disc) / 100)
     return render(request, "constructor.html", active="constructor",
-                  groups_json=json.dumps(groups, ensure_ascii=False), age=age,
-                  courses=sorted({g["course"] for g in groups}))
+                  combos=uniq, age=age, day=day, free=free, size=size,
+                  discount=discount, disc=disc,
+                  days=[{"value": d, "label": DAY_LABEL[d]} for d in DAY_ORDER],
+                  found=len(uniq))
 
 
 @app.get("/callplan", response_class=HTMLResponse, dependencies=AUTH)
@@ -937,7 +1020,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-14.16"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-14.17"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
