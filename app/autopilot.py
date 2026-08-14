@@ -666,14 +666,30 @@ HOT_WORDS = ("оплат", "запиш", "записать", "пришлите",
 
 
 def _is_reaction(text: str) -> bool:
-    """Одни эмодзи/реакция без слов — отвечать не на что, задача не нужна."""
+    """Одни эмодзи/реакция без слов."""
     return not any(ch.isalnum() for ch in text or "")
+
+
+def _got_broadcast(conn, phone: str, days: int = 14) -> bool:
+    """Слали ли мы этому номеру рассылку за последние days дней.
+
+    Важно: в рассылках мы прямо просим «ответьте просто смайликом», поэтому
+    эмодзи от получателя рассылки — это ОТВЕТ и тёплый сигнал, а не шум.
+    """
+    since = (_now() - timedelta(days=days)).isoformat(timespec="seconds")
+    try:
+        return bool(conn.execute(
+            "SELECT 1 FROM broadcast_queue WHERE status='sent' AND sent >= ? "
+            "AND substr(phone,-10) = ? LIMIT 1", (since, phone[-10:])).fetchone())
+    except Exception:
+        return False
 
 
 def unanswered_inbound(mk: MoyklassClient) -> None:
     """Клиент написал в Wazzup, прошло UNANSWERED_MIN минут, ответа от нас нет →
-    задача админу переписки. Одна задача на номер в день; чистые реакции
-    (👍, ❤️) и служебные уведомления Wazzup пропускаем."""
+    задача админу. Смайлик от получателя рассылки — тёплый сигнал (мы сами
+    просили ответить смайликом); смайлик вне рассылки и служебные уведомления
+    Wazzup пропускаем. Одна задача на номер в день."""
     now = _now()
     if not (10 <= now.hour < 20):
         return
@@ -687,12 +703,15 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
                 "SELECT phone, MAX(ts) FROM wazzup_outbox GROUP BY phone").fetchall())
         except Exception:
             return  # таблиц ещё нет — вебхук не приносил сообщений
+        after_broadcast = {p: _got_broadcast(conn, p) for p, *_ in inbox}
     chat_admin = int(db.get_setting("chat_admin", "154181") or 154181)
     admins = _admins_today()
     fallback = admins[0]["managerId"] if admins else chat_admin
     for phone, ts_in, _chat, text in inbox:
         text = (text or "").strip()
-        if _is_reaction(text) or _SERVICE_RE.search(text):
+        reaction = _is_reaction(text)
+        warm = reaction and after_broadcast.get(phone)   # ответ смайликом на рассылку
+        if (reaction and not warm) or _SERVICE_RE.search(text):
             continue
         if ts_in > (now - timedelta(minutes=UNANSWERED_MIN)).isoformat(timespec="seconds"):
             continue                      # ещё есть время ответить по-человечески
@@ -709,11 +728,21 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
         except Exception:
             log.warning("unanswered_inbound: клиент по номеру %s не найден", phone[-10:])
         hot = any(w in text.lower() for w in HOT_WORDS)
-        head = "🔥 КЛИЕНТ ЖДЁТ ОТВЕТА" if hot else "Клиент писал, ответа нет"
-        body = (f"{head} ({ts_in[11:16]}, +{phone[-11:]}{', ' + name if name else ''}): "
-                f"«{text[:90]}» — ответить в WhatsApp и поставить следующий шаг.")
-        _task(mk, chat_admin if chat_admin else fallback, uid, body[:250])
-        log.info("unanswered_inbound: задача по %s (%s)", phone[-10:], "горячий" if hot else "обычный")
+        who = f"+{phone[-11:]}{', ' + name if name else ''}"
+        if warm:
+            # мы просили «ответьте смайликом» — смайлик и есть ответ: тёплый
+            body = (f"🔥 Ответил(а) на рассылку смайликом {text[:6]} ({ts_in[11:16]}, {who}) — "
+                    f"тёплый. Спросить про планы на сентябрь, позвать 29.08 на праздник, "
+                    f"подобрать группу по возрасту.")
+            owner = admins[0]["managerId"] if admins else chat_admin   # это звонок
+        else:
+            head = "🔥 КЛИЕНТ ЖДЁТ ОТВЕТА" if hot else "Клиент писал, ответа нет"
+            body = (f"{head} ({ts_in[11:16]}, {who}): «{text[:90]}» — "
+                    f"ответить в WhatsApp и поставить следующий шаг.")
+            owner = chat_admin or fallback
+        _task(mk, owner, uid, body[:250])
+        log.info("unanswered_inbound: задача по %s (%s)", phone[-10:],
+                 "тёплый-смайлик" if warm else ("горячий" if hot else "обычный"))
 
 
 def no_show(mk: MoyklassClient) -> None:
