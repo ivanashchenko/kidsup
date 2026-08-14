@@ -124,15 +124,12 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
         "channelId": ch["channelId"], "chatType": CHAT_TYPE.get(transport, transport),
         "chatId": phone, "text": text,
     }, timeout=30)
-    ok = r.status_code in (200, 201)
-    if ok:
-        _log_outbox(phone, text)
-    return ok
+    return r.status_code in (200, 201)
 
 
 def _log_outbox(phone: str, text: str) -> None:
-    """Свои отправки пишем сразу: Wazzup не присылает их эхом в вебхук,
-    а без исходящих нельзя понять, ответили мы клиенту или нет."""
+    """Запасной путь записи своих отправок. Обычно не нужен: Wazzup присылает
+    наши исходящие в вебхук как isEcho — проверено 14.08."""
     try:
         from datetime import datetime
         from zoneinfo import ZoneInfo
