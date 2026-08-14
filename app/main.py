@@ -881,7 +881,32 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-14.14"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-14.15"  # видно в /api/health — чтобы проверять, что обновление применилось
+
+
+@app.get("/api/net")
+async def api_net(request: Request):
+    """Диагностика доступа: видно, дошёл ли запрос до приложения и с какого IP.
+    Без авторизации — чтобы можно было проверить доступность из-под VPN."""
+    import subprocess
+    def sh(cmd: list[str]) -> str:
+        try:
+            return subprocess.run(cmd, capture_output=True, text=True,
+                                  timeout=8).stdout.strip()[:1500]
+        except Exception as e:  # noqa: BLE001
+            return f"{type(e).__name__}: {e}"
+    peer = request.client.host if request.client else "?"
+    fwd = request.headers.get("x-forwarded-for", "")
+    return {
+        "ok": True,
+        "ваш_ip_как_видит_сервер": (fwd.split(",")[0].strip() or peer),
+        "peer": peer,
+        "host": request.headers.get("host", ""),
+        "proto": request.headers.get("x-forwarded-proto", ""),
+        "user_agent": request.headers.get("user-agent", "")[:120],
+        "firewall": sh(["ufw", "status"]) or sh(["iptables", "-S"])[:800],
+        "caddy_hosts": sh(["grep", "-E", "^[a-z0-9.]+ ", "/etc/caddy/Caddyfile"]),
+    }
 
 
 @app.get("/api/health")
