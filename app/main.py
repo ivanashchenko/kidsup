@@ -520,7 +520,8 @@ def _inbox_store(payload: dict) -> None:
             continue
         ts = autopilot._now().isoformat(timespec="seconds")
         if msg.get("isEcho"):
-            echoes.append((ts, phone, str(msg.get("messageId") or "")))
+            etext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
+            echoes.append((ts, phone, str(msg.get("messageId") or ""), etext[:500]))
             continue
         text = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
         rows.append((ts, phone, (msg.get("chatType") or "")[:12], text[:500],
@@ -533,15 +534,19 @@ def _inbox_store(payload: dict) -> None:
             chat_type TEXT, text TEXT, message_id TEXT UNIQUE)""")
         conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_outbox (
             id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
-            message_id TEXT UNIQUE)""")
+            message_id TEXT UNIQUE, text TEXT)""")
+        try:
+            conn.execute("ALTER TABLE wazzup_outbox ADD COLUMN text TEXT")
+        except Exception:
+            pass
         if rows:
             conn.executemany(
                 "INSERT OR IGNORE INTO wazzup_inbox (ts, phone, chat_type, text, message_id) "
                 "VALUES (?, ?, ?, ?, ?)", rows)
         if echoes:
             conn.executemany(
-                "INSERT OR IGNORE INTO wazzup_outbox (ts, phone, message_id) "
-                "VALUES (?, ?, ?)", echoes)
+                "INSERT OR IGNORE INTO wazzup_outbox (ts, phone, message_id, text) "
+                "VALUES (?, ?, ?, ?)", echoes)
 
 
 def _wazzup_process(payload: dict) -> None:
@@ -700,6 +705,42 @@ async def api_wazzup_mark_replied(payload: dict):
             except Exception:
                 pass
     return {"marked": added, "phones": phones}
+
+
+@app.get("/api/dialogs", dependencies=AUTH)
+async def api_dialogs(day: str = "", hours: int = 0):
+    """Переписки за день целиком: {"phone": …, "name": …, "messages": [
+    {"ts", "dir": "in"|"out", "text"}]}. day=YYYY-MM-DD (по умолчанию сегодня),
+    либо hours=N — за последние N часов. Для разбора дня и рекомендаций."""
+    from . import autopilot
+    if hours:
+        since = (autopilot._now() - timedelta(hours=hours)).isoformat(timespec="seconds")
+        until = "9999"
+    else:
+        d = day or autopilot._today().isoformat()
+        since, until = f"{d}T00:00:00", f"{d}T23:59:59"
+    msgs: dict[str, list] = {}
+    with db.get_conn() as conn:
+        for table, direction in (("wazzup_inbox", "in"), ("wazzup_outbox", "out")):
+            try:
+                rows = conn.execute(
+                    f"SELECT ts, phone, text FROM {table} WHERE ts >= ? AND ts <= ?",
+                    (since, until)).fetchall()
+            except Exception:
+                rows = []
+            for ts, phone, text in rows:
+                msgs.setdefault(phone[-10:], []).append(
+                    {"ts": ts, "dir": direction, "text": text or ""})
+        names = {}
+        for phone in msgs:
+            row = conn.execute(
+                "SELECT name FROM users WHERE substr(phone,-10)=? LIMIT 1", (phone,)).fetchone()
+            names[phone] = row[0] if row else ""
+    out = [{"phone": p, "name": names.get(p, ""),
+            "messages": sorted(m, key=lambda x: x["ts"])}
+           for p, m in msgs.items()]
+    out.sort(key=lambda d: d["messages"][-1]["ts"], reverse=True)
+    return {"count": len(out), "dialogs": out}
 
 
 @app.get("/api/replies", dependencies=AUTH)
