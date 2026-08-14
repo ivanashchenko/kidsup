@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Ответы клиентам — KidsUp Analytics{% endblock %}
+{% block content %}
+<h1>Кто ждёт ответа и что ответить</h1>
+<p class="muted">Входящие сообщения за последние {{ hours }} ч. Сверху — те, кому мы ещё не ответили ({{ waiting }}).
+Черновик — это подсказка по смыслу, а не готовый текст: проверьте и допишите под клиента.</p>
+
+<div class="card" style="overflow-x:auto">
+  <table>
+    <tr><th>Когда</th><th>Клиент</th><th>Что написал</th><th>Что ответить</th><th>Действия</th></tr>
+    {% for i in items %}
+    <tr{% if not i.answered %} style="background:rgba(255,180,0,.08)"{% endif %}>
+      <td class="small">{{ i.ts[5:16].replace('T',' ') }}</td>
+      <td>{% if i.crm %}<a href="{{ i.crm }}" target="_blank" rel="noopener">{{ i.name }}</a>{% else %}{{ i.name }}{% endif %}
+        <br><span class="muted small">+{{ i.phone }}{% if i.age %} · {{ i.age }} лет{% endif %}</span></td>
+      <td class="small">«{{ i.text[:160] }}»</td>
+      <td class="small">{{ i.draft }}</td>
+      <td style="white-space:nowrap">
+        {% if not i.answered %}<span class="chip warn">ждёт</span>{% else %}<span class="chip free">отвечено</span>{% endif %}
+        <a href="{{ i.brief }}" target="_blank" style="margin-left:6px">подсказка</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not items %}<p class="muted">Входящих за период нет.</p>{% endif %}
+</div>
+{% endblock %}

@@ -676,6 +676,150 @@ def constructor_page(request: Request, age: str = "", day: str = "",
 
 # --- карточка-подсказка для разговора --------------------------------------
 
+
+
+# --- готовые ответы на входящие сообщения ---------------------------------
+
+DRAFT_RULES = [
+    (("цен", "стоимост", "сколько стоит", "прайс"),
+     "Ответить цену по нужному предмету + сразу позвать на бесплатное пробное: "
+     "«Абонемент 8 занятий — X ₽ с 1 сентября. Первое занятие бесплатное — на какой день записать?»"),
+    (("расписан", "какие есть заняти", "время"),
+     "Прислать расписание по возрасту (кнопка «скопировать расписание» на странице подсказки) "
+     "и закрыть вопросом: «Какое время удобнее — будни вечером или суббота?»"),
+    (("запиш", "записать", "хотим", "давайте"),
+     "Оформить запись в CRM сразу, затем подтвердить: группа, день, время, адрес, что взять с собой."),
+    (("оплат", "счет", "счёт", "реквизит", "чек"),
+     "Выставить счёт в МойКласс, прислать ссылку/реквизиты, поставить себе контроль поступления."),
+    (("возраст", "лет", "года", "годик"),
+     "Уточнить дату рождения, занести в карточку и подобрать группу по возрасту."),
+    (("не буд", "не актуал", "отказ", "не пойд", "другой центр"),
+     "Мягко уточнить причину, зафиксировать статус «Отказ» + причину в CRM, "
+     "предложить остаться на связи и позвать на бесплатный праздник 29.08."),
+    (("перенес", "не сможем", "заболел", "болеет"),
+     "Предложить конкретные альтернативные даты и сразу перезаписать."),
+]
+
+
+def _draft_for(text: str) -> str:
+    low = (text or "").lower()
+    for keys, advice in DRAFT_RULES:
+        if any(k in low for k in keys):
+            return advice
+    return ("Ответить по сути вопроса, затем следующий шаг: пригласить на бесплатное пробное "
+            "или на праздник 29.08. Сообщение должно заканчиваться вопросом.")
+
+
+@app.get("/suggest", response_class=HTMLResponse, dependencies=AUTH)
+def suggest_page(request: Request, hours: int = 24):
+    """Клиенты, которые написали и ждут ответа: что они спросили, что известно
+    о клиенте и что ответить. Черновик проверяет админ, а не робот."""
+    from . import autopilot
+    since = (autopilot._now() - timedelta(hours=max(1, min(72, hours)))).isoformat(timespec="seconds")
+    items = []
+    with db.get_conn() as conn:
+        try:
+            inbox = conn.execute(
+                "SELECT phone, MAX(ts) t, text FROM wazzup_inbox WHERE ts >= ? AND chat_type != 'manual' "
+                "GROUP BY substr(phone,-10) ORDER BY t DESC", (since,)).fetchall()
+            outbox = dict(conn.execute(
+                "SELECT substr(phone,-10), MAX(ts) FROM wazzup_outbox GROUP BY substr(phone,-10)").fetchall())
+        except Exception:
+            inbox, outbox = [], {}
+        for phone, ts, text in inbox:
+            key = phone[-10:]
+            answered = outbox.get(key, "") > ts
+            row = conn.execute("SELECT id, name, raw FROM users WHERE substr(phone,-10)=? LIMIT 1",
+                               (key,)).fetchone()
+            uid, name, raw = row if row else (None, "", "")
+            items.append({"phone": key, "name": name or "нет в CRM", "ts": ts,
+                          "text": text or "", "answered": answered,
+                          "age": _age_from_raw(raw) if raw else None,
+                          "draft": _draft_for(text),
+                          "brief": f"/brief?phone={key}",
+                          "crm": f"https://app.moyklass.com/client/{uid}" if uid else ""})
+    items.sort(key=lambda x: (x["answered"], x["ts"]), reverse=False)
+    items.sort(key=lambda x: x["answered"])
+    return render(request, "suggest.html", active="suggest", items=items, hours=hours,
+                  waiting=len([x for x in items if not x["answered"]]))
+
+
+# --- Mango: событие о звонке → мгновенная подсказка админу ------------------
+
+def _mango_sign_ok(key: str, js: str, sign: str) -> bool:
+    import hashlib
+    salt = db.get_setting("mango_salt", "") or ""
+    return hashlib.sha256((key + js + salt).encode()).hexdigest() == (sign or "")
+
+
+def _brief_text(phone: str) -> str:
+    """Короткая справка о клиенте — то, что успеет прочитать админ за гудки."""
+    digits = "".join(ch for ch in phone if ch.isdigit())[-10:]
+    with db.get_conn() as conn:
+        row = conn.execute("SELECT id, name, raw FROM users WHERE substr(phone,-10)=? LIMIT 1",
+                           (digits,)).fetchone()
+        if not row:
+            return (f"📞 Звонит +{phone} — в CRM карточки нет. Новый контакт: спросите имя "
+                    f"и возраст ребёнка, заведите карточку.\napp.kidsup.ru/brief?phone={digits}")
+        uid, name, raw = row
+        age = _age_from_raw(raw)
+        last = conn.execute("""SELECT co.name, MAX(l.date) FROM lesson_records lr
+            JOIN lessons l ON l.id = lr.lesson_id
+            LEFT JOIN classes cl ON cl.id = l.class_id
+            LEFT JOIN courses co ON co.id = cl.course_id
+            WHERE lr.user_id=? AND lr.visit=1""", (uid,)).fetchone()
+        enrolled = conn.execute("SELECT COUNT(*) FROM joins j JOIN classes cl ON cl.id=j.class_id "
+                                "WHERE j.user_id=? AND cl.name LIKE '2627%'", (uid,)).fetchone()[0]
+    parts = [f"📞 Звонит {name} (+{phone})"]
+    if age:
+        parts.append(f"Возраст: {age} → {_suggest_by_age(age)}")
+    if last and last[0]:
+        parts.append(f"Посещал: {last[0]}, последнее занятие {last[1]}")
+    parts.append("На 26/27: записан ✅" if enrolled else "На 26/27 НЕ записан — предложить место")
+    parts.append(f"Подсказка: app.kidsup.ru/brief?phone={digits}")
+    return "\n".join(parts)
+
+
+@app.post("/mango/events")
+async def mango_events(request: Request):
+    """Уведомления Mango о звонках. В ЛК Mango: Настройки → Уведомления о
+    событиях → адрес https://app.kidsup.ru/mango/events (типы: звонки).
+    На входящий звонок шлём дежурному админу справку о клиенте."""
+    from . import autopilot, wazzup
+    form = await request.form()
+    js = form.get("json") or "{}"
+    if not _mango_sign_ok(form.get("vpbx_api_key") or "", js, form.get("sign") or ""):
+        raise HTTPException(403, "подпись не сошлась")
+    try:
+        ev = json.loads(js)
+    except ValueError:
+        return {"ok": True}
+    state = (ev.get("call_state") or "").lower()
+    frm = ((ev.get("from") or {}).get("number") or "")
+    ext = ((ev.get("from") or {}).get("extension") or "")
+    phone = "".join(ch for ch in str(frm) if ch.isdigit())
+    if state not in ("appeared", "connected") or ext or len(phone) < 10:
+        return {"ok": True}      # исходящие и служебные события пропускаем
+    if not autopilot._mark("call_brief", f"{autopilot._today()}:{phone[-10:]}:{state}"):
+        return {"ok": True}      # одна подсказка на номер и состояние в день
+    try:
+        phones = json.loads(db.get_setting("admin_phones") or "{}")
+    except ValueError:
+        phones = {}
+    admins = autopilot._admins_today()
+    target = ""
+    if admins:
+        target = phones.get(str(admins[0].get("managerId")), "")
+    target = target or db.get_setting("digest_phone", "")
+    if target:
+        dry = db.get_setting("wazzup_dry_run", "1") == "1"
+        try:
+            wazzup.send_via("whatsapp", target, _brief_text(phone), dry_run=dry)
+        except Exception:
+            logging.getLogger("kidsup.mango").exception("подсказка не ушла")
+    return {"ok": True}
+
+
 @app.get("/brief", response_class=HTMLResponse, dependencies=AUTH)
 def brief_page(request: Request, phone: str = ""):
     """Всё о клиенте на одном экране: кто это, что было, что предложить,
@@ -1094,7 +1238,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-14.18"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-14.20"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -1133,7 +1277,8 @@ async def health():
 
 SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders",
-            "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url"}
+            "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
+            "admin_phones"}
 
 
 @app.get("/api/settings", dependencies=AUTH)
