@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Подсказка по клиенту — KidsUp Analytics{% endblock %}
+{% block content %}
+<h1>Подсказка для разговора</h1>
+<div class="card">
+  <form method="get">
+    <label>Телефон клиента<br>
+      <input type="text" name="phone" value="{{ phone }}" placeholder="79001234567" size="18" autofocus>
+    </label>
+    <button type="submit">Показать</button>
+    <span class="muted small" style="margin-left:10px">откройте перед звонком или во время переписки</span>
+  </form>
+</div>
+
+{% if phone and not client %}
+<div class="card"><p class="muted">Карточки с таким номером в CRM нет — это новый контакт.
+Спросите имя ребёнка и возраст, заведите карточку, затем вернитесь сюда.</p></div>
+{% endif %}
+
+{% if client %}
+<div class="card">
+  <h2 style="margin-top:0">{{ client.name }} <span class="muted">{{ client.phone }}</span></h2>
+  <p>
+    Возраст ребёнка: <b>{{ client.age if client.age else "не указан" }}</b> ·
+    Статус: <b>{{ client.status }}</b> ·
+    На 26/27: {% if client.enrolled %}<span class="chip free">записан</span>{% else %}<span class="chip warn">не записан</span>{% endif %}
+    · <a href="{{ client.crm }}" target="_blank" rel="noopener">карточка в МойКласс</a>
+  </p>
+  <p><b>Что предложить по возрасту:</b> {{ client.suggest }}</p>
+  {% if history %}
+  <p style="margin-bottom:4px"><b>Что уже посещал:</b></p>
+  <ul style="margin-top:0">
+    {% for h in history %}<li>{{ h.course or "—" }} — {{ h.visits }} занятий, последнее {{ h.last }}</li>{% endfor %}
+  </ul>
+  {% else %}<p class="muted">Занятий в истории нет — вероятно, только заявка.</p>{% endif %}
+</div>
+
+{% if dialog %}
+<div class="card">
+  <h2 style="margin-top:0">Последнее из переписки</h2>
+  <ul>{% for m in dialog %}<li><span class="muted small">{{ m.ts[5:16].replace('T',' ') }}</span> — {{ m.text[:160] }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+{% if pitch %}
+<div class="card">
+  <h2 style="margin-top:0">Что говорить</h2>
+  {% for course, p in pitch.items() %}
+  <p style="margin:.5rem 0"><b>{{ course }}.</b> {{ p.what }}<br>
+    <span class="muted">{{ p.why }}</span><br>
+    <i>{{ p.close }}</i></p>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card" style="overflow-x:auto">
+  <h2 style="margin-top:0">Свободные группы по возрасту ({{ groups|length }})</h2>
+  {% if groups %}
+  <table>
+    <tr><th>Предмет</th><th>День</th><th>Время</th><th class="num">Свободно</th><th class="num">Цена с 01.09</th></tr>
+    {% for g in groups %}
+    <tr><td>{{ g.course }}</td><td>{{ g.day }}</td><td>{{ g.time }}</td>
+        <td class="num"><span class="chip {{ 'warn' if g.free <= 2 else 'free' }}">{{ g.free }}</span></td>
+        <td class="num">{% if g.price %}{{ "{:,}".format(g.price).replace(",", " ") }} ₽{% else %}—{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+  <p style="margin-top:10px">
+    <button type="button" class="copy" data-text="Подобрали расписание{% if client.age %} для ребёнка {{ client.age }} лет{% endif %}:
+{% for g in groups %}• {{ g.course }} — {{ g.day }} в {{ g.time }}{% if g.price %}, {{ g.price }} ₽ за 8 занятий{% endif %}
+{% endfor %}Адрес: б-р Маршала Рокоссовского, 6 к1В (напротив ТЦ «Янтарь»). Первое занятие — бесплатное пробное. Какое время удобнее?">скопировать расписание клиенту</button>
+    <a href="/constructor?age={{ client.age or '' }}" target="_blank" style="margin-left:10px">собрать 2–3 предмета в один вечер</a>
+  </p>
+  {% else %}<p class="muted">Свободных групп под этот возраст не нашлось — уточните возраст в карточке.</p>{% endif %}
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('.copy');
+  if (!b) return;
+  navigator.clipboard.writeText(b.dataset.text).then(function () {
+    var old = b.textContent; b.textContent = 'скопировано ✓';
+    setTimeout(function () { b.textContent = old; }, 1500);
+  });
+});
+</script>
+{% endblock %}

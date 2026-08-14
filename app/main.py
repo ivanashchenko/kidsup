@@ -673,6 +673,80 @@ def constructor_page(request: Request, age: str = "", day: str = "",
                   found=len(uniq))
 
 
+
+# --- карточка-подсказка для разговора --------------------------------------
+
+@app.get("/brief", response_class=HTMLResponse, dependencies=AUTH)
+def brief_page(request: Request, phone: str = ""):
+    """Всё о клиенте на одном экране: кто это, что было, что предложить,
+    какие группы свободны и что написать. Открывается по номеру телефона —
+    перед звонком и во время переписки."""
+    digits = "".join(ch for ch in phone if ch.isdigit())[-10:]
+    client, history, dialog = None, [], []
+    if digits:
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT id, name, phone, client_state_id, raw FROM users "
+                "WHERE substr(phone,-10)=? LIMIT 1", (digits,)).fetchone()
+            if row:
+                uid, name, ph, state, raw = row
+                age = _age_from_raw(raw)
+                history = [{"course": r[0], "last": r[1], "visits": r[2]} for r in conn.execute(
+                    """SELECT co.name, MAX(l.date), COUNT(*) FROM lesson_records lr
+                       JOIN lessons l ON l.id = lr.lesson_id
+                       LEFT JOIN classes cl ON cl.id = l.class_id
+                       LEFT JOIN courses co ON co.id = cl.course_id
+                       WHERE lr.user_id = ? AND lr.visit = 1
+                       GROUP BY co.name ORDER BY MAX(l.date) DESC LIMIT 6""", (uid,))]
+                enrolled = conn.execute(
+                    "SELECT COUNT(*) FROM joins j JOIN classes cl ON cl.id=j.class_id "
+                    "WHERE j.user_id=? AND cl.name LIKE '2627%'", (uid,)).fetchone()[0]
+                st = conn.execute("SELECT name FROM client_statuses WHERE id=?",
+                                  (state,)).fetchone()
+                client = {"id": uid, "name": name, "phone": ph, "age": age,
+                          "status": st[0] if st else "—", "enrolled": enrolled,
+                          "crm": f"https://app.moyklass.com/client/{uid}",
+                          "suggest": _suggest_by_age(age)}
+                try:
+                    dialog = [{"ts": r[0], "dir": "in", "text": r[2]} for r in conn.execute(
+                        "SELECT ts, phone, text FROM wazzup_inbox WHERE substr(phone,-10)=? "
+                        "ORDER BY id DESC LIMIT 5", (digits,))]
+                except Exception:
+                    dialog = []
+    # свободные группы под возраст
+    groups = []
+    if client and client["age"]:
+        with db.get_conn() as conn:
+            rows = conn.execute("""
+                SELECT cl.id, cl.name, cl.max_students, co.name course,
+                       COUNT(DISTINCT j.user_id) enrolled
+                FROM classes cl LEFT JOIN courses co ON co.id = cl.course_id
+                LEFT JOIN joins j ON j.class_id = cl.id
+                WHERE cl.name LIKE '2627%' AND cl.name NOT LIKE '%аявк%'
+                GROUP BY cl.id""").fetchall()
+        for r in rows:
+            lo, hi = _group_ages(r["name"])
+            if lo is None or not (lo - 0.5 <= client["age"] <= hi + 0.5):
+                continue
+            cap, en = (r["max_students"] or 8), (r["enrolled"] or 0)
+            if cap - en <= 0:
+                continue
+            pr = PRICES.get(r["course"] or "")
+            groups.append({"name": r["name"], "course": r["course"],
+                           "day": " · ".join(DAY_LABEL[d] for d in _name_days(r["name"])) or "—",
+                           "time": " · ".join(_TIME_RE.findall(r["name"])[:2]) or "—",
+                           "free": cap - en,
+                           "price": pr["lines"][0][2] if pr else 0})
+        groups.sort(key=lambda g: (g["course"], g["time"]))
+    pitch = {}
+    for g in groups[:3]:
+        if g["course"] in PITCH and g["course"] not in pitch:
+            pitch[g["course"]] = PITCH[g["course"]]
+    return render(request, "brief.html", active="brief", phone=phone,
+                  client=client, history=history, groups=groups[:12],
+                  pitch=pitch, dialog=dialog)
+
+
 @app.get("/callplan", response_class=HTMLResponse, dependencies=AUTH)
 def callplan_page(request: Request, segment: str = "summer", q: str = "",
                   done: int = 0, limit: int = 150):
@@ -1020,7 +1094,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-14.17"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-14.18"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
