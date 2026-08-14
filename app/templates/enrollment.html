@@ -8,15 +8,14 @@
 <div class="card">
   <form method="get" id="f">
     <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
-      <label>Направление<br>
+      <label>Предмет<br>
         <select name="course" onchange="this.form.submit()">
           <option value="">— все —</option>
           {% for c in courses %}<option value="{{ c }}" {% if c == course %}selected{% endif %}>{{ c }}</option>{% endfor %}
         </select>
       </label>
       <label>Возраст ребёнка<br>
-        <input type="text" name="age" value="{{ age }}" placeholder="напр. 5" size="6"
-               onchange="this.form.submit()">
+        <input type="text" name="age" value="{{ age }}" placeholder="напр. 5" size="6" onchange="this.form.submit()">
       </label>
       <label>День<br>
         <select name="day" onchange="this.form.submit()">
@@ -49,12 +48,28 @@
   </p>
 </div>
 
+{% if pitches %}
+<div class="card">
+  <h2>Что говорить о предмете</h2>
+  <p class="muted" style="margin-top:0">Коротко: чем ценно → что получит ребёнок → чем закрыть на пробное.
+  {% if not course %}Выберите предмет в фильтре, чтобы остался только он.{% endif %}</p>
+  {% for p in pitches %}
+  <details {% if course %}open{% endif %} style="margin-bottom:8px">
+    <summary><b>{{ p.course }}</b></summary>
+    <p style="margin:.4rem 0"><b>Суть:</b> {{ p.what }}</p>
+    <p style="margin:.4rem 0"><b>Выгода родителю:</b> {{ p.why }}</p>
+    <p style="margin:.4rem 0"><b>Закрытие:</b> <i>{{ p.close }}</i></p>
+  </details>
+  {% endfor %}
+</div>
+{% endif %}
+
 <div class="card" style="overflow-x:auto">
   <table>
     <tr>
-      <th>Группа</th><th>Направление</th><th>Возраст</th><th>Особенности</th><th>День</th><th>Время</th>
+      <th>Группа</th><th>Предмет</th><th>Возраст</th><th>Особенности</th><th>День</th><th>Время</th>
       <th class="num">Записано</th><th class="num">Мест</th><th class="num">Свободно</th>
-      <th>Заполненность</th><th class="num">+ за 7 дней</th>
+      <th>Заполненность</th><th class="num">+ за 7 дней</th><th>Действия</th>
     </tr>
     {% for g in groups %}
     <tr>
@@ -78,6 +93,11 @@
       </td>
       {% endif %}
       <td class="num">{{ "+" ~ g.fresh if g.fresh else "—" }}</td>
+      <td style="white-space:nowrap">
+        <a href="{{ g.crm_url }}" target="_blank" rel="noopener">Записать</a>
+        <button type="button" class="copy" style="margin-left:6px"
+                data-text="Записываю [ребёнка] в группу «{{ g.course }}», {{ g.day }} в {{ g.time }}{% if g.age != '—' %}, возраст {{ g.age }}{% endif %}. Адрес: б-р Маршала Рокоссовского, 6 к1В (напротив ТЦ «Янтарь»). Абонемент 8 занятий — {{ g.price_new or '—' }} ₽ с 01.09. Первое занятие пробное и бесплатное — приходите, посмотрите педагога 💛">текст клиенту</button>
+      </td>
     </tr>
     {% endfor %}
   </table>
@@ -86,8 +106,8 @@
 
 <div class="card" style="overflow-x:auto">
   <h2>Цены</h2>
-  <p class="muted" style="margin-top:0">Слева — цена прошлого учебного года, справа — с 01.09.2026. Источник: kidsup.ru/price.
-  {% if course %}Показано выбранное направление.{% endif %}</p>
+  <p class="muted" style="margin-top:0">Слева — цена прошлого учебного года со страницы kidsup.ru/price, справа — с 01.09.2026.
+  Сверено 14.08.2026.</p>
   {% for p in prices %}
   <details {% if course %}open{% endif %} style="margin-bottom:8px">
     <summary><b>{{ p.course }}</b> <span class="muted">— {{ p.title }}</span></summary>
@@ -98,7 +118,7 @@
         <td>{{ line[0] }}</td>
         <td class="num muted">{{ "{:,}".format(line[1]).replace(",", " ") }} ₽</td>
         <td class="num"><b>{{ "{:,}".format(line[2]).replace(",", " ") }} ₽</b></td>
-        <td class="num">{% if line[2] > line[1] %}+{{ "{:,}".format(line[2] - line[1]).replace(",", " ") }} ₽{% else %}—{% endif %}</td>
+        <td class="num">{% if line[2] > line[1] %}+{{ "{:,}".format(line[2] - line[1]).replace(",", " ") }} ₽{% elif line[2] < line[1] %}−{{ "{:,}".format(line[1] - line[2]).replace(",", " ") }} ₽{% else %}—{% endif %}</td>
       </tr>
       {% endfor %}
     </table>
@@ -107,9 +127,9 @@
 </div>
 
 <div class="card" style="overflow-x:auto">
-  <h2>Сводка по направлениям</h2>
+  <h2>Сводка по предметам</h2>
   <table>
-    <tr><th>Направление</th><th class="num">Групп</th><th class="num">Записано</th><th class="num">Всего мест</th><th class="num">Свободно</th><th class="num">Заполненность</th><th>Абонемент с 01.09</th></tr>
+    <tr><th>Предмет</th><th class="num">Групп</th><th class="num">Записано</th><th class="num">Всего мест</th><th class="num">Свободно</th><th class="num">Заполненность</th><th>Абонемент с 01.09</th></tr>
     {% for s in summary %}
     <tr>
       <td>{{ s.course }}</td><td class="num">{{ s.groups }}</td><td class="num">{{ s.enrolled }}</td>
@@ -120,4 +140,16 @@
     {% endfor %}
   </table>
 </div>
+
+<script>
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('.copy');
+  if (!b) return;
+  navigator.clipboard.writeText(b.dataset.text).then(function () {
+    var old = b.textContent;
+    b.textContent = 'скопировано ✓';
+    setTimeout(function () { b.textContent = old; }, 1500);
+  });
+});
+</script>
 {% endblock %}
