@@ -534,6 +534,62 @@ def _waitlist_rows() -> list[dict]:
                     "WHERE status='open' ORDER BY id DESC LIMIT 100")]
 
 
+
+def _slots(days: list[str], times: list[str]) -> list[dict]:
+    """Пары «день + время» для проверки пересечений в расписании ребёнка."""
+    if not days:
+        return []
+    if len(times) == len(days):
+        pairs = list(zip(days, times))
+    elif times:
+        pairs = [(d, times[0]) for d in days]
+    else:
+        pairs = [(d, "") for d in days]
+    return [{"day": d, "time": t} for d, t in pairs]
+
+
+@app.get("/constructor", response_class=HTMLResponse, dependencies=AUTH)
+def constructor_page(request: Request, age: str = ""):
+    """Конструктор занятий для родителя: возраст → предметы → группы →
+    проверка пересечений по расписанию → стоимость в месяц → готовое сообщение."""
+    with db.get_conn() as conn:
+        rows = conn.execute("""
+            SELECT cl.id, cl.name, cl.max_students, co.name course,
+                   COUNT(DISTINCT j.user_id) enrolled
+            FROM classes cl
+            LEFT JOIN courses co ON co.id = cl.course_id
+            LEFT JOIN joins j ON j.class_id = cl.id
+            WHERE cl.name LIKE '2627%' AND cl.name NOT LIKE '%аявк%'
+            GROUP BY cl.id ORDER BY co.name, cl.name""").fetchall()
+    tpl = db.get_setting("moyklass_group_url",
+                         "https://app.moyklass.com/class/{id}/joins")
+    groups = []
+    for r in rows:
+        name = r["name"] or ""
+        days = _name_days(name)
+        times = _TIME_RE.findall(name)
+        lo, hi = _group_ages(name)
+        cap = r["max_students"] or 8
+        enrolled = r["enrolled"] or 0
+        course = r["course"] or "?"
+        pr = PRICES.get(course)
+        groups.append({
+            "id": r["id"], "name": name, "course": course,
+            "day": " · ".join(DAY_LABEL[d] for d in days) or "—",
+            "time": " · ".join(times[:2]) or "—",
+            "slots": _slots(days, times),
+            "age_lo": lo, "age_hi": hi,
+            "age": (f"{lo:g}–{hi:g} лет" if lo else ""),
+            "free": max(0, cap - enrolled),
+            "price": pr["lines"][0][2] if pr else 0,
+            "price_label": pr["lines"][0][0] if pr else "",
+            "crm_url": tpl.replace("{id}", str(r["id"])),
+        })
+    return render(request, "constructor.html", active="constructor",
+                  groups_json=json.dumps(groups, ensure_ascii=False), age=age,
+                  courses=sorted({g["course"] for g in groups}))
+
+
 @app.get("/callplan", response_class=HTMLResponse, dependencies=AUTH)
 def callplan_page(request: Request, segment: str = "summer", q: str = "",
                   done: int = 0, limit: int = 150):
@@ -881,7 +937,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-14.15"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-14.16"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
