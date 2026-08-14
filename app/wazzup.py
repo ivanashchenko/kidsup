@@ -12,6 +12,8 @@
 
 import argparse
 
+import logging
+
 import httpx
 
 from . import db
@@ -122,7 +124,29 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
         "channelId": ch["channelId"], "chatType": CHAT_TYPE.get(transport, transport),
         "chatId": phone, "text": text,
     }, timeout=30)
-    return r.status_code in (200, 201)
+    ok = r.status_code in (200, 201)
+    if ok:
+        _log_outbox(phone, text)
+    return ok
+
+
+def _log_outbox(phone: str, text: str) -> None:
+    """Свои отправки пишем сразу: Wazzup не присылает их эхом в вебхук,
+    а без исходящих нельзя понять, ответили мы клиенту или нет."""
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from . import db
+        ts = datetime.now(ZoneInfo("Europe/Moscow")).isoformat(timespec="seconds")
+        with db.get_conn() as conn:
+            conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_outbox (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+                message_id TEXT UNIQUE, text TEXT)""")
+            conn.execute(
+                "INSERT OR IGNORE INTO wazzup_outbox (ts, phone, message_id, text) "
+                "VALUES (?, ?, ?, ?)", (ts, phone, f"self-{phone}-{ts}", text[:500]))
+    except Exception:  # логирование не должно ломать отправку
+        logging.getLogger("kidsup.wazzup").warning("outbox: не записалось для %s", phone)
 
 def main():
     ap = argparse.ArgumentParser(description="Wazzup-рассылки KidsUP")
