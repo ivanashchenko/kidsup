@@ -1209,6 +1209,34 @@ def _inbox_store(payload: dict) -> None:
                 "VALUES (?, ?, ?, ?)", echoes)
 
 
+def _wazzup_status(payload: dict) -> None:
+    """Статусы наших сообщений (sent → delivered → read). Нужны, чтобы видеть,
+    сколько людей прочитали рассылку и промолчали."""
+    from . import autopilot
+    rows = []
+    ts = autopilot._now().isoformat(timespec="seconds")
+    for st in payload.get("statuses", []) or []:
+        mid, status = str(st.get("messageId") or ""), (st.get("status") or "")
+        if mid and status:
+            rows.append((mid, status, ts))
+    for m in payload.get("messages", []) or []:
+        if m.get("isEcho") and m.get("messageId") and m.get("status"):
+            rows.append((str(m["messageId"]), m["status"], ts))
+    if not rows:
+        return
+    rank = {"sent": 1, "delivered": 2, "read": 3, "error": 0}
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_status (
+            message_id TEXT PRIMARY KEY, status TEXT, rank INTEGER, ts TEXT)""")
+        for mid, status, t in rows:
+            r = rank.get(status, 0)
+            conn.execute(
+                "INSERT INTO wazzup_status (message_id, status, rank, ts) VALUES (?,?,?,?) "
+                "ON CONFLICT(message_id) DO UPDATE SET status=excluded.status, rank=excluded.rank, "
+                "ts=excluded.ts WHERE excluded.rank > wazzup_status.rank",
+                (mid, status, r, t))
+
+
 def _wazzup_raw(payload: dict) -> None:
     """Сырые события вебхука — чтобы видеть, что Wazzup реально присылает
     (в частности, приходят ли isEcho-события об ответах сотрудников)."""
@@ -1225,6 +1253,10 @@ def _wazzup_raw(payload: dict) -> None:
 
 def _wazzup_process(payload: dict) -> None:
     try:
+        _wazzup_status(payload)
+    except Exception:
+        logging.getLogger("kidsup.wazzup").exception("статусы: не сохранились")
+    try:
         _wazzup_raw(payload)
     except Exception:
         logging.getLogger("kidsup.wazzup").exception("raw: не сохранилось")
@@ -1238,7 +1270,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-14.20"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-15.01"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -1361,6 +1393,43 @@ async def api_broadcast_add(payload: dict):
     if not campaign or not text or not isinstance(recips, list) or not recips:
         raise HTTPException(400, "нужны campaign, text и непустой recipients")
     return autopilot.broadcast_add(campaign, text, recips)
+
+
+@app.get("/api/broadcast/reads", dependencies=AUTH)
+async def api_broadcast_reads(campaign: str = "camp_aug26"):
+    """Сколько получателей рассылки прочитали сообщение и промолчали.
+    Считаем по статусам Wazzup: read → прочитал, delivered → дошло, но не открыл."""
+    with db.get_conn() as conn:
+        try:
+            sent = [r[0] for r in conn.execute(
+                "SELECT phone FROM broadcast_queue WHERE campaign=? AND status='sent'", (campaign,))]
+            statuses = dict(conn.execute("""
+                SELECT substr(o.phone,-10), MAX(s.rank) FROM wazzup_outbox o
+                JOIN wazzup_status s ON s.message_id = o.message_id
+                GROUP BY substr(o.phone,-10)""").fetchall())
+            replied = {r[0] for r in conn.execute(
+                "SELECT DISTINCT substr(phone,-10) FROM wazzup_inbox WHERE chat_type != 'manual'")}
+        except Exception as e:
+            return {"error": f"нет данных: {type(e).__name__}"}
+    out = {"sent": len(sent), "read": 0, "delivered_not_read": 0,
+           "no_status": 0, "replied": 0, "read_silent": 0}
+    for ph in sent:
+        key = ph[-10:]
+        rank = statuses.get(key)
+        has_reply = key in replied
+        if has_reply:
+            out["replied"] += 1
+        if rank == 3:
+            out["read"] += 1
+            if not has_reply:
+                out["read_silent"] += 1
+        elif rank == 2:
+            out["delivered_not_read"] += 1
+        elif rank is None:
+            out["no_status"] += 1
+    out["hint"] = ("статусы собираются с 15.08 — по сообщениям, отправленным раньше, "
+                   "данных о прочтении нет")
+    return out
 
 
 @app.get("/api/broadcast/status", dependencies=AUTH)
