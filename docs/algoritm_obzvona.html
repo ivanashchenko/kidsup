@@ -1,0 +1,166 @@
+<title>Обзвон базы: пошаговый алгоритм</title>
+<style>
+:root{--paper:#FAF9F5;--ink:#22271F;--muted:#6E7264;--accent:#166B4A;--asoft:#E3EFE8;--risk:#9A5B00;--rsoft:#F6ECD9;--line:#E3E1D6;--fill:#F1EFE7;--card:#FFF}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#151812;--ink:#E7E6DD;--muted:#9B9F90;--accent:#5BC492;--asoft:#1D2E25;--risk:#E0A954;--rsoft:#2E2718;--line:#2C3026;--fill:#1C2018;--card:#1A1E16}}
+:root[data-theme="dark"]{--paper:#151812;--ink:#E7E6DD;--muted:#9B9F90;--accent:#5BC492;--asoft:#1D2E25;--risk:#E0A954;--rsoft:#2E2718;--line:#2C3026;--fill:#1C2018;--card:#1A1E16}
+*{box-sizing:border-box}body{background:var(--paper);color:var(--ink);margin:0;font:16px/1.65 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:52rem;margin:0 auto;padding:2rem 1.25rem 4rem}
+h1{font-size:1.9rem;line-height:1.15;font-weight:800;letter-spacing:-.02em;margin:.3rem 0 .5rem}
+h2{font-size:1.35rem;font-weight:750;margin:2.2rem 0 .7rem;padding-top:1.3rem;border-top:1px solid var(--line)}
+h3{font-size:1.05rem;font-weight:700;margin:1.3rem 0 .4rem}
+p{margin:.55rem 0}.kicker{font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.sub{color:var(--muted)}ul,ol{margin:.4rem 0;padding-left:1.3rem}li{margin:.35rem 0}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+.tbl{overflow-x:auto;margin:.8rem 0;border:1px solid var(--line);border-radius:8px}
+th{background:var(--fill);text-align:left;font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:.5rem .7rem}
+td{padding:.55rem .7rem;border-top:1px solid var(--line);vertical-align:top}td.w{white-space:nowrap;font-weight:650}
+.note{border-left:3px solid var(--accent);background:var(--asoft);padding:.7rem 1rem;border-radius:0 8px 8px 0;margin:.9rem 0}
+.warn{border-left:3px solid var(--risk);background:var(--rsoft);padding:.7rem 1rem;border-radius:0 8px 8px 0;margin:.9rem 0}
+.q{display:block;background:var(--fill);border:1px solid var(--line);border-radius:8px;padding:.7rem 1rem;margin:.5rem 0;font-style:italic}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.9rem 1.1rem;margin:.8rem 0}
+.step b.n{display:inline-block;background:var(--accent);color:#fff;border-radius:999px;width:1.7rem;height:1.7rem;line-height:1.7rem;text-align:center;font-size:.85rem;margin-right:.5rem}
+.big{font-size:1.05rem;font-weight:700}
+strong{font-weight:700}.small{font-size:.85rem;color:var(--muted)}
+code{background:var(--fill);padding:.1rem .35rem;border-radius:4px;font-size:.9em}
+</style>
+<div class="wrap">
+<div class="kicker">KidsUP · рабочий алгоритм администратора · набор 2026/27</div>
+<h1>Обзвон базы: что делать, по шагам</h1>
+<p class="sub">Открыть утром и держать открытым весь день. Здесь всё: с чего начать, куда смотреть, что говорить, что нажимать в МойКласс и как закрыть задачу.</p>
+
+<h2>Норма дня</h2>
+<div class="tbl"><table>
+<tr><th>Кто</th><th>Сколько звонков</th><th>Когда</th></tr>
+<tr><td class="w">Ирина</td><td>30</td><td>10:00–14:00 и 16:00–20:00</td></tr>
+<tr><td class="w">Анна</td><td>45</td><td>10:00–14:00 и 16:00–20:00</td></tr>
+</table></div>
+<p>На каждый звонок в календаре отведено <strong>8 минут</strong>: 2 минуты подготовка, 4 разговор, 2 занести результат. Задачи стоят подряд — просто идите сверху вниз.</p>
+<div class="note"><strong>Порядок не случайный.</strong> Наверху — самые тёплые: новые лиды, «думает», недозвоны. Внизу — архив набора. Не перескакивайте: сверху деньги ближе.</div>
+
+<h2>Шаг 0. Подготовка рабочего места — 5 минут утром</h2>
+<div class="step"><b class="n">0</b><span class="big">Открыть три вкладки и не закрывать весь день</span>
+<ol>
+<li><strong>МойКласс → Задачи</strong>, фильтр «Мои», дата «сегодня»</li>
+<li><strong>app.kidsup.ru/callplan</strong> — «Кого обзвонить»</li>
+<li><strong>Wazzup</strong> — на случай, если клиент попросит прислать в чат</li>
+</ol>
+<p class="small">Скрипты разговора — app.kidsup.ru/base → «Скрипты обзвона».</p>
+</div>
+
+<h2>Шаг 1. Взять задачу</h2>
+<div class="step"><b class="n">1</b><span class="big">Верхняя незакрытая задача с синим значком 📞 «Прозвон базы»</span>
+<p>Внутри задачи есть ссылка на клиента. Кликнуть на имя — откроется карточка.</p>
+</div>
+
+<h2>Шаг 2. За 2 минуты понять, кому звоним</h2>
+<div class="tbl"><table>
+<tr><th>Что смотреть</th><th>Где</th><th>Зачем</th></tr>
+<tr><td class="w">Комментарии 🎯</td><td>вкладка «Комментарии»</td><td>Там заранее написано: чем занимался, когда, что говорил в прошлый раз</td></tr>
+<tr><td class="w">Возраст ребёнка</td><td>в карточке</td><td>От него зависит, что предлагать</td></tr>
+<tr><td class="w">Записи</td><td>вкладка «Записи»</td><td>Какие группы посещал</td></tr>
+<tr><td class="w">Статус</td><td>вверху карточки</td><td>Новый лид / Недозвон / Думает / Архив</td></tr>
+</table></div>
+<div class="note"><strong>Быстрее — на app.kidsup.ru/callplan.</strong> Там та же семья одной строкой: возраст, что посещал, последнее занятие и готовая подсказка «что предложить по возрасту». Если торопитесь — смотрите только сюда.</div>
+
+<h2>Шаг 3. Позвонить</h2>
+<span class="q">— Добрый день! Это KidsUP на Рокоссовского, меня зовут [имя]. [Имя ребёнка] у нас занимался [предмет] — хотела рассказать, что мы открыли набор на новый учебный год.<br>
+— Скажите, вы планируете продолжать занятия в этом году?<br>
+<strong>(слушать!)</strong><br>
+— У нас как раз идёт Неделя открытых уроков с 1 по 6 сентября — можно бесплатно прийти на любое занятие и посмотреть. А 29 августа праздник открытия сезона с аниматорами, тоже бесплатно.<br>
+— Давайте я запишу [имя] на открытый урок? Когда удобнее — до обеда или вечером?</span>
+
+<h3>Три правила, которые решают всё</h3>
+<ol>
+<li><strong>Всегда назвать цену</strong>, если спросили. Не «сейчас уточню» — цены на app.kidsup.ru/enrollment, там старая и новая рядом.</li>
+<li><strong>Всегда позвать на пробное или открытый урок.</strong> Разговор без приглашения — потерянный разговор.</li>
+<li><strong>Всегда договориться о следующем шаге с датой:</strong> «пришлю расписание в WhatsApp сегодня до 18:00», «перезвоню в четверг после 17».</li>
+</ol>
+<p class="small">Как определить, какой именно предмет и уровень предлагать — памятка «Запись в группы: сначала корзина, потом день».</p>
+
+<h2>Шаг 4. Занести результат — четыре сценария</h2>
+
+<h3>🟢 A. Клиент готов записаться</h3>
+<p><strong>Назвал конкретную группу и время:</strong></p>
+<ol>
+<li>app.kidsup.ru/enrollment → найти группу → кнопка <strong>«Записать»</strong> (открывает эту группу в МойКласс сразу на нужной вкладке).<br><span class="small">Или вручную: МойКласс → Группы → найти <code>2627_…</code></span></li>
+<li>В группе — зелёная кнопка <strong>«Записать клиента»</strong> справа вверху.</li>
+<li>Найти клиента по фамилии или телефону → выбрать.</li>
+<li>Проверить, что запись создалась: счётчик мест должен вырасти.</li>
+<li>Статус клиента → <strong>«4. Записался на пробное»</strong>.</li>
+</ol>
+<p><strong>Хочет, но не выбрал время / нет мест / думает над днём:</strong></p>
+<ol>
+<li>Записать в <code>2627_[Предмет]_Заявки</code> — это не расписание, а список тех, кто хочет.</li>
+<li>Статус → <strong>«3. Думает»</strong>.</li>
+<li>В комментарии — что именно смущает: «хочет вторник-четверг, у нас только пн-ср», «ждёт зарплату до 25.08».</li>
+</ol>
+<div class="note"><strong>Хочет 2–3 предмета в один вечер</strong> — откройте app.kidsup.ru/constructor. Он покажет связки, которые идут подряд без окон. Например: ПШ 16:00 → английский 17:00 → ИЗО 18:00 в понедельник.</div>
+
+<h3>🟡 B. Думает</h3>
+<ul>
+<li>Статус → «3. Думает»</li>
+<li>Комментарий: <strong>что именно</strong> решает и <strong>когда</strong> («после отпуска, вернутся 25.08»)</li>
+<li>Создать задачу 🔁 <strong>Дожим</strong> на день после названного клиентом</li>
+<li>Прислать в WhatsApp то, что обещали — <strong>в тот же день</strong></li>
+</ul>
+
+<h3>🔵 C. Не дозвонились</h3>
+<ul>
+<li>Статус → «2. Недозвон»</li>
+<li>Комментарий: во сколько звонили</li>
+<li>Перезвонить <strong>в другое время дня</strong>: кто не взял утром, часто берёт вечером</li>
+<li>Задачу <strong>не закрывать</strong>, пока не было трёх попыток в разное время</li>
+</ul>
+
+<h3>🔴 D. Отказ</h3>
+<ul>
+<li>Статус → «Отказ»</li>
+<li><strong>Обязательно указать причину:</strong> переезд · дорого · неудобное время · ребёнок вырос · ходят в другой центр · нет времени</li>
+<li>Просят не писать — статус «0.1 Не писать»</li>
+</ul>
+<p class="small">Причина — не формальность. По причинам видно, что чинить в центре: если половина отказов «неудобное время», надо менять расписание, а не ругать администраторов.</p>
+
+<h2>Шаг 5. Закрыть задачу правильно</h2>
+<p>В комментарии к задаче — три вещи:</p>
+<ol>
+<li>Дозвонились или нет</li>
+<li>Что сказал клиент — его словами, коротко</li>
+<li>Что сделали в CRM</li>
+</ol>
+<p><strong>Хорошо:</strong></p>
+<span class="q">Дозвонилась. Хотят ПШ, но только вечер после 18:00 — папа забирает с работы. Записала в 2627_ПШ_Заявки, статус «Думает», отправила в WhatsApp расписание вечерних групп. Перезвонить 20.08 после 18:00.</span>
+<p><strong>Плохо:</strong></p>
+<span class="q">Позвонила.</span>
+<div class="warn"><strong>Система проверяет закрытые задачи.</strong> Через 20 минут после закрытия она смотрит: был ли по этому клиенту звонок или сообщение. Если не было — задача открывается заново с пометкой «Закрыта без действия». Это не придирка: так мы дважды за два дня потеряли клиентов.</div>
+
+<h2>Шаг 6. Клиент о чём-то попросил</h2>
+<p>Любое обещание — <strong>сразу в задачу</strong>, не в голову:</p>
+<div class="tbl"><table>
+<tr><td class="w">Прислать расписание или цены</td><td>задача 💬 <strong>Чат</strong>, срок — сегодня</td></tr>
+<tr><td class="w">Посчитать стоимость, выставить счёт</td><td>задача 🔥 <strong>Срочно</strong></td></tr>
+<tr><td class="w">Перезвонить в конкретный день</td><td>задача 🔁 <strong>Дожим</strong> на этот день</td></tr>
+</table></div>
+<p><strong>Обещание без задачи = невыполненное обещание.</strong></p>
+
+<h2>Что говорить про деньги</h2>
+<ul>
+<li>Цены — app.kidsup.ru/enrollment: старая и новая рядом, плюс «что сказать о предмете».</li>
+<li><strong>Скидки не суммируются.</strong> Если у семьи есть право на две — применяется бо́льшая.</li>
+<li>Многодетным −10%, второму ребёнку −10% — тоже не складываются.</li>
+<li>Калькулятор на той же странице считает правильно — не считайте в уме.</li>
+</ul>
+
+<h2>Куда смотреть на app.kidsup.ru</h2>
+<div class="tbl"><table>
+<tr><th>Страница</th><th>Когда открывать</th></tr>
+<tr><td class="w">Кого обзвонить</td><td>Весь день. Кто ещё не записан на новый год, с подсказкой по возрасту</td></tr>
+<tr><td class="w">Набор 26/27</td><td>Цены, свободные места, что сказать о предмете, кнопка «Записать»</td></tr>
+<tr><td class="w">Конструктор</td><td>Родитель хочет 2–3 предмета в один вечер</td></tr>
+<tr><td class="w">Ответы</td><td>Кто написал в чат и ждёт ответа</td></tr>
+<tr><td class="w">База знаний</td><td>Скрипты, методичка, ресепшен-листы, эта памятка</td></tr>
+</table></div>
+
+<h2>Итог дня — в 19:45</h2>
+<p>Написать одним сообщением:</p>
+<span class="q">Дозвонилась X из Y · записалось Z · думают N · отказов M · перезвонить завтра K</span>
+</div>
