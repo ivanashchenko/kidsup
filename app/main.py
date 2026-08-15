@@ -1276,7 +1276,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-15.05"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-15.06"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -1447,6 +1447,13 @@ async def api_broadcast_reads(campaign: str = "camp_aug26"):
     out["hint"] = ("статусы собираются с 15.08 — по сообщениям, отправленным раньше, "
                    "данных о прочтении нет")
     return out
+
+
+@app.post("/api/broadcast/prune-active", dependencies=AUTH)
+async def api_broadcast_prune(payload: dict = None):
+    """Убрать из очереди семьи, которые занимаются у нас этим летом."""
+    from . import autopilot
+    return autopilot.broadcast_prune_active((payload or {}).get("campaign", "camp_aug26"))
 
 
 @app.get("/api/broadcast/status", dependencies=AUTH)

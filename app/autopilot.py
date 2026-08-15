@@ -204,6 +204,12 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
                 SELECT DISTINCT u FROM v WHERE (d>='2024-06-01' AND d<'2024-09-01')
                 OR (d>='2025-06-01' AND d<'2025-09-01')""")}
             pick |= past - summer
+        active_phones = {(_ph or "")[-10:] for (_ph,) in conn.execute(
+            """SELECT DISTINCT u.phone FROM users u
+               JOIN lesson_records lr ON lr.user_id = u.id
+               JOIN lessons l ON l.id = lr.lesson_id
+               WHERE lr.visit = 1 AND l.date >= '2026-06-01'
+                 AND u.phone IS NOT NULL AND u.phone != ''""") if _ph}
         seen_phones: set[str] = set()
         n = 0
         now = _now().isoformat(timespec="seconds")
@@ -218,6 +224,8 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
                 state = None
             if state in SKIP_HARD:
                 continue
+            if row[1][-10:] in active_phones:
+                continue      # семья ходит к нам этим летом — «не увиделись» ей писать нельзя
             seen_phones.add(row[1])
             child = row[0] or ""  # полное имя из CRM; имя ребёнка выделяется при отправке
             conn.execute("INSERT INTO broadcast_queue (campaign, phone, child, text, created) "
@@ -226,6 +234,28 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
             n += 1
     log.info("broadcast: кампания %s (%s) — %d получателей", campaign, segment, n)
     return {"campaign": campaign, "segment": segment, "queued": n}
+
+
+def broadcast_prune_active(campaign: str) -> dict:
+    """Убирает из очереди семьи, которые занимаются у нас этим летом.
+    Нужна, когда у брата и сестры разные карточки: по одной визитов нет,
+    и текст «этим летом мы не увиделись» уходит действующему клиенту."""
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        active = {(p or "")[-10:] for (p,) in conn.execute(
+            """SELECT DISTINCT u.phone FROM users u
+               JOIN lesson_records lr ON lr.user_id = u.id
+               JOIN lessons l ON l.id = lr.lesson_id
+               WHERE lr.visit = 1 AND l.date >= '2026-06-01'
+                 AND u.phone IS NOT NULL AND u.phone != ''""") if p}
+        rows = conn.execute(
+            "SELECT id, phone FROM broadcast_queue WHERE campaign=? AND status='pending'",
+            (campaign,)).fetchall()
+        ids = [rid for rid, ph in rows if (ph or "")[-10:] in active]
+        for rid in ids:
+            conn.execute("UPDATE broadcast_queue SET status='cancelled' WHERE id=?", (rid,))
+    log.info("broadcast_prune_active: снято %d действующих семей", len(ids))
+    return {"campaign": campaign, "removed": len(ids), "checked": len(rows)}
 
 
 def broadcast_add(campaign: str, text: str, recipients: list) -> dict:
