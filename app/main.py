@@ -8,6 +8,7 @@ import re
 import secrets
 from datetime import date, timedelta
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -1270,6 +1271,89 @@ def _inbox_store(payload: dict) -> None:
             conn.executemany(
                 "INSERT OR IGNORE INTO wazzup_outbox (ts, phone, message_id, text) "
                 "VALUES (?, ?, ?, ?)", echoes)
+        for ts, phone, chat_type, text, mid in rows:
+            _match_click(conn, ts, phone, chat_type)
+
+
+# --- переходы по кнопкам мессенджеров (номер Roistat) -----------------------
+# WhatsApp несёт номер визита в тексте первого сообщения, Telegram-бот — в
+# /start. У MAX параметра для этого нет: ссылку открывают «как есть». Поэтому
+# клик по кнопке пишем к себе, а первое входящее из MAX сопоставляем с
+# последним кликом по времени.
+
+CLICK_MATCH_MINUTES = 20
+
+
+def _clicks_init(conn) -> None:
+    conn.execute("""CREATE TABLE IF NOT EXISTS messenger_clicks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, channel TEXT,
+        roistat_visit TEXT, utm TEXT, referrer TEXT,
+        matched_phone TEXT, matched_ts TEXT)""")
+
+
+def _match_click(conn, ts: str, phone: str, chat_type: str) -> None:
+    """Привязывает входящее сообщение к клику по кнопке мессенджера."""
+    if chat_type not in ("max", "telegram"):
+        return                      # у WhatsApp номер визита приходит в тексте
+    _clicks_init(conn)
+    seen = conn.execute(
+        "SELECT 1 FROM wazzup_inbox WHERE substr(phone,-10)=? AND ts < ? LIMIT 1",
+        ((phone or "")[-10:], ts)).fetchone()
+    if seen:
+        return                      # не первое сообщение — источник уже известен
+    from . import autopilot
+    border = (autopilot._now() - timedelta(
+        minutes=CLICK_MATCH_MINUTES)).isoformat(timespec="seconds")
+    row = conn.execute(
+        "SELECT id FROM messenger_clicks WHERE channel=? AND matched_phone IS NULL "
+        "AND ts >= ? ORDER BY ts DESC LIMIT 1", (chat_type, border)).fetchone()
+    if row:
+        conn.execute("UPDATE messenger_clicks SET matched_phone=?, matched_ts=? WHERE id=?",
+                     (phone, ts, row[0]))
+
+
+MESSENGER_LINKS = {
+    "whatsapp": "https://wa.me/79165610077",
+    "telegram": "https://t.me/KidsUP_ru",
+    "max": "https://max.ru/u/f9LHodD0cOL7ouxX67LQufADpyAmbvMGRUdMqaGj2Ya-F1EuIVQMGWeU9gc",
+}
+WA_HELLO = ("Здравствуйте! Пожалуйста, отправьте это сообщение и дождитесь "
+            "ответа. Ваш номер: ")
+
+
+@app.get("/go/{channel}")
+async def go_messenger(channel: str, request: Request):
+    """Кнопка мессенджера на сайте ведёт сюда: фиксируем номер визита Roistat
+    и переводим в мессенджер."""
+    target = MESSENGER_LINKS.get(channel)
+    if not target:
+        raise HTTPException(404)
+    q = request.query_params
+    visit = (q.get("rv") or q.get("roistat_visit") or "")[:64]
+    utm = json.dumps({k: v for k, v in q.items() if k.startswith("utm_")},
+                     ensure_ascii=False)[:500]
+    from . import autopilot
+    with db.get_conn() as conn:
+        _clicks_init(conn)
+        conn.execute("INSERT INTO messenger_clicks (ts, channel, roistat_visit, utm, referrer) "
+                     "VALUES (?, ?, ?, ?, ?)",
+                     (autopilot._now().isoformat(timespec="seconds"), channel,
+                      visit, utm, (request.headers.get("referer") or "")[:300]))
+    if channel == "whatsapp" and visit:
+        target += "?text=" + quote(WA_HELLO + visit)
+    return RedirectResponse(target, status_code=302)
+
+
+@app.get("/clicks", response_class=HTMLResponse, dependencies=AUTH)
+def clicks_page(request: Request):
+    """Клики по кнопкам мессенджеров и то, с каким обращением они склеились."""
+    with db.get_conn() as conn:
+        _clicks_init(conn)
+        rows = [dict(r) for r in conn.execute(
+            "SELECT ts, channel, roistat_visit, utm, matched_phone, matched_ts "
+            "FROM messenger_clicks ORDER BY id DESC LIMIT 300")]
+    return render(request, "clicks.html", active="clicks", rows=rows)
+
 
 
 def _wazzup_status(payload: dict) -> None:
@@ -1333,7 +1417,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-15.10"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-15.11"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")

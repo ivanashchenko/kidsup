@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Клики по мессенджерам — KidsUP{% endblock %}
+{% block content %}
+<h1>Кнопки мессенджеров на сайте</h1>
+
+<div class="notice">
+  Кнопки «Написать» на kidsup.ru ведут не напрямую в мессенджер, а через
+  <code>app.kidsup.ru/go/…</code> — здесь мы запоминаем номер визита Roistat.
+  <br>
+  WhatsApp получает номер прямо в тексте первого сообщения. У Telegram и MAX
+  такого параметра нет, поэтому первое входящее сообщение склеивается с
+  последним кликом по времени (окно 20 минут) — колонка «Обращение».
+</div>
+
+<table class="data">
+  <thead>
+    <tr><th>Время клика</th><th>Мессенджер</th><th>Номер визита Roistat</th>
+        <th>UTM</th><th>Обращение</th></tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td class="small">{{ r.ts|replace('T', ' ') }}</td>
+      <td>{{ r.channel }}</td>
+      <td class="small">{{ r.roistat_visit or '—' }}</td>
+      <td class="small muted">{{ r.utm if r.utm and r.utm != '{}' else '' }}</td>
+      <td class="small">
+        {% if r.matched_phone %}{{ r.matched_phone }}<br>
+          <span class="muted">{{ r.matched_ts|replace('T', ' ') }}</span>
+        {% else %}<span class="muted">не написал</span>{% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5">Кликов пока нет — кнопки на сайте ещё не переведены на /go/…</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
