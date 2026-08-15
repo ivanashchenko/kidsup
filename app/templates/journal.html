@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Журнал действий — KidsUP{% endblock %}
+{% block content %}
+<h1>Журнал действий за {{ day }}</h1>
+<p class="muted">Кто записал клиента в группу, кто провёл оплату, кто написал
+комментарий. Автор берётся из самих объектов МойКласс — отдельного журнала в их
+API нет, но у записи, платежа и комментария автор указан.</p>
+
+<form method="get" style="margin:12px 0">
+  <input type="date" name="day" value="{{ day }}">
+  <button class="btn btn-primary" type="submit">Показать</button>
+</form>
+
+<h2>Итого по сотрудникам</h2>
+<table class="data">
+  <thead><tr><th>Сотрудник</th><th>Записей в группы</th><th>Оплат</th><th>Комментариев</th></tr></thead>
+  <tbody>
+  {% for who, v in per.items() %}
+    <tr><td><b>{{ who }}</b></td>
+        <td>{{ v['запись в группу'] }}</td>
+        <td>{{ v['оплата'] }}</td>
+        <td>{{ v['комментарий'] }}</td></tr>
+  {% else %}
+    <tr><td colspan="4">За этот день действий не зафиксировано.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Подробно</h2>
+<table class="data">
+  <thead><tr><th>Время</th><th>Кто</th><th>Что</th><th>Клиент</th><th>Детали</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td class="small">{{ r.ts }}</td>
+      <td>{{ r.who }}</td>
+      <td class="small">{{ r.kind }}</td>
+      <td class="small">{{ r.client }}</td>
+      <td class="small muted">{{ r.what }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5">Пусто.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<p class="muted small">Записи в группы обновляются каждые 5 минут, оплаты — при
+полной синхронизации (07:00 и по кнопке), комментарии берутся из МойКласс
+онлайн.</p>
+{% endblock %}

@@ -684,6 +684,70 @@ def callaudit_page(request: Request):
     return render(request, "callaudit.html", active="callaudit", rows=rows, stat=stat)
 
 
+@app.get("/journal", response_class=HTMLResponse, dependencies=AUTH)
+def journal_page(request: Request, day: str = ""):
+    """Кто что сделал: записи в группы, оплаты, комментарии — с автором.
+
+    Журнала действий в МойКласс через API нет, но автор есть у самих объектов:
+    join.managerId — кто записал, payment.managerId — кто провёл оплату,
+    userComment.managerId — кто написал. Этого хватает, чтобы видеть работу
+    поимённо, без вебхуков и без входа в интерфейс.
+    """
+    d = day or autopilot._today().isoformat()
+    names = {a["managerId"]: a["name"] for a in autopilot._admins()}
+    names.update({84116: "Борис", 154181: "Лиза"})
+    rows = []
+    with db.get_conn() as conn:
+        for r in conn.execute("SELECT raw FROM joins"):
+            try:
+                j = json.loads(r["raw"] or "{}")
+            except ValueError:
+                continue
+            if (j.get("createdAt") or "")[:10] != d:
+                continue
+            u = conn.execute("SELECT name FROM users WHERE id=?", (j.get("userId"),)).fetchone()
+            cl_ = conn.execute("SELECT name FROM classes WHERE id=?", (j.get("classId"),)).fetchone()
+            rows.append({"ts": (j.get("createdAt") or "")[11:16], "kind": "запись в группу",
+                         "who": names.get(j.get("managerId"), j.get("managerId") or "—"),
+                         "client": (u["name"] if u else "—"),
+                         "what": (cl_["name"] if cl_ else "—")})
+        for r in conn.execute("SELECT raw FROM payments"):
+            try:
+                p = json.loads(r["raw"] or "{}")
+            except ValueError:
+                continue
+            ts = (p.get("createdAt") or "").replace("T", " ")
+            if ts[:10] != d:
+                continue
+            u = conn.execute("SELECT name FROM users WHERE id=?", (p.get("userId"),)).fetchone()
+            rows.append({"ts": ts[11:16], "kind": "оплата",
+                         "who": names.get(p.get("managerId"), p.get("managerId") or "—"),
+                         "client": (u["name"] if u else "—"),
+                         "what": f"{p.get('summa')} ₽ · {p.get('comment') or ''}"[:70]})
+    try:
+        mk = autopilot._client()
+        try:
+            cm = mk.get("/v1/company/userComments", {"createdAt": [d, d], "limit": 200})
+            for x in (cm.get("userComments") if isinstance(cm, dict) else cm) or []:
+                with db.get_conn() as conn:
+                    u = conn.execute("SELECT name FROM users WHERE id=?",
+                                     (x.get("userId"),)).fetchone()
+                rows.append({"ts": (x.get("createdAt") or "")[11:16], "kind": "комментарий",
+                             "who": names.get(x.get("managerId"), x.get("managerId") or "—"),
+                             "client": (u["name"] if u else "—"),
+                             "what": (x.get("comment") or "")[:70]})
+        finally:
+            mk.close()
+    except Exception as e:
+        logging.getLogger("kidsup.journal").warning("комментарии не забрались: %s", e)
+    rows.sort(key=lambda r: r["ts"], reverse=True)
+    per = {}
+    for r in rows:
+        p = per.setdefault(r["who"], {"запись в группу": 0, "оплата": 0, "комментарий": 0})
+        p[r["kind"]] = p.get(r["kind"], 0) + 1
+    return render(request, "journal.html", active="journal", rows=rows, per=per, day=d)
+
+
 @app.get("/metrics", response_class=HTMLResponse, dependencies=AUTH)
 def metrics_page(request: Request):
     """Не «сколько задач», а что они дают: скорость первого касания,
@@ -1640,7 +1704,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-16.04"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-16.05"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
