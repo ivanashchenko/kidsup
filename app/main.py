@@ -375,6 +375,7 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
             "free": max(0, cap - enrolled), "fresh": r["fresh"] or 0, "fill_pct": fill,
             "color": "#E5232A" if fill >= 100 else "#F5A81C" if fill >= 75 else "#5FB53B",
         })
+    all_groups = list(groups)          # до фильтров — для табло набора
     courses_list = sorted({g["course"] for g in groups})
     if course:
         groups = [g for g in groups if g["course"] == course]
@@ -457,7 +458,22 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
             GROUP BY l.class_id""").fetchall())
     for g in groups:
         g["trials"] = trials.get(g["id"], 0)
-    return render(request, "enrollment.html", active="enrollment",
+    # табло набора: одна цифра, ради которой всё и делается
+    real = [g for g in all_groups if not g["buffer"]]
+    total_places = sum(g["capacity"] for g in real)
+    total_taken = sum(g["enrolled"] for g in real)
+    days_left = max(0, (date(2026, 9, 30) - autopilot._today()).days)
+    board = {
+        "places": total_places, "taken": total_taken,
+        "free": max(0, total_places - total_taken),
+        "pct": round(total_taken * 100 / total_places) if total_places else 0,
+        "days": days_left,
+        "per_day": round((total_places - total_taken) / days_left, 1) if days_left else 0,
+        "full": sum(1 for g in real if g["free"] <= 0),
+        "empty": sum(1 for g in real if g["enrolled"] == 0),
+        "groups": len(real),
+    }
+    return render(request, "enrollment.html", active="enrollment", board=board,
                   groups=groups, courses=courses_list, course=course,
                   days=days_list, day=day, free=free,
                   age=age, slots=slots_list, slot=slot,
@@ -1707,7 +1723,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-16.07"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-16.08"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")

@@ -2,6 +2,19 @@
 {% block title %}Набор 2026/27 — KidsUp Analytics{% endblock %}
 {% block content %}
 <h1>Набор групп 2026/27</h1>
+
+<div class="cards" style="margin-bottom:14px">
+  <div class="card"><div class="card-value">{{ board.taken }} / {{ board.places }}</div>
+    <div class="card-label">мест занято ({{ board.pct }}%)</div></div>
+  <div class="card"><div class="card-value">{{ board.free }}</div>
+    <div class="card-label">свободных мест</div></div>
+  <div class="card"><div class="card-value">{{ board.days }}</div>
+    <div class="card-label">дней до 30 сентября</div></div>
+  <div class="card"><div class="card-value">{{ board.per_day }}</div>
+    <div class="card-label">записей в день, чтобы успеть</div></div>
+  <div class="card"><div class="card-value">{{ board.empty }}</div>
+    <div class="card-label">групп совсем пустых</div></div>
+</div>
 <div class="notice"><b>Учебный год: 31 августа 2026 — 31 мая 2027.</b>
 Первый день — понедельник 31.08, в этот день стартует 21 группа; остальные —
 на своём первом дне недели, 1–6 сентября. Последние занятия 25–31 мая.
