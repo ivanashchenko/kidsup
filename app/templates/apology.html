@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Извинения — KidsUP{% endblock %}
+{% block content %}
+<h1>Извинения за ошибку в рассылке</h1>
+
+<div class="notice">
+  <b>Что произошло.</b> В рассылке 13–15.08 текст говорил «был у нас в летнем лагере»,
+  но эти семьи занимались у нас летом <b>не в лагере</b>, а на регулярных занятиях.
+  Сообщение ушло <b>{{ rows|length }}</b> семьям. Остальным в очереди с таким же
+  несоответствием текст уже снят — они его не получат.
+  <br>
+  <b>Что делать.</b> Открыть чат в Wazzup, отправить текст ниже (кнопка «копировать»),
+  затем отметить строку как обработанную у себя в списке. Порядок — сверху вниз,
+  начиная с тех, кто уже написал недовольство.
+</div>
+
+<table class="data">
+  <thead>
+    <tr><th>#</th><th>Ребёнок</th><th>Телефон</th><th>Ходил(а) на</th>
+        <th>Отправлено</th><th>Текст извинения</th></tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr{% if r.complained %} class="warn"{% endif %}>
+      <td>{{ loop.index }}</td>
+      <td>{{ r.child }}{% if r.complained %} <b>— уже написал(а) претензию</b>{% endif %}</td>
+      <td>{{ r.phone }}</td>
+      <td class="small">{{ r.course }}</td>
+      <td class="small muted">{{ r.sent }}</td>
+      <td>
+        <textarea class="apology" rows="6" readonly>{{ r.text }}</textarea>
+        <button class="btn copy-btn" type="button">Копировать</button>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6">Несоответствий нет.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<style>
+  textarea.apology { width: 100%; min-width: 320px; font: inherit; }
+  tr.warn { background: #fff4f4; }
+</style>
+<script>
+document.querySelectorAll('.copy-btn').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var t = b.parentElement.querySelector('textarea');
+    navigator.clipboard.writeText(t.value).then(function () {
+      b.textContent = 'Скопировано';
+      setTimeout(function () { b.textContent = 'Копировать'; }, 1500);
+    });
+  });
+});
+</script>
+{% endblock %}

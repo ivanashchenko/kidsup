@@ -502,6 +502,63 @@ def _waitlist_init(conn) -> None:
         status TEXT DEFAULT 'open')""")
 
 
+APOLOGY_TEXT = (
+    "Здравствуйте! Это KidsUP на Рокоссовского.\n"
+    "Прошу прощения за прошлое сообщение — в нём ошибка: {имя_в} мы помним "
+    "не по лагерю, а по занятиям «{курс}». Рассылка ушла общим текстом, "
+    "это моя оплошность. Извините!\n\n"
+    "Приглашение при этом в силе, и оно про другое: 29 августа у нас праздник "
+    "открытия сезона, а 1–6 сентября — Неделя открытых уроков: можно бесплатно "
+    "прийти на любое занятие нового учебного года и выбрать своё.\n"
+    "Записать {имя_в} на открытый урок?"
+)
+
+# в CRM курсы названы длинно — в письме родителю нужно коротко и по-человечески
+COURSE_SHORT = {
+    "Раннее развитие с Еленой. Музыка и речь": "Музыка и речь с Еленой",
+    "Английский летний клуб": "летний клуб",
+}
+
+
+@app.get("/apology", response_class=HTMLResponse, dependencies=AUTH)
+def apology_page(request: Request, campaign: str = "camp_aug26"):
+    """Список семей, которым ушёл текст про лагерь не по факту, с готовым
+    текстом извинения для каждой."""
+    from . import autopilot
+    audit = autopilot.broadcast_audit_camp(campaign)
+    with db.get_conn() as conn:
+        complained = {(p or "")[-10:] for (p,) in conn.execute(
+            "SELECT DISTINCT phone FROM wazzup_inbox").fetchall() if p}
+        course_by_phone: dict[str, str] = {}
+        for phone, course in conn.execute("""
+                SELECT u.phone, co.name FROM lesson_records lr
+                JOIN lessons l ON l.id = lr.lesson_id
+                JOIN users u ON u.id = lr.user_id
+                LEFT JOIN classes cl ON cl.id = l.class_id
+                LEFT JOIN courses co ON co.id = cl.course_id
+                WHERE lr.visit = 1 AND u.phone IS NOT NULL AND u.phone != ''
+                  AND ((l.date >= '2024-06-01' AND l.date < '2024-09-01')
+                    OR (l.date >= '2025-06-01' AND l.date < '2025-09-01'))"""):
+            if course:
+                course_by_phone.setdefault((phone or "")[-10:], course)
+    rows = []
+    for rec in audit["sent_wrong"]:
+        full = rec.get("child") or ""
+        name = autopilot._child_name(full)
+        course = course_by_phone.get((rec["phone"] or "")[-10:], "летние занятия")
+        course = COURSE_SHORT.get(course, course)
+        text = (APOLOGY_TEXT
+                .replace("{имя_в}", autopilot._accusative(name) if name
+                         else "вашего ребёнка")
+                .replace("{курс}", course))
+        rows.append({"child": full, "phone": rec["phone"], "course": course,
+                     "sent": (rec.get("sent") or "")[:16].replace("T", " "),
+                     "text": text,
+                     "complained": (rec["phone"] or "")[-10:] in complained})
+    rows.sort(key=lambda r: (not r["complained"], r["sent"]))
+    return render(request, "apology.html", active="apology", rows=rows)
+
+
 @app.post("/waitlist/add", dependencies=AUTH)
 async def waitlist_add(class_id: int = Form(...), class_name: str = Form(""),
                        name: str = Form(""), phone: str = Form(""), note: str = Form("")):
@@ -1276,7 +1333,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-15.06"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-15.10"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -1447,6 +1504,21 @@ async def api_broadcast_reads(campaign: str = "camp_aug26"):
     out["hint"] = ("статусы собираются с 15.08 — по сообщениям, отправленным раньше, "
                    "данных о прочтении нет")
     return out
+
+
+@app.get("/api/broadcast/audit-camp", dependencies=AUTH)
+async def api_broadcast_audit_camp(campaign: str = "camp_aug26"):
+    """Кому текст про «летний лагерь» ушёл (или уйдёт) не по факту."""
+    from . import autopilot
+    return autopilot.broadcast_audit_camp(campaign)
+
+
+@app.post("/api/broadcast/prune-wrong-camp", dependencies=AUTH)
+async def api_broadcast_prune_wrong_camp(payload: dict = None):
+    """Снять с очереди получателей, которым текст про лагерь не по факту."""
+    from . import autopilot
+    return autopilot.broadcast_prune_wrong_camp(
+        (payload or {}).get("campaign", "camp_aug26"))
 
 
 @app.post("/api/broadcast/prune-active", dependencies=AUTH)

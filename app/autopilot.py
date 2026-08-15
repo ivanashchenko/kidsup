@@ -68,6 +68,28 @@ ST_REJECT = 125957        # «Отказ»
 CAMP_COURSE = "Английский летний клуб"
 
 
+def _past_summer_kinds(conn) -> dict[int, str]:
+    """Кто чем занимался у нас летом 2024/2025: 'camp' или 'regular'.
+
+    Нужно строго по факту: текст «был у нас в летнем лагере» нельзя слать
+    семье, которая ходила на регулярные занятия (Музыка и речь и т. п.).
+    """
+    rows = conn.execute("""SELECT lr.user_id, co.name FROM lesson_records lr
+        JOIN lessons l ON l.id = lr.lesson_id
+        LEFT JOIN classes cl ON cl.id = l.class_id
+        LEFT JOIN courses co ON co.id = cl.course_id
+        WHERE lr.visit = 1
+          AND ((l.date >= '2024-06-01' AND l.date < '2024-09-01')
+            OR (l.date >= '2025-06-01' AND l.date < '2025-09-01'))""").fetchall()
+    kinds: dict[int, str] = {}
+    for uid, cname in rows:
+        if cname == CAMP_COURSE:
+            kinds[uid] = "camp"          # лагерь перевешивает: он точно был
+        else:
+            kinds.setdefault(uid, "regular")
+    return kinds
+
+
 def _summer_kinds() -> dict[int, str]:
     """user_id -> 'camp' (только летний лагерь) или 'regular' (МсМ/логопед/сад…).
 
@@ -151,6 +173,19 @@ def _genitive(name: str) -> str:
     return name  # несклоняемые (Лео, Отто…)
 
 
+def _accusative(name: str) -> str:
+    """Винительный падеж имени: «записать Еву», «помним Марка», «ждём Игоря».
+    У одушевлённых мужских совпадает с родительным, у женских на -а/-я — -у/-ю."""
+    low = name.lower()
+    if low in INDECLINABLE or low in FEM_SOFT:   # Николь, Любовь — не меняются
+        return name
+    if low.endswith("а"):
+        return name[:-1] + "у"
+    if low.endswith("я"):
+        return name[:-1] + "ю"
+    return _genitive(name)                        # Марк → Марка, Игорь → Игоря
+
+
 def _child_name(full: str) -> str | None:
     """Имя ребёнка из строки CRM или None, если уверенного имени нет."""
     clean = re.sub(r"\([^)]*\)", " ", full or "")
@@ -164,7 +199,11 @@ def _fill_name(text: str, full_name: str) -> str:
     """Плейсхолдеры: {имя} — именительный, {имя_р} — родительный падеж."""
     child = _child_name(full_name)
     text = text.replace("{имя}", child or "ваш ребёнок")
-    return text.replace("{имя_р}", _genitive(child) if child else "вашего ребёнка")
+    text = text.replace("{имя_р}", _genitive(child) if child else "вашего ребёнка")
+    # запасной вариант «ваш ребёнок» может попасть в начало предложения —
+    # без этого клиент видит «…Рокоссовского. ваш ребёнок был…»
+    return re.sub(r"(^|[.!?]\s+)([а-яё])",
+                  lambda m: m.group(1) + m.group(2).upper(), text)
 
 
 # --- кампании рассылок ----------------------------------------------------
@@ -198,12 +237,17 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
             pick |= {u for u in summer if kinds.get(u) == "regular"}
         if segment in ("y2425", "warm"):
             pick |= y2425
-        if segment == "camp_past":
-            # лето 2024/2025 (лагерь и летние занятия), но НЕ были летом 2026
+        if segment in ("camp_past", "camp_past_camp", "camp_past_regular"):
+            # лето 2024/2025, но НЕ были летом 2026
             past = {r[0] for r in conn.execute(base + """
                 SELECT DISTINCT u FROM v WHERE (d>='2024-06-01' AND d<'2024-09-01')
-                OR (d>='2025-06-01' AND d<'2025-09-01')""")}
-            pick |= past - summer
+                OR (d>='2025-06-01' AND d<'2025-09-01')""")} - summer
+            past_kinds = _past_summer_kinds(conn)
+            if segment == "camp_past_camp":
+                past = {u for u in past if past_kinds.get(u) == "camp"}
+            elif segment == "camp_past_regular":
+                past = {u for u in past if past_kinds.get(u) == "regular"}
+            pick |= past
         active_phones = {(_ph or "")[-10:] for (_ph,) in conn.execute(
             """SELECT DISTINCT u.phone FROM users u
                JOIN lesson_records lr ON lr.user_id = u.id
@@ -234,6 +278,58 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
             n += 1
     log.info("broadcast: кампания %s (%s) — %d получателей", campaign, segment, n)
     return {"campaign": campaign, "segment": segment, "queued": n}
+
+
+def broadcast_audit_camp(campaign: str) -> dict:
+    """Проверяет, кому из получателей кампании про «летний лагерь» этот текст
+    не соответствует факту: семья была летом, но на регулярных занятиях.
+    Возвращает списки — по отправленным и по ожидающим отправки."""
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        kinds = _past_summer_kinds(conn)
+        by_phone: dict[str, str] = {}
+        for uid, kind in kinds.items():
+            row = conn.execute("SELECT phone FROM users WHERE id=?", (uid,)).fetchone()
+            if not row or not row[0]:
+                continue
+            key = row[0][-10:]
+            if kind == "camp" or key not in by_phone:
+                by_phone[key] = kind      # лагерь по любому ребёнку → семья была
+        rows = conn.execute(
+            "SELECT phone, child, status, sent FROM broadcast_queue WHERE campaign=?",
+            (campaign,)).fetchall()
+    out: dict = {"campaign": campaign, "sent_wrong": [], "pending_wrong": [],
+                 "sent_ok": 0, "pending_ok": 0, "unknown": 0}
+    for phone, child, status, sent in rows:
+        kind = by_phone.get((phone or "")[-10:])
+        if kind is None:
+            out["unknown"] += 1
+            continue
+        rec = {"phone": phone, "child": child, "sent": sent}
+        if kind == "regular":
+            out["sent_wrong" if status == "sent" else "pending_wrong"].append(rec)
+        elif status == "sent":
+            out["sent_ok"] += 1
+        else:
+            out["pending_ok"] += 1
+    out["sent_wrong_n"] = len(out["sent_wrong"])
+    out["pending_wrong_n"] = len(out["pending_wrong"])
+    return out
+
+
+def broadcast_prune_wrong_camp(campaign: str) -> dict:
+    """Снимает с очереди тех, для кого текст про лагерь не соответствует факту."""
+    wrong = {r["phone"] for r in broadcast_audit_camp(campaign)["pending_wrong"]}
+    with db.get_conn() as conn:
+        _bq_init(conn)
+        n = 0
+        for ph in wrong:
+            n += conn.execute(
+                "UPDATE broadcast_queue SET status='cancelled' "
+                "WHERE campaign=? AND phone=? AND status='pending'",
+                (campaign, ph)).rowcount
+    log.info("broadcast_prune_wrong_camp: снято %d", n)
+    return {"campaign": campaign, "cancelled": n}
 
 
 def broadcast_prune_active(campaign: str) -> dict:
