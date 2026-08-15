@@ -10,23 +10,12 @@
 <body>
 <header class="topbar">
   <div class="brand"><img src="/static/logo.svg" alt="KidsUP"> KidsUP <span>Analytics</span></div>
-  <nav>
-    <span class="nav-group">Смена</span>
+  <nav class="nav-main">
     <a href="/suggest" class="{{ 'active' if active == 'suggest' }}">Ответы</a>
     <a href="/callplan" class="{{ 'active' if active == 'callplan' }}">Кого обзвонить</a>
     <a href="/enrollment" class="{{ 'active' if active == 'enrollment' }}">Набор 26/27</a>
     <a href="/constructor" class="{{ 'active' if active == 'constructor' }}">Конструктор</a>
     <a href="/base" class="{{ 'active' if active == 'base' }}">База знаний</a>
-    <span class="nav-group">Контроль</span>
-    <a href="/" class="{{ 'active' if active == 'dashboard' }}">Дашборд</a>
-    <a href="/metrics" class="{{ 'active' if active == 'metrics' }}">Дисциплина</a>
-    <a href="/leads" class="{{ 'active' if active == 'leads' }}">Лиды</a>
-    <a href="/clicks" class="{{ 'active' if active == 'clicks' }}">Клики</a>
-    <span class="nav-group">Данные</span>
-    <a href="/groups" class="{{ 'active' if active == 'groups' }}">Группы</a>
-    <a href="/students" class="{{ 'active' if active == 'students' }}">Ученики</a>
-    <a href="/payments" class="{{ 'active' if active == 'payments' }}">Платежи</a>
-    <a href="/settings" class="{{ 'active' if active == 'settings' }}">Настройки</a>
   </nav>
   <div class="sync-block">
     {% if last_sync %}<span class="muted small">Синхр.: {{ last_sync }}</span>{% endif %}
@@ -34,6 +23,17 @@
       Синхронизировать
     </button>
   </div>
+  <nav class="nav-sub">
+    <a href="/" class="{{ 'active' if active == 'dashboard' }}">Дашборд</a>
+    <a href="/metrics" class="{{ 'active' if active == 'metrics' }}">Дисциплина</a>
+    <a href="/callaudit" class="{{ 'active' if active == 'callaudit' }}">Учёт обзвона</a>
+    <a href="/leads" class="{{ 'active' if active == 'leads' }}">Лиды</a>
+    <a href="/clicks" class="{{ 'active' if active == 'clicks' }}">Клики</a>
+    <a href="/groups" class="{{ 'active' if active == 'groups' }}">Группы</a>
+    <a href="/students" class="{{ 'active' if active == 'students' }}">Ученики</a>
+    <a href="/payments" class="{{ 'active' if active == 'payments' }}">Платежи</a>
+    <a href="/settings" class="{{ 'active' if active == 'settings' }}">Настройки</a>
+  </nav>
 </header>
 
 <div id="sync-status" class="sync-status" hidden></div>

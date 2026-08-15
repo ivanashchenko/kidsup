@@ -525,6 +525,13 @@ COURSE_SHORT = {
 # Раньше они лежали файлами и терялись. Теперь открываются с любой страницы,
 # сгруппированы по тому, когда именно нужны в работе.
 
+CLIENT_STATE_NAMES = {
+    125951: "1. Новый лид", 345768: "2. Недозвон", 146950: "3. Думает",
+    125952: "4. Записался на пробное", 125953: "Посетил пробное",
+    345767: "Думает-2", 125955: "Клиент", 125957: "Отказ",
+    345759: "0. Архив набора", 146328: "0.1 Не писать", 146513: "0.3 13 лет+",
+}
+
 DOC_GROUPS = [
     ("Каждый день на смене", [
         ("metodichka_v3", "Методичка администратора",
@@ -591,6 +598,78 @@ def base_doc(slug: str):
             'border-bottom:1px solid #ddd;font:15px/1.4 system-ui;z-index:99">'
             '<a href="/base">← Все методички</a></div>')
     return HTMLResponse(back + f.read_text(encoding="utf-8"))
+
+
+@app.get("/callaudit", response_class=HTMLResponse, dependencies=AUTH)
+def callaudit_page(request: Request):
+    """Учёт обзвона: по каждой семье — была ли задача, закрыта ли она,
+    был ли звонок или сообщение, какой статус и записан ли ребёнок на 26/27.
+    Отвечает на вопрос «кому позвонили и кого записали», а не «сколько задач»."""
+    from . import sla
+    mk = autopilot._client()
+    try:
+        tasks = sla._open_tasks(mk)
+        done = mk.get("/v1/company/tasks", {"isComplete": "true", "limit": 100})
+        tasks += (done.get("tasks") if isinstance(done, dict) else done) or []
+    finally:
+        mk.close()
+    call_cats = {sla.CAT_CALL, sla.CAT_PUSH}
+    by_user: dict[int, dict] = {}
+    for t in tasks:
+        uid = t.get("userId")
+        if not uid or t.get("categoryId") not in call_cats:
+            continue
+        cur = by_user.get(uid)
+        if cur and cur["date"] <= (t.get("beginDate") or ""):
+            continue
+        by_user[uid] = {"date": (t.get("beginDate") or "")[:10],
+                        "manager": (t.get("managerIds") or [None])[0],
+                        "done": bool(t.get("isComplete"))}
+    names = {a["managerId"]: a["name"] for a in autopilot._admins()}
+    names[84116] = "Борис"
+    names[154181] = "Лиза"
+    rows = []
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS mango_calls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+            direction TEXT, state TEXT)""")
+        for uid, info in by_user.items():
+            u = conn.execute("SELECT name, phone, raw FROM users WHERE id=?", (uid,)).fetchone()
+            if not u:
+                continue
+            p = "".join(ch for ch in (u["phone"] or "") if ch.isdigit())[-10:]
+            called = msg = False
+            if len(p) == 10:
+                called = bool(conn.execute(
+                    "SELECT 1 FROM mango_calls WHERE substr(phone,-10)=? AND direction='out' "
+                    "AND ts>=? LIMIT 1", (p, info["date"])).fetchone())
+                try:
+                    msg = bool(conn.execute(
+                        "SELECT 1 FROM wazzup_outbox WHERE substr(phone,-10)=? AND ts>=? LIMIT 1",
+                        (p, info["date"])).fetchone())
+                except Exception:
+                    msg = False
+            enrolled = conn.execute(
+                "SELECT COUNT(*) FROM joins j JOIN classes cl ON cl.id=j.class_id "
+                "WHERE j.user_id=? AND cl.name LIKE '2627%'", (uid,)).fetchone()[0]
+            try:
+                state = json.loads(u["raw"] or "{}").get("clientStateId")
+            except ValueError:
+                state = None
+            rows.append({"uid": uid, "name": u["name"], "phone": u["phone"],
+                         "date": info["date"], "manager": names.get(info["manager"], "—"),
+                         "done": info["done"], "called": called, "msg": msg,
+                         "enrolled": enrolled, "state": CLIENT_STATE_NAMES.get(state, "—")})
+    rows.sort(key=lambda r: (r["date"], r["name"] or ""))
+    total = len(rows)
+    stat = {
+        "total": total,
+        "done": sum(1 for r in rows if r["done"]),
+        "touched": sum(1 for r in rows if r["called"] or r["msg"]),
+        "enrolled": sum(1 for r in rows if r["enrolled"]),
+        "ghost": sum(1 for r in rows if r["done"] and not (r["called"] or r["msg"])),
+    }
+    return render(request, "callaudit.html", active="callaudit", rows=rows, stat=stat)
 
 
 @app.get("/metrics", response_class=HTMLResponse, dependencies=AUTH)
@@ -1528,7 +1607,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-15.12"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-15.14"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Учёт обзвона — KidsUP{% endblock %}
+{% block content %}
+<h1>Учёт обзвона</h1>
+<p class="muted">По каждой семье, которой назначен звонок: закрыта ли задача,
+было ли реальное касание (звонок в Mango или сообщение в Wazzup), какой статус
+и записан ли ребёнок на 2026/27.</p>
+
+<div class="cards">
+  <div class="card"><div class="card-value">{{ stat.total }}</div><div class="card-label">семей в обзвоне</div></div>
+  <div class="card"><div class="card-value">{{ stat.done }}</div><div class="card-label">задач закрыто</div></div>
+  <div class="card"><div class="card-value">{{ stat.touched }}</div><div class="card-label">реально коснулись</div></div>
+  <div class="card"><div class="card-value">{{ stat.enrolled }}</div><div class="card-label">записаны на 26/27</div></div>
+  <div class="card"><div class="card-value">{{ stat.ghost }}</div><div class="card-label">закрыто без действия</div></div>
+</div>
+
+{% if stat.ghost %}
+<div class="notice">
+  <b>{{ stat.ghost }}</b> задач закрыто без единого звонка и сообщения. Система
+  открывает такие заново — но если счётчик держится высоким, значит закрывают
+  не работая.
+</div>
+{% endif %}
+
+<table class="data">
+  <thead>
+    <tr><th>Дата</th><th>Клиент</th><th>Телефон</th><th>Кому назначено</th>
+        <th>Задача</th><th>Звонок</th><th>Сообщение</th><th>Статус</th><th>Записан 26/27</th></tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr{% if r.done and not r.called and not r.msg %} style="background:#fff4f4"{% endif %}>
+      <td class="small">{{ r.date }}</td>
+      <td><a href="https://app.moyklass.com/client/{{ r.uid }}" target="_blank">{{ r.name }}</a></td>
+      <td class="small">{{ r.phone }}</td>
+      <td class="small">{{ r.manager }}</td>
+      <td>{{ '✅ закрыта' if r.done else '⏳ открыта' }}</td>
+      <td>{{ '📞 да' if r.called else '—' }}</td>
+      <td>{{ '💬 да' if r.msg else '—' }}</td>
+      <td class="small">{{ r.state }}</td>
+      <td>{{ '✅ ' ~ r.enrolled if r.enrolled else '—' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="9">Задач на обзвон не назначено.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<p class="muted small">Колонка «Звонок» заполняется по уведомлениям Mango. Пока
+уведомления не включены в кабинете Mango, она будет пустой у всех — это не
+значит, что не звонили.</p>
+{% endblock %}

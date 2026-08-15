@@ -67,7 +67,19 @@ body {
 .brand img { height: 40px; width: 40px; object-fit: contain; }
 .brand span { color: var(--primary); font-weight: 600; }
 
-.topbar nav { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+/* Меню в две строки: сверху — то, чем пользуются каждый день на смене,
+   снизу — разделы для контроля и разбора. Раньше подписи групп стояли
+   в одну строку со ссылками и при переносе оказывались посреди меню. */
+.topbar nav { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.topbar nav.nav-main { flex: 1 1 auto; }
+.topbar nav.nav-sub {
+  flex: 1 0 100%;
+  gap: 2px;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.topbar nav.nav-sub a { padding: 5px 11px; font-size: 13px; font-weight: 500; }
 .topbar nav a {
   padding: 8px 15px;
   border-radius: 999px;
@@ -206,10 +218,3 @@ label { font-weight: 600; color: var(--muted); font-size: 14px; }
   main { padding: 18px 12px 56px; }
   .card { padding: 16px; border-radius: 14px; }
 }
-
-/* группировка меню: «Смена» — то, чем пользуются каждый день */
-.topbar nav .nav-group {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
-  opacity: .55; margin: 0 4px 0 14px; align-self: center; white-space: nowrap;
-}
-.topbar nav .nav-group:first-child { margin-left: 0; }
