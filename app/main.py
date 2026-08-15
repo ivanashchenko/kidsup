@@ -1276,7 +1276,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-15.03"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-15.04"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -1411,6 +1411,12 @@ async def api_broadcast_reads(campaign: str = "camp_aug26"):
         conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_outbox (
             id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
             message_id TEXT UNIQUE, text TEXT)""")
+        for ddl in ("ALTER TABLE wazzup_outbox ADD COLUMN message_id TEXT",
+                    "ALTER TABLE wazzup_outbox ADD COLUMN text TEXT"):
+            try:
+                conn.execute(ddl)
+            except Exception:
+                pass
         try:
             sent = [r[0] for r in conn.execute(
                 "SELECT phone FROM broadcast_queue WHERE campaign=? AND status='sent'", (campaign,))]
