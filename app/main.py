@@ -1029,18 +1029,39 @@ def _brief_text(phone: str) -> str:
 
 
 @app.post("/mango/events")
-async def mango_events(request: Request):
-    """Уведомления Mango о звонках. В ЛК Mango: Настройки → Уведомления о
-    событиях → адрес https://app.kidsup.ru/mango/events (типы: звонки).
-    На входящий звонок шлём дежурному админу справку о клиенте."""
+@app.post("/mango/{rest:path}")
+async def mango_events(request: Request, rest: str = ""):
+    """Уведомления Mango о звонках.
+
+    В ЛК Mango: Интеграции → API коннектор → Внешние системы → Добавить
+    систему → адрес https://app.kidsup.ru/mango/ (со слешем на конце).
+    Mango дописывает к адресу подпуть события: events/call, events/summary,
+    events/record/added — поэтому ловим любой подпуть, а не один адрес.
+
+    На входящий звонок шлём дежурному админу справку о клиенте, готовую
+    запись разговора сразу ставим в очередь на расшифровку."""
     from . import autopilot, wazzup
     form = await request.form()
-    js = form.get("json") or "{}"
+    js = form.get("json")
+    if js is None:
+        return {"ok": True}          # «Проверить подключение» шлёт пустой запрос
     if not _mango_sign_ok(form.get("vpbx_api_key") or "", js, form.get("sign") or ""):
         raise HTTPException(403, "подпись не сошлась")
     try:
         ev = json.loads(js)
     except ValueError:
+        return {"ok": True}
+    kind = (rest or "events").strip("/")
+    # запись разговора готова — кладём в очередь, разберём в ближайшие минуты
+    if ev.get("recording_id") or kind.endswith("record/added"):
+        rid = ev.get("recording_id") or ""
+        if rid:
+            with db.get_conn() as conn:
+                conn.execute("""CREATE TABLE IF NOT EXISTS mango_recordings (
+                    recording_id TEXT PRIMARY KEY, ts TEXT, done INTEGER DEFAULT 0)""")
+                conn.execute("INSERT OR IGNORE INTO mango_recordings (recording_id, ts) "
+                             "VALUES (?, ?)",
+                             (rid, autopilot._now().isoformat(timespec="seconds")))
         return {"ok": True}
     state = (ev.get("call_state") or "").lower()
     frm = ((ev.get("from") or {}).get("number") or "")
@@ -1616,7 +1637,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-15.24"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-16.01"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
