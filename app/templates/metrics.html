@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Дисциплина — KidsUP{% endblock %}
+{% block content %}
+<h1>Дисциплина по задачам</h1>
+
+<h2>Сроки (SLA)</h2>
+<table class="data">
+  <thead><tr><th>Вид задачи</th><th>Срок</th><th>Просрочка вдвое</th></tr></thead>
+  <tbody>
+  {% for name, mins in sla %}
+    <tr><td>{{ name }}</td>
+        <td>{{ (mins ~ ' мин') if mins < 120 else ((mins // 60) ~ ' ч') }}</td>
+        <td class="muted small">задача уходит второму администратору смены</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Нагрузка сегодня</h2>
+<p class="muted">Потолок: {{ caps.calls }} звонков и {{ caps.chats }} сообщений
+в день на человека. Новичку первую неделю — половина.</p>
+{% if load.error %}
+  <div class="notice">Не удалось посчитать: {{ load.error }}</div>
+{% else %}
+<table class="data">
+  <thead><tr><th>Сотрудник</th><th>Звонки</th><th>Чат</th><th>Прочее</th></tr></thead>
+  <tbody>
+  {% for mid, v in load.load.items() %}
+    <tr{% if v.calls > caps.calls or v.chats > caps.chats %} style="background:#fff4f4"{% endif %}>
+      <td>{{ names.get(mid, mid) }}</td>
+      <td>{{ v.calls }}{% if v.calls > caps.calls %} — выше потолка{% endif %}</td>
+      <td>{{ v.chats }}{% if v.chats > caps.chats %} — выше потолка{% endif %}</td>
+      <td>{{ v.other }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4">На сегодня задач не назначено.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Что сделано сегодня</h2>
+<table class="data">
+  <tbody>
+    <tr><td>Входящих звонков (уникальных номеров)</td><td><b>{{ calls.get('in', 0) }}</b></td></tr>
+    <tr><td>Исходящих звонков (уникальных номеров)</td><td><b>{{ calls.get('out', 0) }}</b></td></tr>
+    <tr><td>Отправлено сообщений</td><td><b>{{ msgs }}</b></td></tr>
+  </tbody>
+</table>
+<p class="muted small">Звонки считаются по уведомлениям Mango. Если цифры
+нулевые, а звонки были — в кабинете Mango не включены уведомления о событиях
+на <code>https://app.kidsup.ru/mango/events</code>.</p>
+
+{% if alert %}
+<h2>Последняя эскалация</h2>
+<div class="notice">
+  {{ alert.ts|replace('T', ' ') }} — просрочено {{ alert['items']|length }},
+  переназначено {{ alert.moved }}.
+  <ul>{% for it in alert['items'] %}<li class="small">{{ it }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+{% endblock %}

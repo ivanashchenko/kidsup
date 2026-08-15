@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}База знаний — KidsUP{% endblock %}
+{% block content %}
+<h1>База знаний</h1>
+<p class="muted">Все методички, скрипты и планы — здесь. Сгруппированы не по
+темам, а по моменту, когда они нужны в работе.</p>
+
+{% for g in groups %}
+  <h2>{{ g.title }}</h2>
+  <table class="data">
+    <tbody>
+    {% for d in g['items'] %}
+      <tr>
+        <td><a href="/base/{{ d.slug }}"><b>{{ d.name }}</b></a></td>
+        <td class="small muted">{{ d.note }}</td>
+        <td class="small muted">{{ d.size }} КБ</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% endfor %}
+{% endblock %}

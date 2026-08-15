@@ -521,6 +521,108 @@ COURSE_SHORT = {
 }
 
 
+# --- база знаний: методички, скрипты, планы ---------------------------------
+# Раньше они лежали файлами и терялись. Теперь открываются с любой страницы,
+# сгруппированы по тому, когда именно нужны в работе.
+
+DOC_GROUPS = [
+    ("Каждый день на смене", [
+        ("metodichka_v3", "Методичка администратора",
+         "Как вести смену: приветствие, запись, оплата, конфликты"),
+        ("skripty_v3", "Скрипты обзвона и переписки",
+         "Что говорить по каждому поводу — дословно"),
+        ("resepshen_v2", "Ресепшен-листы",
+         "Печатные листы на стойку: цены, расписание, ответы"),
+        ("brify_adminov", "Брифы администраторов",
+         "Короткие памятки по каждому предмету"),
+    ]),
+    ("Набор 2026/27", [
+        ("plan_nabora_v2", "План набора (актуальный)",
+         "Цель 523 места, сегменты, сроки, ответственные"),
+        ("operativka_13_17", "Оперативный план недели",
+         "Что делаем по дням"),
+        ("plan_del_borisa", "План дел Бориса",
+         "Что зависит только от собственника"),
+    ]),
+    ("Маркетинг и привлечение", [
+        ("kontent_plan_13_30", "Контент-план",
+         "Посты и сторис по дням"),
+        ("listovki_promoutery", "Листовки и промоутеры",
+         "Тексты листовок, механика сбора контактов"),
+        ("audit_saitov", "Аудит сайтов",
+         "Что чинить на kidsup.ru"),
+    ]),
+    ("Деньги и система", [
+        ("sistema_pribyli", "Система прибыли",
+         "Из чего складывается прибыль центра"),
+        ("plan_nabora", "План набора (первая версия)",
+         "Архив — для истории решений"),
+    ]),
+]
+
+
+@app.get("/base", response_class=HTMLResponse, dependencies=AUTH)
+def base_page(request: Request):
+    """Все методички в одном месте, сгруппированные по моменту применения."""
+    root = Path(__file__).resolve().parent.parent / "docs"
+    groups = []
+    for title, items in DOC_GROUPS:
+        rows = []
+        for slug, name, note in items:
+            f = root / f"{slug}.html"
+            if f.exists():
+                rows.append({"slug": slug, "name": name, "note": note,
+                             "size": f.stat().st_size // 1024})
+        if rows:
+            groups.append({"title": title, "items": rows})
+    return render(request, "base_docs.html", active="base", groups=groups)
+
+
+@app.get("/base/{slug}", response_class=HTMLResponse, dependencies=AUTH)
+def base_doc(slug: str):
+    """Отдаёт методичку. Имя файла проверяем по белому списку."""
+    known = {s for _, items in DOC_GROUPS for s, _, _ in items}
+    if slug not in known:
+        raise HTTPException(404)
+    f = Path(__file__).resolve().parent.parent / "docs" / f"{slug}.html"
+    if not f.exists():
+        raise HTTPException(404)
+    back = ('<div style="position:sticky;top:0;background:#fff;padding:8px 16px;'
+            'border-bottom:1px solid #ddd;font:15px/1.4 system-ui;z-index:99">'
+            '<a href="/base">← Все методички</a></div>')
+    return HTMLResponse(back + f.read_text(encoding="utf-8"))
+
+
+@app.get("/metrics", response_class=HTMLResponse, dependencies=AUTH)
+def metrics_page(request: Request):
+    """Не «сколько задач», а что они дают: скорость первого касания,
+    доля закрытых в тот же день, конверсия задачи в запись."""
+    from . import sla
+    try:
+        load = sla.load_caps()
+    except Exception as e:
+        load = {"error": f"{type(e).__name__}: {e}", "load": {}, "over": {}}
+    names = {a["managerId"]: a["name"] for a in autopilot._admins()}
+    try:
+        alert = json.loads(db.get_setting("sla_last_alert") or "{}")
+    except ValueError:
+        alert = {}
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS mango_calls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+            direction TEXT, state TEXT)""")
+        today = autopilot._today().isoformat()
+        calls = dict(conn.execute(
+            "SELECT direction, COUNT(DISTINCT phone) FROM mango_calls "
+            "WHERE ts >= ? GROUP BY direction", (today,)).fetchall())
+        msgs = conn.execute(
+            "SELECT COUNT(*) FROM wazzup_outbox WHERE ts >= ?", (today,)).fetchone()[0]
+    return render(request, "metrics.html", active="metrics", load=load,
+                  names=names, alert=alert, calls=calls, msgs=msgs,
+                  sla=[(sla.CAT_NAME[k], v) for k, v in sla.SLA_MINUTES.items()],
+                  caps={"calls": sla.CAP_CALLS, "chats": sla.CAP_CHATS})
+
+
 @app.get("/apology", response_class=HTMLResponse, dependencies=AUTH)
 def apology_page(request: Request, campaign: str = "camp_aug26"):
     """Список семей, которым ушёл текст про лагерь не по факту, с готовым
@@ -855,7 +957,16 @@ async def mango_events(request: Request):
     state = (ev.get("call_state") or "").lower()
     frm = ((ev.get("from") or {}).get("number") or "")
     ext = ((ev.get("from") or {}).get("extension") or "")
+    to_num = "".join(ch for ch in str((ev.get("to") or {}).get("number") or "") if ch.isdigit())
     phone = "".join(ch for ch in str(frm) if ch.isdigit())
+    # журнал звонков: нужен, чтобы проверять «закрыта ли задача с результатом»
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS mango_calls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+            direction TEXT, state TEXT)""")
+        conn.execute("INSERT INTO mango_calls (ts, phone, direction, state) VALUES (?,?,?,?)",
+                     (autopilot._now().isoformat(timespec="seconds"),
+                      (to_num if ext else phone)[-10:], "out" if ext else "in", state))
     if state not in ("appeared", "connected") or ext or len(phone) < 10:
         return {"ok": True}      # исходящие и служебные события пропускаем
     if not autopilot._mark("call_brief", f"{autopilot._today()}:{phone[-10:]}:{state}"):
@@ -1417,7 +1528,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-15.11"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-15.12"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -1495,7 +1606,8 @@ async def api_deploy(request: Request):
     for n in names:
         p = Path(n)
         if p.is_absolute() or ".." in p.parts or \
-                not (n == "requirements.txt" or n == "app" or n.startswith("app/")):
+                not (n == "requirements.txt" or n in ("app", "docs")
+                     or n.startswith("app/") or n.startswith("docs/")):
             raise HTTPException(400, f"недопустимый путь в архиве: {n}")
     tar.extractall(root)  # noqa: S202 — пути проверены выше
     threading.Timer(2.0, lambda: subprocess.Popen(

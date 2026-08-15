@@ -206,3 +206,10 @@ label { font-weight: 600; color: var(--muted); font-size: 14px; }
   main { padding: 18px 12px 56px; }
   .card { padding: 16px; border-radius: 14px; }
 }
+
+/* группировка меню: «Смена» — то, чем пользуются каждый день */
+.topbar nav .nav-group {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  opacity: .55; margin: 0 4px 0 14px; align-self: center; white-space: nowrap;
+}
+.topbar nav .nav-group:first-child { margin-left: 0; }

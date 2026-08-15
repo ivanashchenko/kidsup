@@ -1369,6 +1369,16 @@ def _loop() -> None:
                     auto_reject(mk)
                 finally:
                     mk.close()
+            # дисциплина по задачам: SLA/эскалация — каждые 10 минут,
+            # проверка «закрыто ли с результатом» — каждые 20 минут
+            if 8 <= now.hour < 21 and now.minute % 10 < 2:
+                try:
+                    from . import sla as _sla
+                    _sla.escalate_overdue()
+                    if now.minute % 20 < 2:
+                        _sla.verify_closed()
+                except Exception:
+                    log.exception("модуль SLA упал — продолжаем")
             if now.hour >= 20 and _mark("digest", str(_today())):
                 daily_digest()
             if now.hour >= 21 and _mark("roistat", str(_today())):
