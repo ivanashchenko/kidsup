@@ -394,7 +394,12 @@ def _broadcast_tick() -> None:
     except Exception as e:
         log.warning("wazzup channels недоступны: %s", e)
         return
-    active = [c.get("plainId") for c in chans if c.get("transport") == "whatsapp"]
+    # только реально живые номера: у заблокированного канала Wazzup принимает
+    # сообщение, но не доставляет — при высоком темпе это потеря всей порции
+    ok_states = {"active", "opened", "ready"}
+    active = [c.get("plainId") for c in chans
+              if c.get("transport") == "whatsapp"
+              and str(c.get("state") or "").lower() in ok_states]
     pref = [p.strip() for p in (db.get_setting(
         "wa_senders", wazzup.WHATSAPP_PREFERRED) or "").split(",") if p.strip()]
     active = [p for p in pref if p in active] or active
