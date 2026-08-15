@@ -1300,6 +1300,57 @@ def _eng_alumni_phones(conn) -> list[str]:
           AND u.phone IS NOT NULL AND u.phone != ''""", (ENG_COURSE_ID,))]
 
 
+def poll_calls() -> dict:
+    """Минутный опрос Mango вместо платных уведомлений.
+
+    Вторая внешняя система в API-коннекторе Mango стоит 4 200 ₽/мес. Она даёт
+    события в момент звонка — без неё нельзя подсказать админу ДО снятия
+    трубки. Всё остальное (журнал звонков, проверка «закрыта ли задача с
+    результатом», учёт обзвона) собирается опросом статистики раз в минуту.
+    """
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS mango_calls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+            direction TEXT, state TEXT)""")
+        try:
+            conn.execute("ALTER TABLE mango_calls ADD COLUMN rec_id TEXT")
+        except Exception:
+            pass
+        try:
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_mango_calls_uniq "
+                         "ON mango_calls (ts, phone, direction)")
+        except Exception:
+            pass
+    since = _now() - timedelta(minutes=15)
+    try:
+        rows = mango.calls(since, _now())
+    except Exception as e:
+        log.warning("poll_calls: mango недоступен: %s", e)
+        return {"error": str(e)[:120]}
+    added = 0
+    with db.get_conn() as conn:
+        for r in rows:
+            start = r.get("start")
+            if not start:
+                continue
+            ts = datetime.fromtimestamp(int(start), _now().tzinfo).isoformat(timespec="seconds")
+            ext = str(r.get("from_extension") or "")
+            num = str(r.get("to_number") if ext else r.get("from_number") or "")
+            phone = "".join(ch for ch in num if ch.isdigit())[-10:]
+            if len(phone) < 10:
+                continue
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO mango_calls (ts, phone, direction, state, rec_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (ts, phone, "out" if ext else "in", "finished",
+                 (r.get("records") or [""])[0] if isinstance(r.get("records"), list)
+                 else str(r.get("records") or "")))
+            added += cur.rowcount
+    if added:
+        log.info("poll_calls: добавлено %d звонков", added)
+    return {"added": added, "seen": len(rows)}
+
+
 def _loop() -> None:
     last3 = 0.0
     while True:
@@ -1338,6 +1389,12 @@ def _loop() -> None:
                 finally:
                     mk.close()
             _retry_forwards()
+            # звонки — раз в минуту (бесплатная замена платных уведомлений Mango)
+            if 8 <= now.hour < 21:
+                try:
+                    poll_calls()
+                except Exception:
+                    log.exception("poll_calls упал — продолжаем")
             # лёгкий синк групп и записей каждые 5 минут (08:00-21:00) —
             # «Набор 26/27» видит новые записи почти сразу; полный синк —
             # раз в день утром и по кнопке
