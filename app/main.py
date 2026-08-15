@@ -1195,6 +1195,12 @@ def _inbox_store(payload: dict) -> None:
         conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_outbox (
             id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
             message_id TEXT UNIQUE, text TEXT)""")
+        for ddl in ("ALTER TABLE wazzup_outbox ADD COLUMN message_id TEXT",
+                    "ALTER TABLE wazzup_outbox ADD COLUMN text TEXT"):
+            try:
+                conn.execute(ddl)
+            except Exception:
+                pass
         try:
             conn.execute("ALTER TABLE wazzup_outbox ADD COLUMN text TEXT")
         except Exception:
@@ -1270,7 +1276,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-15.01"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-15.03"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -1400,6 +1406,11 @@ async def api_broadcast_reads(campaign: str = "camp_aug26"):
     """Сколько получателей рассылки прочитали сообщение и промолчали.
     Считаем по статусам Wazzup: read → прочитал, delivered → дошло, но не открыл."""
     with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_status (
+            message_id TEXT PRIMARY KEY, status TEXT, rank INTEGER, ts TEXT)""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_outbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+            message_id TEXT UNIQUE, text TEXT)""")
         try:
             sent = [r[0] for r in conn.execute(
                 "SELECT phone FROM broadcast_queue WHERE campaign=? AND status='sent'", (campaign,))]
@@ -1410,7 +1421,7 @@ async def api_broadcast_reads(campaign: str = "camp_aug26"):
             replied = {r[0] for r in conn.execute(
                 "SELECT DISTINCT substr(phone,-10) FROM wazzup_inbox WHERE chat_type != 'manual'")}
         except Exception as e:
-            return {"error": f"нет данных: {type(e).__name__}"}
+            return {"error": f"нет данных: {type(e).__name__}: {e}"}
     out = {"sent": len(sent), "read": 0, "delivered_not_read": 0,
            "no_status": 0, "replied": 0, "read_silent": 0}
     for ph in sent:
