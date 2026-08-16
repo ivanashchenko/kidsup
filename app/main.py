@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import analytics, config, db, leads, sync
+from . import content as content_mod
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -481,6 +482,55 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
                   prices=price_blocks, pitches=pitches, waitlist=_waitlist_rows(),
                   summary=sorted(summary.values(), key=lambda x: -x["free"]))
 
+
+
+@app.get("/content", response_class=HTMLResponse, dependencies=AUTH)
+def content_page(request: Request, g: str = ""):
+    """Фабрика контента: готовые тексты каналов, собранные из живых данных набора."""
+    groups = _enrollment_groups()
+    blocks = content_mod.build(groups)
+    gnames = content_mod.groups_of(blocks)
+    return render(request, "content.html", active="content",
+                  blocks=blocks, gnames=gnames, sel=g if g in gnames else "",
+                  f=content_mod.facts(groups))
+
+
+def _enrollment_groups() -> list[dict]:
+    """Группы 2026/27 с остатком мест и ценой — то же, что видит страница набора."""
+    with db.get_conn() as conn:
+        rows = conn.execute("""
+            SELECT cl.id, cl.name, cl.max_students, co.name course,
+                   COUNT(DISTINCT j.user_id) enrolled
+            FROM classes cl
+            LEFT JOIN courses co ON co.id = cl.course_id
+            LEFT JOIN joins j ON j.class_id = cl.id
+            WHERE cl.name LIKE '2627%'
+            GROUP BY cl.id ORDER BY co.name, cl.name""").fetchall()
+    out = []
+    for r in rows:
+        name = r["name"] or ""
+        if name.startswith("OLD_") or "ТЕСТ" in name.upper():
+            continue
+        g_days = _name_days(name)
+        times = _TIME_RE.findall(name)
+        buffer = "аявк" in name
+        cap = r["max_students"] or 8
+        enrolled = r["enrolled"] or 0
+        age_lo, age_hi = _group_ages(name)
+        course = COURSE_ALIAS.get(r["course"] or "", r["course"] or "?")
+        pr = PRICES.get(course)
+        out.append({
+            "name": name, "course": course, "buffer": buffer,
+            "day": " · ".join(DAY_LABEL[d] for d in g_days) or "—",
+            "time": " · ".join(times[:2]) or "—",
+            "age_lo": age_lo, "age_hi": age_hi,
+            "age": (f"{age_lo:g}–{age_hi:g} лет" if age_lo else "—"),
+            "enrolled": enrolled, "capacity": cap,
+            "free": 0 if buffer else max(0, cap - enrolled),
+            "price_new": pr["lines"][0][2] if pr else None,
+            "price_label": pr["lines"][0][0] if pr else None,
+        })
+    return out
 
 
 # --- план обзвона: кого перезаписать на 2026/27 ---------------------------

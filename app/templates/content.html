@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Фабрика контента — KidsUP{% endblock %}
+{% block content %}
+<h1>Фабрика контента</h1>
+<p class="muted">Готовые тексты под каждый канал набора. Цифры внутри — живые:
+свободные места, цены с 01.09 и группы, где мест почти не осталось, подставляются
+из МойКласс при каждом открытии страницы. Выбрали канал → «копировать» → вставили.</p>
+
+<div class="cards">
+  <div class="card"><div class="card-value">{{ f.free_total }}</div>
+    <div class="card-label">свободных мест сейчас</div></div>
+  <div class="card"><div class="card-value">{{ f.scarce|length }}</div>
+    <div class="card-label">групп с последними местами</div></div>
+  <div class="card"><div class="card-value">{{ f.days_left }}</div>
+    <div class="card-label">дней до 30 сентября</div></div>
+  <div class="card"><div class="card-value">{{ blocks|length }}</div>
+    <div class="card-label">готовых текстов</div></div>
+</div>
+
+<div class="notice">
+  <b>Как этим пользоваться.</b> Тексты со скобками <code>{Имя}</code> и
+  <code>{Ребёнок}</code> — шаблоны для рассылок, подстановка идёт при отправке.
+  Всё остальное можно копировать и публиковать как есть.
+  Если группа заполнилась или цена изменилась — текст обновится сам, пересоздавать
+  ничего не нужно.
+</div>
+
+<div class="card">
+  <div class="chips">
+    <a href="/content" class="chip {{ 'free' if not sel }}">все каналы</a>
+    {% for g in gnames %}
+      <a href="/content?g={{ g|urlencode }}" class="chip {{ 'free' if sel == g }}">{{ g }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+{% for g in gnames %}
+  {% if not sel or sel == g %}
+  <h2>{{ g }}</h2>
+  {% for b in blocks if b.group == g %}
+  <div class="card">
+    <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px">
+      <b style="font-size:16px">{{ b.title }}</b>
+      <span class="muted small">{{ b.note }}</span>
+      <button type="button" class="copy" style="margin-left:auto"
+              data-text="{{ b.text }}">📋 копировать</button>
+    </div>
+    <pre style="white-space:pre-wrap;font:inherit;margin:0;background:var(--card-2);
+                border:1px solid var(--border);border-radius:var(--r-md);
+                padding:14px 16px">{{ b.text }}</pre>
+  </div>
+  {% endfor %}
+  {% endif %}
+{% endfor %}
+
+<div class="card">
+  <h2>Чего здесь пока нет</h2>
+  <p class="muted" style="margin:0">Макеты и картинки — это Canva, тексты для них берите
+  отсюда. Когда будут файлы из папок марафона (готовый гайд, трекеры, паспорта миссий),
+  добавлю их адаптированные под KidsUP версии сюда же, чтобы всё лежало в одном месте.</p>
+</div>
+
+<script>
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('.copy');
+  if (!b) return;
+  navigator.clipboard.writeText(b.dataset.text).then(function () {
+    var old = b.textContent; b.textContent = 'скопировано ✓'; b.classList.add('done');
+    setTimeout(function () { b.textContent = old; b.classList.remove('done'); }, 1500);
+  });
+});
+</script>
+{% endblock %}
