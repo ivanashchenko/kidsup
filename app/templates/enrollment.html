@@ -15,6 +15,18 @@
   <div class="card"><div class="card-value">{{ board.empty }}</div>
     <div class="card-label">групп совсем пустых</div></div>
 </div>
+
+<div class="card" style="padding:16px 20px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+    <b>Заполнение групп к 30 сентября</b>
+    <span class="muted small">{{ board.taken }} из {{ board.places }} мест ·
+      осталось {{ board.days }} дн. · нужно {{ board.per_day }} записи в день</span>
+  </div>
+  <div class="bar" style="width:100%;height:14px;margin-top:10px">
+    <div style="width:{{ board.pct if board.pct > 1 else 1 }}%;
+                background:linear-gradient(90deg,var(--brand-green),var(--brand-blue))"></div>
+  </div>
+</div>
 <div class="notice"><b>Учебный год: 31 августа 2026 — 31 мая 2027.</b>
 Первый день — понедельник 31.08, в этот день стартует 21 группа; остальные —
 на своём первом дне недели, 1–6 сентября. Последние занятия 25–31 мая.
@@ -254,8 +266,8 @@ document.addEventListener('click', function (e) {
   if (!b) return;
   navigator.clipboard.writeText(b.dataset.text).then(function () {
     var old = b.textContent;
-    b.textContent = 'скопировано ✓';
-    setTimeout(function () { b.textContent = old; }, 1500);
+    b.textContent = 'скопировано ✓'; b.classList.add('done');
+    setTimeout(function () { b.textContent = old; b.classList.remove('done'); }, 1500);
   });
 });
 </script>

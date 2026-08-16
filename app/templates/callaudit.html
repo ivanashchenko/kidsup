@@ -29,7 +29,7 @@
   </thead>
   <tbody>
   {% for r in rows %}
-    <tr{% if r.done and not r.called and not r.msg %} style="background:#fff4f4"{% endif %}>
+    <tr{% if r.done and not r.called and not r.msg %} class="bad"{% endif %}>
       <td class="small">{{ r.date }}</td>
       <td><a href="https://app.moyklass.com/client/{{ r.uid }}" target="_blank">{{ r.name }}</a></td>
       <td class="small">{{ r.phone }}</td>

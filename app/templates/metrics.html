@@ -25,7 +25,7 @@
   <thead><tr><th>Сотрудник</th><th>Звонки</th><th>Чат</th><th>Прочее</th></tr></thead>
   <tbody>
   {% for mid, v in load.load.items() %}
-    <tr{% if v.calls > caps.calls or v.chats > caps.chats %} style="background:#fff4f4"{% endif %}>
+    <tr{% if v.calls > caps.calls or v.chats > caps.chats %} class="bad"{% endif %}>
       <td>{{ names.get(mid, mid) }}</td>
       <td>{{ v.calls }}{% if v.calls > caps.calls %} — выше потолка{% endif %}</td>
       <td>{{ v.chats }}{% if v.chats > caps.chats %} — выше потолка{% endif %}</td>

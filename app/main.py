@@ -599,6 +599,52 @@ DOC_GROUPS = [
 ]
 
 
+def _settings_ctx(request: Request, msg: str = "", ok: bool = True) -> HTMLResponse:
+    """Страница настроек: ключ МойКласс, глубина выгрузки, сырые выгрузки."""
+    key = sync.get_api_key()
+    return render(
+        request, "settings.html", active="settings",
+        counts=db.table_counts(),
+        key_from_env=bool(config.ENV_API_KEY),
+        masked_key=(key[:4] + "…" + key[-4:]) if len(key) > 10 else ("задан" if key else ""),
+        history_months=db.get_setting("history_months", str(config.DEFAULT_HISTORY_MONTHS)),
+        msg=msg, ok=ok,
+    )
+
+
+@app.get("/settings", response_class=HTMLResponse, dependencies=AUTH)
+def settings_page(request: Request):
+    return _settings_ctx(request)
+
+
+@app.post("/settings", response_class=HTMLResponse, dependencies=AUTH)
+def settings_save(request: Request, api_key: str = Form(""),
+                  history_months: str = Form("")):
+    saved = []
+    if api_key.strip():
+        db.set_setting("moyklass_api_key", api_key.strip())
+        saved.append("API-ключ")
+    if history_months.strip().isdigit():
+        db.set_setting("history_months", history_months.strip())
+        saved.append("глубина выгрузки")
+    msg = ("Сохранено: " + ", ".join(saved)) if saved else "Нечего сохранять."
+    return _settings_ctx(request, msg, bool(saved))
+
+
+@app.post("/settings/test", response_class=HTMLResponse, dependencies=AUTH)
+def settings_test(request: Request):
+    """Пробный запрос к МойКласс — сразу видно, живой ключ или нет."""
+    if not sync.get_api_key():
+        return _settings_ctx(request, "API-ключ не задан.", False)
+    try:
+        mk = autopilot._client()
+        data = mk.get("/v1/company/managers")
+        n = len(data.get("managers") if isinstance(data, dict) else data or [])
+        return _settings_ctx(request, f"Связь есть: МойКласс отдал {n} сотрудников.", True)
+    except Exception as e:                                    # noqa: BLE001
+        return _settings_ctx(request, f"Не получилось: {e}", False)
+
+
 @app.get("/base", response_class=HTMLResponse, dependencies=AUTH)
 def base_page(request: Request):
     """Все методички в одном месте, сгруппированные по моменту применения."""
@@ -625,9 +671,21 @@ def base_doc(slug: str):
     f = Path(__file__).resolve().parent.parent / "docs" / f"{slug}.html"
     if not f.exists():
         raise HTTPException(404)
-    back = ('<div style="position:sticky;top:0;background:#fff;padding:8px 16px;'
-            'border-bottom:1px solid #ddd;font:15px/1.4 system-ui;z-index:99">'
-            '<a href="/base">← Все методички</a></div>')
+    back = (
+        '<div style="position:sticky;top:0;z-index:99;display:flex;gap:14px;'
+        'align-items:center;flex-wrap:wrap;padding:9px 18px;'
+        'background:rgba(255,255,255,.94);backdrop-filter:blur(10px);'
+        'border-bottom:1px solid #E3E9F2;'
+        'box-shadow:0 10px 24px -22px rgba(20,30,48,.6);'
+        'font:600 14px/1.4 Inter,-apple-system,Segoe UI,Roboto,sans-serif">'
+        '<a href="/base" style="color:#1481B4;text-decoration:none">← Все методички</a>'
+        '<span style="color:#6B7A91;font-weight:500">KidsUP · база знаний</span>'
+        '<button onclick="window.print()" style="margin-left:auto;border:1px solid '
+        '#D2DBE8;background:#fff;color:#1A2333;border-radius:999px;padding:5px 14px;'
+        'font:700 12.5px/1.2 inherit;cursor:pointer">🖨 Печать</button>'
+        '<div style="position:absolute;left:0;right:0;bottom:-1px;height:3px;'
+        'background:linear-gradient(90deg,#2AA7DE,#5FB53B 34%,#F5A81C 67%,#E5232A)">'
+        '</div></div>')
     return HTMLResponse(back + f.read_text(encoding="utf-8"))
 
 
@@ -1723,7 +1781,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-16.08"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-16.09"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")

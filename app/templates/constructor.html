@@ -80,8 +80,8 @@ document.addEventListener('click', function (e) {
   var b = e.target.closest('.copy');
   if (!b) return;
   navigator.clipboard.writeText(b.dataset.text).then(function () {
-    var old = b.textContent; b.textContent = 'скопировано ✓';
-    setTimeout(function () { b.textContent = old; }, 1500);
+    var old = b.textContent; b.textContent = 'скопировано ✓'; b.classList.add('done');
+    setTimeout(function () { b.textContent = old; b.classList.remove('done'); }, 1500);
   });
 });
 </script>
