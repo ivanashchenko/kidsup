@@ -20,7 +20,7 @@
   call_admins          JSON: [{"managerId": 1, "name": "Админ 1"}, ...] —
                        звонящие админы МойКласс в порядке очередей A/B/C
   digest_phone         телефон руководителя для вечерней сводки (WhatsApp)
-  daily_tasks_per_admin  сколько задач в утренней порции (по умолчанию 40)
+  daily_tasks_per_admin  норма звонков на смену; порция утром добирает до неё (45)
   wazzup_dry_run       "1" — сообщения только логируются (по умолчанию "1")
 
 Состояние (таблица autopilot_state) защищает от повторов: одна задача на
@@ -1014,11 +1014,33 @@ def _queues() -> tuple[dict[int, list[int]], dict[int, str]]:
     return out, kinds
 
 
+def _open_calls_today(mk: MoyklassClient, manager_id: int) -> int:
+    """Сколько незакрытых задач 📞 «Прозвон базы» уже стоит на сотрудника сегодня."""
+    day = _today().isoformat()
+    n, offset = 0, 0
+    try:
+        while True:
+            data = mk.get("/v1/company/tasks",
+                          {"beginDate": day, "endDate": day, "categoryId": CAT_CALL,
+                           "isComplete": "false", "limit": 100, "offset": offset})
+            rows = (data.get("tasks") if isinstance(data, dict) else data) or []
+            if not rows:
+                break
+            n += sum(1 for t in rows if manager_id in (t.get("managerIds") or []))
+            offset += 100
+            if offset >= 600:
+                break
+    except Exception:
+        log.exception("_open_calls_today: не удалось посчитать задачи — считаю 0")
+        return 0
+    return n
+
+
 def morning_tasks(mk: MoyklassClient) -> None:
     admins = _admins_today()
     if not admins:
         return
-    per_admin = int(db.get_setting("daily_tasks_per_admin", "40") or 40)
+    per_admin = int(db.get_setting("daily_tasks_per_admin", "45") or 45)
     queues, kinds = _queues()
     TEXT_CONTIN = ("Продолжение занятий 2026/27: в подсказке 🎯 — чем занимался "
                    "ребёнок в прошлом году. Предложи продолжить в новой группе. "
@@ -1037,8 +1059,17 @@ def morning_tasks(mk: MoyklassClient) -> None:
     for idx, adm in enumerate(admins):
         made = 0
         errors = 0
+        # Порция — это ДОБОРКА до нормы, а не «+40 сверх того, что уже стоит».
+        # Иначе ручное перепланирование смены и утренний автопилот складываются,
+        # и у администратора оказывается вдвое больше звонков, чем влезает в день.
+        already = _open_calls_today(mk, adm["managerId"])
+        quota = max(0, per_admin - already)
+        if quota == 0:
+            log.info("morning_tasks: %s — уже %d звонков на сегодня, добор не нужен",
+                     adm["name"], already)
+            continue
         for uid in queues.get(idx, []):
-            if made >= per_admin:
+            if made >= quota:
                 break
             # одна плохая карточка/сбой API не должны ронять всю порцию
             try:
