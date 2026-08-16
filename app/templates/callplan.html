@@ -39,7 +39,7 @@
       <td class="small">{{ p.courses or "—" }}</td>
       <td class="small">{{ p.last }}</td>
       <td class="small">{{ p.suggest }}</td>
-      <td>{% if p.enrolled %}<span class="chip free">записан</span>{% else %}<span class="chip warn">не записан</span>{% endif %}</td>
+      <td>{% if p.enrolled %}<span class="chip free">записан</span>{% elif p.buffer %}<span class="chip warn">в буфере «Заявки» — поставить в группу</span>{% else %}<span class="chip warn">не записан</span>{% endif %}</td>
       <td style="white-space:nowrap">
         {% if p.phone %}<a href="tel:+{{ p.phone }}">Позвонить</a>{% endif %}
         <a href="/enrollment?age={{ p.age or '' }}&free=1" style="margin-left:6px" target="_blank">Подобрать группу</a>

@@ -1321,9 +1321,15 @@ def callplan_page(request: Request, segment: str = "all", q: str = "",
                   done: int = 0, limit: int = 150):
     """Кого обзвонить: семьи прошлых лет, ещё не записанные в группы 2026/27."""
     with db.get_conn() as conn:
+        # Запись в настоящую группу и «висит в буфере Заявок» — разные вещи.
+        # Раньше буфер считался записью, и семья пропадала из обзвона, хотя
+        # её ещё никто никуда не поставил.
         enrolled = {r[0] for r in conn.execute(
             "SELECT DISTINCT j.user_id FROM joins j JOIN classes cl ON cl.id = j.class_id "
-            "WHERE cl.name LIKE '2627%'")}
+            "WHERE cl.name LIKE '2627%' AND cl.name NOT LIKE '%Заявки%'")}
+        in_buffer = {r[0] for r in conn.execute(
+            "SELECT DISTINCT j.user_id FROM joins j JOIN classes cl ON cl.id = j.class_id "
+            "WHERE cl.name LIKE '2627%' AND cl.name LIKE '%Заявки%'")}
         base = """SELECT lr.user_id u, MAX(l.date) last, co.name course FROM lesson_records lr
                   JOIN lessons l ON l.id = lr.lesson_id
                   LEFT JOIN classes cl ON cl.id = l.class_id
@@ -1364,11 +1370,16 @@ def callplan_page(request: Request, segment: str = "all", q: str = "",
             is_done = uid in enrolled
             if not done and is_done:
                 continue
-            if q and q.lower() not in (name or "").lower() and q not in (phone or ""):
-                continue
+            if q:
+                needle = " ".join(q.lower().split())
+                digits = re.sub(r"\D", "", q)
+                if needle not in " ".join((name or "").lower().split()) and not (
+                        digits and digits in re.sub(r"\D", "", phone or "")):
+                    continue
             age = _age_from_raw(raw)
             out.append({"id": uid, "name": name or "—", "phone": phone or "",
                         "age": age, "last": p["last"], "enrolled": is_done,
+                        "buffer": uid in in_buffer,
                         "courses": ", ".join(sorted(p["courses"]))[:60],
                         "crm": f"https://app.moyklass.com/client/{uid}",
                         "suggest": _suggest_by_age(age)})
