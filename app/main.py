@@ -503,6 +503,7 @@ def _age_from_raw(raw: str) -> float | None:
 
 
 CALL_SEGMENTS = {
+    "all": "Все — вся база",
     "summer": "Ходили этим летом (самые тёплые)",
     "year": "Учебный год 25/26",
     "old": "Ходили давно (до сентября 25)",
@@ -1316,7 +1317,7 @@ def brief_page(request: Request, phone: str = ""):
 
 
 @app.get("/callplan", response_class=HTMLResponse, dependencies=AUTH)
-def callplan_page(request: Request, segment: str = "summer", q: str = "",
+def callplan_page(request: Request, segment: str = "all", q: str = "",
                   done: int = 0, limit: int = 150):
     """Кого обзвонить: семьи прошлых лет, ещё не записанные в группы 2026/27."""
     with db.get_conn() as conn:
@@ -1332,7 +1333,9 @@ def callplan_page(request: Request, segment: str = "summer", q: str = "",
         ranges = {"summer": ("2026-06-01", "2026-12-31"),
                   "year": ("2025-09-01", "2026-06-01"),
                   "old": ("2024-01-01", "2025-09-01")}
-        d1, d2 = ranges.get(segment, ranges["summer"])
+        # «Все» — вся база разом: от самых давних до летних, без деления
+        d1, d2 = ("2024-01-01", "2026-12-31") if segment == "all" \
+            else ranges.get(segment, ranges["summer"])
         rows = conn.execute(base, (d1, d2)).fetchall()
         seen_all = {"summer": set(), "year": set(), "old": set()}
         for key, (a, b) in ranges.items():
