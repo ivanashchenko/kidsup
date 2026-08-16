@@ -75,6 +75,28 @@ def _update(mk, task: dict, **over) -> None:
                                                 if v is not None})
 
 
+BORIS = 84116
+
+
+def _escalate_to(cat: int, cur: int | None, call_admins: list[int]) -> int | None:
+    """Кому передать просроченную задачу.
+
+    Раньше любая просрочка уезжала «второму админу смены» — и переписка
+    сваливалась на того, кто в этот день занят только прозвоном. Теперь
+    задача остаётся в своём русле: звонки — звонящим, переписка — админу
+    переписки, всё остальное — собственнику.
+    """
+    if cat in (CAT_CALL, CAT_PUSH, CAT_URGENT):
+        other = next((a for a in call_admins if a != cur), None)
+        return other or (BORIS if cur != BORIS else None)
+    if cat == CAT_CHAT:
+        chat = int(db.get_setting("chat_admin", "0") or 0)
+        if chat and chat != cur:
+            return chat
+        return BORIS if cur != BORIS else None
+    return BORIS if cur != BORIS else None
+
+
 def escalate_overdue() -> dict:
     """Просрочка вдвое → задача переходит на второго админа смены."""
     mk = _client()
@@ -95,7 +117,7 @@ def escalate_overdue() -> dict:
             if not _mark("sla_esc", str(t["id"])):
                 continue                                   # уже эскалировали
             cur = (t.get("managerIds") or [None])[0]
-            other = next((a for a in admins if a != cur), None)
+            other = _escalate_to(cat, cur, admins)
             if other:
                 _update(mk, t, managerIds=[other])
                 moved += 1
