@@ -1837,7 +1837,10 @@ async def health():
 SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
-            "admin_phones"}
+            "admin_phones",
+            # разобранные записи разговоров: список recording_id, чтобы почасовой
+            # разбор не написал в карточку один и тот же звонок дважды
+            "calls_done"}
 
 
 @app.get("/api/settings", dependencies=AUTH)
