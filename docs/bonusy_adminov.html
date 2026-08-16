@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Бонусы администраторов — KidsUP</title>
+<style>
+:root{
+  --paper:#FAF9F5; --ink:#22271F; --muted:#6E7264; --accent:#166B4A;
+  --accent-soft:#E3EFE8; --risk:#9A5B00; --risk-soft:#F6ECD9;
+  --line:#E3E1D6; --fill:#F1EFE7; --card:#FFFFFF; --blue:#1B6FA8; --blue-soft:#E4F0F8;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#151812; --ink:#E7E6DD; --muted:#9B9F90; --accent:#5BC492;
+    --accent-soft:#1D2E25; --risk:#E0A954; --risk-soft:#2E2718; --line:#2C3026;
+    --fill:#1C2018; --card:#1A1E16; --blue:#6FB6E4; --blue-soft:#152833; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.65 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-variant-numeric:tabular-nums}
+.wrap{max-width:60rem;margin:0 auto;padding:2.6rem 1.25rem 5rem}
+h1{font-size:2.1rem;line-height:1.15;font-weight:800;letter-spacing:-.02em;margin:.4rem 0 .6rem}
+h2{font-size:1.4rem;font-weight:750;letter-spacing:-.01em;margin:0 0 .8rem}
+h3{font-size:1.02rem;font-weight:700;margin:1.5rem 0 .5rem}
+p{margin:.55rem 0;max-width:48rem}
+.kicker{font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.sub{color:var(--muted);max-width:48rem}
+section{margin-top:2.6rem;padding-top:1.8rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.72rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem}
+
+/* карточки тарифа */
+.rates{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));margin:1.2rem 0}
+.rate{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.9rem 1rem;position:relative;overflow:hidden}
+.rate::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--accent)}
+.rate .amt{font-size:1.6rem;font-weight:800;letter-spacing:-.03em;color:var(--accent);line-height:1.1}
+.rate .what{font-weight:700;margin-top:.15rem;font-size:.97rem}
+.rate .why{font-size:.82rem;color:var(--muted);margin-top:.3rem;line-height:1.45}
+.rate.step::before{background:var(--blue)} .rate.step .amt{color:var(--blue)}
+.rate.sprint::before{background:var(--risk)} .rate.sprint .amt{color:var(--risk)}
+
+/* таблицы */
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th{background:var(--fill);text-align:left;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.55rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+td.w{white-space:nowrap;font-weight:650}
+tr.total td{background:var(--fill);font-weight:750}
+
+/* примеры-цепочки */
+.ex{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--blue);
+  border-radius:0 10px 10px 0;padding:1rem 1.15rem;margin:1rem 0}
+.ex b.t{display:block;font-size:1rem;margin-bottom:.5rem}
+.chain{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.6rem 0}
+.st{background:var(--fill);border:1px solid var(--line);border-radius:999px;padding:.28rem .7rem;font-size:.85rem}
+.st.pay{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:700}
+.st.zero{background:var(--risk-soft);border-color:transparent;color:var(--risk);font-weight:700}
+.arr{color:var(--muted);font-size:.9rem}
+.sum{margin-top:.5rem;font-weight:750;color:var(--accent)}
+.sum.bad{color:var(--risk)}
+
+.note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:.7rem 1rem;border-radius:0 8px 8px 0;margin:1rem 0;max-width:48rem}
+.warn{border-left:3px solid var(--risk);background:var(--risk-soft);padding:.7rem 1rem;border-radius:0 8px 8px 0;margin:1rem 0;max-width:48rem}
+ul{margin:.5rem 0;padding-left:1.25rem;max-width:48rem} li{margin:.35rem 0}
+.foot{margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted)}
+.big{font-size:1.05rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="kicker">KidsUP · мотивация · учебный год 2026/27</div>
+<h1>Бонусы администраторов</h1>
+<p class="sub big">Оклад остаётся прежним. Сверху — сдельная часть: платим за результат,
+который можно проверить в CRM. Ниже — сколько и за что, наглядные примеры «от звонка
+до денег» и полный расчёт по месяцам на весь учебный год.</p>
+
+<div class="note"><b>Главный принцип.</b> Мы не платим за «записал», «позвонил» и «поработал».
+Мы платим за то, что <b>ребёнок пришёл</b> и за то, что <b>родитель заплатил</b>.
+Всё остальное — работа, за которую есть оклад.</div>
+
+<!-- ============================================================= ТАРИФ -->
+<section>
+<div class="seclabel">Раздел 1</div>
+<h2>Тариф: пять строк, больше ничего</h2>
+<p class="sub">Запомнить надо ровно это. Всё считается автоматически из МойКласс —
+никаких табличек вручную, никаких споров.</p>
+
+<div class="rates">
+  <div class="rate">
+    <div class="amt">200 ₽</div>
+    <div class="what">Состоявшееся пробное</div>
+    <div class="why">Ребёнок реально пришёл на занятие, стоит отметка посещения.
+      Записали и не дошёл — 0 ₽.</div>
+  </div>
+  <div class="rate">
+    <div class="amt">500 ₽</div>
+    <div class="what">Покупка абонемента новым учеником</div>
+    <div class="why">Деньги пришли, оплата проведена в CRM. Платим тому, кто закрыл сделку.</div>
+  </div>
+  <div class="rate">
+    <div class="amt">300 ₽</div>
+    <div class="what">Возврат «спящего»</div>
+    <div class="why">Учился раньше, перестал ходить, вы его вернули и он оплатил.
+      Вернуть дешевле, чем привести нового.</div>
+  </div>
+  <div class="rate">
+    <div class="amt">300 ₽</div>
+    <div class="what">Второй предмет у ученика</div>
+    <div class="why">Ребёнок, который ходит на два предмета, почти не уходит из центра.</div>
+  </div>
+  <div class="rate sprint">
+    <div class="amt">+2 000 ₽</div>
+    <div class="what">Спринт недели</div>
+    <div class="why">Одному — лучшему за неделю по «записался и дошёл».
+      Объявляем в понедельник, итог — в воскресной сводке.</div>
+  </div>
+</div>
+
+<h3>Плюс две вещи сверху</h3>
+<div class="rates">
+  <div class="rate step">
+    <div class="amt">×1,25</div>
+    <div class="what">Множитель за качество</div>
+    <div class="why">Умножаем всю сдельную часть месяца, если личная конверсия
+      «обращение → запись» ≥ 60% <b>и</b> неявки на пробные ≤ 15%.
+      Считается по CRM и прослушке звонков.</div>
+  </div>
+  <div class="rate step">
+    <div class="amt">15 / 30 / 50 тыс. ₽</div>
+    <div class="what">Командная ступень на 30 сентября</div>
+    <div class="why"><b>Каждому</b>, не в складчину: заполнено ≥80% мест → 15 000 ₽,
+      ≥90% → 30 000 ₽, 100% → 50 000 ₽. Ступени не суммируются — платим одну, высшую.</div>
+  </div>
+</div>
+
+<div class="warn"><b>Почему ступень такая большая.</b> Последние 10% мест — самые трудные
+и самые прибыльные: постоянные расходы уже покрыты, каждое доп. место идёт почти
+целиком в прибыль. Разница между 60% и 100% заполнения — около 8,7 млн ₽ за год.
+Весь бонусный фонд периода набора — меньше 300 тыс. ₽. Это 3% от эффекта:
+дешевле любого рекламного канала.</div>
+</section>
+
+<!-- ============================================================ ПРИМЕРЫ -->
+<section>
+<div class="seclabel">Раздел 2</div>
+<h2>Как это выглядит в жизни: 6 примеров</h2>
+
+<div class="ex">
+  <b class="t">Пример 1. Идеальная цепочка — 1 000 ₽ с одной семьи</b>
+  <div class="chain">
+    <span class="st">Мама пишет в WhatsApp</span><span class="arr">→</span>
+    <span class="st">Аня записала на пробное по английскому, 3 сентября</span><span class="arr">→</span>
+    <span class="st pay">ребёнок пришёл +200 ₽</span><span class="arr">→</span>
+    <span class="st pay">в тот же день купили абонемент +500 ₽</span><span class="arr">→</span>
+    <span class="st pay">через две недели добрали ИЗО +300 ₽</span>
+  </div>
+  <div class="sum">Аня заработала 1 000 ₽ с одной семьи.</div>
+</div>
+
+<div class="ex">
+  <b class="t">Пример 2. Записали десять — дошли шестеро</b>
+  <div class="chain">
+    <span class="st">10 записей на пробное</span><span class="arr">→</span>
+    <span class="st zero">4 не пришли: 0 ₽</span><span class="arr">→</span>
+    <span class="st pay">6 пришли: 6 × 200 = 1 200 ₽</span>
+  </div>
+  <div class="sum bad">Не 2 000 ₽, а 1 200 ₽. Отсюда правило двойного подтверждения:
+    напомнить накануне вечером и утром в день занятия. Каждое напоминание — это ваши деньги.</div>
+</div>
+
+<div class="ex">
+  <b class="t">Пример 3. Работали вдвоём — деньги делятся честно</b>
+  <div class="chain">
+    <span class="st">Елена дозвонилась до «спящего» с прошлого года</span><span class="arr">→</span>
+    <span class="st">семья вернулась, ребёнок пришёл</span><span class="arr">→</span>
+    <span class="st">оплату на ресепшене провела Аня</span>
+  </div>
+  <div class="sum">Елене +300 ₽ (возврат спящего) и +200 ₽ (пробное состоялось) = 500 ₽.
+    Ане +500 ₽ (закрыла оплату).</div>
+  <p class="sub" style="font-size:.85rem;margin-top:.4rem">Правило простое:
+    <b>за пробное платим тому, кто записал; за деньги — тому, кто провёл оплату в CRM.</b>
+    Спорить не о чем, всё видно в карточке.</p>
+</div>
+
+<div class="ex">
+  <b class="t">Пример 4. Множитель за качество — та же работа, на четверть дороже</b>
+  <div class="chain">
+    <span class="st">Сентябрь у Ани: сдельная часть 45 500 ₽</span><span class="arr">→</span>
+    <span class="st">конверсия 64% (норма ≥60%)</span><span class="arr">→</span>
+    <span class="st">неявки 12% (норма ≤15%)</span><span class="arr">→</span>
+    <span class="st pay">×1,25</span>
+  </div>
+  <div class="sum">45 500 → 56 875 ₽. Плюс 11 375 ₽ за то, что работали аккуратно,
+    а не «лишь бы записать».</div>
+</div>
+
+<div class="ex">
+  <b class="t">Пример 5. Ступень 30 сентября — главные деньги года</b>
+  <div class="chain">
+    <span class="st">398 мест всего</span><span class="arr">→</span>
+    <span class="st">на 30.09 занято 366</span><span class="arr">→</span>
+    <span class="st">это 92%</span><span class="arr">→</span>
+    <span class="st pay">каждому по 30 000 ₽</span>
+  </div>
+  <div class="sum">Не хватило 32 мест до 100% — это 20 000 ₽ разницы на каждого.
+    Поэтому последнюю неделю сентября выжимаем полностью.</div>
+</div>
+
+<div class="ex">
+  <b class="t">Пример 6. Так делать нельзя</b>
+  <div class="chain">
+    <span class="st">Записали «для галочки» без согласия родителя</span><span class="arr">→</span>
+    <span class="st zero">ребёнок не пришёл — 0 ₽</span>
+  </div>
+  <div class="chain">
+    <span class="st">Продали абонемент давлением</span><span class="arr">→</span>
+    <span class="st">возврат в первые 7 дней</span><span class="arr">→</span>
+    <span class="st zero">бонус за покупку вычитается обратно</span>
+  </div>
+  <div class="chain">
+    <span class="st">«Осталось два места» — а их шесть</span><span class="arr">→</span>
+    <span class="st zero">дисквалификация из спринта недели</span>
+  </div>
+  <div class="sum bad">Правила анти-накрутки. Пробное засчитывается только по отметке
+    посещения; возвраты первых 7 дней снимают бонус; выдуманный дефицит — минус спринт.</div>
+</div>
+</section>
+
+<!-- ============================================================= ПЛАН -->
+<section>
+<div class="seclabel">Раздел 3</div>
+<h2>Плановые объёмы: откуда берутся числа</h2>
+<p class="sub">Ёмкость учебного года — <b>398 мест</b> в 93 группах.
+Чтобы заполнить их к 30 сентября, нужно:</p>
+<ul>
+  <li><b>132 новых ученика.</b> При конверсии «пробное → покупка» 60% это
+    <b>220 состоявшихся пробных</b> — а значит около 260 записей на пробное
+    (часть не дойдёт даже при двойном подтверждении).</li>
+  <li><b>120 возвратов «спящих»</b> — тех, кто учился раньше и перестал ходить.</li>
+  <li><b>40 вторых предметов</b> у уже занимающихся детей.</li>
+</ul>
+<p class="sub">Дальше, с октября по май, — добор в неполные группы и удержание.
+Объёмы падают, но не обнуляются: январь — вторая по силе точка набора в году.</p>
+
+<div class="tbl">
+<table>
+<thead><tr>
+  <th>Месяц</th><th class="n">Пробных<br>состоялось</th><th class="n">Покупок</th>
+  <th class="n">Возвратов</th><th class="n">Вторых<br>предметов</th><th class="n">Сдельный фонд</th>
+</tr></thead>
+<tbody>
+<tr><td class="w">Август (17–31)</td><td class="n">70</td><td class="n">42</td><td class="n">45</td><td class="n">10</td><td class="n">51 500 ₽</td></tr>
+<tr><td class="w">Сентябрь</td><td class="n">150</td><td class="n">90</td><td class="n">75</td><td class="n">30</td><td class="n">106 500 ₽</td></tr>
+<tr><td class="w">Октябрь</td><td class="n">40</td><td class="n">24</td><td class="n">15</td><td class="n">20</td><td class="n">30 500 ₽</td></tr>
+<tr><td class="w">Ноябрь</td><td class="n">30</td><td class="n">18</td><td class="n">10</td><td class="n">15</td><td class="n">22 500 ₽</td></tr>
+<tr><td class="w">Декабрь</td><td class="n">25</td><td class="n">15</td><td class="n">8</td><td class="n">10</td><td class="n">17 900 ₽</td></tr>
+<tr><td class="w">Январь</td><td class="n">40</td><td class="n">24</td><td class="n">12</td><td class="n">15</td><td class="n">28 100 ₽</td></tr>
+<tr><td class="w">Февраль</td><td class="n">30</td><td class="n">18</td><td class="n">10</td><td class="n">12</td><td class="n">21 600 ₽</td></tr>
+<tr><td class="w">Март</td><td class="n">28</td><td class="n">17</td><td class="n">9</td><td class="n">12</td><td class="n">20 400 ₽</td></tr>
+<tr><td class="w">Апрель</td><td class="n">22</td><td class="n">13</td><td class="n">7</td><td class="n">10</td><td class="n">16 000 ₽</td></tr>
+<tr><td class="w">Май</td><td class="n">15</td><td class="n">9</td><td class="n">5</td><td class="n">8</td><td class="n">11 400 ₽</td></tr>
+<tr class="total"><td class="w">За год</td><td class="n">450</td><td class="n">270</td><td class="n">196</td><td class="n">142</td><td class="n">326 400 ₽</td></tr>
+</tbody>
+</table>
+</div>
+<p class="sub" style="font-size:.85rem">Сдельный фонд = пробные×200 + покупки×500 +
+возвраты×300 + вторые предметы×300. Спринты недели, множитель и ступень 30.09 — сверх этого.</p>
+</section>
+
+<!-- ============================================================= ЛЮДИ -->
+<section>
+<div class="seclabel">Раздел 4</div>
+<h2>Сколько выходит у каждой: помесячно</h2>
+<p class="sub">Ирина и Аня работают 4/3 — доли равные. Елена подключается на прозвон
+с 17 августа по середину октября, понедельник–четверг: она записывает на пробные и
+возвращает спящих, оплаты закрывают администраторы на ресепшене.</p>
+
+<div class="tbl">
+<table>
+<thead><tr><th>Месяц</th><th class="n">Аня</th><th class="n">Ирина</th><th class="n">Елена</th><th class="n">Итого</th></tr></thead>
+<tbody>
+<tr><td class="w">Август (17–31)</td><td class="n">21 700 ₽</td><td class="n">21 700 ₽</td><td class="n">8 100 ₽</td><td class="n">51 500 ₽</td></tr>
+<tr><td class="w">Сентябрь</td><td class="n">45 500 ₽</td><td class="n">45 500 ₽</td><td class="n">15 500 ₽</td><td class="n">106 500 ₽</td></tr>
+<tr><td class="w">Октябрь</td><td class="n">14 200 ₽</td><td class="n">14 200 ₽</td><td class="n">2 100 ₽</td><td class="n">30 500 ₽</td></tr>
+<tr><td class="w">Ноябрь</td><td class="n">11 250 ₽</td><td class="n">11 250 ₽</td><td class="n">—</td><td class="n">22 500 ₽</td></tr>
+<tr><td class="w">Декабрь</td><td class="n">8 950 ₽</td><td class="n">8 950 ₽</td><td class="n">—</td><td class="n">17 900 ₽</td></tr>
+<tr><td class="w">Январь</td><td class="n">14 050 ₽</td><td class="n">14 050 ₽</td><td class="n">—</td><td class="n">28 100 ₽</td></tr>
+<tr><td class="w">Февраль</td><td class="n">10 800 ₽</td><td class="n">10 800 ₽</td><td class="n">—</td><td class="n">21 600 ₽</td></tr>
+<tr><td class="w">Март</td><td class="n">10 200 ₽</td><td class="n">10 200 ₽</td><td class="n">—</td><td class="n">20 400 ₽</td></tr>
+<tr><td class="w">Апрель</td><td class="n">8 000 ₽</td><td class="n">8 000 ₽</td><td class="n">—</td><td class="n">16 000 ₽</td></tr>
+<tr><td class="w">Май</td><td class="n">5 700 ₽</td><td class="n">5 700 ₽</td><td class="n">—</td><td class="n">11 400 ₽</td></tr>
+<tr class="total"><td class="w">Сдельная за год</td><td class="n">150 350 ₽</td><td class="n">150 350 ₽</td><td class="n">25 700 ₽</td><td class="n">326 400 ₽</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>А теперь то же самое — целиком, со ступенью и спринтами</h3>
+<div class="tbl">
+<table>
+<thead><tr><th>Что</th><th class="n">Аня</th><th class="n">Ирина</th><th class="n">Елена</th></tr></thead>
+<tbody>
+<tr><td class="w">Сдельная за год</td><td class="n">150 350 ₽</td><td class="n">150 350 ₽</td><td class="n">25 700 ₽</td></tr>
+<tr><td class="w">Множитель ×1,25 при выполнении качества</td><td class="n">+37 590 ₽</td><td class="n">+37 590 ₽</td><td class="n">+6 425 ₽</td></tr>
+<tr><td class="w">Спринты недели (в среднем)</td><td class="n">+34 000 ₽</td><td class="n">+34 000 ₽</td><td class="n">+12 000 ₽</td></tr>
+<tr><td class="w">Ступень 30.09 при 100%</td><td class="n">+50 000 ₽</td><td class="n">+50 000 ₽</td><td class="n">+25 000 ₽</td></tr>
+<tr class="total"><td class="w">Максимум за учебный год</td><td class="n">271 940 ₽</td><td class="n">271 940 ₽</td><td class="n">69 125 ₽</td></tr>
+</tbody>
+</table>
+</div>
+<p class="sub" style="font-size:.85rem">Елене ступень считаем в половинном размере —
+пропорционально периоду участия (17.08 – середина октября). Спринт недели — приз
+одному человеку, в таблице показано усреднённо, по факту зависит от того, кто выиграл.</p>
+
+<div class="note"><b>Ключевой месяц — сентябрь.</b> На него приходится треть годовой
+сдельной части, и именно им определяется ступень. Один сентябрь у администратора
+может дать 56 875 ₽ (сдельная с множителем) + 50 000 ₽ (ступень) = <b>106 875 ₽</b> сверх оклада.</div>
+</section>
+
+<!-- ============================================================= ПРАВИЛА -->
+<section>
+<div class="seclabel">Раздел 5</div>
+<h2>Правила, чтобы не было споров</h2>
+<ul>
+  <li><b>Всё считается из МойКласс.</b> Пробное — по отметке посещения на занятии.
+    Покупка — по проведённой оплате. Автор действия берётся из карточки, вручную ничего не заносим.</li>
+  <li><b>Пробное засчитывается один раз на ребёнка на предмет.</b> Второй «пробный»
+    по тому же предмету — не бонус.</li>
+  <li><b>«Спящий» — это сегменты B–D:</b> учился в прошлом году или раньше и не ходит
+    сейчас. Тот, кто просто продлевает и не переставал ходить, — не возврат.</li>
+  <li><b>Второй предмет</b> засчитывается при оплате второго абонемента у ребёнка,
+    который уже занимается.</li>
+  <li><b>Возврат денег в первые 7 дней</b> снимает бонус за покупку в следующем расчёте.</li>
+  <li><b>Расчёт — до 5 числа</b> следующего месяца, выплата вместе с зарплатой.
+    Сводка за неделю — в воскресенье вечером, каждый видит свои цифры заранее.</li>
+  <li><b>Испытательный период — у всех до 15 сентября.</b> Постоянные условия — по
+    результатам: дозвон-конверсия, доходимость, покупки, качество по прослушке — по 25% веса.</li>
+</ul>
+
+<div class="warn"><b>Чего мы не делаем.</b> Не превращаем это в соревнование на выживание.
+Командная ступень — общая: выгоднее помочь коллеге закрыть последние места, чем
+придержать лид. Кто «прячет» клиентов — теряет ступень вместе со всеми, и это видно по CRM.</div>
+</section>
+
+<p class="foot">KidsUP · бонусная схема администраторов на 2026/27 · версия от 16.08.2026 ·
+объявляется на стендапе в понедельник · вопросы — Борису</p>
+</div>
+</body>
+</html>
