@@ -725,3 +725,16 @@ tr.warn-row td{background:#FDF1F1}
   color:#6B7A91;font-weight:700;font-size:.9rem;text-decoration:none;transition:all .15s}
 .tab:hover{border-color:#1DA7E0;color:#312783}
 .tab.active{background:#312783;border-color:#312783;color:#fff}
+
+/* --- шахматка --- */
+.grid-table{border-collapse:collapse;min-width:900px;width:100%}
+.grid-table th{background:#312783;color:#fff;padding:.45rem .5rem;font-size:.85rem}
+.grid-table td{border:1px solid #E3E9F2;vertical-align:top;padding:.35rem;min-width:120px}
+.gt-time{background:#EAF6FC;color:#312783;text-align:center;min-width:52px!important}
+.gt-group{background:#F7FAFD;border-radius:8px;padding:.35rem .45rem;margin-bottom:.35rem}
+.gt-gname{display:block;font-weight:700;font-size:.82rem;color:#1DA7E0;text-decoration:none}
+.gt-gname:hover{text-decoration:underline}
+.gt-kid{display:block;font-size:.8rem;color:#1A2333;text-decoration:none;padding-left:.4rem}
+.gt-kid:hover{color:#1DA7E0}
+.gt-pend{font-style:italic;color:#6B7A91}
+.pend-badge{font-style:italic;color:#6B7A91}

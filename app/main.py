@@ -1598,6 +1598,13 @@ def _suggest_by_age(age: float | None) -> str:
     return "13+ — не наш возраст"
 
 
+@app.get("/grid", response_class=HTMLResponse, dependencies=AUTH)
+def grid_page(request: Request, course: int = 0):
+    from . import grid
+    return render(request, "grid.html", active="grid",
+                  g=grid.build(course or None), course=course)
+
+
 @app.get("/promo", response_class=HTMLResponse, dependencies=AUTH)
 def promo_page(request: Request):
     from . import promo

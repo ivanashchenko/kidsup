@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Шахматка — KidsUP{% endblock %}
+{% block content %}
+<h1>Шахматка занятий</h1>
+<p class="muted">Недельная сетка по предмету: группы, записанные дети, свободные места.
+Клик по ребёнку — его карточка в МойКласс, по названию группы — группа в МойКласс.
+<span class="pend-badge">курсивом</span> — заявки набора (ещё не учится).</p>
+
+<div class="tabs" style="margin-bottom:1rem">
+  <a href="/grid" class="tab {{ 'active' if not course }}">все предметы</a>
+  {% for cid, cname in g.courses %}
+  <a href="/grid?course={{ cid }}" class="tab {{ 'active' if course == cid }}">{{ cname }}</a>
+  {% endfor %}
+</div>
+
+{% if not g.rows %}
+<div class="notice">Нет групп с расписанием — проверьте, что у групп созданы занятия в МойКласс.</div>
+{% else %}
+<div style="overflow-x:auto">
+<table class="grid-table">
+  <tr><th class="gt-time"></th>{% for d in g.days %}<th>{{ d }}</th>{% endfor %}</tr>
+  {% for row in g.rows %}
+  <tr>
+    <td class="gt-time"><b>{{ row.time }}</b></td>
+    {% for cell in row.cells %}
+    <td class="gt-cell">
+      {% for e in cell %}
+      <div class="gt-group">
+        <a class="gt-gname" href="https://app.moyklass.com/class/{{ e.id }}/info" target="_blank"
+           title="{{ e.course }}">{{ e.name }}</a>
+        <span class="muted small">{{ e.kids|length + e.pending|length }}/{{ e.max or '∞' }}
+          {% if e.free %}· свободно {{ e.free }}{% endif %}</span>
+        {% for uid, uname in e.kids %}
+        <a class="gt-kid" href="https://app.moyklass.com/user/{{ uid }}/info" target="_blank">{{ uname }}</a>
+        {% endfor %}
+        {% for uid, uname in e.pending %}
+        <a class="gt-kid gt-pend" href="https://app.moyklass.com/user/{{ uid }}/info" target="_blank">{{ uname }}</a>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endif %}
+{% endblock %}
