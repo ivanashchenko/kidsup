@@ -109,6 +109,34 @@ class MoyklassClient:
     def get(self, path: str, params: dict | None = None):
         return self._request("GET", path, params)
 
+
+    def safe_update_user(self, user_id: int, **fields):
+        """ЕДИНСТВЕННЫЙ разрешённый способ обновить клиента.
+
+        POST /v1/company/users/{id} — это ПОЛНАЯ ЗАМЕНА: любое не присланное
+        поле (телефон, email, атрибуты) СТИРАЕТСЯ. Ровно так 14.08.2026 при
+        массовой смене статусов было затёрто 1844 карточки. Поэтому: сначала
+        читаем текущую карточку, накладываем изменения, отправляем всё целиком.
+        Для статусов и тегов используйте /users/{id}/status и /users/{id}/tags —
+        они точечные и безопасные.
+        """
+        cur = self.get(f"/v1/company/users/{user_id}")
+        body = {"name": cur.get("name"), "phone": cur.get("phone")}
+        if cur.get("email"):
+            body["email"] = cur["email"]
+        attrs = []
+        for a in cur.get("attributes") or []:
+            if a.get("valueIds") is not None:
+                attrs.append({"attributeId": a["attributeId"], "valueIds": a["valueIds"]})
+            elif a.get("valueId") is not None:
+                attrs.append({"attributeId": a["attributeId"], "valueId": a["valueId"]})
+            elif a.get("value") is not None:
+                attrs.append({"attributeId": a["attributeId"], "value": a["value"]})
+        if attrs:
+            body["attributes"] = attrs
+        body.update(fields)
+        return self.post(f"/v1/company/users/{user_id}", body)
+
     def post(self, path: str, body: dict | None = None, retries: int = 4):
         """POST с телом JSON (создание задач, комментариев, смена статусов)."""
         if not self._token:
