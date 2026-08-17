@@ -532,6 +532,14 @@ def _broadcast_tick() -> None:
     if not active:
         return
     cap = int(db.get_setting("wa_daily_cap", "25") or 25)
+    # индивидуальные квоты номеров: wa_caps = {"7916…": 40, …}. Нужны, чтобы
+    # свежий номер прогревался малыми объёмами, а основной 0077 почти не
+    # участвовал (у него история банов — беречь как канал переписки)
+    try:
+        caps = {str(k): int(v) for k, v in json.loads(
+            db.get_setting("wa_caps", "") or "{}").items()}
+    except Exception:
+        caps = {}
     day = now.strftime("%Y-%m-%d")
     with db.get_conn() as conn:
         _bq_init(conn)
@@ -546,9 +554,15 @@ def _broadcast_tick() -> None:
             "WHERE status='sent' AND sent LIKE ? GROUP BY COALESCE(sender,'')",
             (day + "%",)).fetchall())
         legacy = counts.get("", 0)  # строки до ротации — вешаем на первый номер
-        sender = min(active, key=lambda p: counts.get(p, 0) + (legacy if p == active[0] else 0))
-        if counts.get(sender, 0) + (legacy if sender == active[0] else 0) >= cap:
+        def used(p):
+            return counts.get(p, 0) + (legacy if p == active[0] else 0)
+        def limit(p):
+            return caps.get(p, cap)
+        # шлём с номера, у которого больше всего свободной квоты
+        candidates = [p for p in active if used(p) < limit(p)]
+        if not candidates:
             return                      # все номера выбрали дневной лимит
+        sender = max(candidates, key=lambda p: limit(p) - used(p))
         rows = conn.execute(
             "SELECT id, phone, child, text, COALESCE(tried,'') FROM broadcast_queue "
             "WHERE status='pending' "

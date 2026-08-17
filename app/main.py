@@ -2037,7 +2037,7 @@ async def health():
 
 
 SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
-            "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders",
+            "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
             "vk_token", "vk_group_id", "tg_bot_token", "tg_channel", "mango_ext_admins",
