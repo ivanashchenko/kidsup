@@ -1,48 +1,105 @@
 {% extends "base.html" %}
 {% block title %}Шахматка — KidsUP{% endblock %}
 {% block content %}
-<h1>Шахматка занятий</h1>
-<p class="muted">Недельная сетка по предмету: группы, записанные дети, свободные места.
-Клик по ребёнку — его карточка в МойКласс, по названию группы — группа в МойКласс.
-<span class="pend-badge">курсивом</span> — заявки набора (ещё не учится).</p>
+<div class="gx-head">
+  <div>
+    <h1>Шахматка занятий</h1>
+    <p class="muted gx-sub">Клик по ребёнку — карточка в МойКласс, по группе — группа.
+    <span class="gx-pend-note">Курсив</span> — заявка набора (место забронировано).</p>
+  </div>
+  <div class="gx-actions">
+    <label class="gx-toggle"><input type="checkbox" id="gx-free-only"> только со свободными местами</label>
+    <button class="btn" onclick="window.print()">🖨 Печать</button>
+  </div>
+</div>
 
-<div class="tabs" style="margin-bottom:1rem">
+<div class="gx-stats">
+  {% set s = g.summary %}
+  <div class="gx-stat"><b>{{ s.groups }}</b><span>групп в сетке</span></div>
+  <div class="gx-stat"><b>{{ s.seats_busy }}</b><span>мест занято</span></div>
+  <div class="gx-stat gx-stat-free"><b>{{ s.seats_free }}</b><span>мест свободно</span></div>
+  <div class="gx-stat">
+    <b>{{ s.fill_pct }}%</b><span>заполненность</span>
+    <div class="gx-meter"><i style="width:{{ s.fill_pct }}%"></i></div>
+  </div>
+  <div class="gx-stat"><b>{{ s.full_groups }}</b><span>групп укомплектовано</span></div>
+</div>
+
+<div class="tabs">
   <a href="/grid" class="tab {{ 'active' if not course }}">все предметы</a>
   {% for cid, cname in g.courses %}
   <a href="/grid?course={{ cid }}" class="tab {{ 'active' if course == cid }}">{{ cname }}</a>
   {% endfor %}
 </div>
 
+<div class="gx-legend">
+  <span><i class="gx-dot gx-ok"></i> есть места</span>
+  <span><i class="gx-dot gx-warn"></i> осталось 1–2</span>
+  <span><i class="gx-dot gx-full"></i> укомплектована</span>
+</div>
+
 {% if not g.rows %}
 <div class="notice">Нет групп с расписанием — проверьте, что у групп созданы занятия в МойКласс.</div>
 {% else %}
-<div style="overflow-x:auto">
-<table class="grid-table">
-  <tr><th class="gt-time"></th>{% for d in g.days %}<th>{{ d }}</th>{% endfor %}</tr>
+<div class="gx-wrap">
+<table class="gx-table">
+  <thead>
+    <tr><th class="gx-time-h"></th>
+    {% for d in g.days %}
+      <th class="{{ 'gx-today' if loop.index0 == g.today_wd }}">{{ d }}
+        {%- if loop.index0 == g.today_wd %}<span class="gx-today-tag">сегодня</span>{% endif %}</th>
+    {% endfor %}</tr>
+  </thead>
+  <tbody>
   {% for row in g.rows %}
   <tr>
-    <td class="gt-time"><b>{{ row.time }}</b></td>
+    <td class="gx-time">{{ row.time }}</td>
     {% for cell in row.cells %}
-    <td class="gt-cell">
+    <td class="gx-cell {{ 'gx-today' if loop.index0 == g.today_wd }}">
       {% for e in cell %}
-      <div class="gt-group">
-        <a class="gt-gname" href="https://app.moyklass.com/class/{{ e.id }}/info" target="_blank"
-           title="{{ e.course }}">{{ e.name }}</a>
-        <span class="muted small">{{ e.kids|length + e.pending|length }}/{{ e.max or '∞' }}
-          {% if e.free %}· свободно {{ e.free }}{% endif %}</span>
-        {% for uid, uname in e.kids %}
-        <a class="gt-kid" href="https://app.moyklass.com/user/{{ uid }}/info" target="_blank">{{ uname }}</a>
-        {% endfor %}
-        {% for uid, uname in e.pending %}
-        <a class="gt-kid gt-pend" href="https://app.moyklass.com/user/{{ uid }}/info" target="_blank">{{ uname }}</a>
-        {% endfor %}
+      <div class="gx-card gx-{{ e.state }}" data-free="{{ e.free }}" style="--gc:#{{ e.color }}">
+        <div class="gx-card-top">
+          <a class="gx-gname" href="https://app.moyklass.com/class/{{ e.id }}/info" target="_blank"
+             title="{{ e.course }} · открыть группу в МойКласс">{{ e.name }}</a>
+          <span class="gx-badge gx-badge-{{ e.state }}">
+            {%- if e.unlimited %}∞{% elif e.state == 'full' %}✓ полна{% elif e.state == 'warn' %}ост. {{ e.free }}{% else %}+{{ e.free }}{% endif -%}
+          </span>
+        </div>
+        <div class="gx-count">{{ e.busy }}/{{ e.max or '∞' }}
+          <div class="gx-fill"><i style="width:{{ e.fill_pct }}%"></i></div>
+        </div>
+        {% if e.kids or e.pending %}
+        <div class="gx-kids">
+          {% for uid, uname in e.kids %}
+          <a class="gx-kid" href="https://app.moyklass.com/user/{{ uid }}/info" target="_blank">{{ uname }}</a>
+          {% endfor %}
+          {% for uid, uname in e.pending %}
+          <a class="gx-kid gx-kid-pend" href="https://app.moyklass.com/user/{{ uid }}/info" target="_blank">{{ uname }}</a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="gx-empty">пока никого — продаём!</div>
+        {% endif %}
       </div>
       {% endfor %}
     </td>
     {% endfor %}
   </tr>
   {% endfor %}
+  </tbody>
 </table>
 </div>
 {% endif %}
+
+<script>
+(function () {
+  const t = document.getElementById('gx-free-only');
+  if (!t) return;
+  t.addEventListener('change', () => {
+    document.querySelectorAll('.gx-card').forEach(c => {
+      c.style.display = (t.checked && c.dataset.free === '0') ? 'none' : '';
+    });
+  });
+})();
+</script>
 {% endblock %}

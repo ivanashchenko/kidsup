@@ -56,7 +56,7 @@ def build(course_id: int | None = None):
         courses = {r[0]: r[1] for r in conn.execute(
             "SELECT id, name FROM courses")}
         # активные группы (+ выбранный предмет)
-        q = "SELECT id, name, course_id, max_students FROM classes WHERE status='opened'"
+        q = "SELECT id, name, course_id, max_students, raw FROM classes WHERE status='opened'"
         args: list = []
         if course_id:
             q += " AND course_id=?"
@@ -77,18 +77,31 @@ def build(course_id: int | None = None):
     grid: dict[str, dict[int, list]] = defaultdict(lambda: defaultdict(list))
     times_seen = set()
     used_courses = {}
-    for cid, name, crs, max_st in classes:
+    seen_entries: dict[int, dict] = {}
+    for cid, name, crs, max_st, raw in classes:
         cls_slots = slots.get(cid) or _slots_from_name(name or "")
         if not cls_slots:
             continue
         used_courses[crs] = courses.get(crs, f"курс {crs}")
+        color = ""
+        try:
+            color = (json.loads(raw).get("color") or "").lstrip("#")
+        except Exception:
+            pass
+        busy = len(kids.get(cid, [])) + len(pending.get(cid, []))
+        free = max(0, (max_st or 0) - busy)
         entry = {
             "id": cid, "name": name, "course": courses.get(crs, ""),
-            "max": max_st or 0,
+            "max": max_st or 0, "busy": busy, "free": free,
+            "unlimited": not max_st,
+            "fill_pct": min(100, round(100 * busy / max_st)) if max_st else 0,
+            "state": ("full" if max_st and free == 0
+                      else "warn" if max_st and free <= 2 else "ok"),
+            "color": color or "1DA7E0",
             "kids": sorted(kids.get(cid, [])),
             "pending": sorted(pending.get(cid, [])),
-            "free": max(0, (max_st or 0) - len(kids.get(cid, [])) - len(pending.get(cid, []))),
         }
+        seen_entries[cid] = entry
         for wd, t in cls_slots:
             grid[t][wd].append(entry)
             times_seen.add(t)
@@ -98,4 +111,15 @@ def build(course_id: int | None = None):
         rows.append({"time": t, "cells": [
             sorted(grid[t][wd], key=lambda e: e["name"]) for wd in range(7)]})
     course_list = sorted(used_courses.items(), key=lambda x: x[1])
-    return {"rows": rows, "days": DAYS, "courses": course_list}
+    seats_max = sum(e["max"] for e in seen_entries.values())
+    seats_busy = sum(e["busy"] for e in seen_entries.values())
+    summary = {
+        "groups": len(seen_entries),
+        "seats_max": seats_max,
+        "seats_busy": seats_busy,
+        "seats_free": max(0, seats_max - seats_busy),
+        "fill_pct": round(100 * seats_busy / seats_max) if seats_max else 0,
+        "full_groups": sum(1 for e in seen_entries.values() if e["state"] == "full"),
+    }
+    return {"rows": rows, "days": DAYS, "courses": course_list,
+            "summary": summary, "today_wd": date.today().weekday()}
