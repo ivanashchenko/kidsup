@@ -75,11 +75,13 @@ def _promo_users():
                     old_clients[t] += 1
                 continue
             st = u.get("clientStateId")
+            # реестр листов полный, поэтому критерий строгий: тег/реестр,
+            # статус «От промоутера» или источник «Промоутер 26/27».
+            # Широкую эвристику («Иное» + статус воронки) убрали 17.08 —
+            # она затягивала лиды рассылок и сайта в промо-статистику.
             is_promo = (promo_tags
                         or st == ST_NEW
-                        or u.get("advSourceId") == ADV_PROMO
-                        or (u.get("advSourceId") == ADV_OTHER
-                            and st in NABOR_STATES))
+                        or u.get("advSourceId") == ADV_PROMO)
             # промо без листа и без тега — в «не распределено» до появления листа
             if is_promo and not promo_tags:
                 promo_tags = ["Промо: не распределено"]
