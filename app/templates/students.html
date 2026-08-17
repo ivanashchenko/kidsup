@@ -28,7 +28,8 @@
     {% for s in students %}
     <tr>
       <td class="muted">{{ s.id }}</td>
-      <td>{{ s.name }}</td>
+      <td><a href="https://app.moyklass.com/client/{{ s.id }}" target="_blank" rel="noopener">{{ s.name }}</a>
+          <a href="/brief?phone={{ s.phone }}" class="small" style="margin-left:6px">досье</a></td>
       <td>{{ s.phone or "—" }}</td>
       <td>{{ s.email or "—" }}</td>
       <td class="num {{ 'neg' if s.balance and s.balance < 0 else '' }}">

@@ -39,10 +39,13 @@
       <td class="small">{{ p.courses or "—" }}</td>
       <td class="small">{{ p.last }}</td>
       <td class="small">{{ p.suggest }}</td>
-      <td>{% if p.enrolled %}<span class="chip free">записан</span>{% elif p.buffer %}<span class="chip warn">в буфере «Заявки» — поставить в группу</span>{% else %}<span class="chip warn">не записан</span>{% endif %}</td>
+      <td>{% if p.enrolled %}<span class="chip free">записан</span>{% elif p.buffer %}<span class="chip warn">в буфере «Заявки» — поставить в группу</span>{% else %}<span class="chip warn">не записан</span>{% endif %}
+          {% if p.marked %}<br><span class="chip" title="отметка о прозвоне">☎ {{ p.marked }}</span>{% endif %}</td>
       <td style="white-space:nowrap">
         {% if p.phone %}<a href="tel:+{{ p.phone }}">Позвонить</a>{% endif %}
         <a href="/enrollment?age={{ p.age or '' }}&free=1" style="margin-left:6px" target="_blank">Подобрать группу</a>
+        <a href="/brief?phone={{ p.phone }}" style="margin-left:6px" target="_blank">Досье</a>
+        <button type="button" class="btn-done" data-uid="{{ p.id }}" style="margin-left:6px">✓ прозвонён</button>
         <button type="button" class="copy" style="margin-left:6px"
           data-text="Здравствуйте! Это KidsUP на Рокоссовского. {{ p.name.split(' ')[-1] if ' ' in p.name else p.name }} занимался(ась) у нас{% if p.courses %} ({{ p.courses }}){% endif %}. Формируем группы на новый учебный год — хотим сохранить место. По возрасту сейчас подходит: {{ p.suggest }}. Прислать расписание и удобное время?">текст клиенту</button>
       </td>
@@ -53,7 +56,22 @@
 </div>
 
 <script>
-document.addEventListener('click', function (e) {
+document.addEventListener('click', async function (e) {
+  var d = e.target.closest('.btn-done');
+  if (d) {
+    var outcome = prompt('Итог разговора (уйдёт комментарием в МойКласс):',
+                         'дозвонились, думает');
+    if (!outcome) return;
+    d.disabled = true; d.textContent = '…';
+    try {
+      var r = await fetch('/api/callplan/done', {method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({user_id: +d.dataset.uid, outcome: outcome})});
+      if (!r.ok) throw new Error();
+      d.textContent = '✓ в CRM'; d.classList.add('done');
+    } catch (err) { d.disabled = false; d.textContent = '✓ прозвонён'; alert('Не получилось — попробуйте ещё раз'); }
+    return;
+  }
   var b = e.target.closest('.copy');
   if (!b) return;
   navigator.clipboard.writeText(b.dataset.text).then(function () {

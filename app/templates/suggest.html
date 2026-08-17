@@ -12,7 +12,8 @@
     <tr{% if not i.answered %} style="background:rgba(255,180,0,.08)"{% endif %}>
       <td class="small">{{ i.ts[5:16].replace('T',' ') }}</td>
       <td>{% if i.crm %}<a href="{{ i.crm }}" target="_blank" rel="noopener">{{ i.name }}</a>{% else %}{{ i.name }}{% endif %}
-        <br><span class="muted small">+{{ i.phone }}{% if i.age %} · {{ i.age }} лет{% endif %}</span></td>
+        <br><span class="muted small">+{{ i.phone }}{% if i.age %} · {{ i.age }} лет{% endif %}</span>
+        <br><a class="small" href="/brief?phone={{ i.phone }}" target="_blank">досье</a>{% if i.crm %} · <a class="small" href="{{ i.crm }}" target="_blank" rel="noopener">CRM ↗</a>{% endif %}</td>
       <td class="small">«{{ i.text[:160] }}»</td>
       <td class="small">{{ i.draft }}</td>
       <td style="white-space:nowrap">

@@ -10,7 +10,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import Body, Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
@@ -165,9 +165,10 @@ def api_search(q: str = ""):
                 f"SELECT id, name, phone FROM users WHERE {conds} LIMIT 5",
                 tuple(f"%{v}%" for v in variants)).fetchall()
         for r in urows:
+            url = (f"/brief?phone={r['phone']}" if r["phone"]
+                   else f"/students?q={r['name'] or digits}")
             items.append({"type": "Клиент", "title": r["name"] or "Без имени",
-                          "sub": r["phone"] or "",
-                          "url": f"/students?q={(r['name'] or digits)}"})
+                          "sub": r["phone"] or "", "url": url})
     return {"items": items[:9]}
 
 
@@ -1023,45 +1024,6 @@ def metrics_page(request: Request):
                   caps={"calls": sla.CAP_CALLS, "chats": sla.CAP_CHATS})
 
 
-@app.get("/apology", response_class=HTMLResponse, dependencies=AUTH)
-def apology_page(request: Request, campaign: str = "camp_aug26"):
-    """Список семей, которым ушёл текст про лагерь не по факту, с готовым
-    текстом извинения для каждой."""
-    from . import autopilot
-    audit = autopilot.broadcast_audit_camp(campaign)
-    with db.get_conn() as conn:
-        complained = {(p or "")[-10:] for (p,) in conn.execute(
-            "SELECT DISTINCT phone FROM wazzup_inbox").fetchall() if p}
-        course_by_phone: dict[str, str] = {}
-        for phone, course in conn.execute("""
-                SELECT u.phone, co.name FROM lesson_records lr
-                JOIN lessons l ON l.id = lr.lesson_id
-                JOIN users u ON u.id = lr.user_id
-                LEFT JOIN classes cl ON cl.id = l.class_id
-                LEFT JOIN courses co ON co.id = cl.course_id
-                WHERE lr.visit = 1 AND u.phone IS NOT NULL AND u.phone != ''
-                  AND ((l.date >= '2024-06-01' AND l.date < '2024-09-01')
-                    OR (l.date >= '2025-06-01' AND l.date < '2025-09-01'))"""):
-            if course:
-                course_by_phone.setdefault((phone or "")[-10:], course)
-    rows = []
-    for rec in audit["sent_wrong"]:
-        full = rec.get("child") or ""
-        name = autopilot._child_name(full)
-        course = course_by_phone.get((rec["phone"] or "")[-10:], "летние занятия")
-        course = COURSE_SHORT.get(course, course)
-        text = (APOLOGY_TEXT
-                .replace("{имя_в}", autopilot._accusative(name) if name
-                         else "вашего ребёнка")
-                .replace("{курс}", course))
-        rows.append({"child": full, "phone": rec["phone"], "course": course,
-                     "sent": (rec.get("sent") or "")[:16].replace("T", " "),
-                     "text": text,
-                     "complained": (rec["phone"] or "")[-10:] in complained})
-    rows.sort(key=lambda r: (not r["complained"], r["sent"]))
-    return render(request, "apology.html", active="apology", rows=rows)
-
-
 @app.post("/waitlist/add", dependencies=AUTH)
 async def waitlist_add(class_id: int = Form(...), class_name: str = Form(""),
                        name: str = Form(""), phone: str = Form(""), note: str = Form("")):
@@ -1481,6 +1443,34 @@ def brief_page(request: Request, phone: str = ""):
                   pitch=pitch, dialog=dialog)
 
 
+@app.post("/api/callplan/done", dependencies=AUTH)
+def callplan_done(payload: dict = Body(...)):
+    """Кнопка «прозвонён» на /callplan: комментарий сразу в карточку МойКласс
+    и локальная метка, чтобы админ видел, кого уже отработали сегодня."""
+    uid = int(payload.get("user_id") or 0)
+    outcome = (payload.get("outcome") or "").strip()[:300]
+    if not uid or not outcome:
+        raise HTTPException(422, "user_id и outcome обязательны")
+    key = sync.get_api_key()
+    if not key:
+        raise HTTPException(400, "нет API-ключа МойКласс")
+    from .moyklass_client import MoyKlassClient
+    c = MoyKlassClient(key)
+    try:
+        c.post("/v1/company/userComments",
+               {"userId": uid, "comment": f"📞 Прозвон (app.kidsup.ru): {outcome}",
+                "showToUser": False})
+    finally:
+        c.close()
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS callplan_marks
+                        (user_id INTEGER PRIMARY KEY, marked_at TEXT, outcome TEXT)""")
+        conn.execute("INSERT OR REPLACE INTO callplan_marks VALUES (?, datetime('now'), ?)",
+                     (uid, outcome))
+        conn.commit()
+    return {"ok": True}
+
+
 @app.get("/callplan", response_class=HTMLResponse, dependencies=AUTH)
 def callplan_page(request: Request, segment: str = "all", q: str = "",
                   done: int = 0, limit: int = 150):
@@ -1508,6 +1498,10 @@ def callplan_page(request: Request, segment: str = "all", q: str = "",
         d1, d2 = ("2024-01-01", "2026-12-31") if segment == "all" \
             else ranges.get(segment, ranges["summer"])
         rows = conn.execute(base, (d1, d2)).fetchall()
+        conn.execute("""CREATE TABLE IF NOT EXISTS callplan_marks
+                        (user_id INTEGER PRIMARY KEY, marked_at TEXT, outcome TEXT)""")
+        marks = {r[0]: r[1][:10] for r in conn.execute(
+            "SELECT user_id, marked_at FROM callplan_marks").fetchall()}
         seen_all = {"summer": set(), "year": set(), "old": set()}
         for key, (a, b) in ranges.items():
             seen_all[key] = {r[0] for r in conn.execute(base, (a, b)).fetchall()}
@@ -1533,6 +1527,7 @@ def callplan_page(request: Request, segment: str = "all", q: str = "",
             if state in (125954, 125957, 146328, 215202, 146330, 146513):
                 continue  # отказ / не звонить / не наш возраст
             is_done = uid in enrolled
+            p["marked"] = marks.get(uid)
             if not done and is_done:
                 continue
             if q:
