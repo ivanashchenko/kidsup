@@ -2021,7 +2021,7 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
-            "vk_token", "vk_group_id", "tg_bot_token", "tg_channel",
+            "vk_token", "vk_group_id", "tg_bot_token", "tg_channel", "mango_ext_admins",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
             "calls_done"}
@@ -2267,7 +2267,9 @@ async def api_duty(day: str = ""):
         sched = {}
     d = day or autopilot._today().isoformat()
     mid = sched.get(d)
-    onduty = [a for a in admins if a.get("managerId") == mid] if mid else []
+    # значение расписания: один id или список — в смене может быть двое
+    mids = mid if isinstance(mid, list) else ([mid] if mid else [])
+    onduty = [a for a in admins if a.get("managerId") in mids]
     if not onduty and admins:
         onduty = [admins[(autopilot._today().toordinal()) % len(admins)]]
     chat = db.get_setting("chat_admin", "")

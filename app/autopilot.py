@@ -590,16 +590,19 @@ def _admins() -> list[dict]:
 
 
 def _admins_today() -> list[dict]:
-    """Кто сегодня на смене. Настройка admin_schedule: {"2026-08-12": 232805, ...}
-    (дата -> managerId). Нет записи на сегодня — работают все из call_admins."""
+    """Кто сегодня на смене. admin_schedule: {"2026-08-18": 232805} или
+    {"2026-08-18": [232805, 202856]} — двое в смене; задачи делятся между ними.
+    Нет записи на сегодня — работают все из call_admins."""
     admins = _admins()
     try:
         sched = json.loads(db.get_setting("admin_schedule") or "{}")
     except ValueError:
         sched = {}
     mid = sched.get(_today().isoformat())
-    if mid:
-        onduty = [a for a in admins if a.get("managerId") == mid]
+    # один id или список [id, id] — когда в смене работают двое
+    mids = mid if isinstance(mid, list) else ([mid] if mid else [])
+    if mids:
+        onduty = [a for a in admins if a.get("managerId") in mids]
         if onduty:
             return onduty
     return admins
