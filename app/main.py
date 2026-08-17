@@ -19,6 +19,7 @@ from fastapi.templating import Jinja2Templates
 from . import analytics, config, db, leads, sync
 from . import content as content_mod
 from . import descriptions as descr_mod
+from . import assistant as assistant_mod
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -522,6 +523,28 @@ def courses_page(request: Request, c: str = ""):
                       "plain": f"{cc['tag']}\n\n{plain}", "trial_note": trial})
     return render(request, "courses.html", active="courses",
                   items=items, sel=c if any(x["key"] == c for x in items) else "")
+
+
+@app.get("/ask", response_class=HTMLResponse, dependencies=AUTH)
+def ask_page(request: Request):
+    """Чат-помощник для админов: живые данные набора + Anthropic API."""
+    return render(request, "ask.html", active="ask",
+                  has_key=bool(db.get_setting("anthropic_api_key")))
+
+
+@app.post("/api/ask", dependencies=AUTH)
+async def api_ask(payload: dict):
+    msgs = payload.get("messages") or []
+    return assistant_mod.ask(msgs, _enrollment_groups())
+
+
+@app.get("/api/ask/health", dependencies=AUTH)
+async def api_ask_health():
+    """Достижимость Anthropic API с сервера + настроен ли ключ."""
+    out = assistant_mod.probe()
+    out["key_set"] = bool(db.get_setting("anthropic_api_key"))
+    out["model"] = db.get_setting("assistant_model") or assistant_mod.DEFAULT_MODEL
+    return out
 
 
 @app.get("/content", response_class=HTMLResponse, dependencies=AUTH)
@@ -1927,7 +1950,7 @@ async def health():
 SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
-            "admin_phones",
+            "admin_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
             "calls_done"}
