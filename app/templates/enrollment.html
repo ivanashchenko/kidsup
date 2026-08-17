@@ -85,7 +85,8 @@
 <div class="card">
   <h2>Что говорить о предмете</h2>
   <p class="muted" style="margin-top:0">Коротко: чем ценно → что получит ребёнок → чем закрыть на пробное.
-  {% if not course %}Выберите предмет в фильтре, чтобы остался только он.{% endif %}</p>
+  {% if not course %}Выберите предмет в фильтре, чтобы остался только он.{% endif %}
+  Полные описания с текстом для WhatsApp — на странице <a href="/courses">Занятия</a>.</p>
   {% for p in pitches %}
   <details {% if course %}open{% endif %} style="margin-bottom:8px">
     <summary><b>{{ p.course }}</b></summary>

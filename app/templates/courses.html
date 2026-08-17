@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Занятия — KidsUP{% endblock %}
+{% block content %}
+<h1>Занятия: полные описания</h1>
+<p class="muted">Витрина всех направлений — что говорить и что отправлять родителю.
+У каждой карточки две кнопки: «в WhatsApp» копирует короткую продающую версию с адресом,
+«полный текст» — развёрнутое описание для поста или сайта. Свободные места — живые, из CRM.</p>
+
+<div class="card">
+  <div class="chips">
+    <a href="/courses" class="chip {{ 'free' if not sel }}">все</a>
+    {% for c in items %}
+      <a href="/courses?c={{ c.key }}" class="chip {{ 'free' if sel == c.key }}">{{ c.icon }} {{ c.title }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+{% for c in items %}
+{% if not sel or sel == c.key %}
+<div class="card" id="{{ c.key }}">
+  <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+    <h2 style="margin:0">{{ c.icon }} {{ c.title }}</h2>
+    {% if c.free_now is not none %}
+      <span class="chip {{ 'full' if c.free_now == 0 else 'warn' if c.free_now <= 5 else 'free' }}">
+        {{ 'мест нет — лист ожидания' if c.free_now == 0 else 'свободно мест: ' ~ c.free_now }}</span>
+    {% endif %}
+    <span style="margin-left:auto;display:flex;gap:8px">
+      <button type="button" class="copy" data-text="{{ c.wa_full }}">📱 в WhatsApp</button>
+      <button type="button" class="copy" data-text="{{ c.plain }}">📄 полный текст</button>
+    </span>
+  </div>
+  <p style="margin:6px 0 10px;font-size:16px;font-weight:650">{{ c.tag }}</p>
+  <p class="muted small" style="margin:0 0 12px">
+    {{ c.age }} · {{ c.sched }} · <b>{{ c.price }}</b></p>
+  <div class="prose">{{ c.html | safe }}</div>
+  {% if c.trial_note %}
+  <p class="small" style="margin-top:10px;padding:10px 14px;background:var(--green-soft);
+     border-radius:var(--r-md);color:var(--green);font-weight:600">{{ c.trial_note }}</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endfor %}
+
+<div class="card">
+  <p class="muted small" style="margin:0">Эти же тексты по группам и с ценами —
+  на <a href="/enrollment">странице набора</a>. Рассылки, посты и офлайн-материалы —
+  в <a href="/content">фабрике контента</a>. Скрипты разговора —
+  в <a href="/base">базе знаний</a>.</p>
+</div>
+
+<script>
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('.copy');
+  if (!b) return;
+  navigator.clipboard.writeText(b.dataset.text).then(function () {
+    var old = b.textContent; b.textContent = 'скопировано ✓'; b.classList.add('done');
+    setTimeout(function () { b.textContent = old; b.classList.remove('done'); }, 1500);
+  });
+});
+</script>
+{% endblock %}

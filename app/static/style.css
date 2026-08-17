@@ -200,6 +200,26 @@ p:last-child { margin-bottom: 0; }
 .topbar nav.nav-sub a { padding: 5px 11px; font-size: 13px; font-weight: 600; }
 .topbar nav.nav-sub a.active { background: var(--primary-soft); color: var(--primary-dark); }
 
+
+/* подписи групп во второй строке меню: Маркетинг · Контроль · Данные */
+.nav-label {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: .75;
+  margin-left: 14px;
+  align-self: center;
+  user-select: none;
+}
+.nav-label:first-child { margin-left: 2px; }
+
+/* витрина занятий: текст описаний */
+.prose p { margin: 0 0 10px; max-width: 74ch; }
+.prose ul { margin: 0 0 10px; padding-left: 20px; max-width: 74ch; }
+.prose li { margin: 4px 0; }
+
 .sync-block { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 
 main {

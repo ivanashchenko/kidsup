@@ -18,6 +18,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import analytics, config, db, leads, sync
 from . import content as content_mod
+from . import descriptions as descr_mod
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -482,6 +483,45 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
                   prices=price_blocks, pitches=pitches, waitlist=_waitlist_rows(),
                   summary=sorted(summary.values(), key=lambda x: -x["free"]))
 
+
+
+@app.get("/courses", response_class=HTMLResponse, dependencies=AUTH)
+def courses_page(request: Request, c: str = ""):
+    """Витрина занятий: полные описания + короткие версии для WhatsApp."""
+    groups = _enrollment_groups()
+    free_by_course: dict[str, int] = {}
+    sad_split = {"Мини-сад": 0, "Нулевой": 0}
+    for g in groups:
+        if g["buffer"]:
+            continue
+        free_by_course[g["course"]] = free_by_course.get(g["course"], 0) + g["free"]
+        for k in sad_split:
+            if k in g["name"]:
+                sad_split[k] += g["free"]
+    TITLES = {"minisad": "Мини-сад с английским", "zeroclass": "Нулевой класс",
+              "reading": "Скорочтение"}
+    items = []
+    for cc in descr_mod.COURSES:
+        if cc["key"] == "minisad":
+            free_now = sad_split["Мини-сад"]
+        elif cc["key"] == "zeroclass":
+            free_now = sad_split["Нулевой"]
+        else:
+            free_now = free_by_course.get(cc["course"])
+        plain = re.sub(r"<li>", "• ", cc["html"])
+        plain = re.sub(r"<[^>]+>", "", plain)
+        plain = re.sub(r"\n{3,}", "\n\n", plain).strip()
+        trial = None
+        if cc["key"] in ("minisad", "zeroclass", "dance"):
+            pass  # у сада пробный день описан в тексте, у танцев условия партнёра
+        else:
+            trial = descr_mod.TRIAL
+        items.append({**cc, "title": TITLES.get(cc["key"], cc["course"]),
+                      "free_now": free_now,
+                      "wa_full": descr_mod.wa_text(cc),
+                      "plain": f"{cc['tag']}\n\n{plain}", "trial_note": trial})
+    return render(request, "courses.html", active="courses",
+                  items=items, sel=c if any(x["key"] == c for x in items) else "")
 
 
 @app.get("/content", response_class=HTMLResponse, dependencies=AUTH)
