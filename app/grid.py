@@ -51,7 +51,7 @@ def _slots_from_name(name: str) -> set[tuple[int, str]]:
     return set()
 
 
-def build(course_id: int | None = None):
+def build(course_id: int | None = None, show_all: bool = False):
     with db.get_conn() as conn:
         courses = {r[0]: r[1] for r in conn.execute(
             "SELECT id, name FROM courses")}
@@ -79,7 +79,12 @@ def build(course_id: int | None = None):
     used_courses = {}
     seen_entries: dict[int, dict] = {}
     for cid, name, crs, max_st, raw in classes:
-        cls_slots = slots.get(cid) or _slots_from_name(name or "")
+        n = name or ""
+        # по умолчанию — только учебный год 26/27: прячем лагерь и группы
+        # прошлого года (2526_*) и техническую «Заявки»
+        if not show_all and (n.startswith("2526") or n.startswith("Заявк")):
+            continue
+        cls_slots = slots.get(cid) or _slots_from_name(n)
         if not cls_slots:
             continue
         used_courses[crs] = courses.get(crs, f"курс {crs}")

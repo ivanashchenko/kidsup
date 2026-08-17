@@ -9,6 +9,8 @@
   </div>
   <div class="gx-actions">
     <label class="gx-toggle"><input type="checkbox" id="gx-free-only"> только со свободными местами</label>
+    <a class="gx-toggle" href="{{ '/grid' if show_all else '/grid?all=1' }}">
+      {{ '← только 26/27' if show_all else 'показать лагерь и прошлый год' }}</a>
     <button class="btn" onclick="window.print()">🖨 Печать</button>
   </div>
 </div>

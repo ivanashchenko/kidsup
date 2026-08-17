@@ -1599,10 +1599,11 @@ def _suggest_by_age(age: float | None) -> str:
 
 
 @app.get("/grid", response_class=HTMLResponse, dependencies=AUTH)
-def grid_page(request: Request, course: int = 0):
+def grid_page(request: Request, course: int = 0, all: int = 0):
     from . import grid
     return render(request, "grid.html", active="grid",
-                  g=grid.build(course or None), course=course)
+                  g=grid.build(course or None, show_all=bool(all)),
+                  course=course, show_all=bool(all))
 
 
 @app.get("/promo", response_class=HTMLResponse, dependencies=AUTH)
