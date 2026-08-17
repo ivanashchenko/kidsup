@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}KidsUp Analytics{% endblock %}</title>
 <meta name="theme-color" content="#1DA7E0">
-<link rel="stylesheet" href="/static/style.css?v=12">
+<link rel="stylesheet" href="/static/style.css?v=13">
 <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 </head>
 <body>
@@ -20,7 +20,7 @@
   <nav class="nav-main">
     <a href="/enrollment" class="{{ 'active' if active == 'enrollment' }}">Набор 26/27</a>
     <a href="/courses" class="{{ 'active' if active == 'courses' }}">Занятия</a>
-    <a href="/callplan" class="{{ 'active' if active == 'callplan' }}">Кого обзвонить</a>
+    <a href="/callplan" class="{{ 'active' if active in ('callplan', 'callaudit') }}">Обзвон</a>
     <a href="/waiting" class="{{ 'active' if active == 'waiting' }}">Ответы</a>
     <a href="/constructor" class="{{ 'active' if active == 'constructor' }}">Конструктор</a>
     <a href="/ask" class="{{ 'active' if active == 'ask' }}">Спросить Клода</a>
@@ -37,13 +37,11 @@
     <span class="nav-label">Маркетинг</span>
     <a href="/content" class="{{ 'active' if active == 'content' }}">Контент</a>
     <a href="/makety" class="{{ 'active' if active == 'makety' }}">Макеты</a>
-    <a href="/leads" class="{{ 'active' if active == 'leads' }}">Лиды</a>
+    <a href="/leads" class="{{ 'active' if active in ('leads', 'clicks') }}">Лиды</a>
     <a href="/promo" class="{{ 'active' if active == 'promo' }}">Промоутеры</a>
-    <a href="/clicks" class="{{ 'active' if active == 'clicks' }}">Клики</a>
     <span class="nav-label">Контроль</span>
     <a href="/" class="{{ 'active' if active == 'dashboard' }}">Дашборд</a>
     <a href="/metrics" class="{{ 'active' if active == 'metrics' }}">Дисциплина</a>
-    <a href="/callaudit" class="{{ 'active' if active == 'callaudit' }}">Обзвон</a>
     <a href="/journal" class="{{ 'active' if active == 'journal' }}">Журнал</a>
     <span class="nav-label">Данные</span>
     <a href="/groups" class="{{ 'active' if active == 'groups' }}">Группы</a>

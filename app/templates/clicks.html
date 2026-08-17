@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Клики по мессенджерам — KidsUP{% endblock %}
 {% block content %}
+<div class="tabs">
+  <a href="/leads" class="tab {{ 'active' if active == 'leads' }}">📥 Лиды</a>
+  <a href="/clicks" class="tab {{ 'active' if active == 'clicks' }}">🖱 Клики по кнопкам</a>
+</div>
 <h1>Кнопки мессенджеров на сайте</h1>
 
 <div class="notice">

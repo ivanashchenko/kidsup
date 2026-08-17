@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Учёт обзвона — KidsUP{% endblock %}
 {% block content %}
+<div class="tabs">
+  <a href="/callplan" class="tab {{ 'active' if active == 'callplan' }}">📞 План: кого обзвонить</a>
+  <a href="/callaudit" class="tab {{ 'active' if active == 'callaudit' }}">✅ Факт: кто кому звонил</a>
+</div>
 <h1>Учёт обзвона</h1>
 <p class="muted">По каждой семье, которой назначен звонок: закрыта ли задача,
 было ли реальное касание (звонок в Mango или сообщение в Wazzup), какой статус

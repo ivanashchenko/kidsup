@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Лиды с каналов — KidsUP Analytics{% endblock %}
 {% block content %}
+<div class="tabs">
+  <a href="/leads" class="tab {{ 'active' if active == 'leads' }}">📥 Лиды</a>
+  <a href="/clicks" class="tab {{ 'active' if active == 'clicks' }}">🖱 Клики по кнопкам</a>
+</div>
 <h1>Лиды с офлайн-каналов</h1>
 
 <div class="card">
