@@ -129,10 +129,14 @@
   async function tick() {
     try {
       const w = await (await fetch('/api/waiting')).json();
-      if (!w.count) { b.hidden = true; return; }
+      const calls = w.calls_count || 0;
+      if (!w.count && !calls) { b.hidden = true; return; }
       b.hidden = false;
-      b.textContent = (w.money ? '🔥 ' : '💬 ') + w.count + ' ждут ответа';
-      b.classList.toggle('hot', w.money > 0 || w.max_wait > 30);
+      const parts = [];
+      if (w.count) parts.push('💬 ' + w.count);
+      if (calls) parts.push('☎ ' + calls);
+      b.textContent = (w.money ? '🔥 ' : '') + parts.join(' · ') + ' ждут';
+      b.classList.toggle('hot', w.money > 0 || w.max_wait > 30 || calls > 0);
     } catch (e) {}
   }
   tick(); setInterval(tick, 180000);

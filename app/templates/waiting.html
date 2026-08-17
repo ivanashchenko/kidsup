@@ -5,6 +5,25 @@
 <p class="muted">Диалоги, где последнее слово за клиентом (15+ минут).
 🔥 — в сообщении речь про деньги или запись. Обновляется автоматически.</p>
 
+<h2>☎ Не перезвонили (пропущенные входящие, 48 ч)</h2>
+{% if not w['calls'] %}
+<div class="notice">✅ Все пропущенные звонки отработаны (перезвонили или написали).</div>
+{% else %}
+<table>
+  <tr><th>Ждёт</th><th>Клиент</th><th>Пропущено</th><th>Попыток перезвона</th><th>Когда звонил</th></tr>
+  {% for it in w['calls'] %}
+  <tr class="{{ 'warn-row' if it.wait_min > 120 }}">
+    <td><b>{{ it.wait_min // 60 }} ч {{ it.wait_min % 60 }} м</b></td>
+    <td>{{ it.name or '—' }}<br><span class="muted small">{{ it.phone }}</span></td>
+    <td>{{ it.attempts }} раз</td>
+    <td>{{ it.tried or '0' }}{{ ' (не дозвонились)' if it.tried }}</td>
+    <td class="muted small">{{ it.since[5:16] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>💬 Чаты без ответа</h2>
 {% if not w['items'] %}
 <div class="notice">✅ Никто не ждёт — все чаты отвечены.</div>
 {% else %}

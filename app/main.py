@@ -2321,6 +2321,64 @@ async def api_dialogs(day: str = "", hours: int = 0):
 
 MONEY_RX = re.compile(r"оплат|плат[ёе]ж|по карте|переве|сч[её]т|запис|прода|купит|абонемент|возврат", re.I)
 
+# Кэш пропущенных: Mango stats с жёстким rate-limit, чаще раза в 5 минут не ходим
+_MISSED_CACHE: dict = {"ts": 0.0, "data": None}
+
+
+def _missed_inbound(hours: int = 48) -> list[dict]:
+    """Входящие без ответа, по которым не перезвонили (и не написали в чат).
+
+    perезвон засчитан, если ПОСЛЕ пропущенного был отвеченный разговор с этим
+    номером (в любую сторону); неотвеченные попытки перезвона показываем
+    отдельно счётчиком tried."""
+    import time as _time
+    from . import autopilot, mango
+    if _MISSED_CACHE["data"] is not None and _time.time() - _MISSED_CACHE["ts"] < 300:
+        return _MISSED_CACHE["data"]
+    now = autopilot._now()
+    rows = mango.calls(now - timedelta(hours=hours), now)
+    missed: dict[str, dict] = {}       # номер -> последний пропущенный
+    for r in rows:
+        num = (r["from_num"] if not r["from_ext"] else r["to_num"])[-10:]
+        if not num.isdigit() or len(num) < 10:
+            continue
+        if not r["from_ext"] and not r["answer"]:
+            m = missed.setdefault(num, {"ts": 0, "attempts": 0, "tried": 0})
+            m["attempts"] += 1
+            m["ts"] = max(m["ts"], r["start"])
+    for r in rows:                      # закрываем перезвонами/дозвонами
+        num = (r["from_num"] if not r["from_ext"] else r["to_num"])[-10:]
+        m = missed.get(num)
+        if not m:
+            continue
+        if r["start"] >= m["ts"]:
+            if r["answer"]:
+                missed.pop(num, None)
+            elif r["from_ext"] and r["start"] > m["ts"]:
+                m["tried"] += 1
+    out = []
+    with db.get_conn() as conn:
+        for num, m in missed.items():
+            row = conn.execute(
+                "SELECT ts FROM wazzup_outbox WHERE substr(phone,-10)=? ORDER BY ts DESC LIMIT 1",
+                (num,)).fetchone()
+            if row:
+                try:
+                    if datetime.fromisoformat(row[0]).timestamp() > m["ts"]:
+                        continue  # написали в чат после пропущенного
+                except Exception:
+                    pass
+            name_row = conn.execute(
+                "SELECT name FROM users WHERE substr(phone,-10)=? LIMIT 1", (num,)).fetchone()
+            ts = datetime.fromtimestamp(m["ts"], tz=now.tzinfo)
+            out.append({"phone": num, "name": name_row[0] if name_row else "",
+                        "since": ts.isoformat(timespec="minutes"),
+                        "wait_min": int((now - ts).total_seconds() // 60),
+                        "attempts": m["attempts"], "tried": m["tried"]})
+    out.sort(key=lambda x: -x["wait_min"])
+    _MISSED_CACHE.update(ts=_time.time(), data=out)
+    return out
+
 
 @app.get("/api/waiting", dependencies=AUTH)
 async def api_waiting(min_minutes: int = 15):
@@ -2370,10 +2428,17 @@ async def api_waiting(min_minutes: int = 15):
         waiting.append({"phone": p, "name": names.get(p, ""), "since": last["ts"],
                         "wait_min": wait_min, "text": text, "money": money})
     waiting.sort(key=lambda w: (not w["money"], -w["wait_min"]))
+    try:
+        calls_waiting = _missed_inbound()
+    except Exception as exc:
+        logging.getLogger(__name__).warning("missed-calls: %s", exc)
+        calls_waiting = []
     return {"count": len(waiting),
             "money": sum(1 for w in waiting if w["money"]),
             "max_wait": max((w["wait_min"] for w in waiting), default=0),
-            "items": waiting}
+            "items": waiting,
+            "calls_count": len(calls_waiting),
+            "calls": calls_waiting}
 
 
 @app.get("/waiting", response_class=HTMLResponse, dependencies=AUTH)
