@@ -128,6 +128,42 @@ def payments_page(request: Request, date_from: str = "", date_to: str = "",
                   optype=optype, totals=[dict(t) for t in totals])
 
 
+@app.get("/api/search", dependencies=AUTH)
+def api_search(q: str = ""):
+    """Глобальный поиск из шапки: группы 2026/27 и клиенты (имя/телефон)."""
+    q = " ".join(q.split())
+    if len(q) < 2:
+        return {"items": []}
+    items: list[dict] = []
+    digits = "".join(ch for ch in q if ch.isdigit())
+    with db.get_conn() as conn:
+        rows = conn.execute("""
+            SELECT cl.id, cl.name, co.name course, cl.max_students,
+                   COUNT(DISTINCT j.user_id) enrolled
+            FROM classes cl LEFT JOIN courses co ON co.id = cl.course_id
+            LEFT JOIN joins j ON j.class_id = cl.id
+            WHERE cl.name LIKE '2627%' AND (cl.name LIKE ? OR co.name LIKE ?)
+            GROUP BY cl.id LIMIT 5""", (f"%{q}%", f"%{q}%")).fetchall()
+        for r in rows:
+            free = max(0, (r["max_students"] or 0) - r["enrolled"])
+            items.append({"type": "Группа", "title": r["name"],
+                          "sub": f"{r['course'] or ''} · свободно {free}",
+                          "url": f"/enrollment?q={r['name']}"})
+        if digits and len(digits) >= 4:
+            urows = conn.execute(
+                "SELECT id, name, phone FROM users WHERE phone LIKE ? LIMIT 5",
+                (f"%{digits}%",)).fetchall()
+        else:
+            urows = conn.execute(
+                "SELECT id, name, phone FROM users WHERE name LIKE ? LIMIT 5",
+                (f"%{q}%",)).fetchall()
+        for r in urows:
+            items.append({"type": "Клиент", "title": r["name"] or "Без имени",
+                          "sub": r["phone"] or "",
+                          "url": f"/students?q={(r['name'] or digits)}"})
+    return {"items": items[:9]}
+
+
 @app.get("/groups", response_class=HTMLResponse, dependencies=AUTH)
 def groups_page(request: Request):
     return render(request, "groups.html", active="groups",

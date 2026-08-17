@@ -4,13 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}KidsUp Analytics{% endblock %}</title>
-<meta name="theme-color" content="#2AA7DE">
-<link rel="stylesheet" href="/static/style.css?v=9">
+<meta name="theme-color" content="#1DA7E0">
+<link rel="stylesheet" href="/static/style.css?v=10">
 <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 </head>
 <body>
 <header class="topbar">
   <div class="brand"><img src="/static/logo.svg" alt="KidsUP"> KidsUP <span>Analytics</span></div>
+  <div class="gsearch">
+    <input type="search" id="gs-input" placeholder="Поиск: группа, ребёнок, телефон…  ( / )"
+           autocomplete="off" spellcheck="false">
+    <div id="gs-drop" class="gs-drop" hidden></div>
+  </div>
   <nav class="nav-main">
     <a href="/enrollment" class="{{ 'active' if active == 'enrollment' }}">Набор 26/27</a>
     <a href="/courses" class="{{ 'active' if active == 'courses' }}">Занятия</a>
@@ -111,6 +116,49 @@
   poll().then(() => {
     if (!box.hidden && box.classList.contains('running') && !timer) {
       timer = setInterval(poll, 1500);
+    }
+  });
+})();
+
+/* --- глобальный поиск в шапке ------------------------------------------- */
+(function () {
+  const inp = document.getElementById('gs-input'), drop = document.getElementById('gs-drop');
+  if (!inp) return;
+  let t = null, sel = -1, items = [];
+  function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+  function renderList() {
+    if (!items.length) { drop.hidden = true; return; }
+    drop.innerHTML = items.map((it, i) =>
+      `<a href="${it.url}" class="gs-item ${i===sel?'sel':''}">
+         <span class="gs-type">${it.type}</span>
+         <span class="gs-title">${esc(it.title)}</span>
+         <span class="gs-sub">${esc(it.sub || '')}</span></a>`).join('');
+    drop.hidden = false;
+  }
+  async function search(q) {
+    try {
+      const r = await fetch('/api/search?q=' + encodeURIComponent(q));
+      items = (await r.json()).items || []; sel = -1; renderList();
+    } catch (e) {}
+  }
+  inp.addEventListener('input', () => {
+    clearTimeout(t);
+    const q = inp.value.trim();
+    if (q.length < 2) { drop.hidden = true; items = []; return; }
+    t = setTimeout(() => search(q), 220);
+  });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, items.length - 1); renderList(); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); renderList(); e.preventDefault(); }
+    else if (e.key === 'Enter' && sel >= 0 && items[sel]) { location.href = items[sel].url; }
+    else if (e.key === 'Escape') { drop.hidden = true; inp.blur(); }
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.gsearch')) drop.hidden = true;
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
+      e.preventDefault(); inp.focus();
     }
   });
 })();

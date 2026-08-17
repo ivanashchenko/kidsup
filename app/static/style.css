@@ -6,11 +6,11 @@
 
 :root {
   /* фирменные цвета */
-  --brand-blue: #2AA7DE;
-  --brand-indigo: #33348E;
-  --brand-green: #5FB53B;
-  --brand-amber: #F5A81C;
-  --brand-red: #E5232A;
+  --brand-blue: #1DA7E0;
+  --brand-indigo: #312783;
+  --brand-green: #7DB928;
+  --brand-amber: #F59C00;
+  --brand-red: #E30613;
 
   /* поверхности */
   --bg: #F4F7FB;
@@ -27,7 +27,7 @@
 
   /* акценты */
   --primary: var(--brand-blue);
-  --primary-dark: #1481B4;
+  --primary-dark: #0F86B8;
   --primary-soft: #E4F4FC;
   --indigo: var(--brand-indigo);
   --indigo-soft: #E9EAF7;
@@ -48,7 +48,7 @@
   --shadow-xs: 0 1px 2px rgba(20, 30, 48, .05);
   --shadow: 0 1px 2px rgba(20, 30, 48, .04), 0 10px 28px -18px rgba(20, 30, 48, .30);
   --shadow-lg: 0 2px 6px rgba(20, 30, 48, .05), 0 22px 48px -26px rgba(20, 30, 48, .38);
-  --ring: 0 0 0 3px rgba(42, 167, 222, .30);
+  --ring: 0 0 0 3px rgba(29, 167, 224, .30);
 
   --content: 1240px;
 }
@@ -626,4 +626,70 @@ textarea.apology {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
   html { scroll-behavior: auto; }
+}
+
+
+/* ============================================================================
+   Полировка v10: глобальный поиск, микро-взаимодействия, эргономика
+   ==========================================================================*/
+
+/* --- глобальный поиск в шапке -------------------------------------------- */
+.gsearch { position: relative; flex: 1 1 260px; max-width: 420px; min-width: 180px; }
+.gsearch input {
+  width: 100%; padding: 9px 16px; border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong); background: var(--card);
+  color: var(--text); font-size: 14px; transition: box-shadow .15s, border-color .15s;
+}
+.gsearch input:focus { outline: none; border-color: var(--primary); box-shadow: var(--ring); }
+.gsearch input::placeholder { color: var(--muted); }
+.gs-drop {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 90;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-lg); overflow: hidden;
+}
+.gs-item {
+  display: grid; grid-template-columns: 64px 1fr; gap: 2px 10px;
+  padding: 9px 14px; text-decoration: none; color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.gs-item:last-child { border-bottom: none; }
+.gs-item:hover, .gs-item.sel { background: var(--primary-soft); }
+.gs-type {
+  grid-row: span 2; align-self: center; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--primary-dark);
+  background: var(--primary-soft); border-radius: var(--r-pill);
+  padding: 3px 8px; text-align: center;
+}
+.gs-item:hover .gs-type, .gs-item.sel .gs-type { background: var(--card); }
+.gs-title { font-weight: 650; font-size: 14px; line-height: 1.25; }
+.gs-sub { font-size: 12.5px; color: var(--muted); }
+
+/* --- микро-взаимодействия: всё живое отвечает на курсор ------------------- */
+.btn, .chip, .card, .nav-main a, .nav-sub a, .copy {
+  transition: background .15s, color .15s, border-color .15s,
+              box-shadow .18s, transform .12s;
+}
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible, .chip:focus-visible, a:focus-visible {
+  outline: none; box-shadow: var(--ring); border-radius: var(--r-sm);
+}
+tbody tr { transition: background .12s; }
+tbody tr:hover { background: var(--bg-deep); }
+
+/* --- типографика: спокойная иерархия ------------------------------------- */
+h1 { letter-spacing: -.022em; }
+h2 { letter-spacing: -.014em; }
+main { animation: pagein .18s ease-out; }
+@keyframes pagein { from { opacity: .55; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  main { animation: none; }
+  .btn, .chip, .card, tbody tr { transition: none; }
+}
+
+/* --- шапка: стеклянная, не съедает экран ---------------------------------- */
+.topbar { position: sticky; top: 0; z-index: 80;
+  backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px); }
+
+@media (max-width: 760px) {
+  .gsearch { order: 5; flex-basis: 100%; max-width: none; }
 }
