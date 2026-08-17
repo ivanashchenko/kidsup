@@ -1255,8 +1255,13 @@ def _draft_for(text: str) -> str:
             "или на праздник 29.08. Сообщение должно заканчиваться вопросом.")
 
 
-@app.get("/suggest", response_class=HTMLResponse, dependencies=AUTH)
-def suggest_page(request: Request, hours: int = 24):
+@app.get("/suggest", dependencies=AUTH)
+def suggest_redirect():
+    """Страница «Ответы» объединена с «Кто ждёт ответа» (/waiting)."""
+    return RedirectResponse("/waiting", status_code=307)
+
+
+def _suggest_page_legacy(request: Request, hours: int = 24):
     """Клиенты, которые написали и ждут ответа: что они спросили, что известно
     о клиенте и что ответить. Черновик проверяет админ, а не робот."""
     from . import autopilot
@@ -2399,11 +2404,11 @@ async def api_waiting(min_minutes: int = 15):
             for ts, phone, text in rows:
                 msgs.setdefault(phone[-10:], []).append(
                     {"ts": ts, "dir": direction, "text": text or ""})
-        names = {}
+        info = {}
         for phone in msgs:
             row = conn.execute(
-                "SELECT name FROM users WHERE substr(phone,-10)=? LIMIT 1", (phone,)).fetchone()
-            names[phone] = row[0] if row else ""
+                "SELECT id, name FROM users WHERE substr(phone,-10)=? LIMIT 1", (phone,)).fetchone()
+            info[phone] = row if row else (None, "")
     waiting = []
     for p, m in msgs.items():
         m.sort(key=lambda x: x["ts"])
@@ -2425,8 +2430,12 @@ async def api_waiting(min_minutes: int = 15):
             tail.append(x["text"])
         text = " · ".join(t for t in reversed(tail) if t)[:300]
         money = bool(MONEY_RX.search(text))
-        waiting.append({"phone": p, "name": names.get(p, ""), "since": last["ts"],
-                        "wait_min": wait_min, "text": text, "money": money})
+        uid, name = info.get(p, (None, ""))
+        waiting.append({"phone": p, "name": name, "since": last["ts"],
+                        "wait_min": wait_min, "text": text, "money": money,
+                        "draft": _draft_for(text),
+                        "brief": f"/brief?phone={p}",
+                        "crm": f"https://app.moyklass.com/client/{uid}" if uid else ""})
     waiting.sort(key=lambda w: (not w["money"], -w["wait_min"]))
     try:
         calls_waiting = _missed_inbound()
