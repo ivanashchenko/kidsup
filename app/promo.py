@@ -24,6 +24,15 @@ ADV_OTHER = 158834     # «Иное» (куда сейчас ошибочно п
 PROMO_TAG_PREFIX = "Промо:"
 SEASON_START = "2026-08-01"
 
+# Оплата промоутеров (ставки Бориса, 17.08): за новый контакт / за контакт,
+# который уже был в базе / за час работы. Часы — по факту смен.
+RATE_NEW, RATE_OLD, RATE_HOUR = 600, 200, 400
+PROMO_HOURS = {
+    "Промо: Руслан 1": 2,
+    "Промо: Руслан 2": 2,
+    "Промо: Маша": 4,
+}
+
 # Статусы воронки набора: свежая карточка с источником «Иное» в одном из них —
 # почти наверняка промо-лид, которому админ уже сменил статус (ловим их тоже,
 # чтобы они попали в список «без тега» на разметку).
@@ -120,9 +129,39 @@ def stats():
         else:
             untagged.append(u)
 
-    promoters = [{"name": tag, "funnel": _funnel(us, paid_ids),
-                  "old_clients": old_clients.get(tag, 0)}
-                 for tag, us in sorted(by_tag.items())]
+    # переписка: кому писали и кто ответил (по последним 10 цифрам телефона)
+    with db.get_conn() as conn:
+        try:
+            out_phones = {p for (p,) in conn.execute(
+                "SELECT DISTINCT substr(phone,-10) FROM wazzup_outbox")}
+            in_phones = {p for (p,) in conn.execute(
+                "SELECT DISTINCT substr(phone,-10) FROM wazzup_inbox")}
+        except Exception:
+            out_phones, in_phones = set(), set()
+
+    promoters = []
+    for tag, us in sorted(by_tag.items()):
+        f = _funnel(us, paid_ids)
+        old = old_clients.get(tag, 0)
+        hours = PROMO_HOURS.get(tag, 0)
+        fee = f["total"] * RATE_NEW + old * RATE_OLD + hours * RATE_HOUR
+        reached = f["thinks"] + f["booked"] + f["visited"] + f["paid"] + f["refused"]
+        booked_plus = f["booked"] + f["visited"] + f["paid"]
+        written = sum(1 for u in us if (u.get("phone") or "")[-10:] in out_phones)
+        replied = sum(1 for u in us if (u.get("phone") or "")[-10:] in in_phones)
+        promoters.append({
+            "name": tag, "funnel": f, "old_clients": old,
+            "hours": hours, "fee": fee,
+            "fee_detail": f"{f['total']}×{RATE_NEW} + {old}×{RATE_OLD} + {hours} ч×{RATE_HOUR}",
+            "called": f["total"] - f["new"],
+            "reached": reached,
+            "written": written, "replied": replied,
+            "cost_contact": round(fee / f["total"]) if f["total"] else 0,
+            "cost_reached": round(fee / reached) if reached else None,
+            "cost_booked": round(fee / booked_plus) if booked_plus else None,
+            "cost_paid": round(fee / f["paid"]) if f["paid"] else None,
+        })
+    total_fee = sum(p["fee"] for p in promoters)
 
     # по дням (последние 14) — сколько контактов собрано
     days = []
@@ -137,6 +176,8 @@ def stats():
 
     bad_source = sum(1 for u in users if u.get("advSourceId") != ADV_PROMO)
     return {
+        "total_fee": total_fee,
+        "rates": {"new": RATE_NEW, "old": RATE_OLD, "hour": RATE_HOUR},
         "promoters": promoters,
         "untagged": _funnel(untagged, paid_ids),
         "untagged_list": [{"id": u["id"], "name": u.get("name") or "",
