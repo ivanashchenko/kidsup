@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Кто ждёт ответа — KidsUP{% endblock %}
+{% block content %}
+<h1>Кто ждёт ответа</h1>
+<p class="muted">Диалоги, где последнее слово за клиентом (15+ минут).
+🔥 — в сообщении речь про деньги или запись. Обновляется автоматически.</p>
+
+{% if not w['items'] %}
+<div class="notice">✅ Никто не ждёт — все чаты отвечены.</div>
+{% else %}
+<table>
+  <tr><th></th><th>Ждёт</th><th>Клиент</th><th>Последние сообщения</th><th>С момента</th></tr>
+  {% for it in w['items'] %}
+  <tr class="{{ 'warn-row' if it.money }}">
+    <td>{{ '🔥' if it.money else '💬' }}</td>
+    <td><b>{{ it.wait_min }} мин</b></td>
+    <td>{{ it.name or '—' }}<br><span class="muted small">{{ it.phone }}</span></td>
+    <td class="small">{{ it.text }}</td>
+    <td class="muted small">{{ it.since[11:16] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+<script>setTimeout(() => location.reload(), 180000);</script>
+{% endblock %}

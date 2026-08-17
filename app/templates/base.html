@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}KidsUp Analytics{% endblock %}</title>
 <meta name="theme-color" content="#1DA7E0">
-<link rel="stylesheet" href="/static/style.css?v=10">
+<link rel="stylesheet" href="/static/style.css?v=11">
 <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 </head>
 <body>
@@ -25,6 +25,7 @@
     <a href="/ask" class="{{ 'active' if active == 'ask' }}">Спросить Клода</a>
     <a href="/base" class="{{ 'active' if active == 'base' }}">База знаний</a>
   </nav>
+  <a id="wait-badge" href="/waiting" class="wait-badge" hidden></a>
   <div class="sync-block">
     {% if last_sync %}<span class="muted small">Синхр.: {{ last_sync }}</span>{% endif %}
     <button id="sync-btn" class="btn btn-primary" {% if not has_api_key %}disabled title="Укажите API-ключ в настройках"{% endif %}>
@@ -119,6 +120,22 @@
       timer = setInterval(poll, 1500);
     }
   });
+})();
+
+/* --- бейдж «кто ждёт ответа» -------------------------------------------- */
+(function () {
+  const b = document.getElementById('wait-badge');
+  if (!b) return;
+  async function tick() {
+    try {
+      const w = await (await fetch('/api/waiting')).json();
+      if (!w.count) { b.hidden = true; return; }
+      b.hidden = false;
+      b.textContent = (w.money ? '🔥 ' : '💬 ') + w.count + ' ждут ответа';
+      b.classList.toggle('hot', w.money > 0 || w.max_wait > 30);
+    } catch (e) {}
+  }
+  tick(); setInterval(tick, 180000);
 })();
 
 /* --- глобальный поиск в шапке ------------------------------------------- */

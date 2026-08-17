@@ -693,3 +693,12 @@ main { animation: pagein .18s ease-out; }
 @media (max-width: 760px) {
   .gsearch { order: 5; flex-basis: 100%; max-width: none; }
 }
+
+/* --- кто ждёт ответа --- */
+.wait-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;
+  border-radius:999px;background:#EAF6FC;color:#312783;font-weight:700;font-size:.82rem;
+  text-decoration:none;white-space:nowrap;transition:transform .15s}
+.wait-badge:hover{transform:translateY(-1px)}
+.wait-badge.hot{background:#E30613;color:#fff;animation:waitpulse 1.6s infinite}
+@keyframes waitpulse{0%,100%{box-shadow:0 0 0 0 rgba(227,6,19,.35)}50%{box-shadow:0 0 0 7px rgba(227,6,19,0)}}
+tr.warn-row td{background:#FDF1F1}

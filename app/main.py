@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import secrets
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
 
@@ -2317,6 +2317,69 @@ async def api_dialogs(day: str = "", hours: int = 0):
            for p, m in msgs.items()]
     out.sort(key=lambda d: d["messages"][-1]["ts"], reverse=True)
     return {"count": len(out), "dialogs": out}
+
+
+MONEY_RX = re.compile(r"оплат|плат[ёе]ж|по карте|переве|сч[её]т|запис|прода|купит|абонемент|возврат", re.I)
+
+
+@app.get("/api/waiting", dependencies=AUTH)
+async def api_waiting(min_minutes: int = 15):
+    """Диалоги, где последнее слово за клиентом дольше min_minutes минут
+    (за последние 2 дня). Для бейджа в шапке и страницы /waiting."""
+    from . import autopilot
+    now = autopilot._now()
+    since = (now - timedelta(days=2)).isoformat(timespec="seconds")
+    msgs: dict[str, list] = {}
+    with db.get_conn() as conn:
+        for table, direction in (("wazzup_inbox", "in"), ("wazzup_outbox", "out")):
+            try:
+                rows = conn.execute(
+                    f"SELECT ts, phone, text FROM {table} WHERE ts >= ?",
+                    (since,)).fetchall()
+            except Exception:
+                rows = []
+            for ts, phone, text in rows:
+                msgs.setdefault(phone[-10:], []).append(
+                    {"ts": ts, "dir": direction, "text": text or ""})
+        names = {}
+        for phone in msgs:
+            row = conn.execute(
+                "SELECT name FROM users WHERE substr(phone,-10)=? LIMIT 1", (phone,)).fetchone()
+            names[phone] = row[0] if row else ""
+    waiting = []
+    for p, m in msgs.items():
+        m.sort(key=lambda x: x["ts"])
+        last = m[-1]
+        if last["dir"] != "in":
+            continue
+        try:
+            last_ts = datetime.fromisoformat(last["ts"])
+        except Exception:
+            continue
+        wait_min = int((now - last_ts).total_seconds() // 60)
+        if wait_min < min_minutes:
+            continue
+        # хвост подряд идущих входящих — весь непрочитанный кусок
+        tail = []
+        for x in reversed(m):
+            if x["dir"] != "in":
+                break
+            tail.append(x["text"])
+        text = " · ".join(t for t in reversed(tail) if t)[:300]
+        money = bool(MONEY_RX.search(text))
+        waiting.append({"phone": p, "name": names.get(p, ""), "since": last["ts"],
+                        "wait_min": wait_min, "text": text, "money": money})
+    waiting.sort(key=lambda w: (not w["money"], -w["wait_min"]))
+    return {"count": len(waiting),
+            "money": sum(1 for w in waiting if w["money"]),
+            "max_wait": max((w["wait_min"] for w in waiting), default=0),
+            "items": waiting}
+
+
+@app.get("/waiting", response_class=HTMLResponse, dependencies=AUTH)
+async def waiting_page(request: Request):
+    data = await api_waiting()
+    return render(request, "waiting.html", active="waiting", w=data)
 
 
 @app.get("/api/replies", dependencies=AUTH)
