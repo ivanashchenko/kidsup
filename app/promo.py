@@ -144,7 +144,8 @@ def stats():
         f = _funnel(us, paid_ids)
         old = old_clients.get(tag, 0)
         hours = PROMO_HOURS.get(tag, 0)
-        fee = f["total"] * RATE_NEW + old * RATE_OLD + hours * RATE_HOUR
+        payable = tag in PROMO_HOURS   # «не распределено» и прочие — вне выплат
+        fee = (f["total"] * RATE_NEW + old * RATE_OLD + hours * RATE_HOUR) if payable else 0
         reached = f["thinks"] + f["booked"] + f["visited"] + f["paid"] + f["refused"]
         booked_plus = f["booked"] + f["visited"] + f["paid"]
         written = sum(1 for u in us if (u.get("phone") or "")[-10:] in out_phones)
@@ -152,7 +153,8 @@ def stats():
         promoters.append({
             "name": tag, "funnel": f, "old_clients": old,
             "hours": hours, "fee": fee,
-            "fee_detail": f"{f['total']}×{RATE_NEW} + {old}×{RATE_OLD} + {hours} ч×{RATE_HOUR}",
+            "fee_detail": (f"{f['total']}×{RATE_NEW} + {old}×{RATE_OLD} + {hours} ч×{RATE_HOUR}"
+                           if payable else "вне выплат — контакты не привязаны к промоутеру"),
             "called": f["total"] - f["new"],
             "reached": reached,
             "written": written, "replied": replied,
