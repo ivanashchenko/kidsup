@@ -24,8 +24,8 @@ Instagram и статусы WhatsApp автопубликации не дают 
 выкладывайте с телефона. Устареть макет не может: он собирается заново из живых
 остатков мест при каждом открытии.</div>
 
-<div id="pub-modal" hidden style="position:fixed;inset:0;background:rgba(15,20,28,.55);z-index:200;
-     display:flex;align-items:center;justify-content:center;padding:16px">
+<div id="pub-modal" style="position:fixed;inset:0;background:rgba(15,20,28,.55);z-index:200;
+     display:none;align-items:center;justify-content:center;padding:16px">
   <div class="card" style="max-width:460px;width:100%">
     <b id="pub-title">Публикация</b>
     <p class="muted small" style="margin:6px 0">Подпись к посту (можно взять текст из
@@ -37,7 +37,7 @@ Instagram и статусы WhatsApp автопубликации не дают 
     </div>
     <div style="display:flex;gap:10px">
       <button class="btn btn-primary" id="pub-go">Опубликовать</button>
-      <button class="btn" onclick="document.getElementById('pub-modal').hidden=true">Отмена</button>
+      <button class="btn" onclick="document.getElementById('pub-modal').style.display='none'">Отмена</button>
     </div>
     <p id="pub-result" class="small" style="margin:10px 0 0"></p>
   </div>
@@ -96,7 +96,7 @@ function pubOpen(id, title) {
   pubTarget = id;
   document.getElementById('pub-title').textContent = '📤 ' + title;
   document.getElementById('pub-result').textContent = '';
-  document.getElementById('pub-modal').hidden = false;
+  document.getElementById('pub-modal').style.display = 'flex';
 }
 function _pngBlob(id) {
   return new Promise(function (resolve, reject) {
