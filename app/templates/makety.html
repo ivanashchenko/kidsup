@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Макеты — KidsUP{% endblock %}
+{% block content %}
+<h1>Макеты</h1>
+<p class="muted">Готовые визуалы в фирменном стиле: посты, сторис, плакат и листовка.
+Цифры внутри — живые, из МойКласс на момент открытия страницы. Кнопка «PNG» отдаёт
+файл нужного размера — можно сразу публиковать или нести в печать.
+Тексты согласованы с <a href="/content">фабрикой контента</a>.</p>
+
+<div class="cards">
+  <div class="card"><div class="card-value">{{ f.free_total }}</div>
+    <div class="card-label">свободных мест в макетах</div></div>
+  <div class="card"><div class="card-value">{{ f.scarce|length }}</div>
+    <div class="card-label">групп «последние места»</div></div>
+  <div class="card"><div class="card-value">{{ makets|length }}</div>
+    <div class="card-label">готовых макетов</div></div>
+</div>
+
+<div class="notice"><b>Как пользоваться.</b> «PNG» — готовая картинка (посты и сторис
+в размере соцсетей, печатные — 150 dpi). «SVG» — исходник, если нужно докрутить в
+редакторе. Устареть макет не может: при каждом открытии страницы он собирается заново
+из текущих остатков мест.</div>
+
+{% for grp in mgroups %}
+<h2 style="margin-top:28px">{{ grp }}</h2>
+<div class="grid-2">
+  {% for m in makets if m.group == grp %}
+  <div class="card">
+    <b>{{ m.title }}</b>
+    <p class="muted small" style="margin:6px 0 10px">{{ m.note }}</p>
+    <div class="maket-holder" style="border:1px solid var(--line,#ddd);border-radius:12px;
+         overflow:hidden;background:#fff;max-width:100%">
+      <div id="mk-{{ m.key }}" data-w="{{ m.w }}" data-h="{{ m.h }}"
+           style="width:100%;line-height:0">{{ m.svg | safe }}</div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="dlPng('mk-{{ m.key }}','kidsup_{{ m.key }}')">⬇ PNG {{ m.w }}×{{ m.h }}</button>
+      <button class="btn" onclick="dlSvg('mk-{{ m.key }}','kidsup_{{ m.key }}')">SVG</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+<script>
+function _svgEl(id){const h=document.getElementById(id);const s=h.querySelector('svg');
+  s.setAttribute('width',h.dataset.w);s.setAttribute('height',h.dataset.h);return s;}
+function dlSvg(id,name){
+  const s=_svgEl(id);
+  const blob=new Blob([new XMLSerializer().serializeToString(s)],{type:'image/svg+xml'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name+'.svg';a.click();
+}
+function dlPng(id,name){
+  const h=document.getElementById(id),s=_svgEl(id);
+  const w=+h.dataset.w,hh=+h.dataset.h;
+  const xml=new XMLSerializer().serializeToString(s);
+  const img=new Image();
+  img.onload=function(){
+    const c=document.createElement('canvas');c.width=w;c.height=hh;
+    const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,w,hh);
+    ctx.drawImage(img,0,0,w,hh);
+    c.toBlob(function(b){const a=document.createElement('a');
+      a.href=URL.createObjectURL(b);a.download=name+'.png';a.click();},'image/png');
+  };
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(xml);
+}
+</script>
+{% endblock %}

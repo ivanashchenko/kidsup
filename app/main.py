@@ -558,6 +558,16 @@ def content_page(request: Request, g: str = ""):
                   f=content_mod.facts(groups))
 
 
+@app.get("/makety", response_class=HTMLResponse, dependencies=AUTH)
+def makety_page(request: Request):
+    """Готовые визуалы (SVG→PNG) на живых данных: посты, сторис, плакат, листовка."""
+    from . import makety as makety_mod
+    f = content_mod.facts(_enrollment_groups())
+    makets = makety_mod.build_makets(f)
+    return render(request, "makety.html", active="makety",
+                  makets=makets, mgroups=makety_mod.maket_groups(makets), f=f)
+
+
 def _enrollment_groups() -> list[dict]:
     """Группы 2026/27 с остатком мест и ценой — то же, что видит страница набора."""
     with db.get_conn() as conn:
