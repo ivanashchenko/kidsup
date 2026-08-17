@@ -19,14 +19,33 @@ from html import escape
 
 from .content import ADDRESS, DEADLINE, METRO, SITE, START
 
-BLUE = "#2AA7DE"
-INDIGO = "#33348E"
-GREEN = "#5FB53B"
-AMBER = "#F5A81C"
-RED = "#E5232A"
+BLUE = "#1DA7E0"
+INDIGO = "#312783"
+GREEN = "#7DB928"
+AMBER = "#F59C00"
+RED = "#E30613"
 PAPER = "#FFFFFF"
-SOFT = "#EAF6FC"     # голубой ~10%
+SOFT = "#E8F6FC"     # голубой ~10%
 FONT = "Arial, Helvetica, sans-serif"
+
+import base64 as _b64
+from pathlib import Path as _Path
+
+_STATIC = _Path(__file__).resolve().parent / "static"
+
+
+def _logo_b64(name, cache={}):
+    if name not in cache:
+        cache[name] = _b64.b64encode((_STATIC / name).read_bytes()).decode()
+    return cache[name]
+
+
+def _logo(cx, y, w=220, white=False):
+    """Настоящий герб KidsUP (PNG из брендбука), по центру cx, верх на y."""
+    name = "logo_white.png" if white else "logo_color.png"
+    return (f'<image x="{cx - w / 2}" y="{y}" width="{w}" height="{w * 0.9995}" '
+            f'href="data:image/png;base64,{_logo_b64(name)}"/>')
+
 
 
 def _t(x, y, size, s, fill=INDIGO, weight="bold", anchor="start", spacing=None):
@@ -36,14 +55,6 @@ def _t(x, y, size, s, fill=INDIGO, weight="bold", anchor="start", spacing=None):
             f'{escape(str(s))}</text>')
 
 
-def _logo(x, y, scale=1.0):
-    """Логотип текстом: Kids — индиго, UP — голубой, стрелка вверх."""
-    s = scale
-    return (f'<g transform="translate({x},{y}) scale({s})">'
-            f'<text font-family="{FONT}" font-size="64" font-weight="bold">'
-            f'<tspan fill="{INDIGO}">Kids</tspan><tspan fill="{BLUE}">UP</tspan></text>'
-            f'<path d="M 218 -46 l 14 -18 l 14 18 h -9 v 22 h -10 v -22 z" fill="{GREEN}"/>'
-            f'</g>')
 
 
 def _bubbles(w, h, seed=0):
@@ -78,19 +89,19 @@ def build_makets(f: dict) -> list[dict]:
     # ---------------------------------------------- 1. пост «Набор открыт» ---
     W = H = 1080
     rows = "".join(
-        _t(W / 2, 690 + i * 58, 44, "· " + c + " ·", INDIGO, "normal", "middle")
+        _t(W / 2, 712 + i * 54, 42, "· " + c + " ·", INDIGO, "normal", "middle")
         for i, c in enumerate(courses[:4]))
     makets.append({"key": "post_open", "group": "Посты 1080×1080",
         "title": "Пост «Набор открыт»", "w": W, "h": H,
         "note": "Закреп ВК, лента, Яндекс.Карты.",
         "svg": f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}">
 <rect width="{W}" height="{H}" fill="{PAPER}"/>{_bubbles(W, H)}
-{_logo(W / 2 - 155, 150)}
-{_t(W / 2, 300, 96, "НАБОР ОТКРЫТ", INDIGO, "bold", "middle", "2")}
-{_t(W / 2, 372, 52, f"на учебный год · занятия с {START}", BLUE, "bold", "middle")}
-<circle cx="{W / 2}" cy="478" r="84" fill="{GREEN}"/>
-{_t(W / 2, 500, 64, free, PAPER, "bold", "middle")}
-{_t(W / 2, 615, 40, "свободных мест сейчас", INDIGO, "normal", "middle")}
+{_logo(W / 2, 40, 210)}
+{_t(W / 2, 330, 92, "НАБОР ОТКРЫТ", INDIGO, "bold", "middle", "2")}
+{_t(W / 2, 400, 50, f"на учебный год · занятия с {START}", BLUE, "bold", "middle")}
+<circle cx="{W / 2}" cy="505" r="80" fill="{GREEN}"/>
+{_t(W / 2, 527, 62, free, PAPER, "bold", "middle")}
+{_t(W / 2, 640, 40, "свободных мест сейчас", INDIGO, "normal", "middle")}
 {rows}
 {_badge(W / 2 - 330, 920, 660, f"первое занятие — условно-бесплатное", GREEN, PAPER, 32)}
 {_t(W / 2, 1030, 34, f"{ADDRESS} · {SITE}", INDIGO, "normal", "middle")}
@@ -119,9 +130,9 @@ def build_makets(f: dict) -> list[dict]:
         "note": "Цифры настоящие, из CRM на момент скачивания. Если дефицита нет — макет сам превращается в «выбирайте время».",
         "svg": f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}">
 <rect width="{W}" height="{H}" fill="{PAPER}"/>{_bubbles(W, H, 1)}
-{_logo(W / 2 - 155, 130)}
-{_t(W / 2, 280, 88, head2, RED if sr else INDIGO, "bold", "middle", "2")}
-{_t(W / 2, 348, 44, sub2, INDIGO, "normal", "middle")}
+{_logo(W / 2, 26, 180)}
+{_t(W / 2, 290, 84, head2, RED if sr else INDIGO, "bold", "middle", "2")}
+{_t(W / 2, 354, 44, sub2, INDIGO, "normal", "middle")}
 {body}
 {_badge(W / 2 - 330, 900, 660, f"успейте до {DEADLINE} — цены прошлого года", AMBER, PAPER, 30)}
 {_t(W / 2, 1020, 34, f"{METRO} · {SITE}", INDIGO, "normal", "middle")}
@@ -130,7 +141,7 @@ def build_makets(f: dict) -> list[dict]:
     # --------------------------------------------------- 3. сторис «Набор» ---
     W2, H2 = 1080, 1920
     story_courses = "".join(
-        _t(W2 / 2, 880 + i * 72, 48, c, PAPER, "normal", "middle")
+        _t(W2 / 2, 890 + i * 72, 48, c, PAPER, "normal", "middle")
         for i, c in enumerate(courses[:4]))
     makets.append({"key": "story_open", "group": "Сторис 1080×1920",
         "title": "Сторис «Набор открыт»", "w": W2, "h": H2,
@@ -141,12 +152,10 @@ def build_makets(f: dict) -> list[dict]:
 <circle cx="1120" cy="300" r="260" fill="{AMBER}" opacity=".55"/>
 <circle cx="1140" cy="1780" r="320" fill="{GREEN}" opacity=".25"/>
 <circle cx="-60" cy="1600" r="260" fill="{BLUE}" opacity=".25"/>
-<g transform="translate({W2 / 2 - 155},260)"><text font-family="{FONT}" font-size="64" font-weight="bold">
-<tspan fill="{PAPER}">Kids</tspan><tspan fill="{BLUE}">UP</tspan></text>
-<path d="M 218 -46 l 14 -18 l 14 18 h -9 v 22 h -10 v -22 z" fill="{GREEN}"/></g>
-{_t(W2 / 2, 470, 110, "НАБОР", PAPER, "bold", "middle", "6")}
-{_t(W2 / 2, 590, 110, "ОТКРЫТ", PAPER, "bold", "middle", "6")}
-{_t(W2 / 2, 680, 52, f"занятия с {START}", AMBER, "bold", "middle")}
+{_logo(W2 / 2, 100, 300, white=True)}
+{_t(W2 / 2, 530, 106, "НАБОР", PAPER, "bold", "middle", "6")}
+{_t(W2 / 2, 648, 106, "ОТКРЫТ", PAPER, "bold", "middle", "6")}
+{_t(W2 / 2, 738, 52, f"занятия с {START}", AMBER, "bold", "middle")}
 <circle cx="{W2 / 2}" cy="1350" r="130" fill="{GREEN}"/>
 {_t(W2 / 2, 1330, 90, free, PAPER, "bold", "middle")}
 {_t(W2 / 2, 1410, 36, "мест сейчас", PAPER, "normal", "middle")}
@@ -162,7 +171,7 @@ def build_makets(f: dict) -> list[dict]:
         "note": f"Крутить с 25 по 30 августа, дальше макет устареет сам.",
         "svg": f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W2} {H2}">
 <rect width="{W2}" height="{H2}" fill="{PAPER}"/>{_bubbles(W2, H2, 2)}
-{_logo(W2 / 2 - 155, 240)}
+{_logo(W2 / 2, 90, 260)}
 {_t(W2 / 2, 520, 72, "ТОЛЬКО ДО", INDIGO, "bold", "middle", "4")}
 <g><rect x="{W2 / 2 - 330}" y="580" width="660" height="200" rx="100" fill="{AMBER}"/>
 {_t(W2 / 2, 712, 110, DEADLINE.upper(), PAPER, "bold", "middle", "2")}</g>
@@ -179,7 +188,7 @@ def build_makets(f: dict) -> list[dict]:
     # -------------------------------------------------------- 5. плакат A4 ---
     W3, H3 = 1240, 1754  # A4 150 dpi
     plakat_courses = "".join(
-        _t(W3 / 2, 760 + i * 74, 44, c, INDIGO, "normal", "middle")
+        _t(W3 / 2, 800 + i * 70, 44, c, INDIGO, "normal", "middle")
         for i, c in enumerate(courses[:7]))
     makets.append({"key": "poster_a4", "group": "Печать",
         "title": "Плакат A4 — подъезд и центр", "w": W3, "h": H3,
@@ -188,11 +197,11 @@ def build_makets(f: dict) -> list[dict]:
 <rect width="{W3}" height="{H3}" fill="{PAPER}"/>
 <rect width="{W3}" height="14" fill="{BLUE}"/><rect y="{H3 - 14}" width="{W3}" height="14" fill="{BLUE}"/>
 {_bubbles(W3, H3, 3)}
-{_logo(W3 / 2 - 155, 170)}
-{_t(W3 / 2, 330, 78, "ДЕТСКИЙ ЦЕНТР", INDIGO, "bold", "middle", "3")}
-{_t(W3 / 2, 420, 78, "В ВАШЕМ ДВОРЕ", INDIGO, "bold", "middle", "3")}
-{_badge(W3 / 2 - 330, 470, 660, f"набор на учебный год · с {START}", AMBER, PAPER, 34)}
-{_t(W3 / 2, 660, 40, "от 1,3 года до 12 лет", BLUE, "bold", "middle")}
+{_logo(W3 / 2, 40, 270)}
+{_t(W3 / 2, 410, 76, "ДЕТСКИЙ ЦЕНТР", INDIGO, "bold", "middle", "3")}
+{_t(W3 / 2, 498, 76, "В ВАШЕМ ДВОРЕ", INDIGO, "bold", "middle", "3")}
+{_badge(W3 / 2 - 330, 548, 660, f"набор на учебный год · с {START}", AMBER, PAPER, 34)}
+{_t(W3 / 2, 726, 40, "от 1,3 года до 12 лет", BLUE, "bold", "middle")}
 {plakat_courses}
 <g><rect x="{W3 / 2 - 420}" y="1310" width="840" height="120" rx="60" fill="{GREEN}"/>
 {_t(W3 / 2, 1360, 40, "Первое занятие — условно-бесплатное:", PAPER, "bold", "middle")}
@@ -213,20 +222,105 @@ def build_makets(f: dict) -> list[dict]:
 <circle cx="900" cy="240" r="200" fill="{AMBER}" opacity=".55"/>
 <circle cx="880" cy="1180" r="240" fill="{GREEN}" opacity=".3"/>
 <circle cx="-30" cy="1050" r="190" fill="{BLUE}" opacity=".3"/>
-<g transform="translate({W4 / 2 - 155},170)"><text font-family="{FONT}" font-size="64" font-weight="bold">
-<tspan fill="{PAPER}">Kids</tspan><tspan fill="{BLUE}">UP</tspan></text>
-<path d="M 218 -46 l 14 -18 l 14 18 h -9 v 22 h -10 v -22 z" fill="{GREEN}"/></g>
-{_t(W4 / 2, 250, 34, "детский центр и английский сад", PAPER, "normal", "middle")}
-{_t(W4 / 2, 470, 62, "Научим читать", PAPER, "bold", "middle")}
-{_t(W4 / 2, 545, 62, "за 3 месяца!", AMBER, "bold", "middle")}
-{_t(W4 / 2, 680, 62, "Заговорит по-английски", PAPER, "bold", "middle")}
-{_t(W4 / 2, 755, 62, "за год!", GREEN, "bold", "middle")}
+{_logo(W4 / 2, 40, 230, white=True)}
+{_t(W4 / 2, 330, 34, "детский центр и английский сад", PAPER, "normal", "middle")}
+{_t(W4 / 2, 500, 60, "Научим читать", PAPER, "bold", "middle")}
+{_t(W4 / 2, 574, 60, "за 3 месяца!", AMBER, "bold", "middle")}
+{_t(W4 / 2, 700, 60, "Заговорит по-английски", PAPER, "bold", "middle")}
+{_t(W4 / 2, 774, 60, "за год!", GREEN, "bold", "middle")}
 <g><rect x="{W4 / 2 - 350}" y="850" width="700" height="130" rx="65" fill="{PAPER}"/>
 {_t(W4 / 2, 905, 36, "Первое занятие условно-бесплатное:", INDIGO, "bold", "middle")}
 {_t(W4 / 2, 950, 30, "не понравится — платить не нужно", BLUE, "normal", "middle")}</g>
 {_t(W4 / 2, 1070, 32, METRO, PAPER, "normal", "middle")}
 {_t(W4 / 2, 1125, 32, ADDRESS.split("(")[0].strip(), PAPER, "normal", "middle")}
 {_t(W4 / 2, 1195, 42, SITE, AMBER, "bold", "middle", "2")}
+</svg>'''})
+
+    # ------------------------------------------------- 7. паспорт миссий ---
+    W5, H5 = 1240, 1754
+    MISSIONS = [
+        "Пришёл на первое занятие",
+        "Выполнил задание педагога до конца",
+        "Рассказал дома, что нового узнал",
+        "Сам собрал всё к занятию",
+        "Позанимался дома 10 минут",
+        "Помог другу на занятии",
+        "Неделя без пропусков",
+        "Придумал вопрос и задал его педагогу",
+    ]
+    mrows = []
+    for i, m in enumerate(MISSIONS):
+        y = 560 + i * 120
+        mrows.append(f'<rect x="100" y="{y - 70}" width="1040" height="100" rx="50" '
+                     f'fill="{SOFT if i % 2 == 0 else PAPER}" stroke="{BLUE}" stroke-width="2"/>')
+        mrows.append(f'<circle cx="170" cy="{y - 20}" r="34" fill="{PAPER}" stroke="{AMBER}" stroke-width="5"/>')
+        mrows.append(_t(170, y - 6, 40, i + 1, AMBER, "bold", "middle"))
+        mrows.append(_t(240, y - 6, 38, m, INDIGO, "bold"))
+        mrows.append(f'<circle cx="1060" cy="{y - 20}" r="28" fill="none" stroke="{GREEN}" '
+                     f'stroke-width="4" stroke-dasharray="6 7"/>')
+    makets.append({"key": "passport_a4", "group": "Печать",
+        "title": "Паспорт миссий «Старт в учёбе» — A4", "w": W5, "h": H5,
+        "note": "Печатать каждому новичку. Педагог ставит печать/наклейку в пунктирный "
+                "круг за миссию. Собрал все восемь — приз на ресепшене.",
+        "svg": f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W5} {H5}">
+<rect width="{W5}" height="{H5}" fill="{PAPER}"/>
+<rect width="{W5}" height="12" fill="{AMBER}"/><rect y="{H5 - 12}" width="{W5}" height="12" fill="{AMBER}"/>
+{_bubbles(W5, H5, 4)}
+{_logo(W5 / 2, 36, 190)}
+{_t(W5 / 2, 300, 64, "ПАСПОРТ МИССИЙ", INDIGO, "bold", "middle", "2")}
+{_t(W5 / 2, 360, 42, "«Старт в учёбе»", BLUE, "bold", "middle")}
+{_t(150, 448, 36, "Агент:", INDIGO, "bold")}
+<line x1="290" y1="452" x2="900" y2="452" stroke="{INDIGO}" stroke-width="2" stroke-dasharray="3 6"/>
+{_t(940, 448, 36, "Возраст:", INDIGO, "bold")}
+<line x1="1100" y1="452" x2="1160" y2="452" stroke="{INDIGO}" stroke-width="2" stroke-dasharray="3 6"/>
+{"".join(mrows)}
+<g><rect x="{W5 / 2 - 520}" y="1560" width="1040" height="110" rx="55" fill="{GREEN}"/>
+{_t(W5 / 2, 1606, 32, "Все 8 печатей собраны? Неси паспорт на ресепшен —", PAPER, "bold", "middle")}
+{_t(W5 / 2, 1648, 32, "тебя ждёт приз!", PAPER, "bold", "middle")}</g>
+</svg>'''})
+
+    # ---------------------------------------------- 8. трекер прогресса ---
+    SKILL_ROWS = 6
+    trows = []
+    for i in range(SKILL_ROWS):
+        y = 640 + i * 130
+        trows.append(f'<rect x="90" y="{y}" width="1060" height="110" rx="20" '
+                     f'fill="{SOFT if i % 2 == 0 else PAPER}" stroke="{BLUE}" stroke-width="1.5"/>')
+        trows.append(f'<line x1="560" y1="{y}" x2="560" y2="{y + 110}" stroke="{BLUE}" stroke-width="1.5"/>')
+        trows.append(f'<line x1="800" y1="{y}" x2="800" y2="{y + 110}" stroke="{BLUE}" stroke-width="1.5"/>')
+        for j in range(5):
+            trows.append(f'<circle cx="{610 + j * 40}" cy="{y + 55}" r="14" fill="none" '
+                         f'stroke="{AMBER}" stroke-width="3"/>')
+    head_y = 585
+    makets.append({"key": "tracker_a4", "group": "Печать",
+        "title": "Трекер прогресса — A4", "w": W5, "h": H5,
+        "note": "Педагог заполняет на первом занятии и отдаёт родителю: навыки, уровень "
+                "сейчас (закрасить кружки), что развиваем. Превращает пробное в "
+                "консультацию с результатом на руках.",
+        "svg": f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W5} {H5}">
+<rect width="{W5}" height="{H5}" fill="{PAPER}"/>
+<rect width="{W5}" height="12" fill="{BLUE}"/><rect y="{H5 - 12}" width="{W5}" height="12" fill="{BLUE}"/>
+{_bubbles(W5, H5, 5)}
+{_logo(W5 / 2, 36, 190)}
+{_t(W5 / 2, 296, 60, "ТРЕКЕР ПРОГРЕССА", INDIGO, "bold", "middle", "2")}
+{_t(150, 380, 34, "Ребёнок:", INDIGO, "bold")}
+<line x1="310" y1="384" x2="760" y2="384" stroke="{INDIGO}" stroke-width="2" stroke-dasharray="3 6"/>
+{_t(800, 380, 34, "Возраст:", INDIGO, "bold")}
+<line x1="950" y1="384" x2="1090" y2="384" stroke="{INDIGO}" stroke-width="2" stroke-dasharray="3 6"/>
+{_t(150, 450, 34, "Курс:", INDIGO, "bold")}
+<line x1="260" y1="454" x2="760" y2="454" stroke="{INDIGO}" stroke-width="2" stroke-dasharray="3 6"/>
+{_t(800, 450, 34, "Дата:", INDIGO, "bold")}
+<line x1="900" y1="454" x2="1090" y2="454" stroke="{INDIGO}" stroke-width="2" stroke-dasharray="3 6"/>
+{_t(110, head_y, 30, "НАВЫК", BLUE, "bold")}
+{_t(610, head_y, 30, "УРОВЕНЬ СЕЙЧАС", BLUE, "bold")}
+{_t(820, head_y, 30, "ЧТО РАЗВИВАЕМ", BLUE, "bold")}
+{"".join(trows)}
+{_t(110, 1490, 34, "Рекомендация педагога:", INDIGO, "bold")}
+<line x1="110" y1="1540" x2="1130" y2="1540" stroke="{INDIGO}" stroke-width="1.5" stroke-dasharray="3 6"/>
+<line x1="110" y1="1600" x2="1130" y2="1600" stroke="{INDIGO}" stroke-width="1.5" stroke-dasharray="3 6"/>
+{_t(110, 1680, 30, "Педагог:", INDIGO, "bold")}
+<line x1="250" y1="1684" x2="560" y2="1684" stroke="{INDIGO}" stroke-width="1.5" stroke-dasharray="3 6"/>
+{_t(W5 - 110, 1680, 30, SITE, BLUE, "bold", "end")}
 </svg>'''})
 
     return makets
