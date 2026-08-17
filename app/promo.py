@@ -23,6 +23,12 @@ ADV_OTHER = 158834     # «Иное» (куда сейчас ошибочно п
 PROMO_TAG_PREFIX = "Промо:"
 SEASON_START = "2026-08-01"
 
+# Статусы воронки набора: свежая карточка с источником «Иное» в одном из них —
+# почти наверняка промо-лид, которому админ уже сменил статус (ловим их тоже,
+# чтобы они попали в список «без тега» на разметку).
+NABOR_STATES = {125951, ST_NEDOZVON, ST_THINKS, ST_BOOKED, ST_VISITED,
+                ST_THINKS2, ST_REFUSED}
+
 
 def _promo_users():
     """Все карточки промо-канала сезона: тег «Промо: …» ИЛИ статус «От
@@ -39,9 +45,12 @@ def _promo_users():
                 continue
             tags = [t.get("name", "") for t in (u.get("tags") or [])]
             promo_tags = [t for t in tags if t.startswith(PROMO_TAG_PREFIX)]
+            st = u.get("clientStateId")
             is_promo = (promo_tags
-                        or u.get("clientStateId") == ST_NEW
-                        or u.get("advSourceId") == ADV_PROMO)
+                        or st == ST_NEW
+                        or u.get("advSourceId") == ADV_PROMO
+                        or (u.get("advSourceId") == ADV_OTHER
+                            and st in NABOR_STATES))
             if not is_promo:
                 continue
             u["_promo_tags"] = promo_tags
