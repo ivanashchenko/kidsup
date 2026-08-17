@@ -2,10 +2,27 @@
 {% block title %}Промоутеры — KidsUP{% endblock %}
 {% block content %}
 <h1>Эффективность промоутеров</h1>
-<p class="muted">Воронка: контакт → дозвон → запись на пробное → пришёл → оплата.
-Ставки: новый контакт {{ s.rates.new }} ₽ · уже в базе {{ s.rates.old }} ₽ · час работы {{ s.rates.hour }} ₽.
-Всего к выплате: <b>{{ '{:,}'.format(s.total_fee).replace(',', ' ') }} ₽</b>.
+<p class="muted">Правила оплаты: <b>{{ s.rates.new }} ₽</b> — только за ПОДТВЕРЖДЁННЫЙ новый контакт
+(дозвонились, настоящий, записался) · <b>{{ s.rates.old }} ₽</b> — контакт уже был в базе ·
+<b>{{ s.rates.hour }} ₽/час</b> работы · фейк или «не готов» — 0 ₽.
 Данные из МойКласс (обновляются синхронизацией).</p>
+
+<h2>💰 Расчёты с промоутерами</h2>
+<table>
+  <tr><th>Промоутер</th><th>Подтверждено</th><th>Начислено</th><th>Оплачено (аванс)</th><th>Итог</th></tr>
+  {% for g in s.pay_groups %}
+  <tr>
+    <td><b>{{ g.label }}</b><br><span class="muted small">{{ g.detail }}</span></td>
+    <td>{{ g.confirmed }} новых + {{ g.old }} в базе<br>
+        <span class="muted small">в работе ещё {{ g.pending }}</span></td>
+    <td><b>{{ '{:,}'.format(g.accrued).replace(',', ' ') }} ₽</b></td>
+    <td>{{ '{:,}'.format(g.paid).replace(',', ' ') }} ₽</td>
+    <td>{% if g.due >= 0 %}<b class="ok">доплатить {{ '{:,}'.format(g.due).replace(',', ' ') }} ₽</b>
+        {% else %}<b class="warn">аванс не отработан на {{ '{:,}'.format(-g.due).replace(',', ' ') }} ₽</b><br>
+        <span class="small muted">нужно ещё ≈{{ g.need_confirm }} подтверждённых контактов</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
 
 {% if s.bad_source %}
 <div class="notice">⚠ У {{ s.bad_source }} промо-карточек источник не «Промоутер 26/27» —
@@ -29,22 +46,17 @@
       <tr><td>Отказ</td><td>{{ f.refused }}</td></tr>
     </table>
     <div class="small">Доведено до записи и дальше: <b>{{ f.reach_pct }}%</b></div>
-    {% if p.old_clients %}
-    <div class="small muted">⚠ уже были нашими клиентами: {{ p.old_clients }} (по {{ s.rates.old }} ₽)</div>
-    {% endif %}
     {% if f.total and (f.nedozvon + f.refused) * 2 > f.total %}
     <div class="small warn">⚠ недозвон+отказ больше половины — проверить качество контактов</div>
     {% endif %}
     <hr>
-    <div class="small"><b>💰 К выплате: {{ '{:,}'.format(p.fee).replace(',', ' ') }} ₽</b>
-      <span class="muted">({{ p.fee_detail }})</span></div>
     <table class="mini">
+      <tr><td>✅ Подтверждено (×{{ s.rates.new }} ₽)</td><td><b>{{ p.confirmed }}</b></td></tr>
+      <tr><td>⏳ В работе (могут подтвердиться)</td><td>{{ p.pending }}</td></tr>
+      <tr><td>🚫 Отказ / не готов (0 ₽)</td><td>{{ p.zero }}</td></tr>
+      <tr><td>Были в базе (×{{ s.rates.old }} ₽)</td><td>{{ p.old_clients }}</td></tr>
       <tr><td>Обзвонено / дозвон</td><td>{{ p.called }} / {{ p.reached }}</td></tr>
       <tr><td>Написали / ответили в чатах</td><td>{{ p.written }} / {{ p.replied }}</td></tr>
-      <tr><td>Цена контакта (со всеми затратами)</td><td>{{ p.cost_contact }} ₽</td></tr>
-      <tr><td>Цена дозвона</td><td>{{ p.cost_reached if p.cost_reached else '—' }}{{ ' ₽' if p.cost_reached }}</td></tr>
-      <tr><td>Цена записи (запись+пришёл+оплата)</td><td>{{ p.cost_booked if p.cost_booked else '—' }}{{ ' ₽' if p.cost_booked }}</td></tr>
-      <tr><td>Цена оплатившего</td><td>{{ p.cost_paid if p.cost_paid else '—' }}{{ ' ₽' if p.cost_paid }}</td></tr>
     </table>
   </div>
   {% endfor %}
