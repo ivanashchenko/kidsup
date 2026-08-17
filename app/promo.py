@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 from . import db
-from .promo_registry import promoter_for, RUSLAN2
+from .promo_registry import promoter_for
 
 # Статусы воронки набора
 ST_NEW = 347075        # 1.1. От промоутера
@@ -61,9 +61,9 @@ def _promo_users():
                         or u.get("advSourceId") == ADV_PROMO
                         or (u.get("advSourceId") == ADV_OTHER
                             and st in NABOR_STATES))
-            # всё промо без листа Руслана 1 — Руслан 2 (правило Бориса 17.08)
+            # промо без листа и без тега — в «не распределено» до появления листа
             if is_promo and not promo_tags:
-                promo_tags = [RUSLAN2]
+                promo_tags = ["Промо: не распределено"]
             if not is_promo:
                 continue
             u["_promo_tags"] = promo_tags
