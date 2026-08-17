@@ -1593,6 +1593,12 @@ def _suggest_by_age(age: float | None) -> str:
     return "13+ — не наш возраст"
 
 
+@app.get("/promo", response_class=HTMLResponse, dependencies=AUTH)
+def promo_page(request: Request):
+    from . import promo
+    return render(request, "promo.html", active="promo", s=promo.stats())
+
+
 @app.get("/leads", response_class=HTMLResponse, dependencies=AUTH)
 def leads_page(request: Request):
     return render(request, "leads.html", active="leads",

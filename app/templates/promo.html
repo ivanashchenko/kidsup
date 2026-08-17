@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Промоутеры — KidsUP{% endblock %}
+{% block content %}
+<h1>Эффективность промоутеров</h1>
+<p class="muted">Воронка: контакт → дозвон → запись на пробное → пришёл → оплата.
+Данные из МойКласс по тегам «Промо: …» (обновляются синхронизацией).</p>
+
+{% if s.bad_source %}
+<div class="notice">⚠ У {{ s.bad_source }} промо-карточек источник не «Промоутер 26/27» —
+админам поправить при обработке (или это сделает ночной робот).</div>
+{% endif %}
+
+<div class="cards">
+  {% for p in s.promoters %}
+  <div class="card">
+    <h3>{{ p.name }}</h3>
+    {% set f = p.funnel %}
+    <div class="big">{{ f.total }}</div>
+    <div class="muted small">контактов собрано</div>
+    <table class="mini">
+      <tr><td>Ещё не обзвонены</td><td>{{ f.new }}</td></tr>
+      <tr><td>Недозвон</td><td>{{ f.nedozvon }}</td></tr>
+      <tr><td>Думают</td><td>{{ f.thinks }}</td></tr>
+      <tr><td>Записались</td><td><b>{{ f.booked }}</b></td></tr>
+      <tr><td>Посетили пробное</td><td><b>{{ f.visited }}</b></td></tr>
+      <tr><td>Оплатили</td><td><b class="ok">{{ f.paid }}</b></td></tr>
+      <tr><td>Отказ</td><td>{{ f.refused }}</td></tr>
+    </table>
+    <div class="small">Доведено до записи и дальше: <b>{{ f.reach_pct }}%</b></div>
+  </div>
+  {% endfor %}
+
+  <div class="card">
+    <h3>Без тега промоутера</h3>
+    {% set f = s.untagged %}
+    <div class="big warn">{{ f.total }}</div>
+    <div class="muted small">карточек не разметили — чьи это листы?</div>
+    <table class="mini">
+      <tr><td>Записались</td><td>{{ f.booked }}</td></tr>
+      <tr><td>Оплатили</td><td>{{ f.paid }}</td></tr>
+      <tr><td>Отказ</td><td>{{ f.refused }}</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Весь промо-канал</h3>
+    {% set f = s.total %}
+    <div class="big">{{ f.total }}</div>
+    <div class="muted small">контактов с 1 августа</div>
+    <table class="mini">
+      <tr><td>Записались</td><td><b>{{ f.booked }}</b></td></tr>
+      <tr><td>Посетили</td><td><b>{{ f.visited }}</b></td></tr>
+      <tr><td>Оплатили</td><td><b class="ok">{{ f.paid }}</b></td></tr>
+    </table>
+    <div class="small">Конверсия в запись+: <b>{{ f.reach_pct }}%</b></div>
+  </div>
+</div>
+
+<h2>Сбор контактов по дням</h2>
+<table>
+  <tr><th>День</th><th>Всего</th><th>Разбивка</th></tr>
+  {% for d in s.days if d.total %}
+  <tr>
+    <td>{{ d.date }}</td>
+    <td><b>{{ d.total }}</b></td>
+    <td class="small muted">
+      {% for name, n in d.counts.items() %}{{ name }}: {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% if s.untagged_list %}
+<h2>Неразмеченные карточки (свежие сверху)</h2>
+<p class="muted small">Открой карточку в МойКласс и поставь тег «Промо: Руслан 1 / Руслан 2 / Маша» — по чьему листу заведена.</p>
+<table>
+  <tr><th>Создана</th><th>Имя</th><th>Телефон</th><th></th></tr>
+  {% for u in s.untagged_list %}
+  <tr>
+    <td>{{ u.created }}</td>
+    <td>{{ u.name }}</td>
+    <td>{{ u.phone }}</td>
+    <td><a href="https://app.moyklass.com/user/{{ u.id }}/info" target="_blank">открыть</a></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}
