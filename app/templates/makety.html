@@ -17,9 +17,31 @@
 </div>
 
 <div class="notice"><b>Как пользоваться.</b> «PNG» — готовая картинка (посты и сторис
-в размере соцсетей, печатные — 150 dpi). «SVG» — исходник, если нужно докрутить в
-редакторе. Устареть макет не может: при каждом открытии страницы он собирается заново
-из текущих остатков мест.</div>
+в размере соцсетей, печатные — 150 dpi). «SVG» — исходник, если нужно докрутить.
+«📤 Опубликовать» — сразу в <b>ВК</b> и <b>Телеграм-канал</b> (токены задаются в
+<a href="/settings">Настройках</a>: vk_token, vk_group_id, tg_bot_token, tg_channel).
+Instagram и статусы WhatsApp автопубликации не дают — для них скачивайте PNG и
+выкладывайте с телефона. Устареть макет не может: он собирается заново из живых
+остатков мест при каждом открытии.</div>
+
+<div id="pub-modal" hidden style="position:fixed;inset:0;background:rgba(15,20,28,.55);z-index:200;
+     display:flex;align-items:center;justify-content:center;padding:16px">
+  <div class="card" style="max-width:460px;width:100%">
+    <b id="pub-title">Публикация</b>
+    <p class="muted small" style="margin:6px 0">Подпись к посту (можно взять текст из
+    <a href="/content" target="_blank">фабрики</a>):</p>
+    <textarea id="pub-caption" rows="5" style="width:100%"></textarea>
+    <div style="display:flex;gap:14px;margin:10px 0;flex-wrap:wrap">
+      <label><input type="checkbox" id="pub-vk" checked> ВКонтакте</label>
+      <label><input type="checkbox" id="pub-tg" checked> Телеграм-канал</label>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-primary" id="pub-go">Опубликовать</button>
+      <button class="btn" onclick="document.getElementById('pub-modal').hidden=true">Отмена</button>
+    </div>
+    <p id="pub-result" class="small" style="margin:10px 0 0"></p>
+  </div>
+</div>
 
 {% for grp in mgroups %}
 <h2 style="margin-top:28px">{{ grp }}</h2>
@@ -36,6 +58,9 @@
     <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="dlPng('mk-{{ m.key }}','kidsup_{{ m.key }}')">⬇ PNG {{ m.w }}×{{ m.h }}</button>
       <button class="btn" onclick="dlSvg('mk-{{ m.key }}','kidsup_{{ m.key }}')">SVG</button>
+      {% if m.group != 'Печать' %}
+      <button class="btn" onclick="pubOpen('mk-{{ m.key }}','{{ m.title }}')">📤 Опубликовать</button>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
@@ -64,5 +89,50 @@ function dlPng(id,name){
   };
   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(xml);
 }
+
+/* --- публикация в соцсети ------------------------------------------------ */
+let pubTarget = null;
+function pubOpen(id, title) {
+  pubTarget = id;
+  document.getElementById('pub-title').textContent = '📤 ' + title;
+  document.getElementById('pub-result').textContent = '';
+  document.getElementById('pub-modal').hidden = false;
+}
+function _pngBlob(id) {
+  return new Promise(function (resolve, reject) {
+    const h = document.getElementById(id), s = _svgEl(id);
+    const w = +h.dataset.w, hh = +h.dataset.h;
+    const img = new Image();
+    img.onload = function () {
+      const c = document.createElement('canvas'); c.width = w; c.height = hh;
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, hh);
+      ctx.drawImage(img, 0, 0, w, hh);
+      c.toBlob(function (b) { b ? resolve(b) : reject(new Error('render')); }, 'image/png');
+    };
+    img.onerror = reject;
+    img.src = 'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent(new XMLSerializer().serializeToString(s));
+  });
+}
+document.getElementById('pub-go').addEventListener('click', async function () {
+  const out = document.getElementById('pub-result');
+  const chans = [];
+  if (document.getElementById('pub-vk').checked) chans.push('vk');
+  if (document.getElementById('pub-tg').checked) chans.push('tg');
+  if (!chans.length) { out.textContent = 'Выберите хотя бы один канал'; return; }
+  this.disabled = true; out.textContent = '⏳ Публикуем…';
+  try {
+    const blob = await _pngBlob(pubTarget);
+    const fd = new FormData();
+    fd.append('image', blob, 'maket.png');
+    fd.append('caption', document.getElementById('pub-caption').value);
+    fd.append('channels', chans.join(','));
+    const r = await fetch('/api/publish', {method: 'POST', body: fd});
+    const d = await r.json();
+    out.innerHTML = Object.entries(d).map(([ch, res]) =>
+      (res.ok ? '✅ ' : '⚠️ ') + ch.toUpperCase() + ': ' + res.msg).join('<br>');
+  } catch (e) { out.textContent = '⚠️ Не получилось: ' + e; }
+  this.disabled = false;
+});
 </script>
 {% endblock %}

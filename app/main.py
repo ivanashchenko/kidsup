@@ -599,6 +599,29 @@ def content_page(request: Request, g: str = ""):
                   f=content_mod.facts(groups))
 
 
+@app.post("/api/publish", dependencies=AUTH)
+async def api_publish(request: Request):
+    """Публикация макета: PNG рендерится в браузере и приходит сюда,
+    сервер раздаёт по каналам (ВК, ТГ-канал)."""
+    from . import publish as publish_mod
+    form = await request.form()
+    up = form.get("image")
+    caption = (form.get("caption") or "").strip()
+    channels = [c for c in (form.get("channels") or "").split(",") if c]
+    if up is None or not channels:
+        raise HTTPException(422, "нужны image и channels")
+    image = await up.read()
+    if len(image) > 8_000_000:
+        raise HTTPException(413, "картинка больше 8 МБ")
+    return publish_mod.publish(image, caption, channels)
+
+
+@app.get("/api/publish/health", dependencies=AUTH)
+def api_publish_health():
+    return {"vk": bool(db.get_setting("vk_token") and db.get_setting("vk_group_id")),
+            "tg": bool(db.get_setting("tg_bot_token") and db.get_setting("tg_channel"))}
+
+
 @app.get("/makety", response_class=HTMLResponse, dependencies=AUTH)
 def makety_page(request: Request):
     """Готовые визуалы (SVG→PNG) на живых данных: посты, сторис, плакат, листовка."""
@@ -1998,6 +2021,7 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
+            "vk_token", "vk_group_id", "tg_bot_token", "tg_channel",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
             "calls_done"}
