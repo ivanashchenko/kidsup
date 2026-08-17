@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 from . import db
+from .promo_registry import promoter_for, RUSLAN2
 
 # Статусы воронки набора
 ST_NEW = 347075        # 1.1. От промоутера
@@ -44,6 +45,11 @@ def _promo_users():
             created = (u.get("createdAt") or "")[:10]
             tags = [t.get("name", "") for t in (u.get("tags") or [])]
             promo_tags = [t for t in tags if t.startswith(PROMO_TAG_PREFIX)]
+            if not promo_tags:
+                # тег слетел или не поставлен — атрибутируем по реестру листов
+                reg = promoter_for(u.get("phone"))
+                if reg:
+                    promo_tags = [reg]
             if created < SEASON_START:
                 # контакт промоутера, который уже был нашим клиентом
                 for t in promo_tags:
@@ -55,6 +61,9 @@ def _promo_users():
                         or u.get("advSourceId") == ADV_PROMO
                         or (u.get("advSourceId") == ADV_OTHER
                             and st in NABOR_STATES))
+            # всё промо без листа Руслана 1 — Руслан 2 (правило Бориса 17.08)
+            if is_promo and not promo_tags:
+                promo_tags = [RUSLAN2]
             if not is_promo:
                 continue
             u["_promo_tags"] = promo_tags
