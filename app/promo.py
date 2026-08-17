@@ -34,6 +34,7 @@ def _promo_users():
     """Все карточки промо-канала сезона: тег «Промо: …» ИЛИ статус «От
     промоутера» ИЛИ источник «Промоутер 26/27», созданные с 1 августа."""
     out = []
+    old_clients = defaultdict(int)  # тег -> сколько старых клиентов принёс
     with db.get_conn() as conn:
         for (raw,) in conn.execute("SELECT raw FROM users"):
             try:
@@ -41,10 +42,13 @@ def _promo_users():
             except Exception:
                 continue
             created = (u.get("createdAt") or "")[:10]
-            if created < SEASON_START:
-                continue
             tags = [t.get("name", "") for t in (u.get("tags") or [])]
             promo_tags = [t for t in tags if t.startswith(PROMO_TAG_PREFIX)]
+            if created < SEASON_START:
+                # контакт промоутера, который уже был нашим клиентом
+                for t in promo_tags:
+                    old_clients[t] += 1
+                continue
             st = u.get("clientStateId")
             is_promo = (promo_tags
                         or st == ST_NEW
@@ -56,7 +60,7 @@ def _promo_users():
             u["_promo_tags"] = promo_tags
             u["_created"] = created
             out.append(u)
-    return out
+    return out, old_clients
 
 
 def _funnel(users, paid_ids):
@@ -87,7 +91,7 @@ def _funnel(users, paid_ids):
 
 
 def stats():
-    users = _promo_users()
+    users, old_clients = _promo_users()
     ids = [u["id"] for u in users]
     paid_ids = set()
     if ids:
@@ -107,7 +111,8 @@ def stats():
         else:
             untagged.append(u)
 
-    promoters = [{"name": tag, "funnel": _funnel(us, paid_ids)}
+    promoters = [{"name": tag, "funnel": _funnel(us, paid_ids),
+                  "old_clients": old_clients.get(tag, 0)}
                  for tag, us in sorted(by_tag.items())]
 
     # по дням (последние 14) — сколько контактов собрано

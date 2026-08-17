@@ -27,6 +27,12 @@
       <tr><td>Отказ</td><td>{{ f.refused }}</td></tr>
     </table>
     <div class="small">Доведено до записи и дальше: <b>{{ f.reach_pct }}%</b></div>
+    {% if p.old_clients %}
+    <div class="small muted">⚠ уже были нашими клиентами: {{ p.old_clients }} (не новые контакты)</div>
+    {% endif %}
+    {% if f.total and (f.nedozvon + f.refused) * 2 > f.total %}
+    <div class="small warn">⚠ недозвон+отказ больше половины — проверить качество контактов</div>
+    {% endif %}
   </div>
   {% endfor %}
 
