@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 from . import db
-from .promo_registry import promoter_for
+from .promo_registry import REGISTRY, promoter_for
 
 # Статусы воронки набора
 ST_NEW = 347075        # 1.1. От промоутера
@@ -55,6 +55,7 @@ def _promo_users():
     промоутера» ИЛИ источник «Промоутер 26/27», созданные с 1 августа."""
     out = []
     old_clients = defaultdict(int)  # тег -> сколько старых клиентов принёс
+    old_phones: set[str] = set()    # их телефоны — чтобы не считать дважды
     with db.get_conn() as conn:
         for (raw,) in conn.execute("SELECT raw FROM users"):
             try:
@@ -62,17 +63,19 @@ def _promo_users():
             except Exception:
                 continue
             created = (u.get("createdAt") or "")[:10]
-            tags = [t.get("name", "") for t in (u.get("tags") or [])]
-            promo_tags = [t for t in tags if t.startswith(PROMO_TAG_PREFIX)]
-            if not promo_tags:
-                # тег слетел или не поставлен — атрибутируем по реестру листов
-                reg = promoter_for(u.get("phone"))
-                if reg:
-                    promo_tags = [reg]
+            # Реестр бумажных листов — источник истины: теги в МойКласс
+            # периодически слетают при правках карточки в интерфейсе.
+            reg = promoter_for(u.get("phone"))
+            if reg:
+                promo_tags = [reg]
+            else:
+                tags = [t.get("name", "") for t in (u.get("tags") or [])]
+                promo_tags = [t for t in tags if t.startswith(PROMO_TAG_PREFIX)]
             if created < SEASON_START:
                 # контакт промоутера, который уже был нашим клиентом
                 for t in promo_tags:
                     old_clients[t] += 1
+                    old_phones.add((u.get("phone") or "")[-10:])
                 continue
             st = u.get("clientStateId")
             # реестр листов полный, поэтому критерий строгий: тег/реестр,
@@ -90,7 +93,27 @@ def _promo_users():
             u["_promo_tags"] = promo_tags
             u["_created"] = created
             out.append(u)
-    return out, old_clients
+    # дедуп: один телефон = один контакт (админы иногда заводят карточку дважды)
+    best: dict[str, dict] = {}
+    no_phone = []
+    for u in out:
+        ph = (u.get("phone") or "")[-10:]
+        if ph and ph in old_phones:
+            continue  # такой же телефон уже посчитан как «был в базе»
+        if not ph:
+            no_phone.append(u)
+            continue
+        prev = best.get(ph)
+        if not prev:
+            best[ph] = u
+            continue
+        # оставляем карточку с более «продвинутым» статусом, при равенстве — раннюю
+        rank = {ST_NEW: 0, ST_NEDOZVON: 1, ST_THINKS: 2, ST_THINKS2: 2,
+                ST_BOOKED: 3, ST_VISITED: 4, ST_REFUSED: 1}
+        if (rank.get(u.get("clientStateId"), 1), prev["_created"]) > \
+           (rank.get(prev.get("clientStateId"), 1), u["_created"]):
+            best[ph] = u
+    return list(best.values()) + no_phone, old_clients
 
 
 def _funnel(users, paid_ids):
@@ -160,11 +183,15 @@ def stats():
         reached = f["thinks"] + confirmed + f["refused"]
         written = sum(1 for u in us if (u.get("phone") or "")[-10:] in out_phones)
         replied = sum(1 for u in us if (u.get("phone") or "")[-10:] in in_phones)
+        sheet_total = sum(1 for t in REGISTRY.values() if t == tag)
+        in_base = f["total"] + old
         promoters.append({
             "name": tag, "funnel": f, "old_clients": old,
             "confirmed": confirmed, "pending": pending, "zero": f["refused"],
             "called": f["total"] - f["new"], "reached": reached,
             "written": written, "replied": replied,
+            "sheet_total": sheet_total, "in_base": in_base,
+            "missing": max(0, sheet_total - in_base),
         })
 
     # денежные группы (Русланы — общий счёт на двоих)

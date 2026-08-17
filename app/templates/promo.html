@@ -34,8 +34,10 @@
   <div class="card">
     <h3>{{ p.name }}</h3>
     {% set f = p.funnel %}
-    <div class="big">{{ f.total }}</div>
-    <div class="muted small">контактов собрано</div>
+    <div class="big">{{ p.sheet_total or f.total }}</div>
+    <div class="muted small">контактов на листах</div>
+    <div class="small">в базе: <b>{{ p.in_base }}</b>{% if p.missing %} ·
+      <span class="warn">не найдено: {{ p.missing }}</span>{% endif %}</div>
     <table class="mini">
       <tr><td>Ещё не обзвонены</td><td>{{ f.new }}</td></tr>
       <tr><td>Недозвон</td><td>{{ f.nedozvon }}</td></tr>
