@@ -5,12 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}KidsUp Analytics{% endblock %}</title>
 <meta name="theme-color" content="#1DA7E0">
-<link rel="stylesheet" href="/static/style.css?v=11">
+<link rel="stylesheet" href="/static/style.css?v=12">
 <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 </head>
 <body>
 <header class="topbar">
   <div class="brand"><img src="/static/logo.svg" alt="KidsUP"> KidsUP <span>Analytics</span></div>
+  <button id="nav-toggle" class="nav-toggle" aria-label="Меню">☰ Меню</button>
   <div class="gsearch">
     <input type="search" id="gs-input" placeholder="Поиск: группа, ребёнок, телефон…  ( / )"
            autocomplete="off" spellcheck="false">
@@ -120,6 +121,15 @@
       timer = setInterval(poll, 1500);
     }
   });
+})();
+
+/* --- мобильное меню ------------------------------------------------------ */
+(function () {
+  const t = document.getElementById('nav-toggle');
+  if (!t) return;
+  t.addEventListener('click', () => document.body.classList.toggle('nav-open'));
+  document.querySelectorAll('.nav-main a, .nav-sub a').forEach(a =>
+    a.addEventListener('click', () => document.body.classList.remove('nav-open')));
 })();
 
 /* --- бейдж «кто ждёт ответа» -------------------------------------------- */

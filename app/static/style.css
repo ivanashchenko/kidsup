@@ -702,3 +702,19 @@ main { animation: pagein .18s ease-out; }
 .wait-badge.hot{background:#E30613;color:#fff;animation:waitpulse 1.6s infinite}
 @keyframes waitpulse{0%,100%{box-shadow:0 0 0 0 rgba(227,6,19,.35)}50%{box-shadow:0 0 0 7px rgba(227,6,19,0)}}
 tr.warn-row td{background:#FDF1F1}
+
+/* --- мобильное меню: на узких экранах навигация сворачивается в бургер --- */
+.nav-toggle{display:none}
+@media (max-width: 920px){
+  .nav-toggle{display:inline-flex;align-items:center;gap:.35rem;margin-left:auto;
+    padding:.45rem .85rem;border:1.5px solid #1DA7E0;border-radius:999px;
+    background:#fff;color:#312783;font-weight:700;font-size:.9rem;cursor:pointer}
+  body:not(.nav-open) .nav-main,
+  body:not(.nav-open) .nav-sub,
+  body:not(.nav-open) .sync-block{display:none}
+  body.nav-open .nav-main, body.nav-open .nav-sub{display:flex;flex-wrap:wrap;width:100%}
+  body.nav-open .sync-block{display:flex;width:100%}
+  .topbar{row-gap:.5rem}
+  .gsearch{order:5;width:100%}
+  .wait-badge{font-size:.78rem;padding:.3rem .6rem}
+}
