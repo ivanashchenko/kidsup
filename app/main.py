@@ -136,15 +136,20 @@ def api_search(q: str = ""):
         return {"items": []}
     items: list[dict] = []
     digits = "".join(ch for ch in q if ch.isdigit())
+    ql = q.lower()
     with db.get_conn() as conn:
+        # групп 2026/27 немного — фильтруем в Python: SQLite LIKE не умеет
+        # кириллицу без учёта регистра
         rows = conn.execute("""
             SELECT cl.id, cl.name, co.name course, cl.max_students,
                    COUNT(DISTINCT j.user_id) enrolled
             FROM classes cl LEFT JOIN courses co ON co.id = cl.course_id
             LEFT JOIN joins j ON j.class_id = cl.id
-            WHERE cl.name LIKE '2627%' AND (cl.name LIKE ? OR co.name LIKE ?)
-            GROUP BY cl.id LIMIT 5""", (f"%{q}%", f"%{q}%")).fetchall()
-        for r in rows:
+            WHERE cl.name LIKE '2627%'
+            GROUP BY cl.id""").fetchall()
+        hits = [r for r in rows
+                if ql in (r["name"] or "").lower() or ql in (r["course"] or "").lower()]
+        for r in hits[:5]:
             free = max(0, (r["max_students"] or 0) - r["enrolled"])
             items.append({"type": "Группа", "title": r["name"],
                           "sub": f"{r['course'] or ''} · свободно {free}",
@@ -154,9 +159,11 @@ def api_search(q: str = ""):
                 "SELECT id, name, phone FROM users WHERE phone LIKE ? LIMIT 5",
                 (f"%{digits}%",)).fetchall()
         else:
+            variants = {q, q.capitalize(), q.title(), ql}
+            conds = " OR ".join(["name LIKE ?"] * len(variants))
             urows = conn.execute(
-                "SELECT id, name, phone FROM users WHERE name LIKE ? LIMIT 5",
-                (f"%{q}%",)).fetchall()
+                f"SELECT id, name, phone FROM users WHERE {conds} LIMIT 5",
+                tuple(f"%{v}%" for v in variants)).fetchall()
         for r in urows:
             items.append({"type": "Клиент", "title": r["name"] or "Без имени",
                           "sub": r["phone"] or "",
