@@ -181,6 +181,13 @@ def light_sync() -> None:
     try:
         db.save_classes(client.fetch_optional("/v1/company/classes", ["classes"]))
         db.save_joins(client.fetch_optional("/v1/company/joins", ["joins"]))
+        # инкремент карточек: только изменённые за 2 дня (несколько десятков) —
+        # /promo и /waiting видят свежие статусы и теги, не дожидаясь полного синка
+        import datetime as _dt
+        since = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+        db.save_users(client.fetch_all(
+            "/v1/company/users", ["users"],
+            params={"updatedAt[]": [since, _dt.date.today().isoformat()]}))
         db.set_state("last_light_sync", __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     finally:
         client.close()

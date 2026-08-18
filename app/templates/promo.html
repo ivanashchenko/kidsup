@@ -5,7 +5,7 @@
 <p class="muted">Правила оплаты: <b>{{ s.rates.new }} ₽</b> — только за ПОДТВЕРЖДЁННЫЙ новый контакт
 (дозвонились, настоящий, записался) · <b>{{ s.rates.old }} ₽</b> — контакт уже был в базе ·
 <b>{{ s.rates.hour }} ₽/час</b> работы · фейк или «не готов» — 0 ₽.
-Данные из МойКласс (обновляются синхронизацией).</p>
+Данные из МойКласс. Страница обновляется сама каждые 3 минуты · <span id="p-upd">открыто только что</span>.</p>
 
 <h2>💰 Расчёты с промоутерами</h2>
 <table>
@@ -118,4 +118,25 @@
   {% endfor %}
 </table>
 {% endif %}
+
+<script>
+/* мягкое обновление раз в 3 минуты — как на «Ответах»: перерисовываем контент
+   без перезагрузки; при ошибке сети — полная перезагрузка */
+(function () {
+  async function refresh() {
+    try {
+      const r = await fetch(location.href, {cache: 'no-store'});
+      if (!r.ok) throw new Error(r.status);
+      const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+      const next = doc.querySelector('main');
+      if (next) document.querySelector('main').innerHTML = next.innerHTML;
+      const t = new Date();
+      const el = document.getElementById('p-upd');
+      if (el) el.textContent = 'обновлено в ' +
+        String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+    } catch (e) { location.reload(); }
+  }
+  setInterval(refresh, 180000);
+})();
+</script>
 {% endblock %}
