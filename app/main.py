@@ -2011,7 +2011,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-18.21"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-18.22"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2353,23 +2353,31 @@ _MISSED_CACHE: dict = {"ts": 0.0, "data": None}
 def _missed_inbound(hours: int = 48) -> list[dict]:
     """Входящие без ответа, по которым не перезвонили (и не написали в чат).
 
-    perезвон засчитан, если ПОСЛЕ пропущенного был отвеченный разговор с этим
-    номером (в любую сторону); неотвеченные попытки перезвона показываем
-    отдельно счётчиком tried."""
+    Перезвон засчитан, если ПОСЛЕ пропущенного был отвеченный разговор с этим
+    номером (в любую сторону). Честность к админам:
+    - серия мгновенных отбоев АТС (перебор добавочных) склеивается в один
+      «пропущенный» (кластер с паузой < 5 минут);
+    - наши недозвоны считаются и ДО пропущенного (за 2 часа): если мы сами
+      набирали клиента, это «взаимный недозвон» (mutual), а не «прозевали»."""
     import time as _time
     from . import autopilot, mango
     if _MISSED_CACHE["data"] is not None and _time.time() - _MISSED_CACHE["ts"] < 300:
         return _MISSED_CACHE["data"]
     now = autopilot._now()
     rows = mango.calls(now - timedelta(hours=hours), now)
+    rows.sort(key=lambda r: r["start"])
     missed: dict[str, dict] = {}       # номер -> последний пропущенный
     for r in rows:
         num = (r["from_num"] if not r["from_ext"] else r["to_num"])[-10:]
         if not num.isdigit() or len(num) < 10:
             continue
         if not r["from_ext"] and not r["answer"]:
-            m = missed.setdefault(num, {"ts": 0, "attempts": 0, "tried": 0})
-            m["attempts"] += 1
+            m = missed.setdefault(num, {"ts": 0, "attempts": 0, "tried": 0,
+                                        "ours_before": 0})
+            # отбой АТС при переборе добавочных даёт десятки строк за минуту —
+            # это ОДИН звонок клиента, а не N пропущенных
+            if r["start"] - m["ts"] > 300:
+                m["attempts"] += 1
             m["ts"] = max(m["ts"], r["start"])
     for r in rows:                      # закрываем перезвонами/дозвонами
         num = (r["from_num"] if not r["from_ext"] else r["to_num"])[-10:]
@@ -2379,8 +2387,12 @@ def _missed_inbound(hours: int = 48) -> list[dict]:
         if r["start"] >= m["ts"]:
             if r["answer"]:
                 missed.pop(num, None)
-            elif r["from_ext"] and r["start"] > m["ts"]:
+            elif r["from_ext"]:
                 m["tried"] += 1
+        elif r["from_ext"] and r["start"] > m["ts"] - 7200:
+            # мы сами набирали клиента незадолго до его звонка:
+            # он перезванивал на наш недозвон — взаимный недозвон
+            m["ours_before"] += 1
     out = []
     with db.get_conn() as conn:
         for num, m in missed.items():
@@ -2399,7 +2411,9 @@ def _missed_inbound(hours: int = 48) -> list[dict]:
             out.append({"phone": num, "name": name_row[0] if name_row else "",
                         "since": ts.isoformat(timespec="minutes"),
                         "wait_min": int((now - ts).total_seconds() // 60),
-                        "attempts": m["attempts"], "tried": m["tried"]})
+                        "attempts": m["attempts"], "tried": m["tried"],
+                        "mutual": m["ours_before"] > 0 or m["tried"] > 0,
+                        "ours": m["ours_before"] + m["tried"]})
     out.sort(key=lambda x: -x["wait_min"])
     _MISSED_CACHE.update(ts=_time.time(), data=out)
     return out

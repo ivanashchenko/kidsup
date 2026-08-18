@@ -11,13 +11,14 @@
 <div class="notice">✅ Все пропущенные звонки отработаны (перезвонили или написали).</div>
 {% else %}
 <table>
-  <tr><th>Ждёт</th><th>Клиент</th><th>Пропущено</th><th>Попыток перезвона</th><th>Когда звонил</th></tr>
+  <tr><th>Ждёт</th><th>Клиент</th><th>Пропущено</th><th>Что происходит</th><th>Когда звонил</th></tr>
   {% for it in w['calls'] %}
-  <tr class="{{ 'warn-row' if it.wait_min > 120 }}">
+  <tr class="{{ 'warn-row' if it.wait_min > 120 and not it.mutual }}">
     <td><b>{{ it.wait_min // 60 }} ч {{ it.wait_min % 60 }} м</b></td>
     <td>{{ it.name or '—' }}<br><span class="muted small">{{ it.phone }}</span></td>
     <td>{{ it.attempts }} раз</td>
-    <td>{{ it.tried or '0' }}{{ ' (не дозвонились)' if it.tried }}</td>
+    <td>{% if it.mutual %}⇄ взаимный недозвон — мы набирали {{ it.ours }} раз, продолжайте
+      {% else %}мы ещё не перезванивали{% endif %}</td>
     <td class="muted small">{{ it.since[5:16] }}</td>
   </tr>
   {% endfor %}
