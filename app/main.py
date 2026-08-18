@@ -1060,7 +1060,7 @@ def metrics_page(request: Request):
         yest = (autopilot._today() - timedelta(days=1)).isoformat()
         week_ago = (autopilot._today() - timedelta(days=6)).isoformat()
         MGR_NAMES = {84116: "Борис", 154181: "Лиза", 202856: "Лена",
-                     229704: "Маша", 232805: "Аня"}
+                     229704: "Маша", 232805: "Аня", 232763: "Ира"}
         rec: dict[int, dict] = {}
         for (raw,) in conn.execute(
                 "SELECT raw FROM joins WHERE created_at >= ?", (week_ago,)):
@@ -2040,7 +2040,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-18.27"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-18.28"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
