@@ -164,6 +164,39 @@ footer a{color:#fff}
 .wait p{flex-basis:100%;font-size:.9rem;color:var(--muted);margin:0 0 .3rem}
 .wait button{border:1.5px solid var(--blue);background:#fff;color:var(--indigo);border-radius:999px;padding:.5rem 1rem;font:600 .9rem Inter;cursor:pointer}
 .wait button:hover{background:var(--blue);color:#fff}
+/* расписание из МойКласс */
+.sched{background:var(--soft)}
+.sched details{background:#fff;border:1px solid var(--line);border-radius:14px;margin:.5rem 0;padding:0}
+.sched summary{list-style:none;cursor:pointer;padding:.85rem 1.1rem;font:700 1rem Rubik;color:var(--indigo);position:relative}
+.sched summary::after{content:"+";position:absolute;right:1.1rem;color:var(--blue);font-size:1.2rem;transition:transform .2s}
+.sched details[open] summary::after{transform:rotate(45deg)}
+.sched summary .sfree{font:600 .8rem Inter;color:var(--green);margin-left:.5rem}
+.sched .s-tbl{width:100%;border-collapse:collapse;font-size:.9rem}
+.sched .s-tbl td{padding:.55rem .9rem;border-top:1px solid var(--line);vertical-align:middle}
+.sched .s-tbl .lvl{color:var(--muted);font-size:.8rem}
+.sched .s-tbl .ok{color:var(--green);font-weight:600;white-space:nowrap}
+.sched .s-tbl .no{color:var(--muted);white-space:nowrap}
+.sched .s-tbl .hotf{color:var(--red);font-weight:700;white-space:nowrap}
+.sched .s-tbl .btn{padding:.4rem .9rem;font-size:.8rem;margin:0}
+@media(max-width:700px){.sched .s-tbl td:nth-child(2){display:none}}
+/* педагоги */
+.teach{background:#fff}
+.t-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-top:1.4rem}
+.tcard{background:var(--soft);border-radius:var(--r);padding:18px;text-align:center}
+.tcard img{width:132px;height:132px;border-radius:50%;object-fit:cover;box-shadow:0 8px 24px rgba(49,39,131,.18)}
+.tcard h3{font-size:1.02rem;margin:.7rem 0 .15rem}
+.tcard .subj{font:700 .74rem Rubik;color:var(--blue);text-transform:uppercase;letter-spacing:.05em}
+.tcard p{font-size:.82rem;color:var(--muted);margin-top:.5rem;text-align:left}
+.tcard .q{font-style:italic;color:var(--ink);font-size:.82rem;margin-top:.5rem;text-align:left}
+/* галерея */
+.gal{background:var(--indigo)}
+.gal h2,.gal>.wrap>p{color:#fff}
+.g-strip{display:flex;gap:14px;overflow-x:auto;padding:1.2rem 0 .6rem;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+.g-strip figure{flex:0 0 auto;margin:0;scroll-snap-align:start}
+.g-strip img{height:240px;width:auto;border-radius:14px;display:block}
+.g-strip figcaption{color:#CFClFF;color:rgba(255,255,255,.85);font-size:.78rem;margin-top:.35rem}
+.gal .soc{color:rgba(255,255,255,.9);font-size:.9rem;margin-top:.8rem}
+.gal .soc a{color:#9BD7F5;font-weight:600}
 /* плавающая кнопка WhatsApp */
 .fab{position:fixed;right:18px;bottom:18px;z-index:60;width:58px;height:58px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px rgba(37,211,102,.45);animation:fabpulse 2.6s ease-in-out infinite}
 .fab svg{width:32px;height:32px;fill:#fff}
@@ -190,6 +223,7 @@ body.js .reveal.in{opacity:1;transform:none}
     <nav>
       <a href="#events">Праздник 29.08</a>
       <a href="#courses">Занятия</a>
+      <a href="#schedule">Расписание</a>
       <a href="#prices">Цены и скидки</a>
       <a href="#faq">Вопросы</a>
       <a href="#contact">Как найти</a>
@@ -605,6 +639,15 @@ body.js .reveal.in{opacity:1;transform:none}
   </div>
 </section>
 
+<section class="sched" id="schedule">
+  <div class="wrap">
+    <h2>📅 Расписание групп 2026/27</h2>
+    <p style="color:var(--muted)">Живые данные из нашей CRM МойКласс: свободные места в каждой группе
+    обновляются автоматически. Нажмите на направление — выберите день и время.</p>
+    <div id="sched-box"><p style="color:var(--muted)">Загружаем расписание…</p></div>
+  </div>
+</section>
+
 <section class="why">
   <div class="wrap">
     <h2>Почему родители выбирают KidsUP</h2>
@@ -628,6 +671,61 @@ body.js .reveal.in{opacity:1;transform:none}
         <p>Бульвар Рокоссовского, 6 к1В — напротив ТЦ «Янтарь». Удобно совмещать
         с садиком и школой: занятия с утра до 20:00.</p></div>
     </div>
+  </div>
+</section>
+
+<section class="teach" id="teachers">
+  <div class="wrap">
+    <h2>Наши педагоги</h2>
+    <p style="color:var(--muted)">Все педагоги работают по единой методике Буракова, проходят обучение
+    и аттестацию. Педагог знает имя и запрос вашего ребёнка ещё до первого занятия — и после урока
+    обязательно расскажет, как всё прошло.</p>
+    <div class="t-grid">
+      <div class="tcard reveal"><img src="PHOTO_T_DUDUEVA" alt="Екатерина Дудуева" loading="lazy">
+        <h3>Екатерина Дудуева</h3><div class="subj">Подготовка к школе · нулевой класс</div>
+        <p>Педагог дошкольного образования; прошла путь от классной доски до руководства центром.
+        Ведёт также скорочтение и каллиграфию.</p>
+        <div class="q">«В руках правильного педагога каждый ребёнок раскрывается».</div></div>
+      <div class="tcard reveal"><img src="PHOTO_T_RASHOYAN" alt="Инга Рашоян" loading="lazy">
+        <h3>Инга Рашоян</h3><div class="subj">Подготовка к школе</div>
+        <p>Педагог дошкольного образования, повышение квалификации по педагогике М. Монтессори.</p>
+        <div class="q">«Обучение с любовью и заботой о каждом ребёнке».</div></div>
+      <div class="tcard reveal"><img src="PHOTO_T_SEMENOVA" alt="Ирина Семёнова" loading="lazy">
+        <h3>Ирина Семёнова</h3><div class="subj">Раннее развитие</div>
+        <p>Выпускница МГОУ с отличием, педагог-психолог. Десять лет работы с дошкольниками:
+        раннее развитие и подготовка к школе.</p>
+        <div class="q">«В каждом ребёнке — потенциал, который нужно раскрывать с любовью».</div></div>
+      <div class="tcard reveal"><img src="PHOTO_T_BURAKOVA" alt="Марина Буракова" loading="lazy">
+        <h3>Марина Буракова</h3><div class="subj">Логопед</div>
+        <p>Высшее педагогическое образование (МПГУ), 20 лет логопедической практики: запуск речи,
+        постановка звуков, подготовка к чтению.</p>
+        <div class="q">«Могу научить кого-то рычать, а кого-то — произносить первое слово: „мама"».</div></div>
+      <div class="tcard reveal"><img src="PHOTO_T_KOROTKOVA" alt="Виктория Короткова" loading="lazy">
+        <h3>Виктория Короткова</h3><div class="subj">ИЗО-студия</div>
+        <p>Художественно-педагогическое образование (МГОПУ). Руководит детскими изостудиями
+        с 2008 года.</p>
+        <div class="q">«Рисование развивает креативность, координацию и воображение».</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="gal" id="gallery">
+  <div class="wrap">
+    <h2>Как проходят наши занятия</h2>
+    <p>Настоящие кадры из центра — без постановки.</p>
+    <div class="g-strip">
+      <figure><img src="PHOTO_G_SCHOOL" alt="Подготовка к школе" loading="lazy"><figcaption>Подготовка к школе</figcaption></figure>
+      <figure><img src="PHOTO_G_EARLY" alt="Раннее развитие" loading="lazy"><figcaption>Раннее развитие — занятие с малышом</figcaption></figure>
+      <figure><img src="PHOTO_G_GROUP" alt="Мини-группа" loading="lazy"><figcaption>Мини-группы до 8 детей</figcaption></figure>
+      <figure><img src="PHOTO_G_PARTY" alt="Праздник KidsUP" loading="lazy"><figcaption>Праздник KidsUP — такой же будет 29 августа</figcaption></figure>
+      <figure><img src="PHOTO_G_IZO" alt="ИЗО-студия" loading="lazy"><figcaption>ИЗО и подготовка руки</figcaption></figure>
+      <figure><img src="PHOTO_G_SAD" alt="Английский сад" loading="lazy"><figcaption>Английский мини-сад</figcaption></figure>
+      <figure><img src="PHOTO_G_PARK" alt="Прогулка" loading="lazy"><figcaption>Прогулки и городской лагерь</figcaption></figure>
+    </div>
+    <p class="soc">Больше фото и видео — в наших соцсетях:
+      <a href="https://vk.com/kidsup_ru" target="_blank" rel="noopener">ВКонтакте</a> ·
+      <a href="https://t.me/KidsUP_ru" target="_blank" rel="noopener">Telegram</a> ·
+      <a href="https://youtube.com/@kidsup_ru" target="_blank" rel="noopener">YouTube</a></p>
   </div>
 </section>
 
@@ -721,6 +819,9 @@ body.js .reveal.in{opacity:1;transform:none}
         <p><b>🕘 Часы работы:</b> ежедневно; в августе 8:00–19:00, с сентября 9:00–20:00.</p>
         <p><b>☎️ Телефон:</b> <a href="tel:+74951209024">+7 495 120-90-24</a></p>
         <p><b>💬 WhatsApp:</b> <a href="https://wa.me/79160170918" target="_blank" rel="noopener">написать нам</a></p>
+        <p><b>📱 Соцсети:</b> <a href="https://vk.com/kidsup_ru" target="_blank" rel="noopener">ВКонтакте</a> ·
+        <a href="https://t.me/KidsUP_ru" target="_blank" rel="noopener">Telegram</a> ·
+        <a href="https://youtube.com/@kidsup_ru" target="_blank" rel="noopener">YouTube</a></p>
       </div>
       <iframe class="map" loading="lazy" title="KidsUP на карте"
         src="https://yandex.ru/map-widget/v1/?text=%D0%B1%D1%83%D0%BB%D1%8C%D0%B2%D0%B0%D1%80%20%D0%9C%D0%B0%D1%80%D1%88%D0%B0%D0%BB%D0%B0%20%D0%A0%D0%BE%D0%BA%D0%BE%D1%81%D1%81%D0%BE%D0%B2%D1%81%D0%BA%D0%BE%D0%B3%D0%BE%206%D0%BA1%D0%92&z=16"></iframe>
@@ -792,7 +893,8 @@ document.getElementById('lead').addEventListener('submit', async e => {
     const r = await fetch('https://app.kidsup.ru/api/public/lead', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({name: n, age: a, phone: p, course: c, roistat: rv,
-                            note: (location.search || '').slice(1, 200),
+                            note: ((window._grp ? 'группа: ' + window._grp + ' | ' : '') +
+                                   (location.search || '').slice(1)).slice(0, 250),
                             website: document.getElementById('f-web').value})});
     const j = await r.json();
     if (j.ok) {
@@ -832,8 +934,55 @@ fetch('https://app.kidsup.ru/api/public/schedule').then(r => r.json()).then(d =>
       b.textContent = `✅ уже записано ${n} детей на 2026/27`;
       b.hidden = false;
     }
+    renderSchedule(d.groups);
   }
-}).catch(() => {});
+}).catch(() => {
+  const box = document.getElementById('sched-box');
+  if (box) box.innerHTML = '<p style="color:var(--muted)">Не получилось загрузить расписание — ' +
+    'позвоните <a href="tel:+74951209024">+7 495 120-90-24</a>, подберём группу за минуту.</p>';
+});
+/* расписание из МойКласс */
+window._grp = '';
+function renderSchedule(groups) {
+  const box = document.getElementById('sched-box'); if (!box) return;
+  const ORDER = ['Подготовка к школе', 'Английский язык', 'Английский детский сад', 'Раннее развитие',
+    'Ментальная арифметика', 'Шахматы', 'ИЗО-студия', 'Логопед'];
+  const byCourse = {};
+  groups.forEach(g => { (byCourse[g.course] = byCourse[g.course] || []).push(g); });
+  const names = Object.keys(byCourse).sort((a, b) => {
+    const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  const esc = t => String(t).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  box.innerHTML = names.map((c, i) => {
+    const gs = byCourse[c];
+    const freeSum = gs.reduce((t, g) => t + (g.free || 0), 0);
+    const rows = gs.map(g => {
+      const seg = (g.name || '').split('_').pop() || '';
+      const lvl = /[A-Za-zА-Яа-я]/.test(seg) && !/^\d/.test(seg) ? seg : '';
+      const f = g.free || 0;
+      const fCell = f === 0 ? '<span class="no">мест нет</span>'
+        : f <= 2 ? `<span class="hotf">🔥 ${f === 1 ? 'последнее место' : 'осталось 2 места'}</span>`
+        : `<span class="ok">свободно ${f}</span>`;
+      const when = (g.day !== '—' ? g.day + ' · ' : '') + g.time;
+      const pick = c === 'Английский детский сад'
+        ? ((g.name || '').includes('Мини-сад') ? 'Английский мини-сад' : 'Нулевой класс') : c;
+      return `<tr><td><b>${esc(when)}</b>${lvl ? ' <span class="lvl">' + esc(lvl) + '</span>' : ''}</td>` +
+        `<td>${esc(g.age)}</td><td>${fCell}</td>` +
+        `<td style="text-align:right"><a class="btn btn-green" href="#signup" data-grp="${esc(g.name)}" ` +
+        `data-gpick="${esc(pick)}">${f === 0 ? 'В лист ожидания' : 'Записаться'}</a></td></tr>`;
+    }).join('');
+    return `<details${i === 0 ? ' open' : ''}><summary>${esc(c)}` +
+      `<span class="sfree">${freeSum > 0 ? 'свободно ' + freeSum + ' мест' : 'мест нет'}</span></summary>` +
+      `<table class="s-tbl">${rows}</table></details>`;
+  }).join('');
+  box.addEventListener('click', e => {
+    const a = e.target.closest('[data-grp]'); if (!a) return;
+    window._grp = a.dataset.grp;
+    if ([...sel.options].some(o => o.value === a.dataset.gpick)) sel.value = a.dataset.gpick;
+  });
+}
+sel.addEventListener('change', () => { window._grp = ''; });
 /* квиз подбора занятия */
 (function(){
   const REC = {
@@ -925,5 +1074,19 @@ if ('IntersectionObserver' in window) {
   setTimeout(() => document.querySelectorAll('.reveal').forEach(el => el.classList.add('in')), 2500);
 }
 </script>
+<!-- Яндекс.Метрика — счётчик 69569509 (тот же, что на kidsup.ru) -->
+<script>
+(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],
+k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+(window,document,"script","https://mc.yandex.ru/metrika/tag.js","ym");
+ym(69569509,"init",{clickmap:true,trackLinks:true,accurateTrackBounce:true,webvisor:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/69569509" style="position:absolute;left:-9999px" alt=""></div></noscript>
+<!-- Пиксель ВКонтакте (VK-RTRG-401784-8crag, как на kidsup.ru) -->
+<script>!function(){var t=document.createElement("script");t.type="text/javascript",t.async=!0,
+t.src="https://vk.com/js/api/openapi.js?169",t.onload=function(){VK.Retargeting.Init("VK-RTRG-401784-8crag"),VK.Retargeting.Hit()},
+document.head.appendChild(t)}();</script>
+<noscript><img src="https://vk.com/rtrg?p=VK-RTRG-401784-8crag" style="position:fixed;left:-999px" alt=""></noscript>
 </body>
 </html>

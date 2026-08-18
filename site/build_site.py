@@ -20,6 +20,12 @@ tpl = (Path(__file__).parent / "kidsup_site_body.html").read_text(encoding="utf-
 for ph, png in (("LOGO_COLOR", "logo_color.png"), ("LOGO_WHITE", "logo_white.png")):
     b64 = base64.b64encode((root / "app" / "static" / png).read_bytes()).decode()
     tpl = tpl.replace(ph, "data:image/png;base64," + b64)
+# фото педагогов и занятий: PHOTO_T_DUDUEVA -> site/assets/t_dudueva.jpg
+import re
+for ph in set(re.findall(r"PHOTO_[A-Z_]+", tpl)):
+    f = Path(__file__).parent / "assets" / (ph[6:].lower() + ".jpg")
+    b64 = base64.b64encode(f.read_bytes()).decode()
+    tpl = tpl.replace(ph, "data:image/jpeg;base64," + b64)
 out = Path(__file__).parent / "kidsup_site.html"
 out.write_text(tpl, encoding="utf-8")
 print("собрано:", out, out.stat().st_size, "байт")
