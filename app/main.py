@@ -2053,7 +2053,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-18.31"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-18.32"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2173,6 +2173,20 @@ async def api_broadcast(payload: dict):
         include_active=bool(payload.get("include_active")),
         exclude_enrolled=bool(payload.get("exclude_enrolled")),
         exclude_campaigns=payload.get("exclude_campaigns") or None)
+
+
+@app.post("/api/broadcast/retext", dependencies=AUTH)
+async def api_broadcast_retext(payload: dict):
+    """Заменить текст у ещё не отправленных сообщений кампании (status=pending)."""
+    campaign = (payload.get("campaign") or "").strip()
+    text = (payload.get("text") or "").strip()
+    if not campaign or not text:
+        raise HTTPException(400, "нужны campaign и text")
+    with db.get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE broadcast_queue SET text=? WHERE campaign=? AND status='pending'",
+            (text, campaign))
+    return {"campaign": campaign, "updated": cur.rowcount}
 
 
 @app.post("/api/broadcast/add", dependencies=AUTH)
