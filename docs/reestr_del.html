@@ -1,0 +1,109 @@
+<title>Реестр дел KidsUP</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@600;800;900&display=swap">
+<style>
+:root{--bg:#F6F8FC;--card:#FFF;--ink:#1A2333;--muted:#66738A;--line:#E4E9F2;
+ --indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--red:#E30613;--soft:#EAF6FC;--chip:#EEF1F8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12141D;--card:#1B1E2B;--ink:#E8EAF2;--muted:#9AA3B8;--line:#2A2F42;--indigo:#8F86E8;--soft:#1D2736;--chip:#232838}}
+:root[data-theme="dark"]{--bg:#12141D;--card:#1B1E2B;--ink:#E8EAF2;--muted:#9AA3B8;--line:#2A2F42;--indigo:#8F86E8;--soft:#1D2736;--chip:#232838}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:940px;margin:0 auto;padding:1.2rem 1rem 4rem}
+h1{font:900 1.8rem Rubik,sans-serif;color:var(--indigo);margin:.3rem 0 .2rem;text-wrap:balance}
+.sub{color:var(--muted);margin:0 0 .9rem}
+.tools{position:sticky;top:0;z-index:5;background:var(--bg);padding:.6rem 0;border-bottom:1px solid var(--line);display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
+.f{border:1.5px solid var(--line);background:var(--card);color:var(--muted);border-radius:999px;padding:.32rem .85rem;font:600 .8rem system-ui;cursor:pointer}
+.f.on{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.spacer{flex:1}
+#left{font:800 .85rem Rubik;color:var(--green)}
+.task{display:flex;gap:.6rem;align-items:flex-start;background:var(--card);border:1px solid var(--line);
+ border-radius:12px;padding:.6rem .8rem;margin:.5rem 0}
+.task input{margin-top:.25rem;width:1.05rem;height:1.05rem;accent-color:var(--green);flex-shrink:0;cursor:pointer}
+.task.done{opacity:.45}.task.done .t{text-decoration:line-through}
+.t{flex:1;cursor:pointer}
+.meta{display:flex;gap:.4rem;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;max-width:180px}
+.tag{font:800 .66rem Rubik;padding:.16rem .55rem;border-radius:99px;background:var(--chip);color:var(--muted);white-space:nowrap}
+.tag.r{background:#FDE8E9;color:var(--red)}.tag.o{background:#FDF1DA;color:#A96A00}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tag.r{background:#3A1518}:root:not([data-theme="light"]) .tag.o{background:#382A10}}
+:root[data-theme="dark"] .tag.r{background:#3A1518}:root[data-theme="dark"] .tag.o{background:#382A10}
+h2{font:800 1.02rem Rubik;color:var(--muted);margin:1.4rem 0 .2rem;text-transform:uppercase;letter-spacing:.05em;font-size:.8rem}
+</style>
+<div class="wrap">
+<h1>Реестр дел KidsUP</h1>
+<p class="sub">Все важные и срочные дела набора — одно место, обновлено 18.08. Галочки сохраняются в браузере; фильтруйте по человеку или срочности.</p>
+<div class="tools" id="ft">
+ <button class="f on" data-f="all">все</button>
+ <button class="f" data-f="Борис">Борис</button>
+ <button class="f" data-f="Маша">Маша</button>
+ <button class="f" data-f="Админы">Админы</button>
+ <button class="f" data-f="Лиза">Лиза</button>
+ <button class="f" data-f="Клод">Клод</button>
+ <button class="f" data-f="срочно">🔴 срочно</button>
+ <button class="f" data-f="open">скрыть сделанные</button>
+ <span class="spacer"></span><span id="left"></span>
+</div>
+
+<h2>Сегодня — деньги и клиенты</h2>
+<div class="task" data-w="Лиза" data-p="срочно"><input id="t01"><span class="t">Ответить Смирнову Роману: дни и время занятий (ждёт с 9:15, история на 16 400 ₽)</span><div class="meta"><span class="tag">Лиза</span><span class="tag r">сегодня</span></div></div>
+<div class="task" data-w="Лиза" data-p="срочно"><input id="t02"><span class="t">Семиной Елизавете — ответ про нулевой класс (прямой запрос на запись; нулевой класс в приоритете по словам Веры)</span><div class="meta"><span class="tag">Лиза</span><span class="tag r">сегодня</span></div></div>
+<div class="task" data-w="Лиза" data-p="срочно"><input id="t03"><span class="t">Принять 11 000 ₽ Денисовой (счёт от 11.08 уже выставлен) + чат «Запуск речи/Моторика» — предложить логопеда и РР</span><div class="meta"><span class="tag">Лиза</span><span class="tag r">сегодня</span></div></div>
+<div class="task" data-w="Админы" data-p="срочно"><input id="t04"><span class="t">Дожать Викторию (мини-сад, «будем записывать») — цена + запись в группу</span><div class="meta"><span class="tag">Аня</span><span class="tag r">до 12:00</span></div></div>
+<div class="task" data-w="Админы" data-p="срочно"><input id="t05"><span class="t">Эльвира: лагерь 24–28.08, точные цены — звонить строго до 14:00</span><div class="meta"><span class="tag">Аня</span><span class="tag r">до 14:00</span></div></div>
+<div class="task" data-w="Админы" data-p="срочно"><input id="t06"><span class="t">Городской 74951376442 — звонил трижды, перезвонить</span><div class="meta"><span class="tag">Аня</span><span class="tag r">сегодня</span></div></div>
+<div class="task" data-w="Админы" data-p="срочно"><input id="t07"><span class="t">Прозвон 110 промо-контактов до конца: статус + комментарий + запись после каждого разговора</span><div class="meta"><span class="tag">Лена·Аня·Ира</span><span class="tag r">сегодня</span></div></div>
+
+<h2>Решения Бориса (блокируют работу)</h2>
+<div class="task" data-w="Борис" data-p="срочно"><input id="t10"><span class="t">Дата-якорь: 29.08 праздник + ДОД 30–31.08 + уроки до 6.09 — одна формула для всех</span><div class="meta"><span class="tag">Борис</span><span class="tag r">🔴</span></div></div>
+<div class="task" data-w="Борис" data-p="срочно"><input id="t11"><span class="t">«Заводи цены» — Клод проставит прайс в 75 групп CRM (сейчас у 100% пусто)</span><div class="meta"><span class="tag">Борис</span><span class="tag r">🔴</span></div></div>
+<div class="task" data-w="Борис" data-p="срочно"><input id="t12"><span class="t">Суммируются ли скидки −10%+−10%? (Лена уже пообещала клиенту двойную)</span><div class="meta"><span class="tag">Борис</span><span class="tag r">🔴</span></div></div>
+<div class="task" data-w="Борис" data-p="важно"><input id="t13"><span class="t">Создать аккаунт Ирины в МойКласс (данные в чате)</span><div class="meta"><span class="tag">Борис</span><span class="tag o">важно</span></div></div>
+<div class="task" data-w="Борис" data-p="важно"><input id="t14"><span class="t">Старые долги 2024–25 на ~326 000 ₽ — взыскивать или списывать</span><div class="meta"><span class="tag">Борис</span><span class="tag o">важно</span></div></div>
+<div class="task" data-w="Борис" data-p="важно"><input id="t15"><span class="t">Токены ВК/ТГ · номер Лизы для пушей · Cloudflare+ключ · да/нет рефералке</span><div class="meta"><span class="tag">Борис</span><span class="tag o">важно</span></div></div>
+
+<h2>Эта неделя</h2>
+<div class="task" data-w="Лиза" data-p="срочно"><input id="t20"><span class="t">Возвраты лета: вписать причины (10 шт., 271 855 ₽) — сводка в Базе знаний</span><div class="meta"><span class="tag">Лиза</span><span class="tag r">сегодня</span></div></div>
+<div class="task" data-w="Лиза" data-p="важно"><input id="t21"><span class="t">Долги 2026 (~160 000 ₽): связаться, получить оплату или закрыть счёт с причиной</span><div class="meta"><span class="tag">Лиза</span><span class="tag o">важно</span></div></div>
+<div class="task" data-w="Лиза" data-p="важно"><input id="t22"><span class="t">Закрыть занятия прошлой недели · Киреевым варианты в Max (просрочено) · вводная Ире</span><div class="meta"><span class="tag">Лиза</span><span class="tag o">важно</span></div></div>
+<div class="task" data-w="Маша" data-p="срочно"><input id="t23"><span class="t">Правила оплаты промоутерам (600 за подтверждённый / 200 в базе / 0 фейк) + сверить 3 «непробиваемых» номера и 6 сомнительных цифр Виталия</span><div class="meta"><span class="tag">Маша</span><span class="tag r">🔴</span></div></div>
+<div class="task" data-w="Маша" data-p="важно"><input id="t24"><span class="t">Указатель к входу · чат лагеря с фотоотчётами · план публикаций на 2 недели</span><div class="meta"><span class="tag">Маша</span><span class="tag o">важно</span></div></div>
+<div class="task" data-w="Админы" data-p="важно"><input id="t25"><span class="t">Продления «Мисс Марта» → записи в группы: Злата, Денис, Аня (+Мария 12 л.)</span><div class="meta"><span class="tag">Лена</span><span class="tag o">важно</span></div></div>
+<div class="task" data-w="Админы" data-p="важно"><input id="t26"><span class="t">Склеить 4 дубля карточек (задачи в CRM) · сверить сомнительные номера с бумагой</span><div class="meta"><span class="tag">Аня·Ира</span><span class="tag o">важно</span></div></div>
+<div class="task" data-w="Клод" data-p="важно"><input id="t27"><span class="t">После ответов Бориса: цены в CRM → мануалы и фабрика на одну формулу → памятка</span><div class="meta"><span class="tag">Клод</span><span class="tag o">важно</span></div></div>
+<div class="task" data-w="Клод" data-p="важно"><input id="t28"><span class="t">Вечерняя сверка реестра промоутеров с базой + отчёт «подтверждено/доплатить»</span><div class="meta"><span class="tag">Клод</span><span class="tag o">важно</span></div></div>
+<div class="task" data-w="Клод" data-p="важно"><input id="t29"><span class="t">Ежедневная автосверка базы со снапшотом (последний пункт защиты данных)</span><div class="meta"><span class="tag">Клод</span><span class="tag o">важно</span></div></div>
+
+<h2>Фон (не забыть)</h2>
+<div class="task" data-w="Маша" data-p="фон"><input id="t30"><span class="t">Разбирать «Лиды» ежедневно — рассылка уже даёт записи</span><div class="meta"><span class="tag">Маша</span><span class="tag">фон</span></div></div>
+<div class="task" data-w="Клод" data-p="фон"><input id="t31"><span class="t">Автовозврат слетевших тегов · чистка источника «Иное» · «Карта развития» PDF · рефералка после «да»</span><div class="meta"><span class="tag">Клод</span><span class="tag">фон</span></div></div>
+<div class="task" data-w="Админы" data-p="фон"><input id="t32"><span class="t">Педагоги: листы интереса на ДОД · мини-программы открытых уроков · кто ведёт «Лицей» вместо Елены — одна версия</span><div class="meta"><span class="tag">педагоги</span><span class="tag">фон</span></div></div>
+</div>
+<script>
+const KEY='kidsup-registry-1';
+const saved=JSON.parse(localStorage.getItem(KEY)||'{}');
+const tasks=[...document.querySelectorAll('.task')];
+function refresh(){
+ const open=tasks.filter(t=>!t.querySelector('input').checked).length;
+ document.getElementById('left').textContent='осталось: '+open+' из '+tasks.length;
+}
+tasks.forEach(t=>{
+ const cb=t.querySelector('input');cb.type='checkbox';cb.checked=!!saved[cb.id];
+ t.classList.toggle('done',cb.checked);
+ t.querySelector('.t').addEventListener('click',()=>cb.click());
+ cb.addEventListener('change',()=>{saved[cb.id]=cb.checked;
+  localStorage.setItem(KEY,JSON.stringify(saved));
+  t.classList.toggle('done',cb.checked);refresh();applyF();});
+});
+let cur='all';
+function applyF(){
+ tasks.forEach(t=>{
+  let ok=(cur==='all')||(cur==='срочно'?t.dataset.p==='срочно':cur==='open'?!t.querySelector('input').checked:t.dataset.w===cur);
+  t.style.display=ok?'':'none';});
+ document.querySelectorAll('h2').forEach(h=>{
+  let el=h.nextElementSibling,any=false;
+  while(el&&el.tagName!=='H2'){if(el.classList&&el.classList.contains('task')&&el.style.display!=='none')any=true;el=el.nextElementSibling;}
+  h.style.display=any?'':'none';});
+}
+document.querySelectorAll('#ft .f').forEach(b=>b.addEventListener('click',()=>{
+ document.querySelectorAll('#ft .f').forEach(x=>x.classList.remove('on'));
+ b.classList.add('on');cur=b.dataset.f;applyF();}));
+refresh();
+</script>

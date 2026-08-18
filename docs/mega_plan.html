@@ -1,0 +1,156 @@
+<title>План набора до 30 сентября</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&display=swap">
+<style>
+:root{--bg:#F6F8FC;--card:#FFFFFF;--ink:#1A2333;--muted:#66738A;--line:#E4E9F2;
+ --indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613;
+ --soft:#EAF6FC;--chip:#EEF1F8}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12141D;--card:#1B1E2B;--ink:#E8EAF2;--muted:#9AA3B8;--line:#2A2F42;--indigo:#8F86E8;--soft:#1D2736;--chip:#232838}}
+:root[data-theme="dark"]{--bg:#12141D;--card:#1B1E2B;--ink:#E8EAF2;--muted:#9AA3B8;--line:#2A2F42;--indigo:#8F86E8;--soft:#1D2736;--chip:#232838}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1020px;margin:0 auto;padding:1.2rem 1rem 4rem}
+h1,h2,h3{font-family:Rubik,system-ui,sans-serif;text-wrap:balance}
+h1{font-size:1.9rem;margin:.3rem 0 .2rem;color:var(--indigo);font-weight:900}
+h2{font-size:1.25rem;margin:2rem 0 .8rem;color:var(--indigo)}
+.sub{color:var(--muted);margin:0 0 1rem}
+.count{display:flex;gap:.7rem;flex-wrap:wrap;margin:1.1rem 0}
+.ct{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:.7rem 1.1rem;min-width:120px;flex:1}
+.ct b{display:block;font:900 1.6rem/1.2 Rubik,sans-serif;font-variant-numeric:tabular-nums}
+.ct span{font-size:.74rem;color:var(--muted)}
+.ct.red b{color:var(--red)}.ct.green b{color:var(--green)}.ct.blue b{color:var(--blue)}.ct.ind b{color:var(--indigo)}
+.bar{height:8px;background:var(--chip);border-radius:99px;overflow:hidden;margin-top:.4rem}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--green))}
+.filters{position:sticky;top:0;z-index:5;background:var(--bg);padding:.6rem 0;display:flex;gap:.45rem;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.f{border:1.5px solid var(--line);background:var(--card);color:var(--muted);border-radius:999px;
+ padding:.35rem .9rem;font:600 .82rem system-ui;cursor:pointer}
+.f.on{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.sec{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:1rem 1.2rem;margin:.9rem 0}
+.sec h3{margin:.1rem 0 .6rem;font-size:1.05rem;display:flex;align-items:center;gap:.5rem}
+.who{font:700 .7rem Rubik;letter-spacing:.06em;text-transform:uppercase;padding:.2rem .6rem;border-radius:99px;background:var(--chip);color:var(--muted)}
+.item{display:flex;gap:.6rem;align-items:flex-start;padding:.45rem .3rem;border-radius:10px}
+.item:hover{background:var(--soft)}
+.item input{margin-top:.28rem;width:1.05rem;height:1.05rem;accent-color:var(--green);flex-shrink:0;cursor:pointer}
+.item label{cursor:pointer}
+.item.done label{opacity:.45;text-decoration:line-through}
+.p{font:800 .68rem Rubik;padding:.14rem .5rem;border-radius:99px;flex-shrink:0;margin-top:.2rem}
+.p.r{background:#FDE8E9;color:var(--red)}.p.o{background:#FDF1DA;color:#A96A00}.p.y{background:#EDF7DC;color:#557F13}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .p.r{background:#3A1518}:root:not([data-theme="light"]) .p.o{background:#382A10}:root:not([data-theme="light"]) .p.y{background:#22300F}}
+:root[data-theme="dark"] .p.r{background:#3A1518}:root[data-theme="dark"] .p.o{background:#382A10}:root[data-theme="dark"] .p.y{background:#22300F}
+.note{background:var(--soft);border-radius:12px;padding:.7rem 1rem;font-size:.9rem;margin:.6rem 0}
+.small{font-size:.84rem;color:var(--muted)}
+.grabli li{margin:.3rem 0}
+a{color:var(--blue)}
+</style>
+<div class="wrap">
+<h1>План набора: все группы на 100% к 30 сентября</h1>
+<p class="sub">Обновлено 18.08, 11:30 — по итогам двух дней работы системы. Галочки сохраняются в вашем браузере.</p>
+
+<div class="count">
+ <div class="ct red"><b>43</b><span>дня до дедлайна</span></div>
+ <div class="ct ind"><b>337</b><span>свободных мест 26/27</span></div>
+ <div class="ct blue"><b>30%</b><span>заполненность групп<div class="bar"><i style="width:30%"></i></div></span></div>
+ <div class="ct green"><b>~8</b><span>записей в день — нужный темп</span></div>
+ <div class="ct ind"><b>110</b><span>промо-контактов в работе</span></div>
+</div>
+
+<div class="note">🧭 <b>Что уже работает:</b> портал app.kidsup.ru (Шахматка · Обзвон план/факт · Ответы с бейджем «кто ждёт» · Промоутеры с экономикой · фабрика контента и макетов) · ежечасный ИИ-разбор звонков → задачи в CRM · вечерний разбор переписок · рассылка лагеря с 3 WhatsApp-номеров с защитой от бана · база восстановлена полностью (1844 карточки) с тройной защитой.</div>
+
+<div class="filters" id="flt">
+ <button class="f on" data-k="all">все</button>
+ <button class="f" data-k="Борис">Борис</button>
+ <button class="f" data-k="Маша">Маша</button>
+ <button class="f" data-k="Звонки">Лена · Аня · Ира</button>
+ <button class="f" data-k="Лиза">Лиза</button>
+ <button class="f" data-k="Клод">Клод</button>
+ <button class="f" data-k="red">только 🔴</button>
+</div>
+
+<div class="sec" data-who="Борис">
+<h3><span class="who">Борис</span> Решения, которые блокируют всех</h3>
+<div class="item"><input id="b1"><span class="p r">🔴</span><label for="b1"><b>Дата-якорь одной фразой</b>: праздник 29.08 + ДОД 30–31.08 + открытые уроки до 6.09 — что говорим клиентам. Вчера клиенты услышали 4 версии, включая «30 сентября». После ответа Клод выравнивает скрипты, тексты, рассылки за час.</label></div>
+<div class="item"><input id="b2"><span class="p r">🔴</span><label for="b2"><b>Цены в CRM</b>: у всех 75 групп 26/27 поле цены пустое. Прайс найден в «Скриптах v3» — сказать Клоду «заводи», и цены встанут за один проход (с бэкапом).</label></div>
+<div class="item"><input id="b3"><span class="p r">🔴</span><label for="b3"><b>Правила скидок</b>: суммируются ли −10% (второй ребёнок) с −10% (многодетные)? Лена уже насчитала маме двойную. Да/нет.</label></div>
+<div class="item"><input id="b4"><span class="p o">🟠</span><label for="b4">Аккаунт Ирины в МойКласс (inGolovina19@yandex.ru) — без него ей нельзя ставить задачи и мерить статистику.</label></div>
+<div class="item"><input id="b5"><span class="p o">🟠</span><label for="b5">Старые долги 2024–25 (~326 000 ₽: Помыткин, Чупановы, Мельников…) — взыскивать или списывать. Список: База знаний → «Возвраты и долги».</label></div>
+<div class="item"><input id="b6"><span class="p o">🟠</span><label for="b6">Токены ВК и Телеграм-канала — кнопка «Опубликовать» готова и простаивает.</label></div>
+<div class="item"><input id="b7"><span class="p y">🟡</span><label for="b7">Номер Лизы для WhatsApp-пушей «🔥 ждут ответа» · Cloudflare + ключ для «Спросить Клода» · да/нет по рефералке 1000 бонусных ₽.</label></div>
+<div class="item"><input id="b8"><span class="p y">🟡</span><label for="b8">Вечером — 2 минуты: /promo (подтверждённые контакты и доплаты) и Обзвон → Факт.</label></div>
+</div>
+
+<div class="sec" data-who="Маша">
+<h3><span class="who">Маша · директор-маркетолог</span> Трафик и точки контакта</h3>
+<div class="item"><input id="m1"><span class="p r">🔴</span><label for="m1">Объявить промоутерам правила оплаты: 600 ₽ — только подтверждённый (дозвонились + записался), 200 ₽ — был в базе, 0 ₽ — фейк. Сверить 3 «непробиваемых» номера с пометкой «в базе» и 6 сомнительных цифр листа Виталия.</label></div>
+<div class="item"><input id="m2"><span class="p o">🟠</span><label for="m2">Публикации после даты-якоря: тексты — /content, макеты — /makety. План на 2 недели + посевы в районных пабликах и мамских чатах.</label></div>
+<div class="item"><input id="m3"><span class="p o">🟠</span><label for="m3">Указатель к входу от Дикси/шлагбаума — три семьи заблудились, одну Аня встречала на улице.</label></div>
+<div class="item"><input id="m4"><span class="p o">🟠</span><label for="m4">Чат лагеря с ежедневным фотоотчётом (жалоба Кукарской «раньше был чат — теперь нет»). 10 минут, инструмент удержания.</label></div>
+<div class="item"><input id="m5"><span class="p y">🟡</span><label for="m5">Разбирать «Лиды» на портале ежедневно — рассылка 12.08 уже дала 3 записи и 1 оплату.</label></div>
+</div>
+
+<div class="sec" data-who="Звонки">
+<h3><span class="who">Лена · Аня · Ира</span> Прозвон и записи</h3>
+<div class="item"><input id="a1"><span class="p r">🔴</span><label for="a1"><b>Правило №1: «записываю» = запись в группу в CRM сразу.</b> Три шага: карточка (поиск «/») → запись в конкретную группу (колеблются — «Заявки» предмета) → статус. Вчера 0 записей при 5+ устных «да».</label></div>
+<div class="item"><input id="a2"><span class="p r">🔴</span><label for="a2">Дообзвонить все 110 промо-контактов (Руслан 65, Виталий 36, Маша 9). После разговора — статус: за подтверждённых промоутерам платят, статусы = деньги.</label></div>
+<div class="item"><input id="a3"><span class="p o">🟠</span><label for="a3">Горячие сегодня: Виктория (мини-сад, «будем записывать» — дожать с ценой!), Эльвира (лагерь 24–28, звонить до 14:00), Тимур (перезвон до обеда), городской 74951376442 (звонил трижды).</label></div>
+<div class="item"><input id="a4"><span class="p o">🟠</span><label for="a4">Продления «Мисс Марта» до записей: Злата, Денис (пн/чт 19:00), Аня вт/вс + вопрос по Марии 12 л.</label></div>
+<div class="item"><input id="a5"><span class="p y">🟡</span><label for="a5">Ира: шпаргалка заведения промо-контакта — База знаний. Каждый работает под своим аккаунтом МойКласс.</label></div>
+<div class="item"><input id="a6"><span class="p y">🟡</span><label for="a6">Одна версия дат и цен для всех: до якоря Бориса — «30–31 августа, старые цены до 30.08». Никаких «до 25.08» и «30 сентября».</label></div>
+</div>
+
+<div class="sec" data-who="Лиза">
+<h3><span class="who">Лиза · онлайн-операционка</span> Чаты, деньги, документы</h3>
+<div class="item"><input id="l1"><span class="p r">🔴</span><label for="l1">Бейдж «ждут ответа» держать на нуле (страница «Ответы»), цель — 15 минут. Сейчас ждут: Смирнов Роман (расписание занятий! с 9:15), Семина («будет ли нулевой класс»), «Запуск речи» (лид назвал интерес), Нилова (документы не нашли).</label></div>
+<div class="item"><input id="l2"><span class="p r">🔴</span><label for="l2">Вписать причины к 10 возвратам лета (271 855 ₽) и обзвонить должников 2026 (~160 000 ₽, среди них Денисова 11 000 ₽ — та самая «готова оплатить»). Готовая сводка: База знаний → «Возвраты и долги».</label></div>
+<div class="item"><input id="l3"><span class="p o">🟠</span><label for="l3">Закрыть занятия прошлой недели в МойКласс (поручение Бориса).</label></div>
+<div class="item"><input id="l4"><span class="p o">🟠</span><label for="l4">Обещания с дедлайном: Киреевы (варианты в Max — просрочено!), сава (материалы «до 1-го»), меню Селезневым.</label></div>
+<div class="item"><input id="l5"><span class="p y">🟡</span><label for="l5">Вводная Ире: статусы, причины отказов, запись в группу, портал.</label></div>
+</div>
+
+<div class="sec" data-who="Клод">
+<h3><span class="who">Клод · системы</span> Работает само + очередь</h3>
+<div class="item"><input id="k1"><span class="p o">🟠</span><label for="k1">Ежечасный разбор звонков и вечерний разбор переписок → комментарии, статусы, задачи. Работает.</label></div>
+<div class="item"><input id="k2"><span class="p o">🟠</span><label for="k2">Вечерняя сверка реестра промоутеров с базой (правки цифр Иры) + отчёт по подтверждённым и доплатам.</label></div>
+<div class="item"><input id="k3"><span class="p o">🟠</span><label for="k3">После ответов Бориса: цены в 75 групп (с бэкапом) → мануалы/скрипты/фабрика на одну формулу → памятка админам.</label></div>
+<div class="item"><input id="k4"><span class="p y">🟡</span><label for="k4">Ежедневная автосверка базы со снапшотом · автовозврат слетевших тегов · ночная чистка источника «Иное» · склейка 4 дублей (задачи стоят).</label></div>
+<div class="item"><input id="k5"><span class="p y">🟡</span><label for="k5">Включить Ирину в ротацию задач и дисциплину, как появится её аккаунт. Рефералка — после «да».</label></div>
+</div>
+
+<h2>Воронка и каналы (методика курса, ×3)</h2>
+<div class="sec">
+<p class="small" style="margin-top:0">Нужно <b>387 заявок за 43 дня</b> (≈163 новых ученика при конверсии 42% + 226 продлений своих). Каналы: <b>листовки/промоутеры 150</b> (запущен: 110 контактов уже в работе) · рассылки по базе 60 (идёт: лагерная рассылка, 22 ответа) · паблики и чаты 30 · расклейки и гео-партнёры 30 · соцсети и Яндекс.Карты 30 (ждёт токены) · конкурс с ботом 30 · блогеры 30 · рефералка 30 (ждёт «да»). Календарь: <b>до 23.08 подготовка</b> (Маша: паблики, партнёры, блогеры, печать) → <b>24.08 общий старт</b> → 29.08 праздник → 30.08 дедлайн «старые цены» → 31.08–6.09 открытые уроки + старт рефералки → два круга каналов до 30.09.</p>
+</div>
+
+<h2>⚠️ Грабли последних дней — не наступать повторно</h2>
+<div class="sec grabli">
+<ul>
+<li><b>Устные «да» без записи в CRM</b> — место никто не держит, статистика врёт. Лечится правилом трёх шагов.</li>
+<li><b>Четыре версии дат и три версии скидок в звонках</b> — клиентов звали даже на «30 сентября». Одна формула для всех.</li>
+<li><b>Цены «на слух»</b> — Аня не знала цен лагеря, Лена суммировала скидки по памяти. Прайс должен жить в CRM, а не в головах.</li>
+<li><b>Чаты после 16:00 без ответа</b> — «готова оплатить 11 000 ₽» провисело до ночи. Последняя проверка чатов — перед уходом.</li>
+<li><b>Дубли карточек</b> — 4 за два дня. Перед заведением — поиск по номеру (клавиша «/»).</li>
+<li><b>Промо-карточки без фамилий и родителей</b> — «даша» среди пяти даш не найти. Заводим полностью с листа.</li>
+<li><b>Пропущенные без перезвона</b> — субботние звонки ждали 32 часа. Теперь ловит страница «Ответы», но её надо открывать.</li>
+</ul>
+</div>
+<p class="small">Реестр всех дел с фильтрами — отдельная страница «Реестр дел KidsUP» в артефактах. Портал: app.kidsup.ru · Вопросы — Клоду в чат.</p>
+</div>
+<script>
+const KEY='kidsup-plan-3';
+const saved=JSON.parse(localStorage.getItem(KEY)||'{}');
+document.querySelectorAll('.item input').forEach(cb=>{
+ cb.type='checkbox';cb.checked=!!saved[cb.id];
+ cb.closest('.item').classList.toggle('done',cb.checked);
+ cb.addEventListener('change',()=>{saved[cb.id]=cb.checked;
+  localStorage.setItem(KEY,JSON.stringify(saved));
+  cb.closest('.item').classList.toggle('done',cb.checked);});
+});
+const btns=document.querySelectorAll('#flt .f');
+btns.forEach(b=>b.addEventListener('click',()=>{
+ btns.forEach(x=>x.classList.remove('on'));b.classList.add('on');
+ const k=b.dataset.k;
+ document.querySelectorAll('.sec[data-who]').forEach(s=>{
+  s.style.display=(k==='all'||k==='red'||s.dataset.who===k)?'':'none';});
+ document.querySelectorAll('.item').forEach(it=>{
+  it.style.display=(k==='red'&&!it.querySelector('.p.r'))?'none':'';});
+}));
+</script>
