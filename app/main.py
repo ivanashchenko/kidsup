@@ -1040,19 +1040,31 @@ def metrics_page(request: Request):
         load = sla.load_caps()
     except Exception as e:
         load = {"error": f"{type(e).__name__}: {e}", "load": {}, "over": {}}
+    # «нагрузка смены» — только про админов; задачи Бориса/Маши (владелец,
+    # маркетинг) — не смена, потолки к ним не относятся
+    ADMINS_ONLY = {202856: "Лена", 232805: "Аня", 232763: "Ира", 154181: "Лиза"}
+    load["load"] = {m: v for m, v in (load.get("load") or {}).items()
+                    if m in ADMINS_ONLY}
     names = {a["managerId"]: a["name"] for a in autopilot._admins()}
+    for mid, nm in ADMINS_ONLY.items():
+        names.setdefault(mid, nm)
     try:
         alert = json.loads(db.get_setting("sla_last_alert") or "{}")
     except ValueError:
         alert = {}
+    # реальные звонки за день — напрямую из Mango (чужой центр уже отфильтрован)
+    try:
+        from . import mango
+        _now = autopilot._now()
+        mrows = mango.calls(_now.replace(hour=0, minute=0, second=0, microsecond=0), _now)
+        calls = {"in": len({r["from_num"][-10:] for r in mrows if not r["from_ext"]}),
+                 "out": len({r["to_num"][-10:] for r in mrows if r["from_ext"]}),
+                 "talked": len({(r["to_num"] if r["from_ext"] else r["from_num"])[-10:]
+                                for r in mrows if r["answer"]})}
+    except Exception:
+        calls = {}
     with db.get_conn() as conn:
-        conn.execute("""CREATE TABLE IF NOT EXISTS mango_calls (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
-            direction TEXT, state TEXT)""")
         today = autopilot._today().isoformat()
-        calls = dict(conn.execute(
-            "SELECT direction, COUNT(DISTINCT phone) FROM mango_calls "
-            "WHERE ts >= ? GROUP BY direction", (today,)).fetchall())
         msgs = conn.execute(
             "SELECT COUNT(*) FROM wazzup_outbox WHERE ts >= ?", (today,)).fetchone()[0]
         # главный счёт недели: записи в группы по админам (создатель заявки).
@@ -2041,7 +2053,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-18.30"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-18.31"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
