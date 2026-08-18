@@ -215,11 +215,18 @@ def _bq_init(conn) -> None:
         status TEXT DEFAULT 'pending', created TEXT, sent TEXT)""")
 
 
-def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
+def enqueue_broadcast(campaign: str, segment: str, text: str,
+                      include_active: bool = False,
+                      exclude_enrolled: bool = False,
+                      exclude_campaigns: list[str] | None = None) -> dict:
     """Ставит кампанию в очередь. Сегменты: contin (уч. год 25/26), camp
     (летний лагерь), regular (летние регулярные), y2425 (давние), warm (все
-    перечисленные). Плейсхолдер {имя} = имя ребёнка из CRM. Один номер — одно
-    сообщение за кампанию; жёсткие статусы (отказ/не звонить) исключаются."""
+    перечисленные), funnel (открытая воронка набора: новые, промо, недозвон,
+    думают). Плейсхолдер {имя} = имя ребёнка из CRM. Один номер — одно
+    сообщение за кампанию; жёсткие статусы (отказ/не звонить) исключаются.
+    include_active — не отсекать семьи, ходившие этим летом (для приглашений);
+    exclude_enrolled — пропустить уже записанных в группы 26/27;
+    exclude_campaigns — пропустить номера, уже стоящие в других кампаниях."""
     kinds = _summer_kinds()
     with db.get_conn() as conn:
         _bq_init(conn)
@@ -237,6 +244,15 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
             pick |= {u for u in summer if kinds.get(u) == "regular"}
         if segment in ("y2425", "warm"):
             pick |= y2425
+        if segment == "funnel":
+            # открытая воронка набора: по статусу карточки, визиты не нужны
+            FUNNEL = {125951, 347075, 345768, 146950, 345767}
+            for uid, raw in conn.execute("SELECT id, raw FROM users"):
+                try:
+                    if json.loads(raw or "{}").get("clientStateId") in FUNNEL:
+                        pick.add(uid)
+                except ValueError:
+                    continue
         if segment in ("camp_past", "camp_past_camp", "camp_past_regular"):
             # лето 2024/2025, но НЕ были летом 2026
             past = {r[0] for r in conn.execute(base + """
@@ -254,6 +270,19 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
                JOIN lessons l ON l.id = lr.lesson_id
                WHERE lr.visit = 1 AND l.date >= '2026-06-01'
                  AND u.phone IS NOT NULL AND u.phone != ''""") if _ph}
+        enrolled_ids: set[int] = set()
+        if exclude_enrolled:
+            enrolled_ids = {r[0] for r in conn.execute(
+                """SELECT DISTINCT j.user_id FROM joins j
+                   JOIN classes c ON c.id = j.class_id
+                   WHERE c.name LIKE '2627%'
+                     AND j.status_id IN (2, 5, 50509, 83760, 58132, 58131, 70367)""")}
+        other_phones: set[str] = set()
+        if exclude_campaigns:
+            marks = ",".join("?" for _ in exclude_campaigns)
+            other_phones = {(p or "")[-10:] for (p,) in conn.execute(
+                f"SELECT DISTINCT phone FROM broadcast_queue WHERE campaign IN ({marks})",
+                exclude_campaigns)}
         seen_phones: set[str] = set()
         n = 0
         now = _now().isoformat(timespec="seconds")
@@ -268,7 +297,11 @@ def enqueue_broadcast(campaign: str, segment: str, text: str) -> dict:
                 state = None
             if state in SKIP_HARD:
                 continue
-            if row[1][-10:] in active_phones:
+            if uid in enrolled_ids:
+                continue      # уже записан в группы 26/27 — приглашать не нужно
+            if row[1][-10:] in other_phones:
+                continue      # уже получает другую кампанию — не дублируем
+            if not include_active and row[1][-10:] in active_phones:
                 continue      # семья ходит к нам этим летом — «не увиделись» ей писать нельзя
             seen_phones.add(row[1])
             child = row[0] or ""  # полное имя из CRM; имя ребёнка выделяется при отправке
