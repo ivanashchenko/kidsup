@@ -1055,8 +1055,35 @@ def metrics_page(request: Request):
             "WHERE ts >= ? GROUP BY direction", (today,)).fetchall())
         msgs = conn.execute(
             "SELECT COUNT(*) FROM wazzup_outbox WHERE ts >= ?", (today,)).fetchone()[0]
+        # главный счёт недели: записи в группы по админам (создатель заявки).
+        # joins обновляются лёгким синком каждые 5 минут
+        yest = (autopilot._today() - timedelta(days=1)).isoformat()
+        week_ago = (autopilot._today() - timedelta(days=6)).isoformat()
+        MGR_NAMES = {84116: "Борис", 154181: "Лиза", 202856: "Лена",
+                     229704: "Маша", 232805: "Аня"}
+        rec: dict[int, dict] = {}
+        for (raw,) in conn.execute(
+                "SELECT raw FROM joins WHERE created_at >= ?", (week_ago,)):
+            try:
+                j = json.loads(raw)
+            except ValueError:
+                continue
+            mid = j.get("managerId")
+            if not mid or j.get("autoJoin"):
+                continue
+            day = (j.get("createdAt") or "")[:10]
+            r = rec.setdefault(mid, {"today": 0, "yest": 0, "week": 0})
+            r["week"] += 1
+            if day == today:
+                r["today"] += 1
+            elif day == yest:
+                r["yest"] += 1
+    records = sorted(
+        ({"name": names.get(m) or MGR_NAMES.get(m, f"id {m}"), **v}
+         for m, v in rec.items()),
+        key=lambda x: (-x["today"], -x["week"]))
     return render(request, "metrics.html", active="metrics", load=load,
-                  names=names, alert=alert, calls=calls, msgs=msgs,
+                  names=names, alert=alert, calls=calls, msgs=msgs, records=records,
                   sla=[(sla.CAT_NAME[k], v) for k, v in sla.SLA_MINUTES.items()],
                   caps={"calls": sla.CAP_CALLS, "chats": sla.CAP_CHATS})
 
@@ -2013,7 +2040,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-18.26"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-18.27"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")

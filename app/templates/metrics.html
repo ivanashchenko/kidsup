@@ -3,6 +3,24 @@
 {% block content %}
 <h1>Дисциплина по задачам</h1>
 
+<h2>🏆 Записи в группы по админам</h2>
+<p class="muted small">Главный счёт недели: кто больше записал — тот молодец. Считаются заявки/записи,
+созданные админом в МойКласс (автозаписи не считаются). Обновляется каждые 5 минут.</p>
+{% if records %}
+<table class="data">
+  <thead><tr><th>Админ</th><th>Сегодня</th><th>Вчера</th><th>За 7 дней</th></tr></thead>
+  <tbody>
+  {% for r in records %}
+    <tr{% if loop.first and r.today %} style="background:#E3EFE8;font-weight:600"{% endif %}>
+      <td>{{ r.name }}{% if loop.first and r.today %} 🥇{% endif %}</td>
+      <td>{{ r.today }}</td><td>{{ r.yest }}</td><td>{{ r.week }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="notice">Записей за неделю пока нет.</div>
+{% endif %}
+
 <h2>Сроки (SLA)</h2>
 <table class="data">
   <thead><tr><th>Вид задачи</th><th>Срок</th><th>Просрочка вдвое</th></tr></thead>
