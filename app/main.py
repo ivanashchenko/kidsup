@@ -1043,8 +1043,8 @@ def metrics_page(request: Request):
     # «нагрузка смены» — только про админов; задачи Бориса/Маши (владелец,
     # маркетинг) — не смена, потолки к ним не относятся
     ADMINS_ONLY = {202856: "Лена", 232805: "Аня", 232763: "Ира", 154181: "Лиза"}
-    load["load"] = {m: v for m, v in (load.get("load") or {}).items()
-                    if m in ADMINS_ONLY}
+    load["load"] = {m: (load.get("load") or {}).get(m, {"calls": 0, "chats": 0, "other": 0})
+                    for m in ADMINS_ONLY}
     names = {a["managerId"]: a["name"] for a in autopilot._admins()}
     for mid, nm in ADMINS_ONLY.items():
         names.setdefault(mid, nm)
@@ -1075,6 +1075,7 @@ def metrics_page(request: Request):
         # её записи (лагерь, переоформления) в соревнование не входят
         MGR_NAMES = {202856: "Лена", 232805: "Аня", 232763: "Ира"}
         rec: dict[int, dict] = {}
+        IRA_SINCE = "2026-08-18"  # аккаунт Ирины Головиной передан новой Ире 18.08
         for (raw,) in conn.execute(
                 "SELECT raw FROM joins WHERE created_at >= ?", (week_ago,)):
             try:
@@ -1084,6 +1085,8 @@ def metrics_page(request: Request):
             mid = j.get("managerId")
             if mid not in MGR_NAMES or j.get("autoJoin"):
                 continue
+            if mid == 232763 and (j.get("createdAt") or "")[:10] < IRA_SINCE:
+                continue  # записи прежнего владельца аккаунта — не в зачёт новой Иры
             day = (j.get("createdAt") or "")[:10]
             r = rec.setdefault(mid, {"today": 0, "yest": 0, "week": 0})
             r["week"] += 1
@@ -2053,7 +2056,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-18.32"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-18.33"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")

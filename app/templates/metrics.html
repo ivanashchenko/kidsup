@@ -2,10 +2,11 @@
 {% block title %}Дисциплина — KidsUP{% endblock %}
 {% block content %}
 <h1>Дисциплина по задачам</h1>
+<p class="muted small">Обновляется само каждые 3 минуты · <span id="m-upd">открыто только что</span></p>
 
 <h2>🏆 Записи в группы по админам</h2>
 <p class="muted small">Главный счёт недели: кто больше записал — тот молодец. Считаются заявки/записи,
-созданные админом в МойКласс (автозаписи не считаются). Обновляется каждые 5 минут.</p>
+созданные админом в МойКласс (автозаписи не считаются). Ире считаются записи с 18.08 — дня передачи ей аккаунта.</p>
 {% if records %}
 <table class="data">
   <thead><tr><th>Админ</th><th>Сегодня</th><th>Вчера</th><th>За 7 дней</th></tr></thead>
@@ -77,4 +78,25 @@
   <ul>{% for it in alert['items'] %}<li class="small">{{ it }}</li>{% endfor %}</ul>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  async function refresh() {
+    try {
+      const r = await fetch(location.href, {cache: 'no-store'});
+      if (!r.ok) throw new Error(r.status);
+      const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+      const next = doc.querySelector('main');
+      if (next) document.querySelector('main').innerHTML = next.innerHTML;
+      const t = new Date();
+      const el = document.getElementById('m-upd');
+      if (el) el.textContent = 'обновлено в ' +
+        String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+    } catch (e) { location.reload(); }
+  }
+  setInterval(refresh, 180000);
+})();
+</script>
 {% endblock %}
