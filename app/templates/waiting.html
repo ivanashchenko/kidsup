@@ -4,7 +4,7 @@
 <h1>Ответы: кто ждёт и что ответить</h1>
 <p class="muted">Чаты, где последнее слово за клиентом (15+ минут), и звонки без перезвона.
 🔥 — деньги или запись. Черновик — подсказка по смыслу, проверьте и допишите под клиента.
-Обновляется автоматически.</p>
+Обновляется само каждые 3 минуты · <span id="w-upd">открыто только что</span>.</p>
 
 <h2>☎ Не перезвонили (пропущенные входящие, 48 ч)</h2>
 {% if not w['calls'] %}
@@ -43,5 +43,25 @@
   {% endfor %}
 </table>
 {% endif %}
-<script>setTimeout(() => location.reload(), 180000);</script>
+<script>
+/* мягкое обновление раз в 3 минуты: перерисовываем контент без перезагрузки,
+   чтобы страница не «мигала» на ресепшене; при ошибке сети — полная перезагрузка */
+(function () {
+  const upd = document.getElementById('w-upd');
+  async function refresh() {
+    try {
+      const r = await fetch(location.href, {cache: 'no-store'});
+      if (!r.ok) throw new Error(r.status);
+      const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+      const next = doc.querySelector('main');
+      if (next) document.querySelector('main').innerHTML = next.innerHTML;
+      const t = new Date();
+      const el = document.getElementById('w-upd');
+      if (el) el.textContent = 'обновлено в ' +
+        String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+    } catch (e) { location.reload(); }
+  }
+  setInterval(refresh, 180000);
+})();
+</script>
 {% endblock %}
