@@ -1348,6 +1348,102 @@ def _eng_alumni_phones(conn) -> list[str]:
           AND u.phone IS NOT NULL AND u.phone != ''""", (ENG_COURSE_ID,))]
 
 
+def _team_phones() -> dict[str, str]:
+    """последние 10 цифр телефона -> подпись сотрудника (для Клода-диспетчера)."""
+    out: dict[str, str] = {}
+    try:
+        for mid, ph in json.loads(db.get_setting("admin_phones") or "{}").items():
+            if ph and len(ph) >= 10:
+                out[ph[-10:]] = f"сотрудник (менеджер {mid})"
+    except Exception:
+        pass
+    dg = db.get_setting("digest_phone") or ""
+    if len(dg) >= 10:
+        out[dg[-10:]] = "Борис (владелец)"
+    for item in (db.get_setting("team_extra_phones") or "").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        ph, _, name = item.partition(":")
+        if len(ph.strip()) >= 10:
+            out[ph.strip()[-10:]] = name.strip() or "сотрудник"
+    return out
+
+
+def _team_history(p10: str) -> list[dict]:
+    """Последние сообщения переписки с сотрудником в формате Anthropic API."""
+    msgs: list[tuple] = []
+    with db.get_conn() as conn:
+        for ts, text in conn.execute(
+                "SELECT ts, text FROM wazzup_inbox WHERE substr(phone,-10)=? "
+                "ORDER BY ts DESC LIMIT 8", (p10,)):
+            msgs.append((ts, "user", text or ""))
+        for ts, text in conn.execute(
+                "SELECT ts, text FROM wazzup_outbox WHERE substr(phone,-10)=? "
+                "AND text IS NOT NULL ORDER BY ts DESC LIMIT 8", (p10,)):
+            msgs.append((ts, "assistant", text or ""))
+    msgs.sort()
+    out: list[dict] = []
+    for _, role, text in msgs:
+        if not text.strip():
+            continue
+        if out and out[-1]["role"] == role:  # API требует чередования ролей
+            out[-1]["content"] += "\n" + text
+        else:
+            out.append({"role": role, "content": text})
+    while out and out[-1]["role"] != "user":
+        out.pop()
+    return out
+
+
+def team_chat_tick() -> None:
+    """Клод-диспетчер: раз в минуту отвечает команде в WhatsApp/Telegram/MAX.
+
+    Смотрит свежие входящие от номеров команды (admin_phones + digest_phone +
+    team_extra_phones «телефон:имя,…»), отвечает через Anthropic API тем же
+    каналом. Без ключа anthropic_api_key молчит — тогда сообщения разбирает
+    большой Клод в ежечасном прогоне."""
+    if not db.get_setting("anthropic_api_key"):
+        return
+    team = _team_phones()
+    if not team:
+        return
+    last = int(db.get_state("team_chat_last_id") or 0)
+    with db.get_conn() as conn:
+        if last == 0:  # первый запуск: старую историю не трогаем
+            row = conn.execute("SELECT COALESCE(MAX(id),0) FROM wazzup_inbox").fetchone()
+            db.set_state("team_chat_last_id", str(row[0]))
+            return
+        cutoff = (_now() - timedelta(hours=2)).isoformat(timespec="seconds")
+        rows = conn.execute(
+            "SELECT id, phone, chat_type, text FROM wazzup_inbox "
+            "WHERE id > ? AND ts >= ? ORDER BY id", (last, cutoff)).fetchall()
+    if not rows:
+        return
+    fresh: dict[str, tuple] = {}
+    for _id, phone, ctype, _text in rows:
+        if phone[-10:] in team:
+            fresh[phone[-10:]] = (phone, ctype)
+    if fresh:
+        from . import analytics, assistant, wazzup
+        groups = analytics.group_stats()
+        tmap = {"telegram": "tgapi", "whatsapp": "whatsapp", "max": "max", "vk": "vk"}
+        for p10, (phone, ctype) in list(fresh.items())[:5]:
+            hist = _team_history(p10)
+            if not hist:
+                continue
+            hist[-1]["content"] = (f"(Пишет {team[p10]} в мессенджер. Ответь кратко "
+                                   f"и по делу, как коллега.)\n" + hist[-1]["content"])
+            res = assistant.ask(hist, groups)
+            ans = (res.get("answer") or "").strip()
+            if ans:
+                wazzup.send_via(tmap.get(ctype, "whatsapp"), phone, ans, dry_run=False)
+                log.info("team_chat: ответ %s (%s)", team[p10], ctype)
+            elif res.get("error"):
+                log.warning("team_chat: %s — %s", team[p10], res.get("message", ""))
+    db.set_state("team_chat_last_id", str(max(r[0] for r in rows)))
+
+
 def poll_calls() -> dict:
     """Минутный опрос Mango вместо платных уведомлений.
 
@@ -1443,6 +1539,12 @@ def _loop() -> None:
                     poll_calls()
                 except Exception:
                     log.exception("poll_calls упал — продолжаем")
+            # Клод-диспетчер: ответы команде в мессенджерах раз в минуту
+            if 8 <= now.hour < 22:
+                try:
+                    team_chat_tick()
+                except Exception:
+                    log.exception("team_chat_tick упал — продолжаем")
             # лёгкий синк групп и записей каждые 5 минут (08:00-21:00) —
             # «Набор 26/27» видит новые записи почти сразу; полный синк —
             # раз в день утром и по кнопке

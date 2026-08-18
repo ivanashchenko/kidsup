@@ -759,6 +759,8 @@ DOC_GROUPS = [
          "Алгоритм Бориса: дубль → источник → тег → статус"),
     ]),
     ("Каждый день на смене", [
+        ("tri_scenariya", "🧭 Три сценария админа: промо, входящие, база",
+         "Что делать в каждом из трёх случаев — по шагам, со статусами и фразами"),
         ("algoritm_obzvona", "📞 Обзвон базы: пошагово",
          "Главная инструкция дня: с чего начать, что говорить, что нажать в CRM"),
         ("zapis_v_gruppy", "📝 Запись в группы: корзина, потом день",
@@ -2011,7 +2013,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-18.24"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-18.25"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2051,7 +2053,7 @@ async def health():
 SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
-            "admin_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
+            "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
             "vk_token", "vk_group_id", "tg_bot_token", "tg_channel", "mango_ext_admins",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
