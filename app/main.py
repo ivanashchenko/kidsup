@@ -1543,8 +1543,8 @@ def callplan_done(payload: dict = Body(...)):
     key = sync.get_api_key()
     if not key:
         raise HTTPException(400, "нет API-ключа МойКласс")
-    from .moyklass_client import MoyKlassClient
-    c = MoyKlassClient(key)
+    from .moyklass_client import MoyklassClient
+    c = MoyklassClient(key)
     try:
         c.post("/v1/company/userComments",
                {"userId": uid, "comment": f"📞 Прозвон (app.kidsup.ru): {outcome}",
@@ -2060,7 +2060,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-18.37"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-18.38"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2180,6 +2180,186 @@ async def api_broadcast(payload: dict):
         include_active=bool(payload.get("include_active")),
         exclude_enrolled=bool(payload.get("exclude_enrolled")),
         exclude_campaigns=payload.get("exclude_campaigns") or None)
+
+
+# --- публичные эндпоинты для сайта kidsup.ru (без Basic-auth) -------------
+# Сайт живёт на другом домене, поэтому CORS «*». Ничего приватного здесь нет:
+# schedule отдаёт то же, что видно в открытых материалах (свободные места),
+# lead только принимает заявку. Всё пишущее — с honeypot и лимитом по IP.
+
+_PUB_CORS = {"Access-Control-Allow-Origin": "*",
+             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+             "Access-Control-Allow-Headers": "Content-Type"}
+_SCHED_CACHE: dict = {"ts": 0.0, "data": None}
+_LEAD_HITS: dict[str, list[float]] = {}
+
+
+@app.get("/api/public/schedule")
+def public_schedule():
+    """Расписание групп 2026/27 и свободные места — для сайта kidsup.ru."""
+    import time as _t
+    if _SCHED_CACHE["data"] is not None and _t.time() - _SCHED_CACHE["ts"] < 180:
+        return JSONResponse(_SCHED_CACHE["data"], headers=_PUB_CORS)
+    groups = [g for g in _enrollment_groups() if not g["buffer"]]
+    free_by_course: dict[str, int] = {}
+    sad_split = {"Мини-сад": 0, "Нулевой": 0}
+    for g in groups:
+        free_by_course[g["course"]] = free_by_course.get(g["course"], 0) + g["free"]
+        for k in sad_split:
+            if k in g["name"]:
+                sad_split[k] += g["free"]
+    by_key: dict[str, int] = {}
+    for cc in descr_mod.COURSES:
+        if cc["key"] == "minisad":
+            by_key[cc["key"]] = sad_split["Мини-сад"]
+        elif cc["key"] == "zeroclass":
+            by_key[cc["key"]] = sad_split["Нулевой"]
+        elif cc["course"] in free_by_course:
+            by_key[cc["key"]] = free_by_course[cc["course"]]
+    data = {"updated": datetime.now().isoformat(timespec="seconds"),
+            "by_key": by_key,
+            "groups": [{"name": g["name"], "course": g["course"], "day": g["day"],
+                        "time": g["time"], "age": g["age"], "free": g["free"],
+                        "capacity": g["capacity"]} for g in groups]}
+    _SCHED_CACHE.update(ts=_t.time(), data=data)
+    return JSONResponse(data, headers=_PUB_CORS)
+
+
+@app.options("/api/public/lead")
+def public_lead_options():
+    return JSONResponse({"ok": True}, headers=_PUB_CORS)
+
+
+def _lead_to_crm(lead: dict) -> None:
+    """Фоновая доводка заявки: карточка в МойКласс + задача дежурному + ТГ."""
+    from . import autopilot, wazzup
+    from .moyklass_client import MoyklassClient
+    log = logging.getLogger("kidsup.lead")
+    phone, child = lead["phone"], lead.get("child") or ""
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        uid = None
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT id, name FROM users WHERE substr(phone,-10)=? LIMIT 1",
+                (phone[-10:],)).fetchone()
+        if row:
+            uid = row["id"]
+        else:
+            u = mk.post("/v1/company/users", {
+                "name": child or "Заявка с сайта", "phone": phone})
+            uid = (u or {}).get("id")
+            if uid:
+                try:
+                    mk.post(f"/v1/company/users/{uid}/status",
+                            {"statusId": 125951, "statusChangeReasonId": 313608})
+                except Exception:
+                    pass
+        details = [f"🤖 Клод: 🌐 Заявка с нового сайта kidsup.ru",
+                   f"Ребёнок: {child or '—'}" + (f", возраст {lead['age']}" if lead.get("age") else ""),
+                   f"Направление: {lead.get('course') or 'не выбрано'}",
+                   f"Телефон: +{phone}"]
+        if lead.get("note"):
+            details.append(f"Комментарий: {lead['note']}")
+        if lead.get("roistat"):
+            details.append(f"roistat_visit: {lead['roistat']} (для сквозной аналитики)")
+        details.append("Правило: позвонить в течение 5 минут (скорость = конверсия).")
+        if uid:
+            mk.post("/v1/company/userComments",
+                    {"userId": uid, "comment": "\n".join(details), "showToUser": False})
+        admins = autopilot._admins_today() or autopilot._admins()
+        duty = admins[autopilot._today().toordinal() % len(admins)] if admins else None
+        if duty:
+            body = (f"🤖 Клод: 🔥 НОВАЯ ЗАЯВКА с сайта — позвонить в течение 5 минут! "
+                    f"{child or 'имя не указано'}"
+                    + (f", {lead['age']}" if lead.get("age") else "")
+                    + (f", {lead['course']}" if lead.get("course") else "")
+                    + f", тел. +{phone}")[:250]
+            autopilot._task(mk, duty["managerId"], uid, body)
+            try:
+                phones = json.loads(db.get_setting("admin_phones") or "{}")
+                dphone = phones.get(str(duty["managerId"])) or db.get_setting("digest_phone")
+                if dphone:
+                    wazzup.send_via("tgapi", dphone,
+                                    f"🔥 Заявка с сайта kidsup.ru: {child or 'имя не указано'}, "
+                                    f"+{phone}" + (f", {lead['course']}" if lead.get("course") else "")
+                                    + ". Задача уже в МойКласс — звоним в течение 5 минут! — Клод",
+                                    dry_run=False)
+            except Exception as e:
+                log.warning("уведомление дежурному не ушло: %s", e)
+        log.info("заявка с сайта: +%s → карточка %s", phone, uid or "не создана")
+    finally:
+        mk.close()
+
+
+@app.post("/api/public/lead")
+async def public_lead(request: Request):
+    """Форма нового сайта kidsup.ru. Всегда отвечает ok (чтобы не подсказывать
+    ботам), но honeypot и лимит по IP отсекают мусор до CRM."""
+    import time as _t
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    if (payload.get("website") or "").strip():   # honeypot-поле, люди его не видят
+        return JSONResponse({"ok": True}, headers=_PUB_CORS)
+    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() \
+        or (request.client.host if request.client else "?")
+    now = _t.time()
+    hits = [t for t in _LEAD_HITS.get(ip, []) if now - t < 600]
+    if len(hits) >= 5:
+        return JSONResponse({"ok": True}, headers=_PUB_CORS)
+    hits.append(now)
+    _LEAD_HITS[ip] = hits
+    digits = "".join(ch for ch in str(payload.get("phone") or "") if ch.isdigit())
+    if len(digits) == 11 and digits[0] == "8":
+        digits = "7" + digits[1:]
+    if len(digits) == 10 and digits[0] == "9":
+        digits = "7" + digits
+    if len(digits) != 11 or not digits.startswith("79"):
+        return JSONResponse({"ok": False, "error": "Проверьте номер телефона"},
+                            headers=_PUB_CORS)
+    lead = {"phone": digits,
+            "child": str(payload.get("name") or "").strip()[:80],
+            "age": str(payload.get("age") or "").strip()[:20],
+            "course": str(payload.get("course") or "").strip()[:80],
+            "note": str(payload.get("note") or "").strip()[:300],
+            "roistat": str(payload.get("roistat") or "").strip()[:64]}
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS site_leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+            child TEXT, age TEXT, course TEXT, note TEXT, roistat TEXT, ip TEXT)""")
+        conn.execute(
+            "INSERT INTO site_leads (ts, phone, child, age, course, note, roistat, ip)"
+            " VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?)",
+            (lead["phone"], lead["child"], lead["age"], lead["course"],
+             lead["note"], lead["roistat"], ip))
+        conn.commit()
+    import threading
+    threading.Thread(target=lambda: _safe_lead(lead), daemon=True).start()
+    return JSONResponse({"ok": True}, headers=_PUB_CORS)
+
+
+def _safe_lead(lead: dict) -> None:
+    try:
+        _lead_to_crm(lead)
+    except Exception:
+        logging.getLogger("kidsup.lead").exception(
+            "заявка +%s сохранена локально (site_leads), но не доехала до МойКласс",
+            lead.get("phone"))
+
+
+@app.get("/api/public/leads", dependencies=AUTH)
+def public_leads_list(limit: int = 50):
+    """Просмотр принятых с сайта заявок (для админки, с auth)."""
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                "SELECT ts, phone, child, age, course, note, roistat, ip "
+                "FROM site_leads ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        except Exception:
+            return {"count": 0, "leads": []}
+    return {"count": len(rows), "leads": [dict(r) for r in rows]}
 
 
 @app.post("/api/broadcast/retext", dependencies=AUTH)

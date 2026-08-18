@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KidsUP — детский центр и английский сад на Бульваре Рокоссовского</title>
+<meta name="description" content="Учебный год 2026/27 стартует 31 августа. Научим читать за 3 месяца, заговорит по-английски за год. 13 направлений для детей от 1,3 до 12 лет. Первое занятие — условно-бесплатное, с диагностикой. До 31.08 — цены прошлого года.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap">
+<style>
+:root{
+  --indigo:#312783; --blue:#1DA7E0; --green:#7DB928; --amber:#F59C00; --red:#E30613;
+  --ink:#221F3B; --muted:#6A6F87; --bg:#FFFFFF; --soft:#F2F8FD; --line:#E6E9F2;
+  --r:18px;
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{font:16px/1.6 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+img{max-width:100%}
+h1,h2,h3{font-family:Rubik,system-ui,sans-serif;color:var(--indigo);text-wrap:balance;line-height:1.15}
+h2{font-size:clamp(1.5rem,3.5vw,2.2rem);font-weight:900;margin-bottom:.5rem}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+section{padding:56px 0}
+.k{color:var(--blue)} .g{color:var(--green)} .a{color:var(--amber)}
+.btn{display:inline-block;border:0;border-radius:999px;padding:.95rem 1.9rem;font:700 1rem Rubik,sans-serif;
+  cursor:pointer;text-decoration:none;text-align:center;transition:transform .15s,box-shadow .15s}
+.btn:active{transform:scale(.97)}
+.btn-green{background:var(--green);color:#fff;box-shadow:0 8px 24px rgba(125,185,40,.35)}
+.btn-green:hover{box-shadow:0 10px 30px rgba(125,185,40,.5);transform:translateY(-2px)}
+.btn-line{border:2px solid var(--indigo);color:var(--indigo);background:#fff}
+.btn-wa{background:#25D366;color:#fff}
+/* topbar */
+.top{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:16px;padding:10px 20px}
+.top img{height:46px}
+.top nav{display:flex;gap:18px;margin-left:auto;font:600 .88rem Inter}
+.top nav a{color:var(--ink);text-decoration:none;white-space:nowrap}
+.top nav a:hover{color:var(--blue)}
+.top .tel{font:700 1rem Rubik;color:var(--indigo);text-decoration:none;white-space:nowrap}
+.top .btn{padding:.55rem 1.2rem;font-size:.88rem}
+@media(max-width:900px){.top nav{display:none}}
+/* hero */
+.hero{background:linear-gradient(160deg,#F2F8FD 0%,#EAF4FB 55%,#E9F5DE 100%);overflow:hidden;position:relative}
+.hero .wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:32px;align-items:center;padding-top:56px;padding-bottom:56px}
+@media(max-width:860px){.hero .wrap{grid-template-columns:1fr}}
+.hero h1{font-size:clamp(1.9rem,4.6vw,3.1rem);font-weight:900}
+.hero .sub{margin:.9rem 0 1.4rem;font-size:1.1rem;color:var(--muted);max-width:34rem}
+.badge-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.1rem}
+.badge{background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:.35rem .9rem;font:600 .82rem Inter;color:var(--indigo)}
+.badge.hot{background:var(--amber);border-color:var(--amber);color:#fff}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap}
+.hero-card{background:#fff;border-radius:22px;box-shadow:0 20px 60px rgba(49,39,131,.12);padding:26px}
+.hero-card h3{font-size:1.05rem;margin-bottom:.7rem}
+.count{display:flex;gap:10px;text-align:center;margin:.6rem 0 1rem}
+.count div{flex:1;background:var(--soft);border-radius:12px;padding:.55rem 0}
+.count b{display:block;font:900 1.5rem Rubik;color:var(--indigo);font-variant-numeric:tabular-nums}
+.count span{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.hero-card .note{font-size:.85rem;color:var(--muted)}
+/* events */
+.events{background:var(--indigo);color:#fff}
+.events h2{color:#fff}
+.events .sub{color:#C9C4EF;margin-bottom:1.6rem}
+.ev-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:820px){.ev-grid{grid-template-columns:1fr}}
+.ev{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);border-radius:var(--r);padding:22px}
+.ev .d{font:900 1.05rem Rubik;color:#FFD98A;margin-bottom:.3rem}
+.ev h3{color:#fff;font-size:1.2rem;margin-bottom:.4rem}
+.ev p{font-size:.92rem;color:#DDD9F5}
+.ev .free{display:inline-block;margin-top:.7rem;background:var(--green);border-radius:999px;padding:.2rem .8rem;font:700 .78rem Rubik}
+/* steps */
+.steps .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:1.4rem}
+@media(max-width:820px){.steps .grid{grid-template-columns:1fr}}
+.step{background:var(--soft);border-radius:var(--r);padding:22px;position:relative}
+.step .n{position:absolute;top:-14px;left:18px;background:var(--blue);color:#fff;border-radius:999px;
+  width:34px;height:34px;display:flex;align-items:center;justify-content:center;font:900 1rem Rubik}
+.step h3{font-size:1.05rem;margin:.6rem 0 .4rem}
+.step p{font-size:.92rem;color:var(--muted)}
+/* courses */
+.courses{background:#FAFBFE}
+.filter{display:flex;gap:8px;flex-wrap:wrap;margin:1.2rem 0 1.4rem}
+.filter button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:.4rem 1rem;
+  font:600 .84rem Inter;color:var(--muted);cursor:pointer}
+.filter button.on{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.c-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;
+  transition:box-shadow .2s,transform .2s}
+.card:hover{box-shadow:0 14px 40px rgba(49,39,131,.12);transform:translateY(-3px)}
+.card .age{font:700 .74rem Rubik;color:var(--blue);text-transform:uppercase;letter-spacing:.06em}
+.card h3{font-size:1.15rem;margin:.25rem 0 .4rem}
+.card .tag{font-size:.9rem;color:var(--ink);margin-bottom:.6rem}
+.card .meta{font-size:.82rem;color:var(--muted);margin-bottom:.3rem}
+.card .price{font:800 1.02rem Rubik;color:var(--indigo);margin:.5rem 0 .9rem}
+.card .btn{margin-top:auto;padding:.65rem 1.2rem;font-size:.9rem}
+.card .more{border:0;background:transparent;margin:.2rem 0 .8rem;border-radius:0}
+.card .more summary{padding:0;color:var(--blue);font:700 .88rem Rubik;cursor:pointer;list-style:none}
+.card .more summary::after{content:" \2193";font-size:.8rem}
+.card .more[open] summary::after{content:" \2191"}
+.card .more .body{font-size:.88rem;color:var(--ink);padding:.6rem 0 0}
+.card .more .body p{margin:.45rem 0}
+.card .more .body ul{margin:.4rem 0 .4rem 1.1rem}
+.card .more .body li{margin:.25rem 0}
+.card .more .body b,.card .more .body strong{color:var(--indigo)}
+.card.hide{display:none}
+/* why */
+.why .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:1.4rem}
+.why .item{border-left:4px solid var(--blue);background:var(--soft);border-radius:0 var(--r) var(--r) 0;padding:16px 18px}
+.why .item b{font-family:Rubik;color:var(--indigo)}
+.why .item p{font-size:.9rem;color:var(--muted);margin-top:.2rem}
+/* prices */
+.deal{background:linear-gradient(120deg,#FFF6E4,#FFEFD1);border-radius:22px;padding:28px;display:grid;
+  grid-template-columns:1.3fr .7fr;gap:20px;align-items:center}
+@media(max-width:760px){.deal{grid-template-columns:1fr}}
+.deal h2{color:#8a5a00}
+.deal ul{margin:.8rem 0 0 1.1rem;font-size:.95rem}
+.deal li{margin:.3rem 0}
+/* form */
+.form-sec{background:var(--indigo)}
+.form-sec h2,.form-sec p{color:#fff}
+.form-box{background:#fff;border-radius:22px;padding:28px;max-width:560px;margin:1.6rem auto 0;box-shadow:0 24px 70px rgba(0,0,0,.25)}
+.form-box label{display:block;font:600 .82rem Inter;color:var(--muted);margin:.8rem 0 .25rem}
+.form-box input,.form-box select{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:.7rem .9rem;
+  font:400 1rem Inter;color:var(--ink);background:#fff}
+.form-box input:focus,.form-box select:focus{outline:2px solid var(--blue);border-color:var(--blue)}
+.form-box .btn{width:100%;margin-top:1.2rem}
+.form-box .alt{text-align:center;font-size:.85rem;color:var(--muted);margin-top:.8rem}
+.form-box .alt a{color:var(--indigo);font-weight:600}
+/* faq */
+details{border:1px solid var(--line);border-radius:14px;padding:0;margin:.6rem 0;background:#fff;overflow:hidden}
+summary{cursor:pointer;padding:1rem 1.2rem;font:700 .98rem Rubik;color:var(--indigo);list-style:none;position:relative}
+summary::after{content:"+";position:absolute;right:1.1rem;font-size:1.3rem;color:var(--blue);transition:transform .2s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{padding:0 1.2rem 1rem;font-size:.93rem;color:var(--muted)}
+/* map/contacts */
+.contact .grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;margin-top:1.2rem}
+@media(max-width:760px){.contact .grid{grid-template-columns:1fr}}
+.contact .box{background:var(--soft);border-radius:var(--r);padding:22px;font-size:.95rem}
+.contact .box b{font-family:Rubik;color:var(--indigo)}
+.contact .box p{margin:.35rem 0}
+.map{border:0;width:100%;height:320px;border-radius:var(--r);background:var(--soft)}
+/* footer */
+footer{background:var(--indigo);color:#B9B3E4;padding:28px 0;font-size:.85rem}
+footer .wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+footer img{height:40px}
+footer a{color:#fff}
+/* свободные места */
+.spots{display:inline-block;align-self:flex-start;font:700 .74rem Rubik;color:#8a5a00;background:#FFF3D6;border-radius:999px;padding:.25rem .7rem;margin:0 0 .8rem}
+.spots.low{color:#fff;background:var(--red)}
+/* квиз подбора занятия */
+.quiz{background:var(--soft)}
+.q-box{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;max-width:760px;margin:0 auto}
+.q-row{margin-top:1rem}
+.q-row b{display:block;font-family:Rubik;color:var(--indigo);margin-bottom:.5rem}
+.q-row button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:.5rem 1rem;margin:0 .4rem .4rem 0;font:600 .9rem Inter;cursor:pointer;color:var(--ink)}
+.q-row button.on,.q-row button:hover{border-color:var(--blue);color:var(--blue)}
+.q-res{margin-top:1.1rem;background:var(--soft);border-radius:14px;padding:16px 18px}
+.q-res h3{margin-bottom:.2rem}
+.q-res p{font-size:.92rem;margin:.3rem 0 .8rem}
+.q-res .btn{padding:.6rem 1.2rem;font-size:.9rem;margin-right:.5rem}
+/* плавающая кнопка WhatsApp */
+.fab{position:fixed;right:18px;bottom:18px;z-index:60;width:58px;height:58px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px rgba(37,211,102,.45);animation:fabpulse 2.6s ease-in-out infinite}
+.fab svg{width:32px;height:32px;fill:#fff}
+@keyframes fabpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+@media(max-width:760px){.fab{bottom:78px;width:52px;height:52px}}
+@media(prefers-reduced-motion:reduce){.fab{animation:none}}
+/* honeypot */
+.hp{position:absolute;left:-5000px;opacity:0;height:0;overflow:hidden}
+/* sticky mobile cta */
+.m-cta{position:fixed;bottom:0;left:0;right:0;z-index:60;display:none;gap:8px;padding:10px 12px;
+  background:rgba(255,255,255,.97);border-top:1px solid var(--line)}
+.m-cta .btn{flex:1;padding:.8rem .5rem;font-size:.92rem}
+@media(max-width:760px){.m-cta{display:flex}body{padding-bottom:72px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto}}
+body.js .reveal{opacity:0;transform:translateY(14px);transition:opacity .5s,transform .5s}
+body.js .reveal.in{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <img src="LOGO_COLOR" alt="KidsUP — детский центр">
+    <nav>
+      <a href="#events">Праздник 29.08</a>
+      <a href="#courses">Занятия</a>
+      <a href="#prices">Цены и скидки</a>
+      <a href="#faq">Вопросы</a>
+      <a href="#contact">Как найти</a>
+    </nav>
+    <a class="tel" href="tel:+74951209024">+7 495 120-90-24</a>
+    <a class="btn btn-green" href="#signup">Записаться</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <div class="badge-row">
+        <span class="badge hot">До 31 августа — цены прошлого года</span>
+        <span class="badge">от 1,3 до 12 лет</span>
+        <span class="badge">группы 6–8 детей</span>
+      </div>
+      <h1>Научим читать за 3 месяца.<br>Заговорит по-английски за год.</h1>
+      <p class="sub">Детский центр и английский сад KidsUP на Бульваре Рокоссовского.
+      Учебный год стартует <b>31 августа</b> — выберите занятие и приходите на первое:
+      оно условно-бесплатное, с диагностикой от педагога.</p>
+      <div class="cta-row">
+        <a class="btn btn-green" href="#signup">Выбрать занятие</a>
+        <a class="btn btn-line" href="#events">🎉 Праздник 29 августа</a>
+      </div>
+    </div>
+    <div class="hero-card">
+      <h3>⏳ Старые цены действуют ещё</h3>
+      <div class="count" id="cnt">
+        <div><b id="cd">–</b><span>дней</span></div>
+        <div><b id="ch">–</b><span>часов</span></div>
+        <div><b id="cm">–</b><span>минут</span></div>
+      </div>
+      <p class="note">Оплатите сентябрь до 31.08 включительно — по ценам прошлого учебного года.
+      С 1 сентября действует новый прайс.</p>
+    </div>
+  </div>
+</section>
+
+<section class="events" id="events">
+  <div class="wrap">
+    <h2>Три дня, чтобы познакомиться с нами</h2>
+    <p class="sub">Приходите всей семьёй — посмотрите центр, педагогов и занятия до начала учебного года.</p>
+    <div class="ev-grid">
+      <div class="ev reveal">
+        <div class="d">СБ · 29 августа · 11:00</div>
+        <h3>🎉 Праздник KidsUP</h3>
+        <p>Аниматоры, конкурсы, весёлые активности и беспроигрышная лотерея.
+        Познакомьтесь с центром и педагогами в игровой атмосфере.</p>
+        <span class="free">Вход свободный, без записи</span>
+      </div>
+      <div class="ev reveal">
+        <div class="d">ВС · 30 августа</div>
+        <h3>🚪 День открытых дверей</h3>
+        <p>Экскурсии по центру, знакомство с программами и расписанием нового года.
+        Программу дня пришлём накануне.</p>
+        <span class="free">Приходите с ребёнком</span>
+      </div>
+      <div class="ev reveal">
+        <div class="d">31 августа — 6 сентября</div>
+        <h3>📚 Неделя открытых уроков</h3>
+        <p>Группы стартуют по расписанию, и на первое занятие можно прийти познакомиться:
+        не понравится — платить не нужно.</p>
+        <span class="free">KidsUPweek.ru</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="steps">
+  <div class="wrap">
+    <h2>Как записаться — три простых шага</h2>
+    <div class="grid">
+      <div class="step reveal"><span class="n">1</span>
+        <h3>Выберите занятие</h3>
+        <p>13 направлений для детей от 1,3 до 12 лет. Не уверены, что подойдёт?
+        Позвоните — подберём под возраст и характер ребёнка.</p></div>
+      <div class="step reveal"><span class="n">2</span>
+        <h3>Придите на первое занятие</h3>
+        <p>Оно условно-бесплатное: не понравится — платить не нужно, понравится —
+        занятие входит в первый абонемент. Педагог проведёт бесплатную диагностику
+        и даст рекомендации.</p></div>
+      <div class="step reveal"><span class="n">3</span>
+        <h3>Оставайтесь со скидкой</h3>
+        <p>Оплатите абонемент в день пробного — скидка 10%.
+        А до 31 августа сентябрь стоит по ценам прошлого года.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="quiz" id="quiz">
+  <div class="wrap">
+    <div class="q-box reveal">
+      <h2>🎯 Подобрать занятие за 30 секунд</h2>
+      <p style="color:var(--muted)">Два вопроса — и мы покажем, с чего лучше начать именно вашему ребёнку.</p>
+      <div class="q-row" id="q-age">
+        <b>Сколько лет ребёнку?</b>
+        <button data-v="1">1–3 года</button><button data-v="3">3–4 года</button><button data-v="4">4–6 лет</button><button data-v="7">7–12 лет</button>
+      </div>
+      <div class="q-row" id="q-goal" hidden>
+        <b>Что сейчас важнее всего?</b>
+        <button data-v="school">Чтение и подготовка к школе</button>
+        <button data-v="eng">Английский язык</button>
+        <button data-v="logic">Счёт, логика, внимание</button>
+        <button data-v="art">Творчество и спорт</button>
+        <button data-v="sad" data-sad>Сад / занять первую половину дня</button>
+      </div>
+      <div class="q-res" id="q-res" hidden></div>
+    </div>
+  </div>
+</section>
+
+<section class="courses" id="courses">
+  <div class="wrap">
+    <h2>Занятия нового учебного года</h2>
+    <p style="color:var(--muted)">Все группы до 8 человек (сад — до 15). Нажмите «Записаться» — и мы подберём группу и время.</p>
+    <div class="filter" id="flt">
+      <button class="on" data-a="all">Все</button>
+      <button data-a="1">1–3 года</button>
+      <button data-a="3">3–6 лет</button>
+      <button data-a="7">7–12 лет</button>
+    </div>
+    <div class="c-grid" id="cards">
+<div class="card g3">
+  <div class="age">✏️ 4–7 лет</div><h3>Подготовка к школе</h3>
+  <div class="tag">Научим читать за 3 месяца. Не по буквам — по-настоящему.</div>
+  <div class="meta">🗓 2 раза в неделю по 50 мин · будни 16:00–20:00 или суббота утром · 15 групп</div>
+  <div class="price">8 400 ₽ / 8 занятий</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>Главный страх родителя перед школой:</b> «все уже читают, а мой — нет». К октябрю
+первого класса разница между читающим и нечитающим превращается в разницу в самооценке,
+и держится она годами.</p>
+<p>Мы работаем по <b>технологиям Николая Буракова</b>. Это не «учим буквы»: чтение
+строится через складовое восприятие — ребёнок сразу видит кусок слова целиком, поэтому
+<b>начинает читать словами и понимать прочитанное за три месяца</b>.</p>
+<ul>
+<li><b>ПШ1 — нечитающие.</b> С нуля до чтения словами. Плюс счёт, письмо, логика, речь
+и главное — умение сидеть, слушать и доводить задание до конца: этого школа ждёт
+больше, чем знаний.</li>
+<li><b>ПШ2 — читающие.</b> Читающему ребёнку скучно среди складывающих буквы. Здесь
+скорость и осмысленность чтения, пересказ, письмо, математика, подготовка руки.
+Наши прошлогодние дети идут сразу сюда — они у нас и научились.</li>
+</ul>
+<p>Возраст сам по себе ничего не решает: пятилетний читающий пойдёт в ПШ2,
+семилетний нечитающий — в ПШ1. Первое занятие — заодно диагностика.</p>
+<p><b>Занятие 50 минут:</b> чтение на свежую голову → математика и логика в игре →
+письмо и подготовка руки → речь: рассказать, объяснить, ответить полным предложением.
+Смена деятельности между блоками, чтобы ребёнок не выгорал. Группы по 8 — педагог
+успевает к каждому.</p>
+<p><b>Что увидите дома:</b> через месяц — осмысленное чтение по слогам, через три —
+чтение словами и пересказ. И спокойное «сел и доделал».</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Подготовка к школе">Записаться</a>
+</div>
+<div class="card g3 g7">
+  <div class="age">🇬🇧 3–12 лет</div><h3>Английский язык</h3>
+  <div class="tag">Через год ребёнок говорит на английском. Не «знает слова» — говорит.</div>
+  <div class="meta">🗓 2 раза в неделю по 50 мин · пн-ср или вт-чт, 16:00–20:00</div>
+  <div class="price">8 400 ₽ / 8 занятий</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>Большинство детей учат английский годами</b> — и на вопрос «how are you?» отвечают
+молчанием. Потому что учат <i>про</i> язык: правила, списки, перевод. Мы учим языком:
+<b>всё занятие идёт на английском с первой минуты</b>. Ребёнок не переводит в голове —
+он слышит «take the red one» и берёт красный, как когда-то освоил родной язык.</p>
+<p><b>В этом году курс перестроен полностью</b> — мы перешли на кембриджскую систему
+уровней, по которой английский учат во всём мире. У каждого уровня понятная точка выхода:</p>
+<ul>
+<li><b>Pre-A1 Starters, первый год</b> — понимает простые просьбы, называет предметы,
+цвета, семью, отвечает короткими фразами, рассказывает о себе десятью предложениями.</li>
+<li><b>A1 Movers, второй год</b> — говорит о прошлом и будущем, описывает картинку,
+сам задаёт вопросы, читает короткие тексты без перевода.</li>
+<li><b>A1–A2 Movers/Flyers, третий год</b> — поддерживает бытовой разговор, пишет
+письмо другу, пересказывает историю, смотрит мультфильм в оригинале.</li>
+</ul>
+<p><b>Занятие 50 минут:</b> приветственный круг → новая лексика через предметы и
+движение → игра, где слова нужно применить → песня или ритмовка → мини-рефлексия.
+Группы по 8 человек — говорит каждый, а не ждёт очереди.</p>
+<p><b>Чего не обещаем:</b> носителя и «международный сертификат». Обещаем педагога,
+который ведёт занятие целиком на английском, — и ребёнка, который заговорит.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Английский язык">Записаться</a>
+</div>
+<div class="card g1 g3">
+  <div class="age">🌿 2–4 года</div><h3>Английский мини-сад</h3>
+  <div class="tag">Полдня, за которые ребёнок получает больше, чем за день в обычном саду.</div>
+  <div class="meta">🗓 будни 9:00–13:00 · от 2 до 5 дней в неделю · группа до 15 детей</div>
+  <div class="price">35 500 ₽ / 20 посещений · 19 600 ₽ / 8 · разовое 2 700 ₽</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>Это половинка дня, в которую умещается целый детский мир.</b> Не присмотр, а
+программа: каждый день минимум четыре занятия — <b>английский ежедневно</b>, ИЗО и
+лепка, музыка, песочная терапия, «говорилка» для запуска речи. Ребёнок мягко привыкает
+к саду без слёз, потому что группы маленькие и день короткий.</p>
+<p><b>Мама видит всё.</b> В группе видеотрансляция: открываете телефон — и смотрите,
+чем занят ребёнок. Для первого сада это снимает главную тревогу.</p>
+<p><b>Гибкая сетка — от 2 до 5 дней в неделю.</b> Можно начать с двух дней «на
+попробовать» и добрать, когда ребёнок втянется. Работаем по образовательной лицензии:
+оплата маткапиталом и налоговый вычет 13%.</p>
+<p><b>Первый день — бесплатный пробный.</b> Дальше есть пробная неделя: её стоимость
+целиком зачитывается при покупке месяца в течение 3 дней. То есть решение вы
+принимаете, уже увидев своего ребёнка в группе.</p>
+<p>В 3 года ребёнок из мини-сада естественно переходит в «Лицей для малышей» и на
+детский английский — тот же центр, те же лица, никакого стресса от смены места.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Английский мини-сад">Записаться</a>
+</div>
+<div class="card g3">
+  <div class="age">🎒 5–7 лет</div><h3>Нулевой класс</h3>
+  <div class="tag">Нулевой класс: мягкая репетиция школы за год до школы.</div>
+  <div class="meta">🗓 будни 10:00–14:00 · 5 или 3 дня в неделю · группа до 15 детей</div>
+  <div class="price">35 500 ₽ / 20 посещений · 26 600 ₽ / 12</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>Первый класс — это стресс не от знаний, а от формата:</b> сидеть 40 минут,
+слушать не маму, работать по инструкции, не бросать на середине. Нулевой класс — это
+год мягкой репетиции: тот же ритм «занятие-перемена», но в группе до 15 детей,
+с педагогом, которому хватает внимания на каждого.</p>
+<p><b>Каждый день минимум четыре занятия:</b> чтение и математика по технологиям
+Николая Буракова, подготовка руки к письму, окружающий мир — и <b>английский
+ежедневно</b>, как в языковом саду.</p>
+<p><b>К школе ребёнок приходит читающим</b> — и, что важнее, умеющим учиться. Разница
+видна с первой четверти: пока другие привыкают к самому формату урока, ваш занимается
+содержанием.</p>
+<p><b>Формат:</b> будни 10:00–14:00, пять или три дня в неделю. Образовательная
+лицензия: маткапитал, налоговый вычет. <b>Первый день — бесплатный пробный</b>,
+дальше пробная неделя с зачётом стоимости при покупке месяца.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Нулевой класс">Записаться</a>
+</div>
+<div class="card g1">
+  <div class="age">🧸 1,3–4 года</div><h3>Раннее развитие</h3>
+  <div class="tag">От первых слов до первых «сам!» — три программы по возрасту.</div>
+  <div class="meta">🗓 утро (с мамой) и день · группы 6–8 детей · 45–50 мин</div>
+  <div class="price">«Музыка и речь» 8 600 ₽ / 8 · «Первая школа» и «Лицей» 7 800 ₽ / 8</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p>С года до четырёх мозг растёт быстрее, чем когда-либо ещё, — и лучшее, что можно
+сделать в это окно, не «обучать», а <b>правильно играть</b>. Три программы, каждая
+под свой возраст:</p>
+<ul>
+<li><b>«Музыка и речь» · 1,3–3 года, с мамой.</b> Музыка, ритмы, движение и пальчиковые
+игры — то, из чего физиологически рождается речь. Мамы приходят «на музыку»,
+а через пару месяцев замечают, что ребёнок заговорил заметно раньше сверстников.
+Утренние группы с шагом возраста в полгода — ребёнок всегда среди ровесников.</li>
+<li><b>«Первая школа» · 1,3–3 года.</b> Первые занятия «как большие»: за столом и в
+движении, со сменой активности каждые несколько минут. Мама рядом, но работает
+ребёнок. Здесь появляются первые «сам!» — и это дороже любых карточек.</li>
+<li><b>«Лицей для малышей» · 3–4 года.</b> Первые 45 минут без мамы: счёт, речь,
+моторика, аккуратная сепарация. Это трамплин в мини-сад и в подготовку к школе —
+после «Лицея» ребёнок заходит туда без слёз и адаптации.</li>
+</ul>
+<p>Группы 6–8 детей, педагог видит каждого. Программа выстроена лесенкой: из «Музыки
+и речи» — в «Первую школу», дальше — «Лицей», сад, подготовка. Ребёнок растёт
+в одном месте, с знакомыми лицами.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Раннее развитие">Записаться</a>
+</div>
+<div class="card g1 g3 g7">
+  <div class="age">🗣️ 2–8 лет</div><h3>Логопед</h3>
+  <div class="tag">Запуск речи и чистые звуки — пока это решается легко.</div>
+  <div class="meta">🗓 индивидуально · Елена: пн/ср/пт вечер + вт/чт утро (50 мин) · Марина: вт/чт вечер, сб (40 мин)</div>
+  <div class="price">консультация 2 700 ₽ (Марина) / 2 500 ₽ (Елена) · 8 600 ₽ / 4 занятия</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>«Само пройдёт» — самая дорогая фраза в логопедии.</b> В 4–5 лет звук ставится
+за несколько занятий, в 8 — за месяцы, потому что неправильный уклад уже закрепился.
+А «молчун» в 2,5 года — это не характер, это повод показаться специалисту:
+запуск речи тем легче, чем раньше начали.</p>
+<p><b>Работаем индивидуально</b> — только ребёнок и логопед, ничьё чужое «р-р-р» не
+отвлекает. Два специалиста, 32 слота в неделю: <b>Елена</b> — понедельник, среда,
+пятница вечером и утро вторника/четверга (занятие 50 минут); <b>Марина</b> — вторник
+и четверг вечером и суббота (40 минут). Время подбирается под ваш график, а не
+наоборот.</p>
+<p><b>Всё начинается с консультации-диагностики:</b> логопед смотрит речь, уклад,
+дыхание — и честно говорит, нужен ли курс вообще. Иногда ответ «всё в норме,
+приходите через полгода» — и это тоже результат, это спокойствие перед школой.</p>
+<p>Родителям 3–5-леток на подготовке и в саду: спросите педагога, как у ребёнка
+с «р» и «ш» — диагностика у нас в том же здании, в те же дни.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Логопед">Записаться</a>
+</div>
+<div class="card g3 g7">
+  <div class="age">🧮 4–12 лет</div><h3>Ментальная арифметика</h3>
+  <div class="tag">Считает быстрее калькулятора — а на самом деле тренирует память и концентрацию.</div>
+  <div class="meta">🗓 воскресенье · 12:30 (4–7 лет) и 14:00 (7–12 лет) · 90 мин</div>
+  <div class="price">8 600 ₽ / 4 занятия</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>Счёт в уме быстрее калькулятора — это витрина.</b> Настоящий продукт — то, что
+происходит по дороге: чтобы держать абакус в воображении и двигать косточки мысленно,
+ребёнку приходится тренировать <b>рабочую память, концентрацию и скорость
+переключения</b>. Это те самые «мышцы», на которые опирается вся школьная учёба.</p>
+<p>Занимаемся по программе <b>CleverStart</b>: сначала настоящий абакус руками, потом
+воображаемый — в голове. Прогресс видно наглядно: сегодня ребёнок считает на счётах,
+через пару месяцев — глядя в потолок, быстрее вас.</p>
+<p><b>Формат под занятых:</b> воскресенье, одно большое занятие 90 минут вместо двух
+коротких — удобно, если будни забиты садом и школой. 12:30 — младшие (4–7),
+14:00 — школьники (7–12).</p>
+<p>Родители школьников говорят одно и то же: «стал собраннее, уроки делает вдвое
+быстрее». Хорошая пара — скорочтение: вместе они закрывают «медленно читает,
+медленно считает» целиком.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Ментальная арифметика">Записаться</a>
+</div>
+<div class="card g7">
+  <div class="age">♟️ 6–12 лет</div><h3>Шахматы</h3>
+  <div class="tag">Логика и умение думать наперёд — через сказку для малышей и турниры для школьников.</div>
+  <div class="meta">🗓 Гр1 (продолжающие): пт 18:00 + вс 11:00 · Гр2 (начинающие): пт 19:00 + вс 12:00</div>
+  <div class="price">7 000 ₽ / 8 занятий</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>Шахматы — это не про фигуры, это про голову.</b> Привычка думать на два хода
+вперёд, держать план и спокойно принимать проигрыш — три навыка, которые школа
+требует, но не учит. Здесь они тренируются каждым ходом.</p>
+<p>Ведёт педагог с авторской методикой <b>«Шахматное королевство»</b>: младшие заходят
+в игру через сказку — у каждой фигуры характер и история; школьники — через разборы
+партий и мини-турниры, где азарт настоящий, а проигрыш — безопасный.</p>
+<p><b>Две группы по уровню, не по возрасту:</b> начинающие — пятница 19:00 и
+воскресенье 12:00; продолжающие — пятница 18:00 и воскресенье 11:00. Два занятия
+в неделю — ровно тот ритм, при котором ребёнок не забывает выученное между встречами.</p>
+<p>Родители чаще всего замечают эффект не за доской, а в школе: математика идёт легче,
+потому что появилась привычка сначала подумать, потом делать.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Шахматы">Записаться</a>
+</div>
+<div class="card g3 g7">
+  <div class="age">🎨 4–11 лет</div><h3>ИЗО-студия</h3>
+  <div class="tag">Не «порисовать» — четыре темы, в каждой ребёнок доводит работу до результата.</div>
+  <div class="meta">🗓 пн + ср, 16:00–20:00 · 4 группы по темам</div>
+  <div class="price">7 000 ₽ / 8 занятий</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>Это не «порисовать, чтобы занять».</b> У каждой группы своя тема и свой
+результат — работа, которую ребёнок в конце занятия несёт домой законченной.
+Довести до конца — здесь это часть метода, а не случайность.</p>
+<ul>
+<li><b>Картины великих художников · 6–11.</b> Разбираем настоящую картину и пишем
+свою версию — попутно узнавая, кто такие Ван Гог и Айвазовский.</li>
+<li><b>Лепка · 4–11.</b> Самый короткий путь к сильной моторике — а моторика напрямую
+тянет за собой речь и письмо.</li>
+<li><b>Живопись · 5–11.</b> Цвет, композиция, смешивание — база, с которой рисунок
+перестаёт быть «каляками».</li>
+<li><b>Алфавитная живопись · 4–7.</b> Рисуем буквы — и запоминаем их телом и рукой.
+Отличная пара к подготовке к школе.</li>
+</ul>
+<p>Мягкий вход для стеснительных детей и хороший «второй предмет» к интеллектуальному
+первому — английскому или подготовке: голова отдыхает, руки работают.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="ИЗО-студия">Записаться</a>
+</div>
+<div class="card g7">
+  <div class="age">📖 7–12 лет</div><h3>Скорочтение (техника чтения)</h3>
+  <div class="tag">Кто быстро читает — быстро учится. Всё остальное — следствие.</div>
+  <div class="meta">🗓 2 раза в неделю по 50 мин</div>
+  <div class="price">8 400 ₽ / 8 занятий</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>«Сидит над уроками часами» почти всегда означает «медленно читает».</b>
+Каждое задание в школе начинается с текста: условие задачи, параграф, упражнение.
+Медленное чтение — это налог на всю учёбу сразу.</p>
+<p>Курс <b>CleverStart</b> ставит технику чтения как навык: расширение поля зрения,
+подавление проговаривания, удержание смысла. Результат измеримый — <b>плюс 30–50%
+к скорости при полном понимании</b>: замеряем на первом занятии и дальше каждый
+месяц, вы видите цифры, а не «стало получше».</p>
+<p><b>Кому это нужно:</b> «читает, но не любит», «прочитал и не помнит»,
+«домашка до ночи». Самый короткий путь к успеваемости из всех наших курсов —
+эффект видно уже в текущей четверти.</p>
+<p>Сильная пара — ментальная арифметика: вместе они разгоняют и чтение, и счёт,
+то есть обе опоры школьной скорости.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Скорочтение (техника чтения)">Записаться</a>
+</div>
+<div class="card g7">
+  <div class="age">✒️ 7–10 лет</div><h3>Каллиграфия + грамота</h3>
+  <div class="tag">Если учитель пишет «старайся!» красной ручкой — это к нам.</div>
+  <div class="meta">🗓 вт + чт, 16:00 · 50 мин</div>
+  <div class="price">8 400 ₽ / 8 занятий</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>Плохой почерк — это не лень.</b> Это неправильно поставленная рука: захват,
+наклон, нажим, соединения. Ругать бесполезно — надо переставить механику, и делается
+это упражнениями, а не «старайся».</p>
+<p>На занятии два пласта сразу: <b>каллиграфия</b> — постановка руки и красивое,
+неутомительное письмо; <b>грамота</b> — базовые правила, которые закрепляются
+в письме тут же, а не отдельной зубрёжкой.</p>
+<p><b>Кому:</b> первокласснику после нашей подготовки — чтобы школьные прописи не
+убили интерес; ребёнку 8–10 лет, у которого «грязь в тетради» уже стала источником
+двоек и слёз. Второе исправляется дольше, но исправляется.</p>
+<p><b>Что увидите:</b> через месяц — правильный захват и первые ровные строчки,
+через два-три — тетради без красных пометок за почерк. Вторник и четверг в 16:00,
+группа маленькая, рука каждого ребёнка — под присмотром.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Каллиграфия + грамота">Записаться</a>
+</div>
+<div class="card g3 g7">
+  <div class="age">🤖 4–12 лет</div><h3>Робототехника</h3>
+  <div class="tag">Ребёнок не смотрит, как делают взрослые, — собирает и программирует сам.</div>
+  <div class="meta">🗓 занятие 55 мин · партнёрский курс</div>
+  <div class="price">6 400 ₽ / 4 занятия · пробное 1 100 ₽ · разовое 2 000 ₽</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>Здесь ребёнок не зритель.</b> Он сам собирает робота и сам заставляет его
+ехать — а когда не едет, сам ищет почему. Этот цикл «попробовал → сломалось → понял →
+починил» и есть инженерное мышление, и он переносится на всё: от школьных задач
+до жизни.</p>
+<p>Курс партнёрский, ведут его инженеры-практики. Каждое занятие — законченный
+проект: робот, который к концу часа что-то умеет. 55 минут пролетают так, что детей
+уводят из класса за руку.</p>
+<p><b>Уровни по возрасту</b> — от крупных конструкторов с простой логикой у младших
+до программирования датчиков у школьников. Лучшие выходят на соревнования по
+робототехнике — это уже спорт, с азартом и медалями.</p>
+<p><b>Пробное занятие 1 100 ₽:</b> ребёнок собирает первого робота и сам всё понимает
+про этот курс. Отличный «второй предмет» для тех, кто уже ходит на английский или
+менталку, — руки и голова работают в другой связке.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Робототехника">Записаться</a>
+</div>
+<div class="card g3 g7">
+  <div class="age">💃 с 3 лет</div><h3>Спортивно-бальные танцы</h3>
+  <div class="tag">Осанка, ритм и уверенность — с трёх лет.</div>
+  <div class="meta">🗓 расписание уточняется у администратора</div>
+  <div class="price">стоимость уточняется у администратора</div>
+  <details class="more"><summary>Подробнее о курсе</summary><div class="body"><p><b>Танцы дают то, чего не даёт ни один «умный» кружок:</b> осанку, координацию,
+чувство ритма — и привычку выходить перед людьми не стесняясь. У девочек и мальчиков
+это работает одинаково: тело становится послушным, а уверенность — заметной.</p>
+<p>Студия партнёрская, занятия идут в нашем центре. Набор с трёх лет, группы по
+возрасту. Расписание и стоимость уточняются у администратора — состав групп
+формируется прямо сейчас, под набор.</p>
+<p>Хорошая пара к любому «сидячему» предмету: после подготовки к школе или английского
+ребёнку физиологически нужно движение — и лучше, если это движение с музыкой
+и результатом.</p></div></details>
+  <a class="btn btn-green" href="#signup" data-pick="Спортивно-бальные танцы">Записаться</a>
+</div>
+</div>
+  </div>
+</section>
+
+<section class="why">
+  <div class="wrap">
+    <h2>Почему родители выбирают KidsUP</h2>
+    <div class="grid">
+      <div class="item reveal"><b>Методика малых шагов Буракова</b>
+        <p>Ребёнок движется маленькими победами — без перегруза и слёз. Так дети начинают
+        читать за 3 месяца и, главное, учатся любить учиться.</p></div>
+      <div class="item reveal"><b>12 лет работаем в районе</b>
+        <p>Сотни выпускников подготовки к школе и английского. Многие семьи приводят
+        уже второго и третьего ребёнка.</p></div>
+      <div class="item reveal"><b>Малые группы 6–8 детей</b>
+        <p>Педагог видит каждого. Английский — по уровням Cambridge (Starters/Movers/Flyers),
+        подготовка к школе — отдельно для читающих и нечитающих.</p></div>
+      <div class="item reveal"><b>Занятия не сгорают</b>
+        <p>Заболели — отработаете в другой группе. Плюс 2 недели «заморозки» абонемента
+        в году на отпуск.</p></div>
+      <div class="item reveal"><b>Обратная связь после занятий</b>
+        <p>Педагог рассказывает, что получается и над чем работаем. Два раза в год —
+        открытые уроки, где дети показывают результат.</p></div>
+      <div class="item reveal"><b>2 минуты от метро</b>
+        <p>Бульвар Рокоссовского, 6 к1В — напротив ТЦ «Янтарь». Удобно совмещать
+        с садиком и школой: занятия с утра до 20:00.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="prices">
+  <div class="wrap">
+    <div class="deal reveal">
+      <div>
+        <h2>💛 Скидки — честные и простые</h2>
+        <ul>
+          <li><b>До 31 августа</b> — сентябрь по ценам прошлого учебного года.</li>
+          <li><b>−10%</b> при оплате абонемента в день пробного занятия.</li>
+          <li><b>−10%</b> на второй предмет · <b>−10%</b> на второго ребёнка ·
+              <b>−10%</b> многодетным и семьям участников СВО.</li>
+          <li>Скидки не суммируются — действует одна, наибольшая.</li>
+        </ul>
+      </div>
+      <div style="text-align:center">
+        <a class="btn btn-green" href="#signup">Успеть по старой цене</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="form-sec" id="signup">
+  <div class="wrap" style="text-align:center">
+    <h2>Записаться на занятие</h2>
+    <p>Оставьте заявку — администратор подберёт группу и время и ответит на вопросы.</p>
+    <form class="form-box" id="lead" style="text-align:left">
+      <label for="f-name">Имя ребёнка</label>
+      <input id="f-name" placeholder="Мария" autocomplete="off">
+      <label for="f-age">Возраст ребёнка</label>
+      <input id="f-age" placeholder="5 лет">
+      <label for="f-phone">Ваш телефон</label>
+      <input id="f-phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel">
+      <label for="f-course">Что интересует</label>
+      <select id="f-course">
+        <option>Подобрать под ребёнка</option>
+      </select>
+      <input class="hp" id="f-web" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="btn btn-green" type="submit">Отправить заявку</button>
+      <p class="alt">Позвоним в рабочее время в течение 15 минут.<br>
+      Удобнее самим? <a href="https://wa.me/79160170918" target="_blank" rel="noopener">WhatsApp</a> ·
+      <a href="tel:+74951209024">+7 495 120-90-24</a> · ежедневно с 9:00</p>
+    </form>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Частые вопросы</h2>
+    <details><summary>Первое занятие правда бесплатное?</summary>
+      <p>Оно условно-бесплатное: если не понравится — платить не нужно; если остаётесь —
+      занятие входит в первый абонемент. На нём педагог проводит бесплатную диагностику.
+      У мини-сада и нулевого класса — бесплатный пробный день, дальше пробная неделя
+      с зачётом стоимости при покупке месяца.</p></details>
+    <details><summary>Что будет, если ребёнок заболеет?</summary>
+      <p>Занятия не сгорают: пропуск можно отработать в другой группе по предварительной записи.
+      Плюс 2 недели «заморозки» абонемента в учебном году — например, на отпуск.</p></details>
+    <details><summary>Как понять, в какую группу попадёт ребёнок?</summary>
+      <p>Сначала предмет и уровень, потом время. Английский делим по уровням Cambridge
+      (Starters/Movers/Flyers), подготовку к школе — на группы для нечитающих и читающих.
+      Уровень определяем на первом занятии-диагностике.</p></details>
+    <details><summary>Есть ли занятия в выходные?</summary>
+      <p>Да: подготовка к школе по субботам, шахматы в пятницу и воскресенье,
+      ментальная арифметика по воскресеньям. Подберём расписание под вашу неделю.</p></details>
+    <details><summary>Как проходит оплата?</summary>
+      <p>Помесячно, абонементами по 8 занятий (у сада — 8/12/20 посещений).
+      Оплатить можно на ресепшене или по ссылке. До 31 августа сентябрь стоит
+      по ценам прошлого года.</p></details>
+  </div>
+</section>
+
+<section class="contact" id="contact">
+  <div class="wrap">
+    <h2>Как нас найти</h2>
+    <div class="grid">
+      <div class="box reveal">
+        <p><b>📍 Адрес:</b> б-р Маршала Рокоссовского, 6 к1В — напротив ТЦ «Янтарь»,
+        БЦ «Богородский», 7-й подъезд, 2-й этаж.</p>
+        <p><b>🚇 Метро:</b> Бульвар Рокоссовского — 2 минуты пешком.</p>
+        <p><b>🕘 Часы работы:</b> ежедневно; в августе 8:00–19:00, с сентября 9:00–20:00.</p>
+        <p><b>☎️ Телефон:</b> <a href="tel:+74951209024">+7 495 120-90-24</a></p>
+        <p><b>💬 WhatsApp:</b> <a href="https://wa.me/79160170918" target="_blank" rel="noopener">написать нам</a></p>
+      </div>
+      <iframe class="map" loading="lazy" title="KidsUP на карте"
+        src="https://yandex.ru/map-widget/v1/?text=%D0%B1%D1%83%D0%BB%D1%8C%D0%B2%D0%B0%D1%80%20%D0%9C%D0%B0%D1%80%D1%88%D0%B0%D0%BB%D0%B0%20%D0%A0%D0%BE%D0%BA%D0%BE%D1%81%D1%81%D0%BE%D0%B2%D1%81%D0%BA%D0%BE%D0%B3%D0%BE%206%D0%BA1%D0%92&z=16"></iframe>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <img src="LOGO_WHITE" alt="KidsUP">
+    <div>KidsUP · Best for our kids · б-р Маршала Рокоссовского, 6 к1В ·
+      <a href="tel:+74951209024">+7 495 120-90-24</a></div>
+    <div style="margin-left:auto"><a href="https://kidsup.ru/o">Договор-оферта</a></div>
+  </div>
+</footer>
+
+<a class="fab" href="https://wa.me/79160170918?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D1%83%D0%B7%D0%BD%D0%B0%D1%82%D1%8C%20%D0%BF%D1%80%D0%BE%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D1%8F%20%D0%B2%20KidsUP" target="_blank" rel="noopener" aria-label="Написать в WhatsApp">
+<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.955 8.955 0 0 1-1.72-5.272c0-4.955 4.04-8.995 8.997-8.995S25.2 10.845 25.2 15.8c0 4.958-4.04 8.998-8.998 8.998zm0-19.798c-5.96 0-10.8 4.842-10.8 10.8 0 1.964.53 3.898 1.546 5.574L5 27.176l5.974-1.92a10.807 10.807 0 0 0 16.03-9.455c0-5.958-4.842-10.8-10.802-10.8z"/></svg>
+</a>
+
+<div class="m-cta">
+  <a class="btn btn-green" href="#signup">Записаться</a>
+  <a class="btn btn-line" href="tel:+74951209024">Позвонить</a>
+</div>
+
+<script>
+/* курсы: фильтр по возрасту + выбор в форму */
+const NAMES = ["Подготовка к школе", "Английский язык", "Английский мини-сад", "Нулевой класс", "Раннее развитие", "Логопед", "Ментальная арифметика", "Шахматы", "ИЗО-студия", "Скорочтение (техника чтения)", "Каллиграфия + грамота", "Робототехника", "Спортивно-бальные танцы"];
+const sel = document.getElementById('f-course');
+NAMES.forEach(n => { const o = document.createElement('option'); o.textContent = n; sel.append(o); });
+document.getElementById('flt').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#flt button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  const f = b.dataset.a;
+  document.querySelectorAll('#cards .card').forEach(c =>
+    c.classList.toggle('hide', f !== 'all' && !c.classList.contains('g' + f)));
+});
+document.getElementById('cards').addEventListener('click', e => {
+  const a = e.target.closest('[data-pick]'); if (a) sel.value = a.dataset.pick;
+});
+/* форма → заявка в CRM (запасной путь — WhatsApp) */
+document.getElementById('lead').addEventListener('submit', async e => {
+  e.preventDefault();
+  const n = document.getElementById('f-name').value.trim();
+  const a = document.getElementById('f-age').value.trim();
+  const p = document.getElementById('f-phone').value.trim();
+  const c = sel.value;
+  const btn = e.target.querySelector('button');
+  btn.disabled = true; btn.textContent = 'Отправляем…';
+  const rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
+  try {
+    const r = await fetch('https://app.kidsup.ru/api/public/lead', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: n, age: a, phone: p, course: c, roistat: rv,
+                            website: document.getElementById('f-web').value})});
+    const j = await r.json();
+    if (j.ok) {
+      e.target.innerHTML = '<h3 style="color:var(--green);font-family:Rubik,sans-serif">✅ Заявка отправлена!</h3>' +
+        '<p style="margin:.6rem 0">Администратор позвонит вам в ближайшее время — в рабочие часы обычно в течение 15 минут.</p>' +
+        '<p>Не хочется ждать звонка? Напишите нам в <a href="https://wa.me/79160170918" target="_blank" rel="noopener">WhatsApp</a>.</p>';
+      return;
+    }
+    if (j.error) { alert(j.error); btn.disabled = false; btn.textContent = 'Отправить заявку'; return; }
+    throw new Error('fail');
+  } catch (_) {
+    const txt = `Здравствуйте! Хочу записаться в KidsUP. Ребёнок: ${n || '…'}, ${a || '…'}. Интересует: ${c}. Телефон: ${p}`;
+    window.open('https://wa.me/79160170918?text=' + encodeURIComponent(txt), '_blank');
+    btn.disabled = false; btn.textContent = 'Отправить заявку';
+  }
+});
+/* живые свободные места из CRM МойКласс */
+const KEYS = {"Подготовка к школе":"school-prep","Английский язык":"english","Английский мини-сад":"minisad",
+  "Нулевой класс":"zeroclass","Раннее развитие":"early","Логопед":"logoped","Ментальная арифметика":"mental",
+  "Шахматы":"chess","ИЗО-студия":"art","Скорочтение (техника чтения)":"reading",
+  "Каллиграфия + грамота":"calligraphy","Робототехника":"robotics","Спортивно-бальные танцы":"dance"};
+fetch('https://app.kidsup.ru/api/public/schedule').then(r => r.json()).then(d => {
+  document.querySelectorAll('#cards [data-pick]').forEach(aEl => {
+    const k = KEYS[aEl.dataset.pick], free = d.by_key && d.by_key[k];
+    if (!free) return;
+    const card = aEl.closest('.card'), price = card && card.querySelector('.price');
+    if (!price) return;
+    const el = document.createElement('div');
+    el.className = 'spots' + (free <= 15 ? ' low' : '');
+    el.textContent = free <= 20 ? `🔥 Осталось ${free} мест в группах` : '✅ Идёт набор в группы';
+    price.after(el);
+  });
+}).catch(() => {});
+/* квиз подбора занятия */
+(function(){
+  const REC = {
+    '1|school': ['Раннее развитие', 'До чтения дойдём в срок — сейчас база: речь, внимание, моторика. Именно с неё начинается лёгкое чтение в 4–5 лет.', 'Английский мини-сад'],
+    '1|eng':    ['Английский мини-сад', 'В этом возрасте язык впитывается средой: полдня в саду с английским — и ребёнок заговорит естественно.', 'Раннее развитие'],
+    '1|logic':  ['Раннее развитие', 'Сенсорика, счёт в игре, первые «сам справился». Малые шаги по Буракову — без слёз и перегруза.', 'Английский мини-сад'],
+    '1|art':    ['Раннее развитие', 'В 1–3 года творчество живёт внутри комплексного занятия: лепим, рисуем, двигаемся, поём.', 'Английский мини-сад'],
+    '1|sad':    ['Английский мини-сад', 'Мягкая адаптация, до 15 детей, английский каждый день. Бесплатный пробный день — приходите посмотреть.', ''],
+    '3|school': ['Подготовка к школе', 'С 4 лет — группа ПШ1 для нечитающих: чтение за 3 месяца по Буракову. В 3 года начните с Раннего развития.', 'Раннее развитие'],
+    '3|eng':    ['Английский язык', 'С 3 лет — игровые группы: песни, движение, первые фразы. Уровни Cambridge подключатся позже.', 'Английский мини-сад'],
+    '3|logic':  ['Раннее развитие', 'Счёт, логика и внимание в игре — фундамент, на который отлично ляжет ментальная арифметика с 4 лет.', 'Ментальная арифметика'],
+    '3|art':    ['ИЗО-студия', 'Рисуем по-настоящему: цвет, композиция, разные материалы. Плюс танцы — если ребёнку хочется двигаться.', 'Спортивно-бальные танцы'],
+    '3|sad':    ['Английский мини-сад', 'Полдня в саду с английским и развивающими занятиями. Бесплатный пробный день.', ''],
+    '4|school': ['Подготовка к школе', 'ПШ1 для нечитающих, ПШ2 для читающих. Научим читать за 3 месяца — и посадим за парту уверенного ребёнка.', 'Нулевой класс'],
+    '4|eng':    ['Английский язык', 'Группы по уровням, игровая методика, результат к концу года — заговорит по-английски.', ''],
+    '4|logic':  ['Ментальная арифметика', 'Счёт в уме, концентрация и память. Отлично сочетается с шахматами.', 'Шахматы'],
+    '4|art':    ['ИЗО-студия', 'Живопись, графика, поделки — и выставки работ. Для энергичных — спортивно-бальные танцы.', 'Спортивно-бальные танцы'],
+    '4|sad':    ['Нулевой класс', 'Полный день 10:00–14:00: подготовка к школе, английский, творчество. Альтернатива садику перед школой.', 'Английский мини-сад'],
+    '7|school': ['Скорочтение (техника чтения)', 'Читает медленно или без понимания — за курс поднимем скорость и осмысленность: учёба станет легче.', 'Каллиграфия + грамота'],
+    '7|eng':    ['Английский язык', 'Уровни Cambridge: Starters → Movers → Flyers. Подтянем школьный и уйдём вперёд.', ''],
+    '7|logic':  ['Ментальная арифметика', 'Устный счёт, концентрация, скорость мышления — видимый результат уже к зиме.', 'Шахматы'],
+    '7|art':    ['ИЗО-студия', 'Серьёзная изостудия для школьников. А для инженерного склада — робототехника.', 'Робототехника']
+  };
+  const qa = document.getElementById('q-age'), qg = document.getElementById('q-goal'), qr = document.getElementById('q-res');
+  let age = '';
+  qa.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    qa.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on'); age = b.dataset.v;
+    qg.hidden = false; qr.hidden = true;
+    qg.querySelector('[data-sad]').style.display = (age === '7') ? 'none' : '';
+    qg.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+  });
+  qg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    qg.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    const r = REC[age + '|' + b.dataset.v] || REC[age + '|school'];
+    qr.innerHTML = '<h3>💡 Вам подойдёт: ' + r[0] + '</h3><p>' + r[1] + '</p>' +
+      (r[2] ? '<p style="color:var(--muted);margin-top:-.4rem">Вторым предметом присмотритесь к «' + r[2] + '».</p>' : '') +
+      '<a class="btn btn-green" href="#signup" data-q="' + r[0] + '">Записаться</a>' +
+      '<a class="btn btn-line" href="#courses" data-show="' + r[0] + '">Подробнее о курсе</a>';
+    qr.hidden = false;
+  });
+  qr.addEventListener('click', e => {
+    const a = e.target.closest('a'); if (!a) return;
+    const name = a.dataset.q || a.dataset.show;
+    if (name && [...sel.options].some(o => o.value === name)) sel.value = name;
+    if (a.dataset.show) {
+      const btnAll = document.querySelector('#flt [data-a="all"]'); if (btnAll) btnAll.click();
+      const pick = document.querySelector('#cards [data-pick="' + name + '"]');
+      const card = pick && pick.closest('.card');
+      if (card) {
+        e.preventDefault();
+        card.scrollIntoView({behavior: 'smooth', block: 'center'});
+        card.style.outline = '3px solid var(--blue)';
+        setTimeout(() => card.style.outline = '', 2500);
+      }
+    }
+  });
+})();
+/* Roistat — сквозная аналитика */
+(function(w, d, s, h, id) {
+  w.roistatProjectId = id; w.roistatHost = h;
+  var p = d.location.protocol == 'https:' ? 'https://' : 'http://';
+  var u = /^.*roistat_visit=[^;]+(.*)?$/.test(d.cookie)
+    ? '/dist/module.js'
+    : '/api/site/1.0/' + id + '/init?referrer=' + encodeURIComponent(d.location.href);
+  var js = d.createElement(s); js.charset = 'UTF-8'; js.async = 1; js.src = p + h + u;
+  var js2 = d.getElementsByTagName(s)[0]; js2.parentNode.insertBefore(js, js2);
+})(window, document, 'script', 'cloud.roistat.com', '228571');
+/* счётчик до 31.08 23:59 МСК */
+(function(){
+  const end = new Date('2026-08-31T23:59:59+03:00').getTime();
+  function tick(){
+    let s = Math.max(0, Math.floor((end - Date.now())/1000));
+    document.getElementById('cd').textContent = Math.floor(s/86400);
+    document.getElementById('ch').textContent = Math.floor(s%86400/3600);
+    document.getElementById('cm').textContent = Math.floor(s%3600/60);
+  }
+  tick(); setInterval(tick, 30000);
+})();
+/* появление при скролле — прогрессивное улучшение со страховкой */
+if ('IntersectionObserver' in window) {
+  document.body.classList.add('js');
+  const io = new IntersectionObserver(es => es.forEach(x => x.isIntersecting && x.target.classList.add('in')),
+    {threshold:.1, rootMargin:'0px 0px -5% 0px'});
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+  setTimeout(() => document.querySelectorAll('.reveal').forEach(el => el.classList.add('in')), 2500);
+}
+</script>
+</body>
+</html>
