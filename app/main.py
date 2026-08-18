@@ -2011,7 +2011,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-18.22"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-18.24"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2394,8 +2394,17 @@ def _missed_inbound(hours: int = 48) -> list[dict]:
             # он перезванивал на наш недозвон — взаимный недозвон
             m["ours_before"] += 1
     out = []
+    answered_after = [(  # все дозвоны (в обе стороны): для закрытия по карточке
+        (r["from_num"] if not r["from_ext"] else r["to_num"])[-10:], r["start"])
+        for r in rows if r["answer"]]
+    try:
+        dismissed = json.loads(db.get_setting("missed_dismissed") or "{}")
+    except Exception:
+        dismissed = {}
     with db.get_conn() as conn:
         for num, m in missed.items():
+            if float(dismissed.get(num, 0)) >= m["ts"]:
+                continue  # админ закрыл строку кнопкой «отработано»
             row = conn.execute(
                 "SELECT ts FROM wazzup_outbox WHERE substr(phone,-10)=? ORDER BY ts DESC LIMIT 1",
                 (num,)).fetchone()
@@ -2405,10 +2414,19 @@ def _missed_inbound(hours: int = 48) -> list[dict]:
                         continue  # написали в чат после пропущенного
                 except Exception:
                     pass
-            name_row = conn.execute(
-                "SELECT name FROM users WHERE substr(phone,-10)=? LIMIT 1", (num,)).fetchone()
+            # у семьи бывает несколько номеров в одной карточке: пропущенный
+            # с одного, а дозвонились по другому — считаем закрытым
+            user_row = conn.execute(
+                "SELECT name, raw FROM users WHERE substr(phone,-10)=? "
+                "OR raw LIKE '%' || ? || '%' LIMIT 1", (num, num)).fetchone()
+            name = user_row[0] if user_row else ""
+            if user_row and user_row[1]:
+                card_nums = {d[-10:] for d in re.findall(r"7?9\d{9}", user_row[1])}
+                card_nums.discard(num)
+                if any(n in card_nums and ts_ >= m["ts"] for n, ts_ in answered_after):
+                    continue
             ts = datetime.fromtimestamp(m["ts"], tz=now.tzinfo)
-            out.append({"phone": num, "name": name_row[0] if name_row else "",
+            out.append({"phone": num, "name": name,
                         "since": ts.isoformat(timespec="minutes"),
                         "wait_min": int((now - ts).total_seconds() // 60),
                         "attempts": m["attempts"], "tried": m["tried"],
@@ -2417,6 +2435,23 @@ def _missed_inbound(hours: int = 48) -> list[dict]:
     out.sort(key=lambda x: -x["wait_min"])
     _MISSED_CACHE.update(ts=_time.time(), data=out)
     return out
+
+
+@app.post("/api/waiting/dismiss", dependencies=AUTH)
+async def api_waiting_dismiss(payload: dict):
+    """Кнопка «✓ отработано» на строке пропущенного: скрыть до нового звонка."""
+    import time as _time
+    num = "".join(ch for ch in (payload.get("phone") or "") if ch.isdigit())[-10:]
+    if len(num) < 10:
+        raise HTTPException(400, "нужен телефон")
+    try:
+        d = json.loads(db.get_setting("missed_dismissed") or "{}")
+    except Exception:
+        d = {}
+    d[num] = _time.time()
+    db.set_setting("missed_dismissed", json.dumps(d))
+    _MISSED_CACHE["data"] = None
+    return {"ok": True}
 
 
 @app.get("/api/waiting", dependencies=AUTH)

@@ -11,7 +11,7 @@
 <div class="notice">✅ Все пропущенные звонки отработаны (перезвонили или написали).</div>
 {% else %}
 <table>
-  <tr><th>Ждёт</th><th>Клиент</th><th>Пропущено</th><th>Что происходит</th><th>Когда звонил</th></tr>
+  <tr><th>Ждёт</th><th>Клиент</th><th>Пропущено</th><th>Что происходит</th><th>Когда звонил</th><th></th></tr>
   {% for it in w['calls'] %}
   <tr class="{{ 'warn-row' if it.wait_min > 120 and not it.mutual }}">
     <td><b>{{ it.wait_min // 60 }} ч {{ it.wait_min % 60 }} м</b></td>
@@ -20,6 +20,8 @@
     <td>{% if it.mutual %}⇄ взаимный недозвон — мы набирали {{ it.ours }} раз, продолжайте
       {% else %}мы ещё не перезванивали{% endif %}</td>
     <td class="muted small">{{ it.since[5:16] }}</td>
+    <td><button class="btn" title="Скрыть: связались другим способом / вопрос закрыт"
+        onclick="dismissMissed('{{ it.phone }}', this)">✓ отработано</button></td>
   </tr>
   {% endfor %}
 </table>
@@ -45,6 +47,15 @@
 </table>
 {% endif %}
 <script>
+/* «✓ отработано»: скрыть строку пропущенного (связались иначе / вопрос закрыт) */
+async function dismissMissed(phone, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await fetch('/api/waiting/dismiss', {method: 'POST',
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify({phone})});
+    btn.closest('tr').remove();
+  } catch (e) { btn.disabled = false; btn.textContent = '✓ отработано'; }
+}
 /* мягкое обновление раз в 3 минуты: перерисовываем контент без перезагрузки,
    чтобы страница не «мигала» на ресепшене; при ошибке сети — полная перезагрузка */
 (function () {
