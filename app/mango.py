@@ -21,6 +21,11 @@ from . import db
 
 API = "https://app.mango-office.ru/vpbx/"
 
+# Добавочные ДРУГОГО центра (Люберцы, «Детский клуб Буракова») на общей АТС:
+# 20 — их рабочее место, 21 — мобильный их сотрудника. Их звонки не анализируем,
+# не показываем в отчётах и не создаём по ним задачи.
+FOREIGN_EXTS = {"20", "21"}
+
 
 def _call(path: str, payload: dict) -> httpx.Response:
     key = db.get_setting("mango_key")
@@ -65,6 +70,8 @@ def calls(date_from: datetime, date_to: datetime) -> list[dict]:
         p = [x.strip("[]") for x in line.split(";")]
         if len(p) < 9:
             continue
+        if p[4] in FOREIGN_EXTS or p[6] in FOREIGN_EXTS:
+            continue  # звонки другого центра (Люберцы) — не наши
         rows.append({
             "start": int(p[1] or 0), "finish": int(p[2] or 0), "answer": int(p[3] or 0),
             "from_ext": p[4], "from_num": p[5], "to_ext": p[6], "to_num": p[7],
