@@ -157,6 +157,13 @@ footer a{color:#fff}
 .q-res h3{margin-bottom:.2rem}
 .q-res p{font-size:.92rem;margin:.3rem 0 .8rem}
 .q-res .btn{padding:.6rem 1.2rem;font-size:.9rem;margin-right:.5rem}
+.ev .btn{display:inline-block;margin-top:.9rem;padding:.6rem 1.2rem;font-size:.9rem}
+/* лист ожидания новых направлений */
+.wait{background:linear-gradient(120deg,#EFF8FF,#F2F8FD);border:1.5px dashed var(--blue);border-radius:22px;padding:22px 26px;margin-top:20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.wait b{font-family:Rubik;color:var(--indigo);flex-basis:100%}
+.wait p{flex-basis:100%;font-size:.9rem;color:var(--muted);margin:0 0 .3rem}
+.wait button{border:1.5px solid var(--blue);background:#fff;color:var(--indigo);border-radius:999px;padding:.5rem 1rem;font:600 .9rem Inter;cursor:pointer}
+.wait button:hover{background:var(--blue);color:#fff}
 /* плавающая кнопка WhatsApp */
 .fab{position:fixed;right:18px;bottom:18px;z-index:60;width:58px;height:58px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px rgba(37,211,102,.45);animation:fabpulse 2.6s ease-in-out infinite}
 .fab svg{width:32px;height:32px;fill:#fff}
@@ -199,6 +206,7 @@ body.js .reveal.in{opacity:1;transform:none}
         <span class="badge hot">До 31 августа — цены прошлого года</span>
         <span class="badge">от 1,3 до 12 лет</span>
         <span class="badge">группы 6–8 детей</span>
+        <span class="badge" id="live-enrolled" hidden></span>
       </div>
       <h1>Научим читать за 3 месяца.<br>Заговорит по-английски за год.</h1>
       <p class="sub">Детский центр и английский сад KidsUP на Бульваре Рокоссовского.
@@ -232,7 +240,8 @@ body.js .reveal.in{opacity:1;transform:none}
         <h3>🎉 Праздник KidsUP</h3>
         <p>Аниматоры, конкурсы, весёлые активности и беспроигрышная лотерея.
         Познакомьтесь с центром и педагогами в игровой атмосфере.</p>
-        <span class="free">Вход свободный, без записи</span>
+        <span class="free">Вход свободный</span>
+        <a class="btn btn-green" href="#signup" data-ev="🎉 Праздник 29.08 (11:00)">Приду! Напомните мне</a>
       </div>
       <div class="ev reveal">
         <div class="d">ВС · 30 августа</div>
@@ -240,6 +249,7 @@ body.js .reveal.in{opacity:1;transform:none}
         <p>Экскурсии по центру, знакомство с программами и расписанием нового года.
         Программу дня пришлём накануне.</p>
         <span class="free">Приходите с ребёнком</span>
+        <a class="btn btn-green" href="#signup" data-ev="🚪 День открытых дверей 30.08">Записаться на экскурсию</a>
       </div>
       <div class="ev reveal">
         <div class="d">31 августа — 6 сентября</div>
@@ -247,6 +257,7 @@ body.js .reveal.in{opacity:1;transform:none}
         <p>Группы стартуют по расписанию, и на первое занятие можно прийти познакомиться:
         не понравится — платить не нужно.</p>
         <span class="free">KidsUPweek.ru</span>
+        <a class="btn btn-green" href="#signup" data-ev="📚 Открытый урок (31.08–06.09)">Выбрать открытый урок</a>
       </div>
     </div>
   </div>
@@ -583,6 +594,14 @@ body.js .reveal.in{opacity:1;transform:none}
   <a class="btn btn-green" href="#signup" data-pick="Спортивно-бальные танцы">Записаться</a>
 </div>
 </div>
+    <div class="wait reveal" id="wait">
+      <b>🔜 Открываем новые направления — как только соберётся группа</b>
+      <p>Оставьте заявку — позовём первыми и дадим скидку первой группы 10%.</p>
+      <button data-w="⚽ Футбол (лист ожидания)">⚽ Футбол</button>
+      <button data-w="🥋 Боевые искусства (лист ожидания)">🥋 Боевые искусства</button>
+      <button data-w="🤸 Акробатика (лист ожидания)">🤸 Акробатика</button>
+      <button data-w="🩰 Хореография (лист ожидания)">🩰 Хореография</button>
+    </div>
   </div>
 </section>
 
@@ -674,6 +693,16 @@ body.js .reveal.in{opacity:1;transform:none}
     <details><summary>Есть ли занятия в выходные?</summary>
       <p>Да: подготовка к школе по субботам, шахматы в пятницу и воскресенье,
       ментальная арифметика по воскресеньям. Подберём расписание под вашу неделю.</p></details>
+    <details><summary>Ребёнок стеснительный — вдруг не пойдёт на контакт?</summary>
+      <p>Это самый частый страх — и именно поэтому первое занятие ни к чему не обязывает.
+      Группы у нас по 6–8 детей, педагог успевает к каждому и умеет мягко включать
+      «наблюдателей» в игру. Если ребёнку нужно время — посидите рядом на первом занятии.
+      Не пойдёт — вы ничего не платите.</p></details>
+    <details><summary>Мы ещё не определились с расписанием на год</summary>
+      <p>Так у большинства в августе! Начните с пробного и диагностики — расписание у нас
+      гибкое: если что-то поменяется, переведём в другую группу по тому же предмету.
+      А открытые уроки с диагностикой идут только с 31.08 по 6.09 — удобный момент
+      попробовать без обязательств.</p></details>
     <details><summary>Как проходит оплата?</summary>
       <p>Помесячно, абонементами по 8 занятий (у сада — 8/12/20 посещений).
       Оплатить можно на ресепшене или по ссылке. До 31 августа сентябрь стоит
@@ -722,6 +751,22 @@ body.js .reveal.in{opacity:1;transform:none}
 const NAMES = ["Подготовка к школе", "Английский язык", "Английский мини-сад", "Нулевой класс", "Раннее развитие", "Логопед", "Ментальная арифметика", "Шахматы", "ИЗО-студия", "Скорочтение (техника чтения)", "Каллиграфия + грамота", "Робототехника", "Спортивно-бальные танцы"];
 const sel = document.getElementById('f-course');
 NAMES.forEach(n => { const o = document.createElement('option'); o.textContent = n; sel.append(o); });
+const og1 = document.createElement('optgroup'); og1.label = 'События (бесплатно)';
+['🎉 Праздник 29.08 (11:00)', '🚪 День открытых дверей 30.08', '📚 Открытый урок (31.08–06.09)']
+  .forEach(n => { const o = document.createElement('option'); o.textContent = n; og1.append(o); });
+sel.append(og1);
+const og2 = document.createElement('optgroup'); og2.label = 'Новые направления — лист ожидания';
+['⚽ Футбол (лист ожидания)', '🥋 Боевые искусства (лист ожидания)', '🤸 Акробатика (лист ожидания)', '🩰 Хореография (лист ожидания)']
+  .forEach(n => { const o = document.createElement('option'); o.textContent = n; og2.append(o); });
+sel.append(og2);
+/* запись на события из карточек */
+document.querySelectorAll('[data-ev]').forEach(a => a.addEventListener('click', () => { sel.value = a.dataset.ev; }));
+/* лист ожидания новых направлений */
+document.getElementById('wait').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  sel.value = b.dataset.w;
+  document.getElementById('signup').scrollIntoView({behavior: 'smooth'});
+});
 document.getElementById('flt').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   document.querySelectorAll('#flt button').forEach(x => x.classList.remove('on'));
@@ -747,6 +792,7 @@ document.getElementById('lead').addEventListener('submit', async e => {
     const r = await fetch('https://app.kidsup.ru/api/public/lead', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({name: n, age: a, phone: p, course: c, roistat: rv,
+                            note: (location.search || '').slice(1, 200),
                             website: document.getElementById('f-web').value})});
     const j = await r.json();
     if (j.ok) {
@@ -779,6 +825,14 @@ fetch('https://app.kidsup.ru/api/public/schedule').then(r => r.json()).then(d =>
     el.textContent = free <= 20 ? `🔥 Осталось ${free} мест в группах` : '✅ Идёт набор в группы';
     price.after(el);
   });
+  if (d.groups) {
+    const n = d.groups.reduce((t, g) => t + Math.max(0, (g.capacity || 0) - (g.free || 0)), 0);
+    if (n >= 30) {
+      const b = document.getElementById('live-enrolled');
+      b.textContent = `✅ уже записано ${n} детей на 2026/27`;
+      b.hidden = false;
+    }
+  }
 }).catch(() => {});
 /* квиз подбора занятия */
 (function(){
