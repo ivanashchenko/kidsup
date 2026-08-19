@@ -599,7 +599,10 @@ def _broadcast_tick() -> None:
         rows = conn.execute(
             "SELECT id, phone, child, text, COALESCE(tried,'') FROM broadcast_queue "
             "WHERE status='pending' "
-            "ORDER BY campaign = 'no1_apology' DESC, id LIMIT 30").fetchall()
+            # приглашения на праздник 29.08 идут вперёд лагерной рассылки:
+            # у них жёсткий дедлайн — прийти до события, иначе смысла нет
+            "ORDER BY campaign = 'no1_apology' DESC, campaign LIKE 'invite%' DESC, id "
+            "LIMIT 30").fetchall()
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
     for rid, phone, child, text, tried in rows:
         if "whatsapp=" in tried:
