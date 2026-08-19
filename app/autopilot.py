@@ -66,6 +66,7 @@ ST_NEDOZVON = 345768      # «2. Недозвон (в работе)»
 ST_REJECT = 125957        # «Отказ»
 ST_BOOKED = 125952        # «3. Записался на пробное»
 ST_PROMO = 347075         # «От промоутера»: контакт есть, разговора ещё не было
+ST_JOIN_BOOKED = 58132    # запись в группу «Записался на пробное»
 
 CAMP_COURSE = "Английский летний клуб"
 
@@ -1004,6 +1005,92 @@ def trial_reminder(mk: MoyklassClient) -> None:
         log.info("напоминание о пробном: %s на %s", phone[-4:], when)
 
 
+def booking_summary(mk: MoyklassClient) -> None:
+    """Резюме сразу после записи на пробное: дата, время, адрес, что взять.
+
+    «Книга продаж 2025», приём 4: родитель записывается голосом и через час
+    уже не помнит деталей — резюме в мессенджере снимает половину неявок
+    и вопросов «а куда идти»."""
+    today = _today().isoformat()
+    tomorrow = (_today() + timedelta(days=1)).isoformat()
+    try:
+        joins = mk.fetch_all("/v1/company/joins", ["joins"], params={
+            "statusId": ST_JOIN_BOOKED, "createdAt": [today, tomorrow]})
+    except Exception:
+        log.exception("booking_summary: не удалось получить записи")
+        return
+    for j in joins:
+        if not _mark("booking_summary", str(j.get("id"))):
+            continue
+        try:
+            user = mk.get(f"/v1/company/users/{j.get('userId')}")
+            cls = mk.get(f"/v1/company/classes/{j.get('classId')}")
+        except Exception:
+            continue
+        phone = user.get("phone")
+        if not phone:
+            continue
+        child = _child_name(user.get("name") or "") or "вашего ребёнка"
+        parts = (cls.get("name") or "").split("_")
+        when = " · ".join(p for p in parts[1:3] if p) or "время уточним"
+        _wa(phone, f"Записали {child} — подтверждаем 🌿\n"
+                   f"Занятие: {when}.\n"
+                   f"Адрес: б-р Маршала Рокоссовского, 6 к1В, 7-й подъезд, 2 этаж "
+                   f"(напротив ТЦ «Янтарь»).\n"
+                   f"С собой сменная обувь, бахилы дадим. Придите на 10 минут раньше — "
+                   f"заполнить документы.\n"
+                   f"Первое занятие условно-бесплатное: не понравится — платить не нужно, "
+                   f"понравится — войдёт в первый абонемент.\n"
+                   f"Сохраните сообщение, накануне напомним 😊")
+        log.info("booking_summary: %s → %s", str(phone)[-4:], when)
+
+
+def after_trial(mk: MoyklassClient) -> None:
+    """Окно 24 часов после пробного — главный конвертер «был → купил».
+
+    «Книга продаж» (приём 7) и годовой маркетинговый план (действие 4):
+    решение принимается в первые сутки, дальше впечатление стирается.
+    Вопрос админа обязательно открытый — «какие впечатления?», а не
+    «понравилось?»: закрытый даёт «да» и тишину, открытый — возражение,
+    которое можно отработать."""
+    admins = _admins_today()
+    today = _today().isoformat()
+    try:
+        recs = mk.fetch_all("/v1/company/lessonRecords", ["lessonRecords"], params={
+            "date": today, "test": "true", "visit": "true", "includeLessons": "true"})
+    except Exception:
+        log.exception("after_trial: не удалось получить посещения")
+        return
+    for r in recs:
+        uid = r.get("userId")
+        if not uid or not _mark("after_trial", str(r.get("id"))):
+            continue
+        lesson = r.get("lesson") or {}
+        end = f"{lesson.get('date', '')} {lesson.get('endTime', '23:59')}"
+        try:
+            if datetime.strptime(end, "%Y-%m-%d %H:%M") > _now():
+                continue                      # занятие ещё идёт
+        except ValueError:
+            continue
+        try:
+            user = mk.get(f"/v1/company/users/{uid}")
+        except Exception:
+            continue
+        child = _child_name(user.get("name") or "") or "ребёнка"
+        if admins:
+            _task(mk, admins[0]["managerId"], uid,
+                  "🔥 БЫЛ НА ПРОБНОМ СЕГОДНЯ — позвонить завтра до обеда, пока впечатление живое. "
+                  "Вопрос открытый: «Какие у вас впечатления?», не «понравилось?». "
+                  "Причина решить сейчас: скидка 10% на первый абонемент действует сутки.")
+        phone = user.get("phone")
+        if phone:
+            _wa(phone, f"Спасибо, что пришли к нам сегодня! 🌿 Если хотите, перешлём "
+                       f"комментарий педагога о том, как {child} занимался.\n"
+                       f"Решите продолжить — скидка 10% на первый абонемент действует "
+                       f"сутки после пробного. Подобрать группу и время?")
+        log.info("after_trial: %s", str(phone)[-4:])
+
+
 def no_show(mk: MoyklassClient) -> None:
     admins = _admins_today()
     now = _now()
@@ -1813,6 +1900,8 @@ def _loop() -> None:
                         unanswered_inbound(mk)
                     if now.minute < 3 and 9 <= now.hour <= 20:  # раз в час
                         no_show(mk)
+                        after_trial(mk)
+                        booking_summary(mk)
                     # напоминание о завтрашнем пробном — раз в день вечером,
                     # когда родитель уже дома и может ответить на вопрос
                     if now.hour == 18 and _mark("trial_reminder_day", str(_today())):
