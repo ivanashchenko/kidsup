@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import secrets
+import threading
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
@@ -1957,9 +1958,15 @@ def _match_click(conn, ts: str, phone: str, chat_type: str) -> None:
 
 
 MESSENGER_LINKS = {
-    "whatsapp": "https://wa.me/79165610077",
-    "telegram": "https://t.me/KidsUP_ru",
+    # мессенджеры для обращений
+    "whatsapp": "https://wa.me/79160170918",
+    "telegram": "https://t.me/KidsUPchat",
     "max": "https://max.ru/u/f9LHodD0cOL7ouxX67LQufADpyAmbvMGRUdMqaGj2Ya-F1EuIVQMGWeU9gc",
+    # соцсети — тоже через /go, чтобы видеть, откуда приходят
+    "tgchannel": "https://t.me/KidsUP_ru",
+    "vk": "https://vk.com/kidsup_ru",
+    "youtube": "https://youtube.com/@kidsup_ru",
+    "instagram": "https://instagram.com/kidsup_ru",
 }
 WA_HELLO = ("Здравствуйте! Пожалуйста, отправьте это сообщение и дождитесь "
             "ответа. Ваш номер: ")
@@ -2061,7 +2068,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-19.7"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-19.11"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2191,17 +2198,34 @@ async def api_broadcast(payload: dict):
 _PUB_CORS = {"Access-Control-Allow-Origin": "*",
              "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
              "Access-Control-Allow-Headers": "Content-Type"}
+_SCHED_HEADERS = dict(_PUB_CORS, **{"Cache-Control": "public, max-age=60, stale-while-revalidate=120"})
 _SCHED_CACHE: dict = {"ts": 0.0, "data": None}
 _LEAD_HITS: dict[str, list[float]] = {}
+
+
+_SCHED_LOCK = threading.Lock()
 
 
 @app.get("/api/public/schedule")
 def public_schedule():
     """Расписание групп 2026/27 и свободные места — для сайта kidsup.ru."""
     import time as _t
-    if _SCHED_CACHE["data"] is not None and _t.time() - _SCHED_CACHE["ts"] < 180:
-        return JSONResponse(_SCHED_CACHE["data"], headers=_PUB_CORS)
-    groups = [g for g in _enrollment_groups() if not g["buffer"]]
+    fresh = _SCHED_CACHE["data"] is not None and _t.time() - _SCHED_CACHE["ts"] < 180
+    if fresh or (_SCHED_CACHE["data"] is not None and not _SCHED_LOCK.acquire(blocking=False)):
+        # пока один поток пересчитывает, остальные отдают прошлый ответ
+        return JSONResponse(_SCHED_CACHE["data"], headers=_SCHED_HEADERS)
+    locked = not fresh
+    try:
+        return _build_schedule()
+    finally:
+        if locked and _SCHED_LOCK.locked():
+            _SCHED_LOCK.release()
+
+
+def _build_schedule():
+    import time as _t
+    all_groups = _enrollment_groups()
+    groups = [g for g in all_groups if not g["buffer"]]
     free_by_course: dict[str, int] = {}
     sad_split = {"Мини-сад": 0, "Нулевой": 0}
     for g in groups:
@@ -2217,13 +2241,35 @@ def public_schedule():
             by_key[cc["key"]] = sad_split["Нулевой"]
         elif cc["course"] in free_by_course:
             by_key[cc["key"]] = free_by_course[cc["course"]]
-    data = {"updated": datetime.now().isoformat(timespec="seconds"),
-            "by_key": by_key,
+    # листы ожидания новых направлений: сколько семей уже записалось
+    waitlist: dict[str, int] = {}
+    WAIT_KEYS = {"Танцы": "dance", "Хореография": "choreography", "Футбол": "football",
+                 "Единоборства": "martial", "Акробатика": "acrobatics",
+                 "Актёрское мастерство": "acting", "Техника речи": "speech"}
+    for g in all_groups:
+        if not g["name"].startswith("2627_Заявки_"):
+            continue
+        tail = g["name"].replace("2627_Заявки_", "").strip()
+        k = WAIT_KEYS.get(tail)
+        if k:
+            waitlist[k] = g["enrolled"]
+    try:
+        with db.get_conn() as conn:
+            synced = conn.execute(
+                "SELECT value FROM sync_state WHERE key IN ('last_light_sync','last_sync') "
+                "ORDER BY key DESC LIMIT 1").fetchone()
+        data_updated = synced[0] if synced else None
+    except Exception:
+        data_updated = None
+    data = {"generated": datetime.now().isoformat(timespec="seconds"),
+            "updated": datetime.now().isoformat(timespec="seconds"),
+            "data_updated": data_updated,
+            "by_key": by_key, "waitlist": waitlist,
             "groups": [{"name": g["name"], "course": g["course"], "day": g["day"],
                         "time": g["time"], "age": g["age"], "free": g["free"],
                         "capacity": g["capacity"]} for g in groups]}
     _SCHED_CACHE.update(ts=_t.time(), data=data)
-    return JSONResponse(data, headers=_PUB_CORS)
+    return JSONResponse(data, headers=_SCHED_HEADERS)
 
 
 @app.options("/api/public/lead")
@@ -2231,123 +2277,228 @@ def public_lead_options():
     return JSONResponse({"ok": True}, headers=_PUB_CORS)
 
 
+def _lead_mark(lead_id: int | None, status: str, uid: int | None = None,
+               error: str = "") -> None:
+    """Отметка судьбы заявки: чтобы потерянные было видно и можно было добрать."""
+    if not lead_id:
+        return
+    try:
+        with db.get_conn() as conn:
+            conn.execute("UPDATE site_leads SET crm_status=?, mk_user_id=COALESCE(?, mk_user_id), "
+                         "attempts=COALESCE(attempts,0)+1, last_error=? WHERE id=?",
+                         (status, uid, error[:300], lead_id))
+            conn.commit()
+    except Exception:
+        logging.getLogger("kidsup.lead").warning("не удалось отметить заявку %s", lead_id)
+
+
+def _find_client(mk, phone: str) -> tuple[int | None, int]:
+    """Ищем карточку по номеру: сперва локальная база (самая свежая), затем
+    живой поиск в МойКласс — локальная копия отстаёт до нескольких минут,
+    и без этого шага на каждый повторный звонок плодился дубль карточки."""
+    p10 = phone[-10:]
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT id FROM users WHERE substr(phone,-10)=? ORDER BY id DESC", (p10,)).fetchall()
+        if rows:
+            return rows[0]["id"], len(rows)
+    except Exception:
+        pass
+    try:
+        r = mk.get("/v1/company/users", {"phone": phone})
+        users = (r.get("users") if isinstance(r, dict) else r) or []
+        if users:
+            return users[0]["id"], len(users)
+    except Exception:
+        pass
+    return None, 0
+
+
 def _lead_to_crm(lead: dict) -> None:
-    """Фоновая доводка заявки: карточка в МойКласс + задача дежурному + ТГ."""
+    """Доводка заявки с сайта. Порядок важен: СНАЧАЛА живому человеку
+    (уведомление не зависит от МойКласс), потом CRM — иначе авария в CRM
+    means клиент вообще никому не достался."""
     from . import autopilot, wazzup
     from .moyklass_client import MoyklassClient
     log = logging.getLogger("kidsup.lead")
     phone, child = lead["phone"], lead.get("child") or ""
+    lead_id = lead.get("lead_id")
+    course = lead.get("course") or ""
+
+    admins = autopilot._admins_today() or autopilot._admins()
+    duty = admins[autopilot._today().toordinal() % len(admins)] if admins else None
+    # 1) человек узнаёт о заявке в любом случае
+    try:
+        phones = json.loads(db.get_setting("admin_phones") or "{}")
+        dphone = (phones.get(str(duty["managerId"])) if duty else None) or db.get_setting("digest_phone")
+        if dphone:
+            wazzup.send_via("tgapi", dphone,
+                            f"🔥 Заявка с сайта kidsup.ru: {child or 'имя не указано'}, +{phone}"
+                            + (f", {course}" if course else "")
+                            + (f", {lead['age']}" if lead.get("age") else "")
+                            + ". Звоним в течение 5 минут! — Клод", dry_run=False)
+    except Exception as e:
+        log.warning("уведомление дежурному не ушло: %s", e)
+
+    # 2) CRM — по шагам, каждый сбой не роняет остальные
     mk = MoyklassClient(sync.get_api_key())
     try:
-        uid = None
-        with db.get_conn() as conn:
-            row = conn.execute(
-                "SELECT id, name FROM users WHERE substr(phone,-10)=? LIMIT 1",
-                (phone[-10:],)).fetchone()
-        if row:
-            uid = row["id"]
-        else:
-            u = mk.post("/v1/company/users", {
-                "name": child or "Заявка с сайта", "phone": phone})
-            uid = (u or {}).get("id")
-            if uid:
-                try:
-                    mk.post(f"/v1/company/users/{uid}/status",
-                            {"statusId": 125951, "statusChangeReasonId": 313608})
-                except Exception:
-                    pass
-        details = [f"🤖 Клод: 🌐 Заявка с нового сайта kidsup.ru",
+        uid, same = _find_client(mk, phone)
+        if not uid:
+            try:
+                u = mk.post("/v1/company/users", {"name": child or "Заявка с сайта", "phone": phone})
+                uid = (u or {}).get("id")
+                if uid:
+                    try:
+                        mk.post(f"/v1/company/users/{uid}/status",
+                                {"statusId": 125951, "statusChangeReasonId": 313608})
+                    except Exception as e:
+                        log.warning("статус новому лиду не поставлен: %s", e)
+            except Exception as e:
+                log.warning("карточка не создана: %s", e)
+        details = ["🤖 Клод: 🌐 Заявка с нового сайта kidsup.ru",
                    f"Ребёнок: {child or '—'}" + (f", возраст {lead['age']}" if lead.get("age") else ""),
-                   f"Направление: {lead.get('course') or 'не выбрано'}",
+                   f"Направление: {course or 'не выбрано'}",
                    f"Телефон: +{phone}"]
         if lead.get("note"):
             details.append(f"Комментарий: {lead['note']}")
         if lead.get("roistat"):
-            details.append(f"roistat_visit: {lead['roistat']} (для сквозной аналитики)")
+            details.append(f"roistat_visit: {lead['roistat']} (сквозная аналитика)")
+        if same > 1:
+            details.append(f"⚠️ В базе {same} карточек с этим номером — проверьте, к какому ребёнку заявка.")
         details.append("Правило: позвонить в течение 5 минут (скорость = конверсия).")
         if uid:
-            mk.post("/v1/company/userComments",
-                    {"userId": uid, "comment": "\n".join(details), "showToUser": False})
-        admins = autopilot._admins_today() or autopilot._admins()
-        duty = admins[autopilot._today().toordinal() % len(admins)] if admins else None
+            try:
+                mk.post("/v1/company/userComments",
+                        {"userId": uid, "comment": "\n".join(details), "showToUser": False})
+            except Exception as e:
+                log.warning("комментарий не записан: %s", e)
         if duty:
-            body = (f"🤖 Клод: 🔥 НОВАЯ ЗАЯВКА с сайта — позвонить в течение 5 минут! "
+            body = ("🤖 Клод: 🔥 НОВАЯ ЗАЯВКА с сайта — позвонить в течение 5 минут! "
                     f"{child or 'имя не указано'}"
                     + (f", {lead['age']}" if lead.get("age") else "")
-                    + (f", {lead['course']}" if lead.get("course") else "")
+                    + (f", {course}" if course else "")
                     + f", тел. +{phone}")[:250]
             autopilot._task(mk, duty["managerId"], uid, body)
-            try:
-                phones = json.loads(db.get_setting("admin_phones") or "{}")
-                dphone = phones.get(str(duty["managerId"])) or db.get_setting("digest_phone")
-                if dphone:
-                    wazzup.send_via("tgapi", dphone,
-                                    f"🔥 Заявка с сайта kidsup.ru: {child or 'имя не указано'}, "
-                                    f"+{phone}" + (f", {lead['course']}" if lead.get("course") else "")
-                                    + ". Задача уже в МойКласс — звоним в течение 5 минут! — Клод",
-                                    dry_run=False)
-            except Exception as e:
-                log.warning("уведомление дежурному не ушло: %s", e)
+        _lead_mark(lead_id, "done", uid)
         log.info("заявка с сайта: +%s → карточка %s", phone, uid or "не создана")
     finally:
         mk.close()
 
+    # 3) лид в Roistat — чтобы воронка видела не только оплаты
+    try:
+        from . import roistat as roistat_mod
+        roistat_mod.push_lead(lead)
+    except Exception as e:
+        log.info("лид в Roistat не ушёл: %s", e)
+
 
 @app.post("/api/public/lead")
 async def public_lead(request: Request):
-    """Форма нового сайта kidsup.ru. Всегда отвечает ok (чтобы не подсказывать
-    ботам), но honeypot и лимит по IP отсекают мусор до CRM."""
+    """Форма нового сайта kidsup.ru. Ботам не подсказываем (honeypot и лимит
+    отвечают ok), но всё, что похоже на живую заявку, обязательно доходит
+    хотя бы до журнала site_leads."""
     import time as _t
+    from starlette.concurrency import run_in_threadpool
+    log = logging.getLogger("kidsup.lead")
+    try:
+        if int(request.headers.get("content-length") or 0) > 8192:
+            return JSONResponse({"ok": False, "error": "Слишком длинная заявка"},
+                                status_code=413, headers=_PUB_CORS)
+    except ValueError:
+        pass
     try:
         payload = await request.json()
     except Exception:
         payload = {}
-    if (payload.get("website") or "").strip():   # honeypot-поле, люди его не видят
+    if not isinstance(payload, dict):     # POST [] или "abc" не должны валить сервер
+        payload = {}
+    if str(payload.get("website") or "").strip():   # honeypot — люди его не видят
         return JSONResponse({"ok": True}, headers=_PUB_CORS)
-    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() \
-        or (request.client.host if request.client else "?")
-    now = _t.time()
-    hits = [t for t in _LEAD_HITS.get(ip, []) if now - t < 600]
-    if len(hits) >= 5:
-        return JSONResponse({"ok": True}, headers=_PUB_CORS)
-    hits.append(now)
-    _LEAD_HITS[ip] = hits
+
     digits = "".join(ch for ch in str(payload.get("phone") or "") if ch.isdigit())
     if len(digits) == 11 and digits[0] == "8":
         digits = "7" + digits[1:]
     if len(digits) == 10 and digits[0] == "9":
         digits = "7" + digits
     if len(digits) != 11 or not digits.startswith("79"):
+        # опечатка в телефоне не должна съедать лимит попыток
         return JSONResponse({"ok": False, "error": "Проверьте номер телефона"},
                             headers=_PUB_CORS)
+
+    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip() \
+        or (request.client.host if request.client else "?")
+    now = _t.time()
+    for k in [k for k, v in _LEAD_HITS.items() if not v or now - v[-1] > 3600]:
+        _LEAD_HITS.pop(k, None)          # чтобы словарь не рос вечно
+    hits = [t for t in _LEAD_HITS.get(ip, []) if now - t < 600]
+    throttled = len(hits) >= 15
+    hits.append(now)
+    _LEAD_HITS[ip] = hits
+
     lead = {"phone": digits,
             "child": str(payload.get("name") or "").strip()[:80],
             "age": str(payload.get("age") or "").strip()[:20],
             "course": str(payload.get("course") or "").strip()[:80],
             "note": str(payload.get("note") or "").strip()[:300],
             "roistat": str(payload.get("roistat") or "").strip()[:64]}
-    with db.get_conn() as conn:
-        conn.execute("""CREATE TABLE IF NOT EXISTS site_leads (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
-            child TEXT, age TEXT, course TEXT, note TEXT, roistat TEXT, ip TEXT)""")
-        conn.execute(
-            "INSERT INTO site_leads (ts, phone, child, age, course, note, roistat, ip)"
-            " VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?)",
-            (lead["phone"], lead["child"], lead["age"], lead["course"],
-             lead["note"], lead["roistat"], ip))
-        conn.commit()
+
+    def _store() -> int | None:
+        with db.get_conn() as conn:
+            conn.execute("""CREATE TABLE IF NOT EXISTS site_leads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+                child TEXT, age TEXT, course TEXT, note TEXT, roistat TEXT, ip TEXT)""")
+            for col, ddl in (("crm_status", "TEXT"), ("attempts", "INTEGER"),
+                             ("last_error", "TEXT"), ("mk_user_id", "INTEGER")):
+                try:
+                    conn.execute(f"ALTER TABLE site_leads ADD COLUMN {col} {ddl}")
+                except Exception:
+                    pass
+            cur = conn.execute(
+                "INSERT INTO site_leads (ts, phone, child, age, course, note, roistat, ip, crm_status)"
+                " VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?)",
+                (lead["phone"], lead["child"], lead["age"], lead["course"],
+                 lead["note"], lead["roistat"], ip,
+                 "throttled" if throttled else "pending"))
+            conn.commit()
+            return cur.lastrowid
+
+    lead["lead_id"] = await run_in_threadpool(_store)
+    if throttled:
+        log.warning("лимит заявок с IP %s: заявка +%s сохранена в журнал без CRM", ip, digits)
+        return JSONResponse({"ok": True}, headers=_PUB_CORS)
     import threading
     threading.Thread(target=lambda: _safe_lead(lead), daemon=True).start()
     return JSONResponse({"ok": True}, headers=_PUB_CORS)
 
 
 def _safe_lead(lead: dict) -> None:
-    try:
-        _lead_to_crm(lead)
+    """Три попытки довести заявку до CRM: сеть и МойКласс иногда моргают."""
+    import time as _t
+    log = logging.getLogger("kidsup.lead")
+    last = ""
+    for attempt in range(3):
+        try:
+            _lead_to_crm(lead)
+            return
+        except Exception as e:
+            last = f"{type(e).__name__}: {e}"
+            log.warning("заявка +%s: попытка %s не удалась (%s)", lead.get("phone"), attempt + 1, last)
+            _t.sleep(5 * (attempt + 1))
+    _lead_mark(lead.get("lead_id"), "failed", None, last)
+    log.error("заявка +%s НЕ доехала до МойКласс: %s", lead.get("phone"), last)
+    try:                                   # молча терять лид нельзя — зовём людей
+        from . import wazzup
+        for ph in {db.get_setting("digest_phone") or "", }:
+            if ph:
+                wazzup.send_via("tgapi", ph,
+                                f"⚠️ Заявка с сайта НЕ доехала до МойКласс: {lead.get('child') or 'без имени'}, "
+                                f"+{lead.get('phone')}, {lead.get('course') or 'направление не выбрано'}. "
+                                f"Позвоните вручную! Журнал: app.kidsup.ru/api/public/leads — Клод",
+                                dry_run=False)
     except Exception:
-        logging.getLogger("kidsup.lead").exception(
-            "заявка +%s сохранена локально (site_leads), но не доехала до МойКласс",
-            lead.get("phone"))
+        pass
 
 
 @app.get("/api/public/leads", dependencies=AUTH)

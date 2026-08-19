@@ -168,7 +168,7 @@ def build_makets(f: dict) -> list[dict]:
     # ------------------------------------------------ 4. сторис «Дедлайн» ---
     makets.append({"key": "story_deadline", "group": "Сторис 1080×1920",
         "title": "Сторис «Дедлайн цены»", "w": W2, "h": H2,
-        "note": f"Крутить с 25 по 30 августа, дальше макет устареет сам.",
+        "note": f"Крутить с 25 по 31 августа, дальше макет устареет сам.",
         "svg": f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W2} {H2}">
 <rect width="{W2}" height="{H2}" fill="{PAPER}"/>{_bubbles(W2, H2, 2)}
 {_logo(W2 / 2, 90, 260)}
@@ -178,7 +178,7 @@ def build_makets(f: dict) -> list[dict]:
 {_t(W2 / 2, 900, 56, "сентябрь по ценам", INDIGO, "normal", "middle")}
 {_t(W2 / 2, 970, 56, "прошлого года", INDIGO, "normal", "middle")}
 <g><rect x="{W2 / 2 - 400}" y="1080" width="800" height="150" rx="75" fill="{SOFT}"/>
-{_t(W2 / 2, 1140, 44, "−15% на первый абонемент", INDIGO, "bold", "middle")}
+{_t(W2 / 2, 1140, 44, "−10% на первый абонемент", INDIGO, "bold", "middle")}
 {_t(W2 / 2, 1195, 36, "при покупке в день первого занятия", BLUE, "normal", "middle")}</g>
 {_t(W2 / 2, 1400, 48, f"занятия стартуют {START}", GREEN, "bold", "middle")}
 {_badge(W2 / 2 - 300, 1500, 600, "напишите нам — подберём группу", BLUE, PAPER, 34)}

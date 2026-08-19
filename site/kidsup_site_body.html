@@ -5,16 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KidsUP — детский центр и английский сад на Бульваре Рокоссовского</title>
 <meta name="description" content="Учебный год 2026/27 стартует 31 августа. Научим читать за 3 месяца, заговорит по-английски за год. 13 направлений для детей от 1,3 до 12 лет. Первое занятие — условно-бесплатное, с диагностикой. До 31.08 — цены прошлого года.">
+<link rel="canonical" href="https://kidsup.ru/">
+<meta name="theme-color" content="#312783">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kidsup.ru/">
+<meta property="og:title" content="KidsUP — детский центр и английский сад на Бульваре Рокоссовского">
+<meta property="og:description" content="Учебный год 2026/27 стартует 31 августа. Научим читать за 3 месяца, заговорит по-английски за год. Первое занятие условно-бесплатное, с диагностикой.">
+<meta property="og:image" content="https://kidsup.ru/og.jpg">
+<meta property="og:locale" content="ru_RU">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%A9%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap">
 <style>
 :root{
   --indigo:#312783; --blue:#1DA7E0; --green:#7DB928; --amber:#F59C00; --red:#E30613;
+  /* тёмные оттенки тех же цветов — только для текста и кнопок, ради контраста WCAG AA */
+  --green-cta:#5C8C1D; --green-ink:#4E7A18; --blue-ink:#0F6E96; --red-ink:#C1050F;
   --ink:#221F3B; --muted:#6A6F87; --bg:#FFFFFF; --soft:#F2F8FD; --line:#E6E9F2;
   --r:18px;
 }
 *{box-sizing:border-box;margin:0}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;scroll-padding-top:82px}
 body{font:16px/1.6 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
 img{max-width:100%}
 h1,h2,h3{font-family:Rubik,system-ui,sans-serif;color:var(--indigo);text-wrap:balance;line-height:1.15}
@@ -25,7 +37,7 @@ section{padding:56px 0}
 .btn{display:inline-block;border:0;border-radius:999px;padding:.95rem 1.9rem;font:700 1rem Rubik,sans-serif;
   cursor:pointer;text-decoration:none;text-align:center;transition:transform .15s,box-shadow .15s}
 .btn:active{transform:scale(.97)}
-.btn-green{background:var(--green);color:#fff;box-shadow:0 8px 24px rgba(125,185,40,.35)}
+.btn-green{background:var(--green-cta);color:#fff;box-shadow:0 8px 24px rgba(125,185,40,.35)}
 .btn-green:hover{box-shadow:0 10px 30px rgba(125,185,40,.5);transform:translateY(-2px)}
 .btn-line{border:2px solid var(--indigo);color:var(--indigo);background:#fff}
 .btn-wa{background:#25D366;color:#fff}
@@ -39,7 +51,16 @@ section{padding:56px 0}
 .top nav a:hover{color:var(--blue)}
 .top .tel{font:700 1rem Rubik;color:var(--indigo);text-decoration:none;white-space:nowrap}
 .top .btn{padding:.55rem 1.2rem;font-size:.88rem}
-@media(max-width:900px){.top nav{display:none}}
+.burger{display:none;background:none;border:1.5px solid var(--line);border-radius:10px;padding:.4rem .6rem;cursor:pointer;font-size:1.2rem;line-height:1;color:var(--indigo)}
+@media(max-width:900px){
+  .top nav{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;flex-direction:column;
+    align-items:flex-start;gap:0;padding:.4rem 1rem 1rem;box-shadow:0 14px 30px rgba(49,39,131,.12)}
+  .top nav.open{display:flex}
+  .top nav a{padding:.7rem 0;width:100%;border-bottom:1px solid var(--line)}
+  .burger{display:block;order:2}
+  .top .wrap{flex-wrap:wrap;position:relative}
+}
+@media(max-width:420px){.top .tel{display:none}}
 /* hero */
 .hero{background:linear-gradient(160deg,#F2F8FD 0%,#EAF4FB 55%,#E9F5DE 100%);overflow:hidden;position:relative}
 .hero .wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:32px;align-items:center;padding-top:56px;padding-bottom:56px}
@@ -124,6 +145,10 @@ section{padding:56px 0}
 .form-box input:focus,.form-box select:focus{outline:2px solid var(--blue);border-color:var(--blue)}
 .form-box .btn{width:100%;margin-top:1.2rem}
 .form-box .alt{text-align:center;font-size:.85rem;color:var(--muted);margin-top:.8rem}
+.form-box .consent{display:flex;gap:.55rem;align-items:flex-start;margin-top:1rem;font-size:.8rem;color:var(--muted);line-height:1.4}
+.form-box .consent input{width:auto;margin-top:.15rem;flex:0 0 auto}
+.form-box .consent a{color:var(--indigo);font-weight:600}
+.f-err{color:var(--red-ink);font-size:.8rem;margin-top:.3rem;font-weight:600}
 .form-box .alt a{color:var(--indigo);font-weight:600}
 /* faq */
 details{border:1px solid var(--line);border-radius:14px;padding:0;margin:.6rem 0;background:#fff;overflow:hidden}
@@ -145,7 +170,7 @@ footer img{height:40px}
 footer a{color:#fff}
 /* свободные места */
 .spots{display:inline-block;align-self:flex-start;font:700 .74rem Rubik;color:#8a5a00;background:#FFF3D6;border-radius:999px;padding:.25rem .7rem;margin:0 0 .8rem}
-.spots.low{color:#fff;background:var(--red)}
+.spots.low{color:#fff;background:var(--red-ink)}
 /* квиз подбора занятия */
 .quiz{background:var(--soft)}
 .q-box{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;max-width:760px;margin:0 auto}
@@ -174,9 +199,9 @@ footer a{color:#fff}
 .sched .s-tbl{width:100%;border-collapse:collapse;font-size:.9rem}
 .sched .s-tbl td{padding:.55rem .9rem;border-top:1px solid var(--line);vertical-align:middle}
 .sched .s-tbl .lvl{color:var(--muted);font-size:.8rem}
-.sched .s-tbl .ok{color:var(--green);font-weight:600;white-space:nowrap}
+.sched .s-tbl .ok{color:var(--green-ink);font-weight:600;white-space:nowrap}
 .sched .s-tbl .no{color:var(--muted);white-space:nowrap}
-.sched .s-tbl .hotf{color:var(--red);font-weight:700;white-space:nowrap}
+.sched .s-tbl .hotf{color:var(--red-ink);font-weight:700;white-space:nowrap}
 .sched .s-tbl .btn{padding:.4rem .9rem;font-size:.8rem;margin:0}
 @media(max-width:700px){.sched .s-tbl td:nth-child(2){display:none}}
 /* педагоги */
@@ -194,9 +219,39 @@ footer a{color:#fff}
 .g-strip{display:flex;gap:14px;overflow-x:auto;padding:1.2rem 0 .6rem;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
 .g-strip figure{flex:0 0 auto;margin:0;scroll-snap-align:start}
 .g-strip img{height:240px;width:auto;border-radius:14px;display:block}
-.g-strip figcaption{color:#CFClFF;color:rgba(255,255,255,.85);font-size:.78rem;margin-top:.35rem}
+.g-strip figcaption{color:rgba(255,255,255,.85);font-size:.78rem;margin-top:.35rem}
 .gal .soc{color:rgba(255,255,255,.9);font-size:.9rem;margin-top:.8rem}
 .gal .soc a{color:#9BD7F5;font-weight:600}
+footer .legal{font-size:.78rem;color:rgba(255,255,255,.72);line-height:1.5}
+footer .legal a{color:#9BD7F5}
+/* отзывы */
+.rev{background:var(--soft)}
+.rev .wrap{max-width:1100px}
+.rev-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:20px;margin-top:1.4rem;align-items:start}
+@media(max-width:860px){.rev-grid{grid-template-columns:1fr}}
+.rev-widget{position:relative;background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;min-height:560px}
+.rev-fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;text-align:center;padding:1.5rem;color:var(--muted);font-size:.9rem}
+.rev-fallback a{color:var(--indigo);font-weight:600}
+.rev-widget iframe{position:relative}
+.rev-widget iframe{width:100%;height:560px;border:0;display:block}
+.rev-note{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:20px 22px}
+.rev-note h3{font-size:1.05rem;margin-bottom:.5rem}
+.rev-note p{font-size:.92rem;color:var(--muted);margin:.5rem 0}
+.rev-stars{font-size:1.5rem;letter-spacing:.1em}
+.rev-note .btn{margin-top:.8rem;padding:.6rem 1.2rem;font-size:.9rem}
+/* мессенджеры и соцсети */
+.mess{background:#fff}
+.mess-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:1.3rem}
+.mcard{display:flex;gap:12px;align-items:center;border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;
+  text-decoration:none;color:var(--ink);transition:border-color .2s,transform .2s,box-shadow .2s}
+.mcard:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 10px 26px rgba(49,39,131,.10)}
+.mcard .ico{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.mcard .ico svg{width:24px;height:24px;fill:#fff}
+.mcard b{display:block;font-family:Rubik;font-size:.98rem;color:var(--indigo)}
+.mcard span{font-size:.82rem;color:var(--muted)}
+.ico-wa{background:#25D366}.ico-tg{background:#2AABEE}.ico-max{background:#7B5CFF}
+.ico-vk{background:#0077FF}.ico-yt{background:#FF0000}.ico-ig{background:linear-gradient(45deg,#F58529,#DD2A7B,#8134AF)}
+.soc-note{font-size:.76rem;color:var(--muted);margin-top:1rem;line-height:1.45}
 /* плавающая кнопка WhatsApp */
 .fab{position:fixed;right:18px;bottom:18px;z-index:60;width:58px;height:58px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px rgba(37,211,102,.45);animation:fabpulse 2.6s ease-in-out infinite}
 .fab svg{width:32px;height:32px;fill:#fff}
@@ -220,14 +275,16 @@ body.js .reveal.in{opacity:1;transform:none}
 <header class="top">
   <div class="wrap">
     <img src="LOGO_COLOR" alt="KidsUP — детский центр">
-    <nav>
+    <nav id="mainnav">
       <a href="#events">Праздник 29.08</a>
       <a href="#courses">Занятия</a>
       <a href="#schedule">Расписание</a>
       <a href="#prices">Цены и скидки</a>
+      <a href="#reviews">Отзывы</a>
       <a href="#faq">Вопросы</a>
       <a href="#contact">Как найти</a>
     </nav>
+    <button class="burger" id="burger" aria-label="Меню" aria-expanded="false" aria-controls="mainnav">☰</button>
     <a class="tel" href="tel:+74951209024">+7 495 120-90-24</a>
     <a class="btn btn-green" href="#signup">Записаться</a>
   </div>
@@ -335,7 +392,7 @@ body.js .reveal.in{opacity:1;transform:none}
         <button data-v="art">Творчество и спорт</button>
         <button data-v="sad" data-sad>Сад / занять первую половину дня</button>
       </div>
-      <div class="q-res" id="q-res" hidden></div>
+      <div class="q-res" id="q-res" role="status" aria-live="polite" hidden></div>
     </div>
   </div>
 </section>
@@ -627,7 +684,7 @@ body.js .reveal.in{opacity:1;transform:none}
 <p><b>Сейчас идёт набор первых групп 2026/27.</b> Запись в лист ожидания ни к чему
 не обязывает: набираем группу по возрасту → зовём вас первыми → <b>у первой группы
 скидка 10%</b> на первый абонемент. В заявке укажите возраст ребёнка и удобные дни.</p></div></details>
-  <a class="btn btn-green" href="#signup" data-pick="Спортивно-бальные танцы">Записаться</a>
+  <a class="btn btn-green" href="#signup" data-pick="💃 Спортивно-бальные танцы (лист ожидания)">В лист ожидания</a>
 </div>
 <div class="card g3 g7">
   <div class="age">🩰 с 3 лет</div><h3>Хореография</h3>
@@ -756,6 +813,7 @@ body.js .reveal.in{opacity:1;transform:none}
     <div class="wait reveal" id="wait">
       <b>🔜 Открываем новые направления — как только соберётся группа</b>
       <p>Оставьте заявку — позовём первыми и дадим скидку первой группы 10%.</p>
+      <button data-w="💃 Спортивно-бальные танцы (лист ожидания)">💃 Танцы</button>
       <button data-w="⚽ Футбол (лист ожидания)">⚽ Футбол</button>
       <button data-w="🥋 Единоборства (лист ожидания)">🥋 Единоборства</button>
       <button data-w="🤸 Акробатика (лист ожидания)">🤸 Акробатика</button>
@@ -771,7 +829,7 @@ body.js .reveal.in{opacity:1;transform:none}
     <h2>📅 Расписание групп 2026/27</h2>
     <p style="color:var(--muted)">Живые данные из нашей CRM МойКласс: свободные места в каждой группе
     обновляются автоматически. Нажмите на направление — выберите день и время.</p>
-    <div id="sched-box"><p style="color:var(--muted)">Загружаем расписание…</p></div>
+    <div id="sched-box" role="status" aria-live="polite"><p style="color:var(--muted)">Загружаем расписание…</p></div>
   </div>
 </section>
 
@@ -849,10 +907,7 @@ body.js .reveal.in{opacity:1;transform:none}
       <figure><img src="PHOTO_G_SAD" alt="Английский сад" loading="lazy"><figcaption>Английский мини-сад</figcaption></figure>
       <figure><img src="PHOTO_G_PARK" alt="Прогулка" loading="lazy"><figcaption>Прогулки и городской лагерь</figcaption></figure>
     </div>
-    <p class="soc">Больше фото и видео — в наших соцсетях:
-      <a href="https://vk.com/kidsup_ru" target="_blank" rel="noopener">ВКонтакте</a> ·
-      <a href="https://t.me/KidsUP_ru" target="_blank" rel="noopener">Telegram</a> ·
-      <a href="https://youtube.com/@kidsup_ru" target="_blank" rel="noopener">YouTube</a></p>
+    <p class="soc">Больше фото и видео — в наших соцсетях ниже 👇</p>
   </div>
 </section>
 
@@ -880,21 +935,25 @@ body.js .reveal.in{opacity:1;transform:none}
   <div class="wrap" style="text-align:center">
     <h2>Записаться на занятие</h2>
     <p>Оставьте заявку — администратор подберёт группу и время и ответит на вопросы.</p>
-    <form class="form-box" id="lead" style="text-align:left">
+    <form class="form-box" id="lead" style="text-align:left" action="https://app.kidsup.ru/api/public/lead" method="post" novalidate>
       <label for="f-name">Имя ребёнка</label>
-      <input id="f-name" placeholder="Мария" autocomplete="off">
+      <input id="f-name" name="name" placeholder="Мария" autocomplete="off">
       <label for="f-age">Возраст ребёнка</label>
-      <input id="f-age" placeholder="5 лет">
+      <input id="f-age" name="age" placeholder="5 лет">
       <label for="f-phone">Ваш телефон</label>
-      <input id="f-phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel">
+      <input id="f-phone" name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-describedby="f-phone-err">
+      <p id="f-phone-err" class="f-err" hidden>Проверьте номер: нужен российский мобильный, например +7 916 000-00-00</p>
       <label for="f-course">Что интересует</label>
-      <select id="f-course">
+      <select id="f-course" name="course">
         <option>Подобрать под ребёнка</option>
       </select>
       <input class="hp" id="f-web" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label class="consent"><input type="checkbox" id="f-ok" name="consent" required checked>
+        <span>Соглашаюсь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки
+        персональных данных</a> и на обработку моих данных для записи на занятие</span></label>
       <button class="btn btn-green" type="submit">Отправить заявку</button>
       <p class="alt">Позвоним в рабочее время в течение 15 минут.<br>
-      Удобнее самим? <a href="https://wa.me/79160170918" target="_blank" rel="noopener">WhatsApp</a> ·
+      Удобнее самим? <a href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">WhatsApp</a> ·
       <a href="tel:+74951209024">+7 495 120-90-24</a> · ежедневно с 9:00</p>
     </form>
   </div>
@@ -935,6 +994,34 @@ body.js .reveal.in{opacity:1;transform:none}
   </div>
 </section>
 
+<section class="rev" id="reviews">
+  <div class="wrap">
+    <h2>Что говорят родители</h2>
+    <p style="color:var(--muted)">Отзывы с Яндекс.Карт — настоящие, их нельзя отредактировать или удалить.</p>
+    <div class="rev-grid">
+      <div class="rev-widget">
+        <div class="rev-fallback">Загружаем отзывы с Яндекс.Карт…<br>
+          <a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">Открыть отзывы в новой вкладке →</a></div>
+        <iframe src="https://yandex.ru/maps-reviews-widget/220508405205?comments" title="Отзывы о KidsUP на Яндекс.Картах" loading="lazy"></iframe>
+      </div>
+      <div class="rev-note reveal">
+        <div class="rev-stars">⭐️⭐️⭐️⭐️⭐️</div>
+        <h3>5,0 на Яндекс.Картах · 253 отзыва</h3>
+        <p style="color:var(--ink);font-size:.95rem;margin-top:.2rem"><b>«Хорошее место 2026»</b> — награда Яндекса
+        центрам, которые родители выбирают и рекомендуют чаще других.</p>
+        <p>12 лет в районе: многие приводят уже второго и третьего ребёнка, а выпускники
+        подготовки возвращаются на английский и скорочтение. Мы не просим писать отзывы
+        «за скидку» — всё, что вы читаете слева, родители написали сами.</p>
+        <p><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener"
+        style="color:var(--indigo);font-weight:600">Открыть все отзывы на Яндекс.Картах →</a></p>
+        <p>Хотите увидеть центр вживую — приходите 29 августа на праздник: аниматоры,
+        конкурсы и беспроигрышная лотерея, вход свободный.</p>
+        <a class="btn btn-green" href="#signup">Записаться на занятие</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="contact" id="contact">
   <div class="wrap">
     <h2>Как нас найти</h2>
@@ -945,10 +1032,9 @@ body.js .reveal.in{opacity:1;transform:none}
         <p><b>🚇 Метро:</b> Бульвар Рокоссовского — 2 минуты пешком.</p>
         <p><b>🕘 Часы работы:</b> ежедневно; в августе 8:00–19:00, с сентября 9:00–20:00.</p>
         <p><b>☎️ Телефон:</b> <a href="tel:+74951209024">+7 495 120-90-24</a></p>
-        <p><b>💬 WhatsApp:</b> <a href="https://wa.me/79160170918" target="_blank" rel="noopener">написать нам</a></p>
-        <p><b>📱 Соцсети:</b> <a href="https://vk.com/kidsup_ru" target="_blank" rel="noopener">ВКонтакте</a> ·
-        <a href="https://t.me/KidsUP_ru" target="_blank" rel="noopener">Telegram</a> ·
-        <a href="https://youtube.com/@kidsup_ru" target="_blank" rel="noopener">YouTube</a></p>
+        <p><b>💬 WhatsApp:</b> <a href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">написать нам</a></p>
+        <p><b>📄 Работаем по образовательной лицензии:</b> оплата материнским капиталом
+        и налоговый вычет 13%.</p>
       </div>
       <iframe class="map" loading="lazy" title="KidsUP на карте"
         src="https://yandex.ru/map-widget/v1/?text=%D0%B1%D1%83%D0%BB%D1%8C%D0%B2%D0%B0%D1%80%20%D0%9C%D0%B0%D1%80%D1%88%D0%B0%D0%BB%D0%B0%20%D0%A0%D0%BE%D0%BA%D0%BE%D1%81%D1%81%D0%BE%D0%B2%D1%81%D0%BA%D0%BE%D0%B3%D0%BE%206%D0%BA1%D0%92&z=16"></iframe>
@@ -956,16 +1042,75 @@ body.js .reveal.in{opacity:1;transform:none}
   </div>
 </section>
 
-<footer>
+<section class="mess" id="messengers">
   <div class="wrap">
-    <img src="LOGO_WHITE" alt="KidsUP">
-    <div>KidsUP · Best for our kids · б-р Маршала Рокоссовского, 6 к1В ·
-      <a href="tel:+74951209024">+7 495 120-90-24</a></div>
-    <div style="margin-left:auto"><a href="https://kidsup.ru/o">Договор-оферта</a></div>
+    <h2>Напишите нам, где удобно</h2>
+    <p style="color:var(--muted)">Отвечаем в рабочее время обычно в течение 15 минут — в любом мессенджере.</p>
+    <div class="mess-grid">
+      <a class="mcard" href="https://app.kidsup.ru/go/whatsapp?src=site&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D1%83%D0%B7%D0%BD%D0%B0%D1%82%D1%8C%20%D0%BF%D1%80%D0%BE%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D1%8F%20%D0%B2%20KidsUP" target="_blank" rel="noopener">
+        <span class="ico ico-wa"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.955 8.955 0 0 1-1.72-5.272c0-4.955 4.04-8.995 8.997-8.995S25.2 10.845 25.2 15.8c0 4.958-4.04 8.998-8.998 8.998zm0-19.798c-5.96 0-10.8 4.842-10.8 10.8 0 1.964.53 3.898 1.546 5.574L5 27.176l5.974-1.92a10.807 10.807 0 0 0 16.03-9.455c0-5.958-4.842-10.8-10.802-10.8z"/></svg></span>
+        <span><b>WhatsApp</b><span>Быстрее всего — сюда</span></span>
+      </a>
+      <a class="mcard" href="https://app.kidsup.ru/go/telegram?src=site" target="_blank" rel="noopener">
+        <span class="ico ico-tg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.04 15.47 8.7 20.2c.5 0 .72-.22.98-.48l2.35-2.25 4.87 3.57c.9.5 1.53.24 1.77-.83l3.2-15.02c.29-1.33-.48-1.85-1.35-1.53L1.36 9.86C.06 10.37.08 11.1 1.14 11.42l4.83 1.5L17.2 6.1c.53-.33 1-.15.61.2z"/></svg></span>
+        <span><b>Telegram</b><span>Чат с администратором</span></span>
+      </a>
+      <a class="mcard" href="https://max.ru/u/f9LHodD0cOL7ouxX67LQufADpyAmbvMGRUdMqaGj2Ya-F1EuIVQMGWeU9gc" target="_blank" rel="noopener">
+        <span class="ico ico-max"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5zm0 2.3 6.5 3.6L12 11.5 5.5 7.9 12 4.3zM5 9.6l6 3.3v6.4l-6-3.3V9.6zm8 9.7v-6.4l6-3.3v6.4l-6 3.3z"/></svg></span>
+        <span><b>MAX</b><span>Наш профиль в MAX</span></span>
+      </a>
+      <a class="mcard" href="tel:+74951209024">
+        <span class="ico" style="background:var(--indigo)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.6.1.3 0 .7-.2 1l-2.3 2.2z"/></svg></span>
+        <span><b>Позвонить</b><span>+7 495 120-90-24, ежедневно с 9:00</span></span>
+      </a>
+    </div>
+
+    <h2 style="margin-top:2.2rem;font-size:1.3rem">Мы в соцсетях</h2>
+    <div class="mess-grid">
+      <a class="mcard" href="https://app.kidsup.ru/go/vk?src=site" target="_blank" rel="noopener">
+        <span class="ico ico-vk"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.8 16.9c-5 0-8.2-3.5-8.3-9.3h2.6c.1 4.3 2 6.1 3.4 6.5V7.6h2.4v3.8c1.4-.2 2.9-1.8 3.4-3.8h2.4c-.4 2.5-2 4.1-3.1 4.7 1.1.5 2.9 1.9 3.6 4.6h-2.6c-.5-1.8-1.8-3.1-3.7-3.4v3.4h-.1z"/></svg></span>
+        <span><b>ВКонтакте</b><span>Новости, фото, розыгрыши</span></span>
+      </a>
+      <a class="mcard" href="https://app.kidsup.ru/go/tgchannel?src=site" target="_blank" rel="noopener">
+        <span class="ico ico-tg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.04 15.47 8.7 20.2c.5 0 .72-.22.98-.48l2.35-2.25 4.87 3.57c.9.5 1.53.24 1.77-.83l3.2-15.02c.29-1.33-.48-1.85-1.35-1.53L1.36 9.86C.06 10.37.08 11.1 1.14 11.42l4.83 1.5L17.2 6.1c.53-.33 1-.15.61.2z"/></svg></span>
+        <span><b>Telegram-канал</b><span>Анонсы и жизнь центра</span></span>
+      </a>
+      <a class="mcard" href="https://app.kidsup.ru/go/youtube?src=site" target="_blank" rel="noopener">
+        <span class="ico ico-yt"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 7.2c-.2-.9-.9-1.6-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4c-.9.2-1.6.9-1.8 1.8C2 8.8 2 12 2 12s0 3.2.4 4.8c.2.9.9 1.6 1.8 1.8C5.8 19 12 19 12 19s6.2 0 7.8-.4c.9-.2 1.6-.9 1.8-1.8.4-1.6.4-4.8.4-4.8s0-3.2-.4-4.8zM10 15V9l5.2 3L10 15z"/></svg></span>
+        <span><b>YouTube</b><span>Видео с занятий</span></span>
+      </a>
+      <a class="mcard" href="https://app.kidsup.ru/go/instagram?src=site" target="_blank" rel="noopener">
+        <span class="ico ico-ig"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.3 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.3 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.3-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.9c.1-1.2.3-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 3.4A6.4 6.4 0 1 0 18.4 12 6.4 6.4 0 0 0 12 5.6zm0 10.6A4.2 4.2 0 1 1 16.2 12 4.2 4.2 0 0 1 12 16.2zm6.6-10.9a1.5 1.5 0 1 0 1.5 1.5 1.5 1.5 0 0 0-1.5-1.5z"/></svg></span>
+        <span><b>Instagram*</b><span>Фото и сторис</span></span>
+      </a>
+    </div>
+    <p class="soc-note">* Instagram принадлежит компании Meta, признанной экстремистской организацией
+    и запрещённой на территории Российской Федерации.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="flex-direction:column;align-items:flex-start;gap:.9rem">
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      <img src="LOGO_WHITE" alt="KidsUP">
+      <div>KidsUP · Best for our kids · б-р Маршала Рокоссовского, 6 к1В ·
+        <a href="tel:+74951209024">+7 495 120-90-24</a></div>
+    </div>
+    <div class="legal">
+      ИП Иванащенко Б. М. · ИНН 502710671385 · ОГРНИП 318774600342197<br>
+      Лицензия на осуществление образовательной деятельности
+      <a href="https://islod.obrnadzor.gov.ru/rlic/details/81d03c5d-187f-995b-ef7e-85425051bb9c/" target="_blank" rel="noopener">№ Л035-01298-77/00180224 от 14.05.2021</a>
+      — работаем по лицензии: можно оплатить материнским капиталом и вернуть 13% налогового вычета.
+    </div>
+    <div class="legal">
+      <a href="https://kidsup.ru/o" target="_blank" rel="noopener">Договор-оферта</a> ·
+      <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">Политика конфиденциальности</a> ·
+      Нажимая «Отправить заявку», вы соглашаетесь на обработку персональных данных.
+    </div>
   </div>
 </footer>
 
-<a class="fab" href="https://wa.me/79160170918?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D1%83%D0%B7%D0%BD%D0%B0%D1%82%D1%8C%20%D0%BF%D1%80%D0%BE%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D1%8F%20%D0%B2%20KidsUP" target="_blank" rel="noopener" aria-label="Написать в WhatsApp">
+<a class="fab" href="https://app.kidsup.ru/go/whatsapp?src=site&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D1%83%D0%B7%D0%BD%D0%B0%D1%82%D1%8C%20%D0%BF%D1%80%D0%BE%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D1%8F%20%D0%B2%20KidsUP" target="_blank" rel="noopener" aria-label="Написать в WhatsApp">
 <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.955 8.955 0 0 1-1.72-5.272c0-4.955 4.04-8.995 8.997-8.995S25.2 10.845 25.2 15.8c0 4.958-4.04 8.998-8.998 8.998zm0-19.798c-5.96 0-10.8 4.842-10.8 10.8 0 1.964.53 3.898 1.546 5.574L5 27.176l5.974-1.92a10.807 10.807 0 0 0 16.03-9.455c0-5.958-4.842-10.8-10.802-10.8z"/></svg>
 </a>
 
@@ -976,7 +1121,7 @@ body.js .reveal.in{opacity:1;transform:none}
 
 <script>
 /* курсы: фильтр по возрасту + выбор в форму */
-const NAMES = ["Подготовка к школе", "Английский язык", "Английский мини-сад", "Нулевой класс", "Раннее развитие", "Логопед", "Ментальная арифметика", "Шахматы", "ИЗО-студия", "Скорочтение (техника чтения)", "Каллиграфия + грамота", "Робототехника", "Спортивно-бальные танцы"];
+const NAMES = ["Подготовка к школе", "Английский язык", "Английский мини-сад", "Нулевой класс", "Раннее развитие", "Логопед", "Ментальная арифметика", "Шахматы", "ИЗО-студия", "Скорочтение (техника чтения)", "Каллиграфия + грамота", "Робототехника"];
 const sel = document.getElementById('f-course');
 NAMES.forEach(n => { const o = document.createElement('option'); o.textContent = n; sel.append(o); });
 const og1 = document.createElement('optgroup'); og1.label = 'События (бесплатно)';
@@ -984,17 +1129,38 @@ const og1 = document.createElement('optgroup'); og1.label = 'События (б�
   .forEach(n => { const o = document.createElement('option'); o.textContent = n; og1.append(o); });
 sel.append(og1);
 const og2 = document.createElement('optgroup'); og2.label = 'Новые направления — лист ожидания';
-['⚽ Футбол (лист ожидания)', '🥋 Единоборства (лист ожидания)', '🤸 Акробатика (лист ожидания)', '🩰 Хореография (лист ожидания)', '🎭 Актёрское мастерство (лист ожидания)', '🎤 Техника речи (лист ожидания)']
+['💃 Спортивно-бальные танцы (лист ожидания)', '⚽ Футбол (лист ожидания)', '🥋 Единоборства (лист ожидания)', '🤸 Акробатика (лист ожидания)', '🩰 Хореография (лист ожидания)', '🎭 Актёрское мастерство (лист ожидания)', '🎤 Техника речи (лист ожидания)']
   .forEach(n => { const o = document.createElement('option'); o.textContent = n; og2.append(o); });
 sel.append(og2);
+/* единая точка выбора курса: подставляет в форму и сбрасывает «прицепленную» группу */
+window._grp = '';
+function setCourse(name, grp) {
+  if (!name) return;
+  if ([...sel.options].some(o => o.value === name)) sel.value = name;
+  else console.warn('нет такого курса в форме:', name);
+  window._grp = grp || '';
+}
 /* запись на события из карточек */
-document.querySelectorAll('[data-ev]').forEach(a => a.addEventListener('click', () => { sel.value = a.dataset.ev; }));
+document.querySelectorAll('[data-ev]').forEach(a => a.addEventListener('click', () => setCourse(a.dataset.ev)));
 /* лист ожидания новых направлений */
 document.getElementById('wait').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  sel.value = b.dataset.w;
+  setCourse(b.dataset.w);
   document.getElementById('signup').scrollIntoView({behavior: 'smooth'});
 });
+/* бургер-меню */
+(function(){
+  const bt = document.getElementById('burger'), nav = document.getElementById('mainnav');
+  if (!bt || !nav) return;
+  bt.addEventListener('click', () => {
+    const open = nav.classList.toggle('open');
+    bt.setAttribute('aria-expanded', open ? 'true' : 'false');
+    bt.textContent = open ? '✕' : '☰';
+  });
+  nav.addEventListener('click', e => {
+    if (e.target.tagName === 'A') { nav.classList.remove('open'); bt.textContent = '☰'; bt.setAttribute('aria-expanded','false'); }
+  });
+})();
 document.getElementById('flt').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   document.querySelectorAll('#flt button').forEach(x => x.classList.remove('on'));
@@ -1004,16 +1170,27 @@ document.getElementById('flt').addEventListener('click', e => {
     c.classList.toggle('hide', f !== 'all' && !c.classList.contains('g' + f)));
 });
 document.getElementById('cards').addEventListener('click', e => {
-  const a = e.target.closest('[data-pick]'); if (a) sel.value = a.dataset.pick;
+  const a = e.target.closest('[data-pick]'); if (a) setCourse(a.dataset.pick);
 });
 /* форма → заявка в CRM (запасной путь — WhatsApp) */
+function normPhone(raw) {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
+  if (d.length === 10 && d[0] === '9') d = '7' + d;
+  return (d.length === 11 && d.startsWith('79')) ? d : '';
+}
 document.getElementById('lead').addEventListener('submit', async e => {
   e.preventDefault();
   const n = document.getElementById('f-name').value.trim();
   const a = document.getElementById('f-age').value.trim();
   const p = document.getElementById('f-phone').value.trim();
   const c = sel.value;
-  const btn = e.target.querySelector('button');
+  const err = document.getElementById('f-phone-err');
+  const ok = document.getElementById('f-ok');
+  if (!normPhone(p)) { err.hidden = false; document.getElementById('f-phone').focus(); return; }
+  err.hidden = true;
+  if (ok && !ok.checked) { ok.focus(); return; }
+  const btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true; btn.textContent = 'Отправляем…';
   const rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
   try {
@@ -1025,16 +1202,29 @@ document.getElementById('lead').addEventListener('submit', async e => {
                             website: document.getElementById('f-web').value})});
     const j = await r.json();
     if (j.ok) {
-      e.target.innerHTML = '<h3 style="color:var(--green);font-family:Rubik,sans-serif">✅ Заявка отправлена!</h3>' +
+      try { ym(69569509, 'reachGoal', 'lead', {course: c}); } catch (_) {}
+      try { VK.Goal('lead'); } catch (_) {}
+      try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
+      e.target.setAttribute('role', 'status'); e.target.setAttribute('aria-live', 'polite');
+      e.target.innerHTML = '<h3 style="color:var(--green-ink);font-family:Rubik,sans-serif">✅ Заявка отправлена!</h3>' +
         '<p style="margin:.6rem 0">Администратор позвонит вам в ближайшее время — в рабочие часы обычно в течение 15 минут.</p>' +
-        '<p>Не хочется ждать звонка? Напишите нам в <a href="https://wa.me/79160170918" target="_blank" rel="noopener">WhatsApp</a>.</p>';
+        '<p>Не хочется ждать звонка? Напишите нам в <a href="https://app.kidsup.ru/go/whatsapp" target="_blank" rel="noopener">WhatsApp</a> ' +
+        'или <a href="https://app.kidsup.ru/go/telegram" target="_blank" rel="noopener">Telegram</a>.</p>';
       return;
     }
     if (j.error) { alert(j.error); btn.disabled = false; btn.textContent = 'Отправить заявку'; return; }
     throw new Error('fail');
   } catch (_) {
-    const txt = `Здравствуйте! Хочу записаться в KidsUP. Ребёнок: ${n || '…'}, ${a || '…'}. Интересует: ${c}. Телефон: ${p}`;
-    window.open('https://wa.me/79160170918?text=' + encodeURIComponent(txt), '_blank');
+    // попап-блокер может съесть window.open после await — показываем видимую кнопку
+    const txt = encodeURIComponent(`Здравствуйте! Хочу записаться в KidsUP. Ребёнок: ${n || '…'}, ${a || '…'}. Интересует: ${c}. Телефон: ${p}`);
+    const box = document.createElement('div');
+    box.style.cssText = 'margin-top:1rem;padding:14px 16px;border:1.5px solid var(--amber);border-radius:14px;background:#FFF6E4';
+    box.innerHTML = '<b>Не получилось отправить заявку.</b><br>Напишите нам — ответим сразу:' +
+      '<div style="margin-top:.7rem;display:flex;gap:.5rem;flex-wrap:wrap">' +
+      '<a class="btn btn-green" style="padding:.55rem 1.1rem;font-size:.9rem" target="_blank" rel="noopener" href="https://app.kidsup.ru/go/whatsapp?src=site&t=' + txt + '">WhatsApp</a>' +
+      '<a class="btn btn-line" style="padding:.55rem 1.1rem;font-size:.9rem" target="_blank" rel="noopener" href="https://app.kidsup.ru/go/telegram?src=site">Telegram</a>' +
+      '<a class="btn btn-line" style="padding:.55rem 1.1rem;font-size:.9rem" href="tel:+74951209024">Позвонить</a></div>';
+    if (!e.target.querySelector('.send-fallback')) { box.className = 'send-fallback'; e.target.append(box); }
     btn.disabled = false; btn.textContent = 'Отправить заявку';
   }
 });
@@ -1042,16 +1232,28 @@ document.getElementById('lead').addEventListener('submit', async e => {
 const KEYS = {"Подготовка к школе":"school-prep","Английский язык":"english","Английский мини-сад":"minisad",
   "Нулевой класс":"zeroclass","Раннее развитие":"early","Логопед":"logoped","Ментальная арифметика":"mental",
   "Шахматы":"chess","ИЗО-студия":"art","Скорочтение (техника чтения)":"reading",
-  "Каллиграфия + грамота":"calligraphy","Робототехника":"robotics","Спортивно-бальные танцы":"dance"};
-fetch('https://app.kidsup.ru/api/public/schedule').then(r => r.json()).then(d => {
+  "Каллиграфия + грамота":"calligraphy","Робототехника":"robots"};
+const plural = (n, f) => f[(n % 100 > 4 && n % 100 < 20) ? 2 : [2, 0, 1, 1, 1, 2][Math.min(n % 10, 5)]];
+fetch('https://app.kidsup.ru/api/public/schedule').then(r => {
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}).then(d => {
   document.querySelectorAll('#cards [data-pick]').forEach(aEl => {
-    const k = KEYS[aEl.dataset.pick], free = d.by_key && d.by_key[k];
-    if (!free) return;
+    const k = KEYS[aEl.dataset.pick], free = d.by_key ? d.by_key[k] : undefined;
+    if (free === undefined || free === null) return;
     const card = aEl.closest('.card'), price = card && card.querySelector('.price');
     if (!price) return;
     const el = document.createElement('div');
-    el.className = 'spots' + (free <= 15 ? ' low' : '');
-    el.textContent = free <= 20 ? `🔥 Осталось ${free} мест в группах` : '✅ Идёт набор в группы';
+    if (free === 0) {
+      el.className = 'spots low';
+      el.textContent = 'Мест нет — записываем в лист ожидания';
+    } else if (free <= 6) {
+      el.className = 'spots' + (free <= 3 ? ' low' : '');
+      el.textContent = `🔥 Осталось ${free} ${plural(free, ['место', 'места', 'мест'])}`;
+    } else {
+      el.className = 'spots';
+      el.textContent = '✅ Идёт набор в группы';
+    }
     price.after(el);
   });
   if (d.groups) {
@@ -1061,13 +1263,16 @@ fetch('https://app.kidsup.ru/api/public/schedule').then(r => r.json()).then(d =>
       b.textContent = `✅ уже записано ${n} детей на 2026/27`;
       b.hidden = false;
     }
-    renderSchedule(d.groups);
-  }
-}).catch(() => {
+    if (d.groups.length) renderSchedule(d.groups); else schedFallback();
+  } else schedFallback();
+}).catch(() => schedFallback());
+function schedFallback() {
   const box = document.getElementById('sched-box');
-  if (box) box.innerHTML = '<p style="color:var(--muted)">Не получилось загрузить расписание — ' +
-    'позвоните <a href="tel:+74951209024">+7 495 120-90-24</a>, подберём группу за минуту.</p>';
-});
+  if (box) box.innerHTML = '<p style="color:var(--muted)">Расписание сейчас недоступно — ' +
+    'позвоните <a href="tel:+74951209024">+7 495 120-90-24</a> или ' +
+    '<a href="https://app.kidsup.ru/go/whatsapp" target="_blank" rel="noopener">напишите в WhatsApp</a>, ' +
+    'подберём группу за минуту.</p>';
+}
 /* расписание из МойКласс */
 window._grp = '';
 function renderSchedule(groups) {
@@ -1090,26 +1295,25 @@ function renderSchedule(groups) {
       const f = g.free || 0;
       const fCell = f === 0 ? '<span class="no">мест нет</span>'
         : f <= 2 ? `<span class="hotf">🔥 ${f === 1 ? 'последнее место' : 'осталось 2 места'}</span>`
-        : `<span class="ok">свободно ${f}</span>`;
-      const when = (g.day !== '—' ? g.day + ' · ' : '') + g.time;
+        : `<span class="ok">свободно ${f} ${plural(f, ['место', 'места', 'мест'])}</span>`;
+      const when = [g.day, g.time].filter(v => v && v !== '—').join(' · ') || 'время уточняется';
       const pick = c === 'Английский детский сад'
         ? ((g.name || '').includes('Мини-сад') ? 'Английский мини-сад' : 'Нулевой класс') : c;
       return `<tr><td><b>${esc(when)}</b>${lvl ? ' <span class="lvl">' + esc(lvl) + '</span>' : ''}</td>` +
-        `<td>${esc(g.age)}</td><td>${fCell}</td>` +
+        `<td>${esc(g.age || '—')}</td><td>${fCell}</td>` +
         `<td style="text-align:right"><a class="btn btn-green" href="#signup" data-grp="${esc(g.name)}" ` +
         `data-gpick="${esc(pick)}">${f === 0 ? 'В лист ожидания' : 'Записаться'}</a></td></tr>`;
     }).join('');
     return `<details${i === 0 ? ' open' : ''}><summary>${esc(c)}` +
-      `<span class="sfree">${freeSum > 0 ? 'свободно ' + freeSum + ' мест' : 'мест нет'}</span></summary>` +
+      `<span class="sfree">${freeSum > 0 ? 'свободно ' + freeSum + ' ' + plural(freeSum, ['место','места','мест']) : 'мест нет'}</span></summary>` +
       `<table class="s-tbl">${rows}</table></details>`;
   }).join('');
   box.addEventListener('click', e => {
     const a = e.target.closest('[data-grp]'); if (!a) return;
-    window._grp = a.dataset.grp;
-    if ([...sel.options].some(o => o.value === a.dataset.gpick)) sel.value = a.dataset.gpick;
+    setCourse(a.dataset.gpick, a.dataset.grp);
   });
 }
-sel.addEventListener('change', () => { window._grp = ''; });
+sel.addEventListener('change', () => { window._grp = ''; });  // ручной выбор отвязывает группу
 /* квиз подбора занятия */
 (function(){
   const REC = {
@@ -1159,7 +1363,7 @@ sel.addEventListener('change', () => { window._grp = ''; });
   qr.addEventListener('click', e => {
     const a = e.target.closest('a'); if (!a) return;
     const name = a.dataset.q || a.dataset.show;
-    if (name && [...sel.options].some(o => o.value === name)) sel.value = name;
+    setCourse(name);
     if (a.dataset.show) {
       const btnAll = document.querySelector('#flt [data-a="all"]'); if (btnAll) btnAll.click();
       const pick = document.querySelector('#cards [data-pick="' + name + '"]');

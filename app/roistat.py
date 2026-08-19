@@ -24,13 +24,38 @@ def _params() -> str:
     return f"project={db.get_setting('roistat_project')}&key={db.get_setting('roistat_key')}"
 
 
+def _visits_by_phone() -> dict[str, str]:
+    """Номер визита Roistat по последним 10 цифрам телефона: из заявок с сайта
+    и из кликов по кнопкам мессенджеров. Без этого выгрузка оплат приходит
+    в Roistat «ниоткуда» и сквозная аналитика по источникам не считается."""
+    out: dict[str, str] = {}
+    with db.get_conn() as conn:
+        for table, phone_col in (("site_leads", "phone"), ("messenger_clicks", "matched_phone")):
+            try:
+                rows = conn.execute(
+                    f"SELECT {phone_col} ph, roistat_visit FROM {table} "
+                    f"WHERE roistat_visit IS NOT NULL AND roistat_visit != '' ORDER BY id"
+                ).fetchall() if table == "messenger_clicks" else conn.execute(
+                    "SELECT phone ph, roistat FROM site_leads "
+                    "WHERE roistat IS NOT NULL AND roistat != '' ORDER BY id").fetchall()
+            except Exception:
+                continue
+            for r in rows:
+                ph = "".join(ch for ch in str(r["ph"] or "") if ch.isdigit())[-10:]
+                visit = r[1]
+                if len(ph) == 10 and visit:
+                    out[ph] = visit          # берём самый свежий
+    return out
+
+
 def build_orders(since: str) -> list[dict]:
+    visits = _visits_by_phone()
     with db.get_conn() as conn:
         rows = conn.execute("""
-            SELECT p.id, p.date, ABS(p.summa) amount, p.user_id,
+            SELECT p.id, p.date, p.optype, ABS(p.summa) amount, p.user_id,
                    u.name, u.phone, u.email
             FROM payments p LEFT JOIN users u ON u.id = p.user_id
-            WHERE p.optype = 'income' AND ABS(p.summa) > 0 AND p.date >= ?
+            WHERE p.optype IN ('income', 'refund') AND ABS(p.summa) > 0 AND p.date >= ?
             ORDER BY p.date
         """, (since,)).fetchall()
     orders = []
@@ -40,16 +65,42 @@ def build_orders(since: str) -> list[dict]:
             fields["phone"] = str(r["phone"])
         if r["email"]:
             fields["email"] = r["email"]
-        orders.append({
-            "id": f"mk{r['id']}",
-            "name": f"Оплата — {r['name'] or 'клиент ' + str(r['user_id'])}",
+        refund = r["optype"] == "refund"
+        order = {
+            "id": ("mkr" if refund else "mk") + str(r["id"]),
+            "name": ("Возврат — " if refund else "Оплата — ") + (r["name"] or f"клиент {r['user_id']}"),
             "date_create": f"{r['date']}T12:00:00+0300",
-            "status": "paid",
-            "price": float(r["amount"]),
+            "status": "returned" if refund else "paid",
+            "price": -float(r["amount"]) if refund else float(r["amount"]),
             "client_id": str(r["user_id"] or ""),
             "fields": fields,
-        })
+        }
+        ph10 = "".join(ch for ch in str(r["phone"] or "") if ch.isdigit())[-10:]
+        if visits.get(ph10):
+            order["roistat"] = visits[ph10]   # номер визита = склейка с рекламой
+        orders.append(order)
     return orders
+
+
+def push_lead(lead: dict) -> None:
+    """Заявка с сайта уходит в Roistat сразу — чтобы воронка видела не только
+    оплаты, но и обращения (иначе конверсия по источникам не считается)."""
+    project, key = db.get_setting("roistat_project"), db.get_setting("roistat_key")
+    if not project or not key:
+        return
+    order = {
+        "id": "lead" + str(lead.get("lead_id") or lead.get("phone")),
+        "name": "Заявка с сайта — " + (lead.get("child") or "без имени"),
+        "date_create": __import__("datetime").datetime.now().strftime("%Y-%m-%dT%H:%M:%S+0300"),
+        "status": "lead",
+        "price": 0,
+        "client_id": str(lead.get("phone") or ""),
+        "fields": {"phone": "+" + str(lead.get("phone") or ""),
+                   "comment": (lead.get("course") or "") + " " + (lead.get("note") or "")},
+    }
+    if lead.get("roistat"):
+        order["roistat"] = lead["roistat"]
+    httpx.post(f"{BASE}/project/add-orders?{_params()}", json=[order], timeout=20)
 
 
 def push(since: str, dry_run: bool = True) -> None:
