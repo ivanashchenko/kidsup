@@ -2068,7 +2068,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-19.17"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-19.19"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2619,6 +2619,62 @@ async def api_broadcast_prune(payload: dict = None):
 async def api_broadcast_status():
     from . import autopilot
     return autopilot.broadcast_status()
+
+
+@app.post("/api/broadcast/suppress", dependencies=AUTH)
+def api_broadcast_suppress(payload: dict = Body(...)):
+    """Точечно снять с рассылки конкретные номера: {"phones": [...],
+    "dry_run": true}. В отличие от /cancel не трогает всю кампанию —
+    нужна, когда клиент попросил не писать или семья ушла с конфликтом."""
+    phones = {"".join(ch for ch in str(p) if ch.isdigit())[-10:]
+              for p in (payload.get("phones") or [])}
+    phones = {p for p in phones if len(p) == 10}
+    if not phones:
+        raise HTTPException(422, "нужен список phones")
+    dry = bool(payload.get("dry_run"))
+    hit, camps = 0, {}
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, phone, campaign FROM broadcast_queue WHERE status='pending'").fetchall()
+        for rid, phone, camp in rows:
+            p10 = "".join(ch for ch in str(phone or "") if ch.isdigit())[-10:]
+            if p10 not in phones:
+                continue
+            hit += 1
+            camps[camp] = camps.get(camp, 0) + 1
+            if not dry:
+                conn.execute("UPDATE broadcast_queue SET status='cancelled' WHERE id=?", (rid,))
+        if not dry:
+            conn.commit()
+    return {"matched": hit, "by_campaign": camps, "dry_run": dry}
+
+
+@app.post("/api/broadcast/restore", dependencies=AUTH)
+def api_broadcast_restore(payload: dict = Body(...)):
+    """Вернуть в очередь ошибочно отменённые строки: {"campaigns": [...],
+    "exclude_phones": ["7996…"]}. Не трогает тех, кому уже отправляли, —
+    чтобы никто не получил сообщение дважды."""
+    camps = [str(c) for c in (payload.get("campaigns") or []) if c]
+    excl = {"".join(ch for ch in str(p) if ch.isdigit())[-10:]
+            for p in (payload.get("exclude_phones") or [])}
+    if not camps:
+        raise HTTPException(422, "нужен список campaigns")
+    marks = ",".join("?" * len(camps))
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT id, phone FROM broadcast_queue WHERE status='cancelled' "
+            f"AND campaign IN ({marks})", camps).fetchall()
+        sent_phones = {r[0][-10:] for r in conn.execute(
+            "SELECT DISTINCT phone FROM broadcast_queue WHERE status='sent' AND phone IS NOT NULL")}
+        back = 0
+        for rid, phone in rows:
+            p10 = "".join(ch for ch in str(phone or "") if ch.isdigit())[-10:]
+            if p10 in excl or p10 in sent_phones:
+                continue
+            conn.execute("UPDATE broadcast_queue SET status='pending' WHERE id=?", (rid,))
+            back += 1
+        conn.commit()
+    return {"restored": back, "skipped_already_sent_or_excluded": len(rows) - back}
 
 
 @app.get("/api/broadcast/peek", dependencies=AUTH)
