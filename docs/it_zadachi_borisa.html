@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ИТ-задачи владельца — KidsUP</title>
+<style>
+:root{
+  --paper:#FAF9F5; --ink:#22271F; --muted:#6E7264; --accent:#166B4A;
+  --accent-soft:#E3EFE8; --risk:#9A5B00; --risk-soft:#F6ECD9;
+  --stop:#A3282B; --stop-soft:#F7E4E3;
+  --line:#E3E1D6; --fill:#F1EFE7; --card:#FFFFFF; --blue:#1B6FA8; --blue-soft:#E4F0F8;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#151812; --ink:#E7E6DD; --muted:#9B9F90; --accent:#5BC492;
+    --accent-soft:#1D2E25; --risk:#E0A954; --risk-soft:#2E2718;
+    --stop:#E4837F; --stop-soft:#33201F;
+    --line:#2C3026; --fill:#1C2018; --card:#1A1E16; --blue:#6FB6E4; --blue-soft:#152833; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.65 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-variant-numeric:tabular-nums}
+.wrap{max-width:62rem;margin:0 auto;padding:2.6rem 1.25rem 5rem}
+h1{font-size:2.1rem;line-height:1.15;font-weight:800;letter-spacing:-.02em;margin:.4rem 0 .6rem;text-wrap:balance}
+h2{font-size:1.4rem;font-weight:750;letter-spacing:-.01em;margin:0 0 .3rem;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:700;margin:1.5rem 0 .5rem}
+p{margin:.55rem 0;max-width:48rem}
+.kicker{font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.sub{color:var(--muted);max-width:48rem}
+section{margin-top:2.6rem;padding-top:1.8rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.72rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem}
+code{background:var(--fill);border:1px solid var(--line);border-radius:5px;padding:.08em .35em;
+  font:.86em/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all}
+a{color:var(--blue)}
+
+/* сводка сверху */
+.nums{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));margin:1.4rem 0 .4rem}
+.num{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.85rem 1rem}
+.num .v{font-size:1.75rem;font-weight:800;letter-spacing:-.03em;line-height:1.1;color:var(--accent)}
+.num.warn .v{color:var(--risk)} .num.stop .v{color:var(--stop)}
+.num .l{font-size:.82rem;color:var(--muted);margin-top:.2rem;line-height:1.4}
+
+/* задача */
+.task{background:var(--card);border:1px solid var(--line);border-radius:11px;
+  padding:.95rem 1.1rem .95rem 1.1rem;margin:.7rem 0;display:grid;
+  grid-template-columns:1.6rem 1fr;gap:.2rem .75rem;align-items:start}
+.task input[type=checkbox]{width:1.15rem;height:1.15rem;margin:.3rem 0 0;accent-color:var(--accent);cursor:pointer}
+.task .hd{display:flex;flex-wrap:wrap;gap:.45rem;align-items:baseline}
+.task .ttl{font-weight:750;font-size:1.03rem;letter-spacing:-.01em}
+.task .body{grid-column:2}
+.task .body p{margin:.4rem 0;font-size:.94rem}
+.task.done{opacity:.5}
+.task.done .ttl{text-decoration:line-through}
+.badge{font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  border-radius:999px;padding:.16rem .55rem;white-space:nowrap}
+.b-stop{background:var(--stop-soft);color:var(--stop)}
+.b-warn{background:var(--risk-soft);color:var(--risk)}
+.b-ok{background:var(--accent-soft);color:var(--accent)}
+.b-time{background:var(--fill);color:var(--muted)}
+.where{font-size:.84rem;color:var(--muted)}
+.money{font-weight:700;color:var(--accent)}
+.steps{margin:.5rem 0 .2rem;padding-left:1.15rem;font-size:.92rem}
+.steps li{margin:.24rem 0}
+.mine{background:var(--blue-soft);border-radius:8px;padding:.5rem .7rem;margin-top:.6rem;
+  font-size:.88rem;color:var(--ink)}
+.mine b{color:var(--blue)}
+
+/* таблицы */
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th{background:var(--fill);text-align:left;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.55rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+td.w{white-space:nowrap;font-weight:650}
+
+.note{background:var(--risk-soft);border-radius:10px;padding:.85rem 1.05rem;margin:1.1rem 0;font-size:.93rem}
+.note b{color:var(--risk)}
+.ok{background:var(--accent-soft);border-radius:10px;padding:.85rem 1.05rem;margin:1.1rem 0;font-size:.93rem}
+.ok b{color:var(--accent)}
+.prog{position:sticky;top:0;z-index:5;background:var(--paper);padding:.6rem 0 .5rem;
+  border-bottom:1px solid var(--line);margin-bottom:.4rem;font-size:.87rem;color:var(--muted)}
+.bar{height:6px;background:var(--fill);border-radius:99px;overflow:hidden;margin-top:.35rem}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .25s}
+.foot{margin-top:3rem;padding-top:1.4rem;border-top:1px solid var(--line);color:var(--muted);font-size:.86rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="kicker">Борису — личный список</div>
+<h1>ИТ-задачи владельца: что открыть, подключить и решить</h1>
+<p class="sub">Всё, что я не могу сделать сам, потому что нужен ваш доступ, ваша карта или ваше
+решение. 18 задач. Каждая — что сделать, зачем в деньгах, сколько времени и что я делаю сразу после.
+Галочки сохраняются в браузере.</p>
+
+<div class="prog">
+  <span id="cnt">0 из 18 закрыто</span>
+  <div class="bar"><i id="fill"></i></div>
+</div>
+
+<div class="nums">
+  <div class="num stop"><div class="v">5</div><div class="l">блокируют деньги прямо сейчас — до 22.08</div></div>
+  <div class="num warn"><div class="v">7</div><div class="l">на следующую неделю — до 27.08</div></div>
+  <div class="num"><div class="v">6</div><div class="l">гигиена и решения — до конца месяца</div></div>
+  <div class="num"><div class="v">15&nbsp;мин</div><div class="l">медианное время на задачу</div></div>
+</div>
+
+<div class="note"><b>Главная цифра дня.</b> В Roistat лежат 5&nbsp;487 визитов за 2026 год,
+коллтрекинг работает — и при этом <b>0 заявок и 0 продаж</b>. Оплаты из МойКласс уже готовы к выгрузке:
+70 платежей на 774 412 ₽ только с 1 августа. Но из этих 70 к рекламному визиту привязана
+<b>одна</b>. То есть мы платим за рекламу вслепую: не знаем ни одного канала, который реально
+приносит деньги. Первые пять задач ниже закрывают именно это.</div>
+
+<!-- ============ P0 ============ -->
+<section>
+<div class="seclabel">Приоритет 0 · до пятницы 22.08 · блокирует деньги</div>
+<h2>Сквозная аналитика: увидеть, какая реклама приносит оплаты</h2>
+<p class="sub">Пока эти пять пунктов не закрыты, любой рекламный бюджет сентября тратится наугад.
+Вместе — примерно час вашего времени.</p>
+
+<div class="task" data-id="t1">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Включить в Roistat интеграцию «Своя CRM»</span>
+    <span class="badge b-stop">блокер</span><span class="badge b-time">10 мин</span></div>
+  <div class="body">
+    <p class="where">Кабинет Roistat, проект <code>228571</code> → Интеграции → Свои интеграции → API.</p>
+    <ol class="steps">
+      <li>Включить приём заказов по API (галка «Разрешить добавление заказов»).</li>
+      <li>В разделе «Статусы сделок» создать статус с кодом <code>paid</code> и пометить его как
+        <b>«Оплачен» / успешная продажа</b>. Без этой пометки Roistat примет оплаты, но не посчитает их выручкой.</li>
+      <li>Проверить, что ключ проекта не менялся: он у меня уже прописан на портале.</li>
+    </ol>
+    <div class="mine"><b>Что делаю я сразу после:</b> выгружаю все оплаты с 1 января —
+    несколько миллионов рублей истории, — и ставлю ночную догрузку. Через сутки в Roistat
+    появляется реальный ДРР по каждому каналу.</div>
+  </div>
+</div>
+
+<div class="task" data-id="t2">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Добавить поле <code>roistat_visit</code> в форму заявки на kidsup.ru</span>
+    <span class="badge b-stop">блокер</span><span class="badge b-time">нужен доступ к сайту</span></div>
+  <div class="body">
+    <p class="where">Это причина, по которой из 70 оплат к рекламе привязана одна.</p>
+    <p>Roistat кладёт номер визита в куку <code>roistat_visit</code>. Форма на сайте его не читает и
+    не передаёт — поэтому заявка приходит в МойКласс «ничьей». Нужно: скрытое поле в форме +
+    приём этого поля в МойКласс (доп. атрибут клиента «Roistat визит»).</p>
+    <p><b>От вас нужен один из двух вариантов:</b> либо доступ в админку сайта kidsup.ru (кто его
+    ведёт — подрядчик или конструктор?), либо разрешение выложить новый сайт (задача 3) и делать
+    всё там — в нём это поле я уже предусмотрел.</p>
+    <div class="mine"><b>Что делаю я:</b> дописываю передачу визита и завожу атрибут в МойКласс;
+    дальше каждая заявка и каждая оплата сами склеиваются с источником.</div>
+  </div>
+</div>
+
+<div class="task" data-id="t3">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Дать доступ к хостингу kidsup.ru</span>
+    <span class="badge b-stop">блокер</span><span class="badge b-time">5 мин</span></div>
+  <div class="body">
+    <p class="where">FTP/SSH или панель хостинга — логин и пароль.</p>
+    <p>Новый сайт готов и лежит на <code>app.kidsup.ru/site</code>: живое расписание из МойКласс
+    (78 групп, 398 мест), цены, формы с целями Метрики, отдельные страницы оферты и политики.
+    Пока он не на боевом домене, вся реклама ведёт на старый сайт без расписания.</p>
+    <div class="mine"><b>Что делаю я:</b> выкладываю, оставляю старые адреса страниц рабочими,
+    проверяю Метрику и коллтрекинг на боевом.</div>
+  </div>
+</div>
+
+<div class="task" data-id="t4">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Создать цель <code>lead</code> в Яндекс.Метрике</span>
+    <span class="badge b-warn">важно</span><span class="badge b-time">5 мин</span></div>
+  <div class="body">
+    <p class="where">Метрика, счётчик <code>69569509</code> → Настройка → Цели → Добавить цель →
+    тип «JavaScript-событие», идентификатор <code>lead</code>.</p>
+    <p>Событие в коде сайта я уже отправляю — но цели с таким идентификатором в Метрике нет,
+    поэтому Директ не может на неё оптимизироваться и не показывает конверсии.
+    Пока цели нет, автостратегии Директа работают на клики, а не на заявки.</p>
+  </div>
+</div>
+
+<div class="task" data-id="t5">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Подключить рекламные кабинеты к Roistat</span>
+    <span class="badge b-warn">важно</span><span class="badge b-time">15 мин</span></div>
+  <div class="body">
+    <p class="where">Roistat → Интеграции → Рекламные площадки.</p>
+    <ol class="steps">
+      <li><b>Яндекс.Директ</b> — авторизация под аккаунтом, где лежат кампании. Roistat подтянет
+        расходы, и вместе с оплатами из задачи 1 сам посчитает окупаемость.</li>
+      <li><b>VK Реклама</b> — то же самое, если крутим таргет.</li>
+      <li>Проверить, что во всех кампаниях включена <b>разметка utm</b> и подстановка
+        <code>roistat</code>-метки. Без неё расходы будут, а источник заявки — «прямой заход».</li>
+    </ol>
+    <div class="mine"><b>Что делаю я:</b> раз в неделю кладу вам в отчёт цену заявки и цену оплаты
+    по каждому каналу, и мы режем то, что не окупается.</div>
+  </div>
+</div>
+
+</section>
+
+<!-- ============ P1 ============ -->
+<section>
+<div class="seclabel">Приоритет 1 · до среды 27.08 · расширяет охват</div>
+<h2>Каналы: чем мы разговариваем с базой и с новыми</h2>
+<p class="sub">Три канала из четырёх сейчас выключены не по решению, а потому что не введён ключ.</p>
+
+<div class="task" data-id="t6">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Запустить WhatsApp Business API на 79165610077</span>
+    <span class="badge b-warn">важно</span><span class="badge b-time">30 мин + модерация 1–3 дня</span></div>
+  <div class="body">
+    <p>Номер зарезервирован и нигде не публикуется — именно чтобы его не сожгли до подключения.
+    Сейчас рассылки идут с личных номеров через Wazzup: три отправителя, суммарный потолок
+    ~165 сообщений в день. Этого мало на базу и рискованно — личный номер могут заблокировать.</p>
+    <ol class="steps">
+      <li>В кабинете Wazzup завести канал WABA на этот номер.</li>
+      <li>Пройти верификацию бизнеса (нужны реквизиты ООО и подтверждение домена kidsup.ru).</li>
+      <li>Отправить на модерацию 3–4 шаблона — тексты я подготовлю и передам.</li>
+    </ol>
+    <div class="mine"><b>Что это даёт:</b> легальные шаблонные рассылки без риска бана и потолок
+    в разы выше. Это разблокирует прозвон-обход всей летней базы до 30.09.</div>
+  </div>
+</div>
+
+<div class="task" data-id="t7">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Выдать токен группы ВКонтакте</span>
+    <span class="badge b-warn">важно</span><span class="badge b-time">7 мин</span></div>
+  <div class="body">
+    <p class="where">Настройки сообщества → Работа с API → Ключи доступа → создать ключ с правами
+    <b>wall, photos, messages, docs</b>. Плюс скажите ID сообщества.</p>
+    <p>Контент-план на сентябрь у меня написан, макеты рисуются автоматически — но публиковать
+    некуда: ключ <code>vk_token</code> на портале пустой. Из восьми каналов маркетинг-плана
+    паблики — один из пяти незапущенных, а на них в плане ~50 заявок из 130.</p>
+  </div>
+</div>
+
+<div class="task" data-id="t8">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Создать бота Telegram и добавить его в канал</span>
+    <span class="badge b-ok">полезно</span><span class="badge b-time">5 мин</span></div>
+  <div class="body">
+    <p class="where">@BotFather → <code>/newbot</code> → прислать мне токен; бота сделать
+    администратором канала центра.</p>
+    <p>Тот же контент, что и во ВК, плюс автопост расписания и анонсов событий 29–31.08.</p>
+  </div>
+</div>
+
+<div class="task" data-id="t9">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Подтвердить добавочные номера Mango</span>
+    <span class="badge b-ok">полезно</span><span class="badge b-time">5 мин</span></div>
+  <div class="body">
+    <p>Я разбираю записи звонков и раскладываю их по администраторам через добавочные:
+    <b>10 — Ира, 12 — Лена, 15 — Аня</b>. Это восстановлено по звонкам, а не выдано мне —
+    подтвердите или поправьте, и я запишу в настройки.</p>
+    <p>Отдельно: добавочные <b>20 и 21</b> — чужой центр (Клуб Буракова), я их жёстко исключаю
+    из любого анализа. Если появятся ещё чужие — скажите номера.</p>
+  </div>
+</div>
+
+<div class="task" data-id="t10">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Решить судьбу домена KidsUPday.ru</span>
+    <span class="badge b-ok">полезно</span><span class="badge b-time">10 мин</span></div>
+  <div class="body">
+    <p>В рассылках и на сайте фигурировал только KidsUPweek.ru (НОУ), а сайта ДОД не было —
+    вы это заметили, ссылку я добавил. Но нужно понять: домен ваш, куда он ведёт, есть ли там
+    отдельный сайт или ставим редирект на раздел kidsup.ru. Нужен доступ к регистратору домена.</p>
+  </div>
+</div>
+
+<div class="task" data-id="t11">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Оформить ключ Anthropic через ProxyAPI</span>
+    <span class="badge b-ok">полезно</span><span class="badge b-time">15 мин · ~2–5 тыс ₽/мес</span></div>
+  <div class="body">
+    <p>На портале ключ <code>anthropic_api_key</code> пустой. Из-за этого не работает помощник
+    для администраторов: подсказка ответа прямо в карточке клиента, авторазбор переписок
+    на «горячо / остыл», черновики писем. Прямая оплата Anthropic из РФ не проходит — идём
+    через ProxyAPI (принимает карты РФ, тот же протокол, мне нужен только ключ и адрес).</p>
+  </div>
+</div>
+
+<div class="task" data-id="t12">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Проверить лимиты и здоровье номеров Wazzup</span>
+    <span class="badge b-ok">полезно</span><span class="badge b-time">10 мин</span></div>
+  <div class="body">
+    <p>Сейчас три отправителя с потолками 70 / 35 / 60 сообщений в сутки. Перед массовым
+    обходом базы стоит убедиться, что все три канала «зелёные» и ни один не в теневом бане —
+    иначе рассылка уйдёт в пустоту, а мы будем считать её доставленной.</p>
+  </div>
+</div>
+
+</section>
+
+<!-- ============ P2 ============ -->
+<section>
+<div class="seclabel">Приоритет 2 · до конца августа · безопасность и порядок</div>
+<h2>Гигиена: то, что не горит, но однажды дорого обойдётся</h2>
+
+<div class="task" data-id="t13">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Сменить пароль админки app.kidsup.ru</span>
+    <span class="badge b-stop">риск</span><span class="badge b-time">2 мин</span></div>
+  <div class="body">
+    <p>Пароль портала совпадает с паролем от внешней обучающей платформы, куда вы заходите
+    с личной почты. За порталом — вся клиентская база, телефоны, оплаты. Одна утечка на стороне
+    чужого сервиса — и доступ у постороннего. Придумайте отдельный пароль, скажите его мне,
+    я поставлю в течение минуты.</p>
+  </div>
+</div>
+
+<div class="task" data-id="t14">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Дать SSH-доступ к серверу портала</span>
+    <span class="badge b-warn">важно</span><span class="badge b-time">10 мин</span></div>
+  <div class="body">
+    <p>Сейчас я обновляю портал только через HTTP-деплой. Если контейнер упадёт или откатится —
+    а он за неделю дважды откатывал репозиторий на состояние двухнедельной давности, — поднять
+    его без SSH я не смогу, придётся ждать вас. Нужен доступ к панели хостинга портала
+    или ключ на сервер.</p>
+  </div>
+</div>
+
+<div class="task" data-id="t15">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Проверить, что резервная копия МойКласс делается</span>
+    <span class="badge b-warn">важно</span><span class="badge b-time">10 мин</span></div>
+  <div class="body">
+    <p>14 августа массовая операция затёрла 1 844 карточки — телефоны, родителей, историю.
+    Восстановили из копии; с тех пор все изменения идут только через безопасное обновление.
+    Но копия была разовой. Нужно: либо тариф МойКласс с выгрузкой, либо я ставлю ночной
+    дамп базы на портал — тогда откат всегда есть. Подтвердите, что делаем второе.</p>
+  </div>
+</div>
+
+<div class="task" data-id="t16">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Решение: темп рассылки по базе</span>
+    <span class="badge b-stop">решение за вами</span><span class="badge b-time">2 мин</span></div>
+  <div class="body">
+    <p>До 30 сентября 41 день и 354 свободных места. Обход базы — самый дешёвый источник записей,
+    но темп определяет риск для номеров. Три варианта:</p>
+    <div class="tbl"><table>
+      <tr><th>Вариант</th><th class="n">В день</th><th>Вся база</th><th>Риск</th></tr>
+      <tr><td class="w">Осторожный</td><td class="n">60</td><td>~3 недели</td><td>минимальный, номера точно живы</td></tr>
+      <tr><td class="w">Рабочий</td><td class="n">120</td><td>~10 дней</td><td>средний, нужен WABA (задача 6)</td></tr>
+      <tr><td class="w">Спринт до 31.08</td><td class="n">200</td><td>~5 дней</td><td>высокий, личные номера могут словить бан</td></tr>
+    </table></div>
+    <p><b>Моя рекомендация:</b> рабочий вариант, но только после запуска WABA. До него —
+    осторожный, чтобы не потерять личные номера перед самым сезоном.</p>
+  </div>
+</div>
+
+<div class="task" data-id="t17">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Решение: рекламный бюджет сентября</span>
+    <span class="badge b-warn">решение за вами</span><span class="badge b-time">после задачи 1</span></div>
+  <div class="body">
+    <p>Осмысленно назначать бюджет можно только когда в Roistat появятся продажи — то есть
+    после первой задачи. Как только увидим цену оплаты по каналам, я приношу расчёт:
+    сколько докинуть в то, что окупается, и что выключить. До этого любая цифра — гадание.</p>
+  </div>
+</div>
+
+<div class="task" data-id="t18">
+  <input type="checkbox">
+  <div class="hd"><span class="ttl">Решение: промоутеры — кого оставляем</span>
+    <span class="badge b-warn">решение за вами</span><span class="badge b-time">2 мин</span></div>
+  <div class="body">
+    <p>По факту на 19.08, при цене 600 ₽ за контакт:</p>
+    <div class="tbl"><table>
+      <tr><th>Промоутер</th><th class="n">Контактов</th><th class="n">Записей</th><th class="n">Стоимость записи</th><th>Вывод</th></tr>
+      <tr><td class="w">Руслан</td><td class="n">65</td><td class="n">8</td><td class="n">4 875 ₽</td><td>продолжать</td></tr>
+      <tr><td class="w">Виталий</td><td class="n">36</td><td class="n">0</td><td class="n">21 600 ₽ впустую</td><td>пауза</td></tr>
+      <tr><td class="w">Маша</td><td class="n">9</td><td class="n">1</td><td class="n">5 400 ₽</td><td>дать вторую неделю</td></tr>
+    </table></div>
+    <p>Оговорка честности: часть контактов Виталия администраторы не прозвонили ни разу —
+    я это нашёл и поставил задачи. Так что цифра «0» отчасти наша вина, а не только его.
+    Предлагаю: неделя паузы, за это время добиваем его контакты, и решаем по результату.</p>
+  </div>
+</div>
+
+</section>
+
+<!-- ============ что уже сделано ============ -->
+<section>
+<div class="seclabel">Для полноты картины</div>
+<h2>Что по ИТ уже стоит и работает — от вас ничего не нужно</h2>
+<div class="ok"><b>Работает без вашего участия:</b> синхронизация МойКласс (клиенты, оплаты,
+группы, записи); почасовой разбор записей звонков с расшифровкой и заметкой в карточку;
+ежедневный разбор переписок; автозадачи администраторам с контролем закрытия; проверка
+дисциплины по повторяющимся ошибкам; рассылки через Wazzup с честной статистикой доставки;
+портал с базой знаний, скриптами, расписанием и макетами; реестр промо-контактов с тегами
+источников; выгрузка оплат в Roistat — готова к отправке, ждёт только задачу 1.</div>
+
+<h3>Куда что вводится</h3>
+<div class="tbl"><table>
+  <tr><th>Что</th><th>Куда</th><th>Кто вводит</th></tr>
+  <tr><td class="w">Токен ВК, бот Telegram, ключ Anthropic</td><td>app.kidsup.ru → Настройки</td><td>пришлите мне, введу сам</td></tr>
+  <tr><td class="w">Интеграция «Своя CRM», рекламные кабинеты</td><td>кабинет Roistat</td><td>только вы — нужен вход</td></tr>
+  <tr><td class="w">Цель <code>lead</code></td><td>Метрика 69569509</td><td>только вы — нужен вход</td></tr>
+  <tr><td class="w">WABA</td><td>кабинет Wazzup</td><td>только вы — нужны реквизиты ООО</td></tr>
+  <tr><td class="w">Доступ к хостингу kidsup.ru</td><td>пришлите доступы</td><td>вы → дальше я</td></tr>
+</table></div>
+</section>
+
+<div class="foot">
+  Собрано 20.08.2026 по фактическому состоянию портала, Roistat и МойКласс.
+  Цифры — живые, не оценочные: 70 оплат и 774 412 ₽ — это результат реальной пробной
+  выгрузки, 5 487 визитов — из кабинета Roistat.<br>
+  🤖 Клод, ИИ-сотрудник KidsUP
+</div>
+
+</div>
+<script>
+(function(){
+  var KEY = 'it_zadachi_borisa_v1';
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { state = {}; }
+  var tasks = Array.prototype.slice.call(document.querySelectorAll('.task'));
+  var cnt = document.getElementById('cnt'), fill = document.getElementById('fill');
+  function paint(){
+    var done = 0;
+    tasks.forEach(function(t){
+      var on = !!state[t.dataset.id];
+      t.classList.toggle('done', on);
+      t.querySelector('input').checked = on;
+      if (on) done++;
+    });
+    cnt.textContent = done + ' из ' + tasks.length + ' закрыто';
+    fill.style.width = (tasks.length ? done / tasks.length * 100 : 0) + '%';
+  }
+  tasks.forEach(function(t){
+    t.querySelector('input').addEventListener('change', function(){
+      state[t.dataset.id] = this.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+      paint();
+    });
+  });
+  paint();
+})();
+</script>
+</body>
+</html>
