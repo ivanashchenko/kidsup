@@ -1036,6 +1036,18 @@ def missed_calls() -> None:
 
 
 DEAD_STATES = {345759, 125957, 146328, 125954, 215202, 146330, 146513}
+# «Архив набора» — не приговор: туда массово уезжают и свои же клиенты. Замер 19.08:
+# из 142 семей, плативших этим летом, 136 лежали в архиве. По таким задачи не трогаем.
+SOFT_DEAD = {345759}
+
+
+def _paid_recently(user_id: int, days: int = 150) -> bool:
+    since = (_today() - timedelta(days=days)).isoformat()
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM payments WHERE user_id = ? AND optype = 'income' "
+            "AND summa > 0 AND date >= ? LIMIT 1", (user_id, since)).fetchone()
+    return bool(row)
 
 
 def close_dead_tasks(limit: int = 400) -> int:
@@ -1071,6 +1083,8 @@ def close_dead_tasks(limit: int = 400) -> int:
                     cache[uid] = None
             if cache[uid] not in DEAD_STATES:
                 continue
+            if cache[uid] in SOFT_DEAD and _paid_recently(uid):
+                continue          # платил в этом сезоне — это клиент, а не отработанный лид
             body = {k: t.get(k) for k in ("body", "beginDate", "endDate", "isAllDay",
                                           "reminds", "ownerId", "managerIds", "userId",
                                           "classIds", "filialIds", "categoryId")}

@@ -2068,7 +2068,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-19.24"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-19.26"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2766,6 +2766,20 @@ async def api_wazzup_raw(limit: int = 40, kind: str = ""):
                 pass
         return {"count": len(events), "top_keys": cnt.most_common()}
     return {"count": len(events), "events": events}
+
+
+@app.get("/site", response_class=HTMLResponse)
+async def site_preview():
+    """Новый сайт на техническом домене — чтобы проверять живые интеграции
+    (расписание, бейджи мест, заявку) до переноса на kidsup.ru. Локально
+    открытый файл для этого не годится: браузер режет запросы с file://."""
+    f = BASE / "static" / "site.html"
+    if not f.exists():
+        raise HTTPException(404, "сайт ещё не собран (python3 site/build_site.py)")
+    html = f.read_text(encoding="utf-8")
+    # черновик на служебном домене не должен попадать в поиск
+    html = html.replace("<head>", '<head>\n<meta name="robots" content="noindex, nofollow">', 1)
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
 @app.post("/api/roistat/push", dependencies=AUTH)
