@@ -785,6 +785,10 @@ def _hint_for_lead(mk: MoyklassClient, user_id: int, join: dict) -> None:
             LEFT JOIN courses co ON co.id = cl.course_id WHERE cl.id = ?""",
             (join.get("classId"),)).fetchone()
     course = row[0] if row else None
+    # служебные «группы-накопители» (заявки из рекламы, лист ожидания) названием
+    # курса не описывают запрос клиента — подставлять их в подсказку бессмысленно
+    if course and any(s in course.lower() for s in ("не создавайте", "заявк", "roistat")):
+        course = None
     if ag is None:
         main = "уточнить возраст; до 3 лет — МсМ/раннее развитие, 4–6 — подготовка к школе + английский, 7+ — английский/менталка/скорочтение"
     elif ag < 3:

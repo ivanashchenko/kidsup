@@ -2068,7 +2068,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-19.21"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-19.23"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2112,7 +2112,10 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "vk_token", "vk_group_id", "tg_bot_token", "tg_channel", "mango_ext_admins",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
-            "calls_done"}
+            "calls_done",
+            # сквозная аналитика: без этих двух ключей выгрузка оплат в Roistat
+            # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
+            "roistat_project", "roistat_key"}
 
 
 @app.get("/api/settings", dependencies=AUTH)
@@ -2763,6 +2766,37 @@ async def api_wazzup_raw(limit: int = 40, kind: str = ""):
                 pass
         return {"count": len(events), "top_keys": cnt.most_common()}
     return {"count": len(events), "events": events}
+
+
+@app.post("/api/roistat/push", dependencies=AUTH)
+async def api_roistat_push(since: str = "", dry_run: int = 1, collect: int = 1):
+    """Выгрузка оплат и возвратов в Roistat вручную (автопилот делает это в 21:00).
+    collect=1 — сначала подобрать номера визитов из комментариев Roistat в карточках,
+    без них заказы приходят в аналитику без привязки к рекламе."""
+    from . import roistat as ro
+    from .moyklass_client import MoyklassClient
+    log = logging.getLogger("kidsup.roistat")
+    since = since or (date.today() - timedelta(days=3)).isoformat()
+    picked = 0
+    if collect:
+        try:
+            mk = MoyklassClient(sync.get_api_key())
+            mk.authenticate()
+            picked = ro.collect_visits_from_crm(mk, since)
+        except Exception as e:
+            log.warning("сбор визитов не удался: %s", e)
+    orders = ro.build_orders(since)
+    with_visit = sum(1 for o in orders if o.get("roistat"))
+    result = {"since": since, "orders": len(orders), "with_visit": with_visit,
+              "visits_picked": picked, "sum": round(sum(o["price"] for o in orders), 2),
+              "dry_run": bool(dry_run)}
+    if dry_run:
+        result["sample"] = orders[:3]
+        return result
+    out = ro.push(since=since, dry_run=False)
+    if out.get("sent"):
+        db.set_setting("roistat_pushed_day", str(date.today()))
+    return {**result, **out}
 
 
 @app.get("/api/duty", dependencies=AUTH)

@@ -11,6 +11,7 @@
 
 import argparse
 import json
+import re
 
 import httpx
 
@@ -24,12 +25,64 @@ def _params() -> str:
     return f"project={db.get_setting('roistat_project')}&key={db.get_setting('roistat_key')}"
 
 
+VISIT_RE = re.compile(r"Промокод:\s*(\d{3,})")
+
+
+def _ensure_visits_table(conn) -> None:
+    conn.execute("""CREATE TABLE IF NOT EXISTS roistat_visits (
+        phone10 TEXT PRIMARY KEY, visit TEXT, source TEXT, ts TEXT)""")
+
+
+def collect_visits_from_crm(mk, since: str, limit: int = 400) -> int:
+    """Номер визита Roistat живёт в карточке МойКласс единственным способом —
+    строкой «Промокод: 206750» внутри комментария, который пишет интеграция.
+    Отдельного поля под него нет, поэтому вытаскиваем регуляркой и храним у себя:
+    без визита оплата приходит в Roistat «ниоткуда» и к рекламе не привязывается.
+
+    Возвращает число новых связок «телефон → визит»."""
+    with db.get_conn() as conn:
+        _ensure_visits_table(conn)
+        rows = conn.execute("""
+            SELECT DISTINCT p.user_id, u.phone FROM payments p
+            JOIN users u ON u.id = p.user_id
+            WHERE p.date >= ? AND u.phone IS NOT NULL AND u.phone != ''
+            ORDER BY p.date DESC LIMIT ?""", (since, limit)).fetchall()
+        known = {r[0] for r in conn.execute("SELECT phone10 FROM roistat_visits")}
+    added = 0
+    for r in rows:
+        ph10 = "".join(ch for ch in str(r["phone"] or "") if ch.isdigit())[-10:]
+        if len(ph10) != 10 or ph10 in known:
+            continue
+        try:
+            cm = mk.get("/v1/company/userComments", {"userId": r["user_id"]})
+        except Exception:
+            continue
+        text = " ".join((c.get("comment") or "") for c in (cm.get("userComments") or []))
+        m = VISIT_RE.search(text)
+        if not m:
+            continue
+        with db.get_conn() as conn:
+            _ensure_visits_table(conn)
+            conn.execute("INSERT OR REPLACE INTO roistat_visits (phone10, visit, source, ts) "
+                         "VALUES (?, ?, 'crm_comment', datetime('now'))", (ph10, m.group(1)))
+        known.add(ph10)
+        added += 1
+    return added
+
+
 def _visits_by_phone() -> dict[str, str]:
-    """Номер визита Roistat по последним 10 цифрам телефона: из заявок с сайта
-    и из кликов по кнопкам мессенджеров. Без этого выгрузка оплат приходит
-    в Roistat «ниоткуда» и сквозная аналитика по источникам не считается."""
+    """Номер визита Roistat по последним 10 цифрам телефона: из заявок с сайта,
+    из кликов по кнопкам мессенджеров и из комментариев Roistat в карточках CRM.
+    Без этого выгрузка оплат приходит в Roistat «ниоткуда» и сквозная аналитика
+    по источникам не считается."""
     out: dict[str, str] = {}
     with db.get_conn() as conn:
+        try:
+            _ensure_visits_table(conn)
+            for r in conn.execute("SELECT phone10, visit FROM roistat_visits"):
+                out[r[0]] = r[1]
+        except Exception:
+            pass
         for table, phone_col in (("site_leads", "phone"), ("messenger_clicks", "matched_phone")):
             try:
                 rows = conn.execute(
@@ -100,30 +153,47 @@ def push_lead(lead: dict) -> None:
     }
     if lead.get("roistat"):
         order["roistat"] = lead["roistat"]
-    httpx.post(f"{BASE}/project/add-orders?{_params()}", json=[order], timeout=20)
+    httpx.post(f"{BASE}/project/add-orders?project={project}",
+               headers=_headers(), json=[order], timeout=20)
 
 
-def push(since: str, dry_run: bool = True) -> None:
+def _headers() -> dict:
+    return {"Api-key": db.get_setting("roistat_key") or "", "Content-type": "application/json"}
+
+
+def push(since: str, dry_run: bool = True) -> dict:
+    """Отдаёт итог словарём, а не бросает исключение: приём сделок в Roistat
+    может быть выключен на стороне проекта (метод add-orders доступен только
+    при заведённой «Интеграции по API»), и тогда ночной прогон должен оставлять
+    внятную причину в логе, а не падать молча каждые сутки."""
     orders = build_orders(since)
     total = sum(o["price"] for o in orders)
+    res = {"since": since, "orders": len(orders), "sum": round(total, 2),
+           "with_visit": sum(1 for o in orders if o.get("roistat"))}
     print(f"К выгрузке: {len(orders)} оплат на {total:,.0f} ₽ (с {since})")
     if dry_run:
         for o in orders[:5]:
             print("  пример:", json.dumps(o, ensure_ascii=False)[:160])
         print("[dry-run] ничего не отправлено")
-        return
-    sent = 0
+        return {**res, "dry_run": True}
+    project = db.get_setting("roistat_project")
+    sent, errors = 0, []
     for i in range(0, len(orders), BATCH):
         chunk = orders[i:i + BATCH]
-        r = httpx.post(f"{BASE}/project/add-orders?{_params()}", json=chunk, timeout=60)
+        r = httpx.post(f"{BASE}/project/add-orders?project={project}",
+                       headers=_headers(), json=chunk, timeout=60)
         body = r.text[:200]
         ok = r.status_code == 200 and '"error"' not in body
         print(f"  батч {i // BATCH + 1}: HTTP {r.status_code} {body}")
-        if not ok:
-            raise RuntimeError("Roistat отклонил батч — остановка")
-        sent += len(chunk)
-    db.set_setting("roistat_last_push", since)
-    print(f"Готово: {sent} заказов в Roistat")
+        if ok:
+            sent += len(chunk)
+        else:
+            errors.append(body)
+            break                       # смысла долбить остальными батчами нет
+    if sent:
+        db.set_setting("roistat_last_push", since)
+    print(f"Итог: принято {sent} заказов" + (f", отклонено: {errors[0]}" if errors else ""))
+    return {**res, "sent": sent, "errors": errors}
 
 
 def main():
