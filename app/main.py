@@ -2068,7 +2068,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-19.12"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-19.14"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2619,6 +2619,26 @@ async def api_broadcast_prune(payload: dict = None):
 async def api_broadcast_status():
     from . import autopilot
     return autopilot.broadcast_status()
+
+
+@app.get("/api/broadcast/peek", dependencies=AUTH)
+def api_broadcast_peek(campaign: str = "", limit: int = 3):
+    """Показать тексты, которые СЕЙЧАС стоят в очереди, — чтобы перед запуском
+    рассылки глазами проверить даты, цены и место события."""
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT campaign, status, COUNT(*) n FROM broadcast_queue "
+            + ("WHERE campaign=? " if campaign else "")
+            + "GROUP BY campaign, status", ((campaign,) if campaign else ())).fetchall()
+        out = {"counts": [dict(r) for r in rows], "samples": []}
+        q = ("SELECT campaign, phone, child, text FROM broadcast_queue "
+             "WHERE status='pending' " + ("AND campaign=? " if campaign else "")
+             + "GROUP BY campaign LIMIT ?")
+        args = ((campaign, limit) if campaign else (limit,))
+        for r in conn.execute(q, args).fetchall():
+            out["samples"].append({"campaign": r["campaign"], "child": r["child"],
+                                   "phone": (r["phone"] or "")[-4:], "text": r["text"]})
+    return out
 
 
 @app.post("/api/broadcast/cancel", dependencies=AUTH)
