@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Неделя открытых уроков KidsUP — 31 августа – 6 сентября</title>
+<meta name="description" content="С 31 августа по 6 сентября приходите на настоящее занятие своей группы в KidsUP. Живое расписание со свободными местами, первое занятие условно-бесплатное.">
+<link rel="canonical" href="https://kidsupweek.ru/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Неделя открытых уроков KidsUP — 31 августа – 6 сентября">
+<meta property="og:description" content="Настоящее занятие своей группы, а не показательное. Первое занятие условно-бесплатное: не понравится — платить не нужно.">
+<meta property="og:image" content="https://kidsupweek.ru/og.jpg">
+<meta property="og:url" content="https://kidsupweek.ru/">
+<meta name="theme-color" content="#312783">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap">
+<style>
+:root{
+  --indigo:#312783; --sky:#1DA7E0; --green:#7DB928; --amber:#F59C00; --red:#E30613;
+  --ink:#1B1D2B; --muted:#5F6478; --paper:#FBFCFE; --card:#FFFFFF; --line:#E6EAF0;
+  --sky-soft:#E5F4FC; --green-soft:#EFF7E0; --amber-soft:#FFF3DE; --indigo-soft:#EAE8F6;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:17px/1.6 Manrope,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+img{max-width:100%;display:block}
+a{color:var(--sky)}
+.wrap{max-width:66rem;margin:0 auto;padding:0 1.15rem}
+
+.top{position:sticky;top:0;z-index:30;background:rgba(251,252,254,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:1rem;padding-top:.6rem;padding-bottom:.6rem}
+.top img{height:38px;width:auto}
+.top .sp{flex:1}
+.top .tel{font-weight:800;white-space:nowrap;color:var(--indigo);text-decoration:none;font-size:.98rem}
+@media (max-width:32rem){ .top .tel{font-size:.86rem} }
+
+.hero{background:linear-gradient(160deg,#312783 0%,#241C63 60%,#1C1650 100%);color:#fff;
+  position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;inset:auto -20% -60% 35%;height:80%;
+  background:radial-gradient(closest-side,rgba(29,167,224,.4),transparent);pointer-events:none}
+.hero .wrap{padding:3.2rem 1.15rem 3rem;position:relative;z-index:1}
+.eyebrow{display:inline-flex;align-items:center;gap:.45rem;background:rgba(255,255,255,.14);
+  border-radius:999px;padding:.32rem .85rem;font-size:.8rem;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase}
+h1{font-size:clamp(2rem,6vw,3.4rem);line-height:1.06;font-weight:800;letter-spacing:-.03em;
+  margin:.9rem 0 .5rem;text-wrap:balance}
+.hero .lead{font-size:1.12rem;max-width:35rem;color:#D9D6EE;margin:0 0 1.3rem}
+.stats{display:flex;gap:.6rem;flex-wrap:wrap;margin:1.3rem 0 1.5rem}
+.stats div{background:rgba(255,255,255,.12);border-radius:12px;padding:.65rem .95rem;min-width:8rem}
+.stats b{display:block;font-size:1.35rem;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+.stats span{font-size:.77rem;color:#C6C2E4;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.cta{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  background:var(--green);color:#fff;font-weight:800;font-size:1.02rem;
+  padding:.85rem 1.7rem;border-radius:14px;text-decoration:none;border:0;cursor:pointer;
+  box-shadow:0 8px 20px rgba(125,185,40,.3)}
+.cta:hover{filter:brightness(1.06)}
+.cta.line{background:transparent;border:1.5px solid rgba(255,255,255,.5);box-shadow:none;color:#fff}
+.ctas{display:flex;gap:.6rem;flex-wrap:wrap}
+
+section{padding:3rem 0 .5rem}
+h2{font-size:clamp(1.5rem,3.6vw,2.05rem);line-height:1.15;font-weight:800;letter-spacing:-.025em;
+  margin:0 0 .5rem;text-wrap:balance}
+.sub{color:var(--muted);max-width:41rem;margin:0 0 1.5rem}
+
+/* шаги */
+.steps{display:grid;gap:.85rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))}
+.step{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:1.15rem 1.25rem;
+  position:relative}
+.step .n{width:30px;height:30px;border-radius:9px;background:var(--indigo);color:#fff;
+  display:grid;place-items:center;font-weight:800;font-size:.92rem;margin-bottom:.55rem}
+.step h3{margin:0 0 .3rem;font-size:1.05rem;font-weight:800;letter-spacing:-.015em}
+.step p{margin:0;color:var(--muted);font-size:.95rem}
+
+/* условие */
+.deal{background:var(--green-soft);border:1px solid #D6E7B8;border-radius:18px;
+  padding:1.4rem 1.5rem;margin:1.2rem 0}
+.deal b{color:#4C7317}
+
+/* расписание */
+.schedbar{display:flex;gap:.45rem;flex-wrap:wrap;margin:.2rem 0 1rem}
+.chip{font:inherit;font-size:.87rem;font-weight:700;padding:.42rem .85rem;border-radius:999px;
+  border:1.5px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--indigo);border-color:var(--indigo);color:#fff}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.93rem;min-width:34rem}
+th{background:#F4F6FA;text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.6rem .9rem;white-space:nowrap;font-weight:800}
+td{padding:.65rem .9rem;border-top:1px solid var(--line);vertical-align:middle}
+td.w{font-weight:700}
+td.t{white-space:nowrap;color:var(--muted)}
+.spots{display:inline-block;font-size:.79rem;font-weight:800;padding:.2rem .55rem;border-radius:999px;
+  background:var(--green-soft);color:#4C7317;white-space:nowrap}
+.spots.low{background:var(--amber-soft);color:#8A5A00}
+.spots.no{background:#FBE7E6;color:#9B1219}
+.pickbtn{font:inherit;font-size:.83rem;font-weight:800;padding:.35rem .8rem;border-radius:9px;
+  border:0;background:var(--sky);color:#fff;cursor:pointer;white-space:nowrap}
+.pickbtn:hover{filter:brightness(1.07)}
+.loading{padding:1.4rem;color:var(--muted)}
+
+/* форма */
+.formwrap{background:var(--indigo);border-radius:22px;padding:2rem 1.6rem;color:#fff;margin-top:1rem}
+.formwrap h2{color:#fff} .formwrap .sub{color:#C6C2E4}
+form{display:grid;gap:.7rem;max-width:29rem}
+label{font-size:.82rem;font-weight:700;color:#C6C2E4;margin-bottom:-.45rem}
+input,select{font:inherit;font-size:1rem;padding:.75rem .9rem;border-radius:12px;border:0;
+  background:#fff;color:var(--ink);width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{
+  outline:3px solid var(--amber);outline-offset:2px}
+.hp{position:absolute;left:-9999px;width:1px;height:1px}
+.agree{display:flex;gap:.55rem;align-items:flex-start;font-size:.8rem;color:#C6C2E4}
+.agree input{width:auto;margin-top:.2rem}
+.agree a{color:#fff}
+.err{color:#FFD2CE;font-size:.85rem}
+.done{background:rgba(255,255,255,.1);border-radius:14px;padding:1.2rem}
+.done h3{margin:0 0 .4rem;font-size:1.2rem}
+
+.addr{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));
+  background:var(--card);border:1px solid var(--line);border-radius:16px;padding:1.3rem 1.4rem}
+.addr b{display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--muted);margin-bottom:.2rem;font-weight:800}
+
+.faq details{border-top:1px solid var(--line);padding:.9rem 0}
+.faq details:first-of-type{border-top:0}
+.faq summary{font-weight:800;cursor:pointer;font-size:1.02rem;list-style:none;
+  display:flex;justify-content:space-between;gap:1rem}
+.faq summary::after{content:"+";color:var(--sky);font-weight:800}
+.faq details[open] summary::after{content:"−"}
+.faq p{color:var(--muted);margin:.55rem 0 0}
+
+footer{margin-top:3rem;padding:2rem 0 3rem;border-top:1px solid var(--line);
+  color:var(--muted);font-size:.88rem}
+footer a{color:var(--muted)}
+.fl{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.6rem}
+.float{position:fixed;right:1rem;bottom:1rem;z-index:40;background:#25D366;color:#fff;
+  width:56px;height:56px;border-radius:50%;display:grid;place-items:center;text-decoration:none;
+  box-shadow:0 8px 22px rgba(0,0,0,.22);font-size:1.5rem}
+@media print{ .float,.top{display:none} body{background:#fff} }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a href="https://kidsup.ru"><img src="LOGO_COLOR" alt="KidsUP"></a>
+    <span class="sp"></span>
+    <a class="tel" href="tel:+74951209024">+7 495 120-90-24</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <span class="eyebrow">📅 31 августа — 6 сентября</span>
+    <h1>Неделя открытых уроков</h1>
+    <p class="lead">Не показательное занятие для гостей, а настоящий урок своей группы —
+      с тем педагогом и теми детьми, с которыми ребёнок будет заниматься весь год.
+      Именно так и становится понятно, ваше это место или нет.</p>
+    <div class="stats">
+      <div><b id="s-groups">—</b><span>групп в расписании</span></div>
+      <div><b id="s-free">—</b><span>свободных мест</span></div>
+      <div><b>7 дней</b><span>чтобы выбрать без спешки</span></div>
+    </div>
+    <div class="ctas">
+      <a class="cta" href="#zapis">Выбрать занятие</a>
+      <a class="cta line" href="#sched">Смотреть расписание</a>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<section id="how">
+  <h2>Как это работает</h2>
+  <p class="sub">Четыре шага, между которыми ничего не теряется.</p>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h3>Выбираете направление</h3>
+      <p>Сначала предмет и уровень, потом уже время. Английский — по уровням Cambridge,
+        подготовка к школе — по тому, читает ребёнок или ещё нет.</p></div>
+    <div class="step"><div class="n">2</div><h3>Администратор подбирает группу</h3>
+      <p>Спросит возраст, прошлый опыт и что для вас сейчас важно. Без этого группу
+        можно только угадать — а угадывать мы не хотим.</p></div>
+    <div class="step"><div class="n">3</div><h3>Ребёнок приходит на занятие</h3>
+      <p>Обычный урок обычной группы. Педагог знает, что ребёнок придёт впервые,
+        и готовится к этому заранее.</p></div>
+    <div class="step"><div class="n">4</div><h3>Вы решаете</h3>
+      <p>После занятия администратор спросит впечатления и, если всё подошло,
+        закрепит место в группе. Если нет — предложит другое направление или педагога.</p></div>
+  </div>
+
+  <div class="deal">
+    <p style="margin:0"><b>Условие простое.</b> Первое занятие <b>условно-бесплатное</b>:
+      не понравится — платить не нужно; понравится — это занятие войдёт в первый абонемент.
+      Никаких обязательств заранее.</p>
+    <p style="margin:.6rem 0 0;color:#4C7317;font-weight:700">До 31 августа сентябрь
+      идёт по ценам прошлого года.</p>
+  </div>
+</section>
+
+<section id="sched">
+  <h2>Расписание и свободные места</h2>
+  <p class="sub">Данные берутся прямо из нашей системы — то, что вы видите, это реальные
+    остатки на сейчас, а не рекламная цифра. Нажмите «Записаться» в нужной строке,
+    и группа подставится в заявку.</p>
+  <div class="schedbar" id="filters"></div>
+  <div class="tbl">
+    <table id="sched-table">
+      <thead><tr><th>Направление</th><th>Группа</th><th>День и время</th>
+        <th>Места</th><th></th></tr></thead>
+      <tbody><tr><td colspan="5" class="loading">Загружаем расписание…</td></tr></tbody>
+    </table>
+  </div>
+  <p class="sub" style="margin-top:.8rem;font-size:.87rem">Если нужной группы в списке нет —
+    напишите нам: часть групп добирается под запрос, и мы ведём лист ожидания.</p>
+</section>
+
+<section id="zapis">
+  <div class="formwrap">
+    <h2>Записаться на открытый урок</h2>
+    <p class="sub">Администратор перезвонит, уточнит уровень и подтвердит день и время.
+      В рабочие часы обычно в течение 15 минут.</p>
+    <form id="lead" novalidate>
+      <label for="f-name">Имя ребёнка</label>
+      <input id="f-name" name="name" autocomplete="off" placeholder="Например, Ева">
+      <label for="f-age">Возраст</label>
+      <input id="f-age" name="age" autocomplete="off" placeholder="Например, 6 лет">
+      <label for="f-phone">Телефон *</label>
+      <input id="f-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
+             placeholder="+7 900 000-00-00" required>
+      <p class="err" id="f-phone-err" hidden>Проверьте номер — нужен российский мобильный</p>
+      <label for="f-int">Направление</label>
+      <select id="f-int">
+        <option>Ещё не решили — помогите выбрать</option>
+        <option>Подготовка к школе</option>
+        <option>Английский язык</option>
+        <option>Английский мини-сад</option>
+        <option>Нулевой класс</option>
+        <option>Логопед</option>
+        <option>Раннее развитие</option>
+        <option>Творчество и ИЗО</option>
+        <option>Ментальная арифметика</option>
+        <option>Шахматы</option>
+      </select>
+      <input class="hp" id="f-web" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label class="agree"><input type="checkbox" id="f-ok" checked>
+        <span>Согласен на обработку персональных данных в соответствии с
+          <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой</a></span></label>
+      <button class="cta" type="submit">Записаться на урок</button>
+    </form>
+  </div>
+</section>
+
+<section id="where">
+  <h2>Где проходят занятия</h2>
+  <div class="addr">
+    <div><b>Адрес</b>Москва, бульвар Маршала Рокоссовского, 6 к1В<br>7-й подъезд, 2 этаж</div>
+    <div><b>Ориентир</b>Напротив ТЦ «Янтарь», 2 минуты пешком от метро
+      «Бульвар Рокоссовского»</div>
+    <div><b>Телефон</b><a href="tel:+74951209024">+7 495 120-90-24</a><br>
+      <a href="https://app.kidsup.ru/go/whatsapp?src=week" target="_blank" rel="noopener">Написать в WhatsApp</a></div>
+  </div>
+</section>
+
+<section class="faq">
+  <h2>Частые вопросы</h2>
+  <details><summary>«Условно-бесплатное» — это как?</summary>
+    <p>Вы приходите на занятие и ничего не платите заранее. Если не понравилось —
+      просто уходите, платить не нужно. Если понравилось и вы покупаете абонемент —
+      это занятие входит в него как первое.</p></details>
+  <details><summary>Ребёнок стесняется, вдруг откажется заниматься?</summary>
+    <p>Это нормально и бывает часто. Педагог знает, что ребёнок новый. Можно посидеть
+      рядом, можно просто посмотреть со стороны — никто не будет тянуть за руку.</p></details>
+  <details><summary>А если мы не попадаем ни в один день?</summary>
+    <p>Напишите — подберём другое время или начнём со второй недели сентября.
+      Неделя открытых уроков — удобный повод, но не единственная возможность.</p></details>
+  <details><summary>Можно на два направления сразу?</summary>
+    <p>Да. И на второй предмет действует скидка 10%. Скидки не суммируются —
+      действует одна, наибольшая.</p></details>
+  <details><summary>Как понять уровень английского?</summary>
+    <p>Мы делим группы по уровням Cambridge: Starters, Movers, Flyers. Уровень определяет
+      педагог за 10 минут на первом занятии — заранее готовиться не нужно.</p></details>
+  <details><summary>Что взять с собой?</summary>
+    <p>Сменную обувь или бахилы (бахилы есть у нас) и хорошее настроение.
+      Всё для занятия — тетради, материалы для творчества — даём мы.</p></details>
+</section>
+
+<footer>
+  <div>KidsUP — детский центр и английский сад. Москва, б-р Маршала Рокоссовского, 6 к1В.
+    Учебный год 2026/27: 31 августа — 31 мая.</div>
+  <div class="fl">
+    <a href="https://kidsup.ru">Основной сайт</a>
+    <a href="https://kidsupday.ru">День открытых дверей 30 августа</a>
+    <a href="https://kidsup.ru/privacy">Политика обработки данных</a>
+    <a href="https://kidsup.ru/o">Договор-оферта</a>
+  </div>
+</footer>
+</div>
+
+<a class="float" href="https://app.kidsup.ru/go/whatsapp?src=week" target="_blank"
+   rel="noopener" aria-label="Написать в WhatsApp">✆</a>
+
+<script>
+var ALL = [], CUR = 'Все';
+function plural(n, f) {
+  return f[(n % 100 > 4 && n % 100 < 20) ? 2 : [2, 0, 1, 1, 1, 2][Math.min(n % 10, 5)]];
+}
+function shortName(g) {
+  /* "2627_ПШ1_вт-чт_17:00" → "ПШ1 · вт-чт" — служебный префикс родителю не нужен */
+  var n = (g.name || '').replace(/^2[0-9]{3}_/, '').replace(/_/g, ' · ');
+  return n || g.course || '—';
+}
+function render() {
+  var tb = document.querySelector('#sched-table tbody');
+  var rows = ALL.filter(function (g) { return CUR === 'Все' || g.course === CUR; });
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="5" class="loading">В этом направлении сейчас нет открытых групп — ' +
+      'напишите нам, ведём лист ожидания.</td></tr>';
+    return;
+  }
+  tb.innerHTML = rows.map(function (g) {
+    var free = Math.max(0, g.free || 0);
+    var cls = free === 0 ? 'spots no' : (free <= 2 ? 'spots low' : 'spots');
+    var txt = free === 0 ? 'Лист ожидания'
+      : (free <= 2 ? '🔥 ' + free + ' ' + plural(free, ['место', 'места', 'мест'])
+        : free + ' ' + plural(free, ['место', 'места', 'мест']));
+    var day = [g.day, g.time].filter(function (x) { return x && x !== '—'; }).join(' · ') || 'уточняется';
+    return '<tr><td class="w">' + (g.course || '—') + '</td>' +
+      '<td>' + shortName(g) + (g.age && g.age !== '—' ? '<br><span style="color:var(--muted);font-size:.85rem">' + g.age + '</span>' : '') + '</td>' +
+      '<td class="t">' + day + '</td>' +
+      '<td><span class="' + cls + '">' + txt + '</span></td>' +
+      '<td><button class="pickbtn" data-course="' + (g.course || '') + '" data-grp="' +
+      shortName(g).replace(/"/g, '') + '">Записаться</button></td></tr>';
+  }).join('');
+}
+function buildFilters() {
+  var courses = ['Все'].concat(Array.from(new Set(ALL.map(function (g) { return g.course; })
+    .filter(Boolean))).sort());
+  document.getElementById('filters').innerHTML = courses.map(function (c) {
+    return '<button class="chip" aria-pressed="' + (c === CUR) + '" data-c="' + c + '">' + c + '</button>';
+  }).join('');
+}
+document.getElementById('filters').addEventListener('click', function (e) {
+  var b = e.target.closest('.chip'); if (!b) return;
+  CUR = b.dataset.c; buildFilters(); render();
+});
+document.querySelector('#sched-table').addEventListener('click', function (e) {
+  var b = e.target.closest('.pickbtn'); if (!b) return;
+  var sel = document.getElementById('f-int');
+  for (var i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].text === b.dataset.course) { sel.selectedIndex = i; break; }
+  }
+  window._grp = b.dataset.grp;
+  document.getElementById('zapis').scrollIntoView({behavior: 'smooth'});
+  setTimeout(function () { document.getElementById('f-phone').focus(); }, 500);
+});
+
+fetch('https://app.kidsup.ru/api/public/schedule')
+  .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  .then(function (d) {
+    ALL = (d.groups || []).filter(function (g) { return (g.capacity || 0) > 0; });
+    if (!ALL.length) throw new Error('пусто');
+    document.getElementById('s-groups').textContent = ALL.length;
+    document.getElementById('s-free').textContent =
+      ALL.reduce(function (t, g) { return t + Math.max(0, g.free || 0); }, 0);
+    buildFilters(); render();
+  })
+  .catch(function () {
+    document.querySelector('#sched-table tbody').innerHTML =
+      '<tr><td colspan="5" class="loading">Расписание не загрузилось. Напишите нам в WhatsApp — ' +
+      'пришлём актуальное расписание с местами.</td></tr>';
+    document.getElementById('s-groups').textContent = '30+';
+    document.getElementById('s-free').textContent = 'есть';
+  });
+
+function normPhone(v) {
+  var d = (v || '').replace(/\D/g, '');
+  if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
+  if (d.length === 10 && d[0] === '9') d = '7' + d;
+  return (d.length === 11 && d.indexOf('79') === 0) ? d : '';
+}
+document.getElementById('lead').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  var f = e.target;
+  var n = document.getElementById('f-name').value.trim();
+  var a = document.getElementById('f-age').value.trim();
+  var p = document.getElementById('f-phone').value.trim();
+  var i = document.getElementById('f-int').value;
+  var err = document.getElementById('f-phone-err');
+  var ok = document.getElementById('f-ok');
+  if (!normPhone(p)) { err.hidden = false; document.getElementById('f-phone').focus(); return; }
+  err.hidden = true;
+  if (ok && !ok.checked) { ok.focus(); return; }
+  var btn = f.querySelector('button[type="submit"]');
+  btn.disabled = true; btn.textContent = 'Отправляем…';
+  var rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
+  try {
+    var r = await fetch('https://app.kidsup.ru/api/public/lead', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: n, age: a, phone: p, course: i, roistat: rv,
+        note: ('Неделя открытых уроков' + (window._grp ? ' | группа: ' + window._grp : '') +
+          ' | ' + (location.search || '').slice(1)).slice(0, 250),
+        website: document.getElementById('f-web').value})});
+    var j = await r.json();
+    if (j.ok) {
+      try { ym(69569509, 'reachGoal', 'lead', {course: i, event: 'week'}); } catch (_) {}
+      try { VK.Goal('lead'); } catch (_) {}
+      try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
+      f.setAttribute('role', 'status'); f.setAttribute('aria-live', 'polite');
+      f.innerHTML = '<div class="done"><h3>✅ Заявка принята!</h3>' +
+        '<p>Администратор позвонит, уточнит уровень и подтвердит день. ' +
+        'Занятия идут с 31 августа по 6 сентября на бульваре Маршала Рокоссовского, 6к1В.</p>' +
+        '<p style="margin-top:.8rem"><a class="cta" style="background:#25D366" ' +
+        'href="https://app.kidsup.ru/go/whatsapp?src=week" target="_blank" rel="noopener">Написать в WhatsApp</a></p></div>';
+      return;
+    }
+    if (j.error) { alert(j.error); btn.disabled = false; btn.textContent = 'Записаться на урок'; return; }
+    throw new Error('fail');
+  } catch (_) {
+    var txt = encodeURIComponent('Здравствуйте! Хотим на открытый урок. Ребёнок: ' +
+      (n || '…') + ', ' + (a || '…') + '. Направление: ' + i + '. Телефон: ' + p);
+    var box = document.createElement('div');
+    box.className = 'done'; box.style.marginTop = '1rem';
+    box.innerHTML = '<b>Не получилось отправить заявку.</b><br>Напишите нам — ответим сразу:' +
+      '<p style="margin-top:.7rem"><a class="cta" style="background:#25D366" target="_blank" rel="noopener" ' +
+      'href="https://app.kidsup.ru/go/whatsapp?src=week&t=' + txt + '">WhatsApp</a></p>';
+    if (!f.querySelector('.done')) f.append(box);
+    btn.disabled = false; btn.textContent = 'Записаться на урок';
+  }
+});
+/* Roistat — сквозная аналитика */
+(function (w, d, s, h, id) {
+  w.roistatProjectId = id; w.roistatHost = h;
+  var p = d.location.protocol == 'https:' ? 'https://' : 'http://';
+  var u = /^.*roistat_visit=[^;]+(.*)?$/.test(d.cookie)
+    ? '/dist/module.js'
+    : '/api/site/1.0/' + id + '/init?referrer=' + encodeURIComponent(d.location.href);
+  var js = d.createElement(s); js.charset = 'UTF-8'; js.async = 1; js.src = p + h + u;
+  var js2 = d.getElementsByTagName(s)[0]; js2.parentNode.insertBefore(js, js2);
+})(window, document, 'script', 'cloud.roistat.com', '228571');
+</script>
+<!-- Яндекс.Метрика — счётчик 69569509, тот же, что на kidsup.ru -->
+<script>
+(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],
+k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+(window,document,"script","https://mc.yandex.ru/metrika/tag.js","ym");
+ym(69569509,"init",{clickmap:true,trackLinks:true,accurateTrackBounce:true,webvisor:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/69569509" style="position:absolute;left:-9999px" alt=""></div></noscript>
+<!-- Пиксель ВКонтакте -->
+<script>!function(){var t=document.createElement("script");t.type="text/javascript",t.async=!0,
+t.src="https://vk.com/js/api/openapi.js?169",t.onload=function(){VK.Retargeting.Init("VK-RTRG-401784-8crag"),VK.Retargeting.Hit()},
+document.head.appendChild(t)}();</script>
+<noscript><img src="https://vk.com/rtrg?p=VK-RTRG-401784-8crag" style="position:fixed;left:-999px" alt=""></noscript>
+</body>
+</html>

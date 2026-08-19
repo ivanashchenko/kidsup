@@ -2081,7 +2081,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-20.05"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-20.07"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2793,6 +2793,29 @@ async def site_preview():
     # черновик на служебном домене не должен попадать в поиск
     html = html.replace("<head>", '<head>\n<meta name="robots" content="noindex, nofollow">', 1)
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})
+
+
+def _preview(name: str) -> HTMLResponse:
+    f = BASE / "static" / name
+    if not f.exists():
+        raise HTTPException(404, "страница ещё не собрана (python3 site/build_site.py)")
+    html = f.read_text(encoding="utf-8")
+    html = html.replace("<head>", '<head>\n<meta name="robots" content="noindex, nofollow">', 1)
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/day", response_class=HTMLResponse)
+async def day_preview():
+    """Лендинг дня открытых дверей 30.08 — для kidsupday.ru. Здесь его можно
+    проверить с живыми заявками до переноса домена."""
+    return _preview("day.html")
+
+
+@app.get("/week", response_class=HTMLResponse)
+async def week_preview():
+    """Лендинг Недели открытых уроков 31.08–06.09 — для kidsupweek.ru.
+    Расписание и свободные места тянутся из /api/public/schedule."""
+    return _preview("week.html")
 
 
 @app.post("/api/roistat/push", dependencies=AUTH)
