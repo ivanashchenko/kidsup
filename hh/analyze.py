@@ -4,7 +4,9 @@
 (выгрузка откликов, чтение переписки) работают как обычно.
 """
 
-from typing import List, Literal, Optional
+import base64
+import pathlib
+from typing import List, Literal
 
 MODEL = "claude-opus-5"
 
@@ -46,7 +48,7 @@ def _models():
     from pydantic import BaseModel, Field
 
     class Assessment(BaseModel):
-        negotiation_id: str = Field(description="ID отклика из входных данных")
+        ref: str = Field(description="ID отклика hh или имя файла резюме")
         candidate: str = Field(description="Имя кандидата или 'без имени'")
         score: int = Field(description="Соответствие профилю, 0-100", ge=0, le=100)
         summary: str = Field(description="1-2 предложения: кто это и насколько подходит")
@@ -120,7 +122,8 @@ def analyze(items, profile_text, resumes=None):
     prompt = (
         f"Профиль вакансии и требования:\n{profile_text}\n\n"
         f"Отклики ({len(items)} шт.):\n\n{briefs}\n\n"
-        "Оцени каждый отклик. Верни оценку для всех откликов, ничего не пропуская."
+        "Оцени каждый отклик. В поле ref укажи ID отклика. "
+        "Верни оценку для всех откликов, ничего не пропуская."
     )
     response = _client().messages.parse(
         model=MODEL,
@@ -168,7 +171,7 @@ def render_report(assessments, vacancy_name=""):
     for a in assessments:
         lines += [
             f"## {a.candidate} — {a.score}/100 ({a.recommended_action})",
-            f"Отклик: {a.negotiation_id}",
+            f"Источник: {a.ref}",
             "",
             a.summary,
             "",
@@ -181,3 +184,98 @@ def render_report(assessments, vacancy_name=""):
             lines += ["**Уточнить:**"] + [f"- {s}" for s in a.missing_info] + [""]
         lines += [f"_Рекомендация: {a.reason}_", ""]
     return "\n".join(lines)
+
+
+# --- Офлайн-режим: резюме, выгруженные из кабинета hh вручную ---
+
+SUPPORTED_SUFFIXES = (".pdf", ".txt", ".md", ".rtf")
+
+
+def collect_files(paths):
+    """Разворачивает папки в список файлов резюме."""
+    files = []
+    for raw in paths:
+        path = pathlib.Path(raw)
+        if path.is_dir():
+            files += sorted(
+                f for f in path.rglob("*") if f.suffix.lower() in SUPPORTED_SUFFIXES
+            )
+        elif path.is_file():
+            files.append(path)
+        else:
+            raise SystemExit(f"Не найдено: {path}")
+    if not files:
+        raise SystemExit(
+            "Не найдено файлов резюме. Поддерживаются: " + ", ".join(SUPPORTED_SUFFIXES)
+        )
+    return files
+
+
+def _file_blocks(path):
+    """PDF уходит в модель как документ, текстовые файлы — как текст."""
+    if path.suffix.lower() == ".pdf":
+        data = base64.standard_b64encode(path.read_bytes()).decode()
+        return [
+            {
+                "type": "document",
+                "source": {"type": "base64", "media_type": "application/pdf", "data": data},
+            },
+            {"type": "text", "text": f"Файл резюме: {path.name}"},
+        ]
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return [{"type": "text", "text": f"Файл резюме: {path.name}\n\n{text}"}]
+
+
+def analyze_files(paths, profile_text):
+    """Оценка резюме из локальных файлов — не требует доступа к API hh."""
+    Report = _models()
+    files = collect_files(paths)
+    content = [{"type": "text", "text": f"Профиль вакансии и требования:\n{profile_text}"}]
+    for path in files:
+        content += _file_blocks(path)
+    content.append(
+        {
+            "type": "text",
+            "text": (
+                f"Выше {len(files)} резюме кандидатов. Оцени каждое по профилю вакансии. "
+                "В поле ref укажи имя файла. Ни одно резюме не пропускай."
+            ),
+        }
+    )
+    response = _client().messages.parse(
+        model=MODEL,
+        max_tokens=16000,
+        system=SYSTEM,
+        thinking={"type": "adaptive"},
+        messages=[{"role": "user", "content": content}],
+        output_format=Report,
+    )
+    return sorted(response.parsed_output.assessments, key=lambda a: a.score, reverse=True)
+
+
+def draft_reply_file(path, profile_text, intent, extra=None):
+    """Черновик письма кандидату по файлу резюме — для ручной отправки в hh."""
+    _lazy.load()
+    task = INTENTS.get(intent, intent)
+    content = [{"type": "text", "text": f"Профиль вакансии:\n{profile_text}"}]
+    content += _file_blocks(pathlib.Path(path))
+    content.append(
+        {
+            "type": "text",
+            "text": (
+                f"Задача: {task}.\n"
+                + (f"Дополнительно от HR: {extra}\n" if extra else "")
+                + "Напиши текст сообщения кандидату в hh.ru: на «вы», доброжелательно, "
+                "без канцелярита и эмодзи, 3-6 предложений. "
+                "Только текст сообщения, без пояснений."
+            ),
+        }
+    )
+    response = _client().messages.create(
+        model=MODEL,
+        max_tokens=2000,
+        system=SYSTEM,
+        thinking={"type": "adaptive"},
+        messages=[{"role": "user", "content": content}],
+    )
+    return "\n".join(b.text for b in response.content if b.type == "text").strip()

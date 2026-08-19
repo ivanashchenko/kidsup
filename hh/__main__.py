@@ -157,6 +157,23 @@ def cmd_reply(args):
     print("Отправлено.")
 
 
+def cmd_screen(args):
+    """Офлайн: анализ резюме, выгруженных из кабинета hh вручную."""
+    assessments = analyze_mod.analyze_files(args.paths, _profile(args.profile))
+    report = analyze_mod.render_report(assessments, args.title or "")
+    if args.out:
+        pathlib.Path(args.out).write_text(report, encoding="utf-8")
+        print(f"Отчёт: {args.out}")
+    else:
+        print(report)
+
+
+def cmd_letter(args):
+    """Офлайн: текст письма кандидату — скопировать и отправить руками в hh."""
+    print(analyze_mod.draft_reply_file(args.resume, _profile(args.profile),
+                                       args.intent, args.note))
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="python3 -m hh", description="Работа с откликами hh.ru")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -206,6 +223,20 @@ def main(argv=None):
     p.add_argument("--automated", action="store_true",
                    help="пометить сообщение как автоматическое (is_automated)")
     p.set_defaults(func=cmd_reply)
+
+    p = sub.add_parser("screen", help="офлайн-анализ резюме из файлов (без токена hh)")
+    p.add_argument("paths", nargs="+", help="файлы .pdf/.txt/.md или папка с ними")
+    p.add_argument("--profile", default="hh/profiles/teacher.md")
+    p.add_argument("--title", help="название вакансии для заголовка отчёта")
+    p.add_argument("--out", help="файл для отчёта в markdown")
+    p.set_defaults(func=cmd_screen)
+
+    p = sub.add_parser("letter", help="офлайн-черновик письма по файлу резюме")
+    p.add_argument("resume", help="файл резюме .pdf/.txt/.md")
+    p.add_argument("--intent", default="invite", choices=["invite", "clarify", "reject"])
+    p.add_argument("--profile", default="hh/profiles/teacher.md")
+    p.add_argument("--note", help="дополнение от HR: время встречи, вопросы и т.п.")
+    p.set_defaults(func=cmd_letter)
 
     args = parser.parse_args(argv)
     try:
