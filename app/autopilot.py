@@ -1035,6 +1035,56 @@ def missed_calls() -> None:
                    "Когда удобно созвониться? Или ответьте здесь — подберём группу 😊")
 
 
+DEAD_STATES = {345759, 125957, 146328, 125954, 215202, 146330, 146513}
+
+
+def close_dead_tasks(limit: int = 400) -> int:
+    """Закрывает открытые задачи по клиентам, ушедшим в архив/отказ.
+
+    Замер 19.08: 167 из 215 висящих задач (77 %) стояли на архивных карточках —
+    админ видит список из сотни дел, где живых десяток, перестаёт ему верить и
+    работает по своим спискам мимо CRM. Чистим ежедневно, чтобы список задач
+    оставался списком реальной работы."""
+    mk = _client()
+    cache: dict[int, int | None] = {}
+    closed = 0
+    ids = [a["managerId"] for a in _admins()]
+    chat_admin = int(db.get_setting("chat_admin", "154181") or 154181)
+    if chat_admin not in ids:
+        ids.append(chat_admin)
+    for mid in ids:
+        try:
+            tasks = mk.fetch_all("/v1/company/tasks", ["tasks"], {"managerId": mid})
+        except Exception:
+            log.exception("не удалось получить задачи менеджера %s", mid)
+            continue
+        for t in tasks:
+            if closed >= limit:
+                return closed
+            if t.get("isComplete") or not t.get("userId"):
+                continue
+            uid = t["userId"]
+            if uid not in cache:
+                try:
+                    cache[uid] = mk.get(f"/v1/company/users/{uid}").get("clientStateId")
+                except Exception:
+                    cache[uid] = None
+            if cache[uid] not in DEAD_STATES:
+                continue
+            body = {k: t.get(k) for k in ("body", "beginDate", "endDate", "isAllDay",
+                                          "reminds", "ownerId", "managerIds", "userId",
+                                          "classIds", "filialIds", "categoryId")}
+            body["isComplete"] = True
+            try:
+                mk.post(f"/v1/company/tasks/{t['id']}", body)
+                closed += 1
+            except Exception:
+                log.warning("не закрылась задача %s", t.get("id"))
+    if closed:
+        log.info("закрыто задач по архивным клиентам: %s", closed)
+    return closed
+
+
 def card_quality() -> None:
     """Проверка новых карточек: без даты рождения и телефона карточка почти
     бесполезна — по ней не подобрать группу и не перезвонить. Раз в день
@@ -1696,6 +1746,11 @@ def _loop() -> None:
                     card_quality()
                 except Exception:
                     log.exception("проверка качества карточек не удалась")
+            if now.hour >= 8 and _mark("close_dead_tasks", str(_today())):
+                try:
+                    close_dead_tasks()
+                except Exception:
+                    log.exception("чистка задач по архивным клиентам не удалась")
             if now.hour >= 20 and _mark("digest", str(_today())):
                 daily_digest()
             if now.hour >= 21 and db.get_setting("roistat_pushed_day") != str(_today()):
