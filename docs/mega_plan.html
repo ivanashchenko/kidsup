@@ -1,158 +1,172 @@
-<title>План набора до 30 сентября</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&display=swap">
+<title>Карта набора: 100% групп к 30 сентября</title>
 <style>
-:root{--bg:#F6F8FC;--card:#FFFFFF;--ink:#1A2333;--muted:#66738A;--line:#E4E9F2;
- --indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613;
- --soft:#EAF6FC;--chip:#EEF1F8}
-:root:not([data-theme="light"]){}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12141D;--card:#1B1E2B;--ink:#E8EAF2;--muted:#9AA3B8;--line:#2A2F42;--indigo:#8F86E8;--soft:#1D2736;--chip:#232838}}
-:root[data-theme="dark"]{--bg:#12141D;--card:#1B1E2B;--ink:#E8EAF2;--muted:#9AA3B8;--line:#2A2F42;--indigo:#8F86E8;--soft:#1D2736;--chip:#232838}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
-.wrap{max-width:1020px;margin:0 auto;padding:1.2rem 1rem 4rem}
-h1,h2,h3{font-family:Rubik,system-ui,sans-serif;text-wrap:balance}
-h1{font-size:1.9rem;margin:.3rem 0 .2rem;color:var(--indigo);font-weight:900}
-h2{font-size:1.25rem;margin:2rem 0 .8rem;color:var(--indigo)}
-.sub{color:var(--muted);margin:0 0 1rem}
-.count{display:flex;gap:.7rem;flex-wrap:wrap;margin:1.1rem 0}
-.ct{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:.7rem 1.1rem;min-width:120px;flex:1}
-.ct b{display:block;font:900 1.6rem/1.2 Rubik,sans-serif;font-variant-numeric:tabular-nums}
-.ct span{font-size:.74rem;color:var(--muted)}
-.ct.red b{color:var(--red)}.ct.green b{color:var(--green)}.ct.blue b{color:var(--blue)}.ct.ind b{color:var(--indigo)}
-.bar{height:8px;background:var(--chip);border-radius:99px;overflow:hidden;margin-top:.4rem}
-.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--green))}
-.filters{position:sticky;top:0;z-index:5;background:var(--bg);padding:.6rem 0;display:flex;gap:.45rem;flex-wrap:wrap;border-bottom:1px solid var(--line)}
-.f{border:1.5px solid var(--line);background:var(--card);color:var(--muted);border-radius:999px;
- padding:.35rem .9rem;font:600 .82rem system-ui;cursor:pointer}
-.f.on{background:var(--indigo);border-color:var(--indigo);color:#fff}
-.sec{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:1rem 1.2rem;margin:.9rem 0}
-.sec h3{margin:.1rem 0 .6rem;font-size:1.05rem;display:flex;align-items:center;gap:.5rem}
-.who{font:700 .7rem Rubik;letter-spacing:.06em;text-transform:uppercase;padding:.2rem .6rem;border-radius:99px;background:var(--chip);color:var(--muted)}
-.item{display:flex;gap:.6rem;align-items:flex-start;padding:.45rem .3rem;border-radius:10px}
-.item:hover{background:var(--soft)}
-.item input{margin-top:.28rem;width:1.05rem;height:1.05rem;accent-color:var(--green);flex-shrink:0;cursor:pointer}
-.item label{cursor:pointer}
-.item.done label{opacity:.45;text-decoration:line-through}
-.p{font:800 .68rem Rubik;padding:.14rem .5rem;border-radius:99px;flex-shrink:0;margin-top:.2rem}
-.p.r{background:#FDE8E9;color:var(--red)}.p.o{background:#FDF1DA;color:#A96A00}.p.y{background:#EDF7DC;color:#557F13}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .p.r{background:#3A1518}:root:not([data-theme="light"]) .p.o{background:#382A10}:root:not([data-theme="light"]) .p.y{background:#22300F}}
-:root[data-theme="dark"] .p.r{background:#3A1518}:root[data-theme="dark"] .p.o{background:#382A10}:root[data-theme="dark"] .p.y{background:#22300F}
-.note{background:var(--soft);border-radius:12px;padding:.7rem 1rem;font-size:.9rem;margin:.6rem 0}
-.small{font-size:.84rem;color:var(--muted)}
-.grabli li{margin:.3rem 0}
-a{color:var(--blue)}
+:root{--paper:#FAF9F5;--ink:#22271F;--muted:#6E7264;--accent:#166B4A;--asoft:#E3EFE8;--risk:#9A5B00;--rsoft:#F6ECD9;--line:#E3E1D6;--fill:#F1EFE7;--card:#FFF}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#151812;--ink:#E7E6DD;--muted:#9B9F90;--accent:#5BC492;--asoft:#1D2E25;--risk:#E0A954;--rsoft:#2E2718;--line:#2C3026;--fill:#1C2018;--card:#1A1E16}}
+:root[data-theme="dark"]{--paper:#151812;--ink:#E7E6DD;--muted:#9B9F90;--accent:#5BC492;--asoft:#1D2E25;--risk:#E0A954;--rsoft:#2E2718;--line:#2C3026;--fill:#1C2018;--card:#1A1E16}
+*{box-sizing:border-box}body{background:var(--paper);color:var(--ink);margin:0;font:15px/1.6 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:52rem;margin:0 auto;padding:2.5rem 1.25rem 4rem}
+h1{font-size:1.8rem;font-weight:800;letter-spacing:-.02em;margin:.3rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.25rem;font-weight:750;margin:2rem 0 .6rem;padding-top:1.3rem;border-top:1px solid var(--line)}
+h3{font-size:1rem;font-weight:700;margin:1.2rem 0 .4rem}
+p{margin:.5rem 0}.kicker{font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.sub{color:var(--muted)}ul{margin:.4rem 0;padding-left:1.2rem}li{margin:.3rem 0}
+.q{display:block;background:var(--fill);border:1px solid var(--line);border-radius:8px;padding:.6rem .9rem;margin:.5rem 0;font-style:italic}
+.meta{font-size:.82rem;color:var(--muted);margin:.1rem 0 .4rem}
+.close{border-left:3px solid var(--accent);background:var(--asoft);padding:.5rem .9rem;border-radius:0 8px 8px 0;margin:.4rem 0}
+.warn{border-left:3px solid var(--risk);background:var(--rsoft);padding:.6rem .9rem;border-radius:0 8px 8px 0;margin:.8rem 0}
+.grid2{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));margin:.7rem 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.7rem .9rem;font-size:.9rem}
+.card b.t{display:block;margin-bottom:.2rem}
+strong{font-weight:700}.small{font-size:.83rem;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+.tbl{overflow-x:auto;margin:.8rem 0;border:1px solid var(--line);border-radius:8px}
+th{background:var(--fill);text-align:left;font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:.5rem .7rem}
+td{padding:.5rem .7rem;border-top:1px solid var(--line);vertical-align:top}td.w{white-space:nowrap;font-weight:650}
+</style><style>
+.hero{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));margin:1rem 0 1.6rem}
+.m{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.75rem .9rem}
+.m b{display:block;font:800 1.5rem/1.1 Rubik,-apple-system,sans-serif;color:var(--accent)}
+.m span{font-size:.78rem;color:var(--muted);display:block;margin-top:.15rem}
+.m.red b{color:#B4341C}
+.pri{display:inline-block;border-radius:5px;padding:.08rem .45rem;font-size:.7rem;font-weight:800;
+     letter-spacing:.04em;vertical-align:middle;margin-right:.35rem}
+.p1{background:#B4341C;color:#fff}.p2{background:var(--risk);color:#fff}.p3{background:var(--accent);color:#fff}
+.ck{list-style:none;padding-left:0;margin:.5rem 0}
+.ck li{margin:.42rem 0;padding-left:1.8rem;position:relative;line-height:1.5}
+.ck li::before{content:"☐";position:absolute;left:0;font-size:1.05rem;color:var(--muted)}
+.ck li.on{opacity:.5;text-decoration:line-through}
+.ck li.on::before{content:"☑";color:var(--accent)}
+.own{font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);
+     background:var(--asoft);border-radius:4px;padding:.05rem .35rem;margin-left:.3rem}
+.chan{width:100%;border-collapse:collapse;font-size:.87rem}
+.chan td,.chan th{padding:.42rem .6rem;border-top:1px solid var(--line)}
+.bar{height:7px;border-radius:4px;background:var(--fill);overflow:hidden;min-width:70px}
+.bar i{display:block;height:100%;background:var(--accent)}
+@media print{.wrap{max-width:100%}.m,.card,.close,.warn{break-inside:avoid}}
 </style>
 <div class="wrap">
-<h1>План набора: все группы на 100% к 30 сентября</h1>
-<p class="sub">Обновлено 18.08, 11:30 — по итогам двух дней работы системы. Галочки сохраняются в вашем браузере.</p>
+<div class="kicker">KidsUP · главный документ набора · обновлено 20.08.2026</div>
+<h1>Все группы заполнены к 30 сентября</h1>
+<p class="sub">Собрано из семи книг «Ярких мы», интенсива «Система набора групп», маркетинг-плана
+Полины и марафона Марики — и сведено с живыми данными МойКласс. Галочки сохраняются в браузере.</p>
 
-<div class="count">
- <div class="ct red"><b>43</b><span>дня до дедлайна</span></div>
- <div class="ct ind"><b>337</b><span>свободных мест 26/27</span></div>
- <div class="ct blue"><b>30%</b><span>заполненность групп<div class="bar"><i style="width:30%"></i></div></span></div>
- <div class="ct green"><b>~8</b><span>записей в день — нужный темп</span></div>
- <div class="ct ind"><b>110</b><span>промо-контактов в работе</span></div>
+<div class="hero">
+<div class="m"><b>41</b><span>день до 30 сентября</span></div>
+<div class="m red"><b>354</b><span>свободных места из 398</span></div>
+<div class="m red"><b>11%</b><span>заполненность групп</span></div>
+<div class="m"><b>8,6</b><span>записей в день — нужный темп</span></div>
+<div class="m"><b>828 210 ₽</b><span>оплат с 1 августа</span></div>
 </div>
 
-<div class="note">🧭 <b>Что уже работает:</b> портал app.kidsup.ru (Шахматка · Обзвон план/факт · Ответы с бейджем «кто ждёт» · Промоутеры с экономикой · фабрика контента и макетов) · ежечасный ИИ-разбор звонков → задачи в CRM · вечерний разбор переписок · рассылка лагеря с 3 WhatsApp-номеров с защитой от бана · база восстановлена полностью (1844 карточки) с тройной защитой.</div>
+<div class="warn"><strong>Главный разрыв.</strong> Нужно 8,6 записей в день, фактический темп
+августа — 3,1. Разница не закрывается «звонить больше»: вчера 146 наборов дали 25 детей.
+Закрывается тем, что ниже, — в порядке приоритета.</div>
 
-<div class="filters" id="flt">
- <button class="f on" data-k="all">все</button>
- <button class="f" data-k="Борис">Борис</button>
- <button class="f" data-k="Маша">Маша</button>
- <button class="f" data-k="Звонки">Лена · Аня · Ира</button>
- <button class="f" data-k="Лиза">Лиза</button>
- <button class="f" data-k="Клод">Клод</button>
- <button class="f" data-k="red">только 🔴</button>
-</div>
+<h2>Воронка набора: цель и куда мы попадаем</h2>
+<p class="sub">Норматив из маркетинг-плана Полины — 130 заявок превращаются в 55 покупок.</p>
+<div class="tbl"><table>
+<tr><th>Этап</th><th>Цель</th><th>Что это значит для нас</th></tr>
+<tr><td class="w">Заявок</td><td class="w">130</td><td>Все каналы вместе: листовки, база, соцсети, партнёры</td></tr>
+<tr><td class="w">Ответов</td><td class="w">80</td><td>62% — мы теряем на недозвонах вдвое больше нормы</td></tr>
+<tr><td class="w">Приход в центр</td><td class="w">60</td><td>75% дошедших до разговора должны прийти на пробное</td></tr>
+<tr><td class="w">Покупка</td><td class="w">55</td><td>92% пришедших покупают — если отработан день пробного</td></tr>
+</table></div>
+<p>При среднем доходе с клиента <strong>45 091 ₽ за учебный год</strong> эти 55 покупок дают
+около 2,5 млн ₽ выручки сезона. Наш дефицит — 354 места, то есть воронку нужно прогнать
+примерно трижды за 41 день.</p>
 
-<div class="sec" data-who="Борис">
-<h3><span class="who">Борис</span> Решения, которые блокируют всех</h3>
-<div class="item"><input id="b1"><span class="p r">🔴</span><label for="b1"><b>Дата-якорь одной фразой</b>: праздник 29.08 + ДОД 30–31.08 + открытые уроки до 6.09 — что говорим клиентам. Вчера клиенты услышали 4 версии, включая «30 сентября». После ответа Клод выравнивает скрипты, тексты, рассылки за час.</label></div>
-<div class="item"><input id="b2"><span class="p r">🔴</span><label for="b2"><b>Цены в CRM</b>: у всех 75 групп 26/27 поле цены пустое. Прайс найден в «Скриптах v3» — сказать Клоду «заводи», и цены встанут за один проход (с бэкапом).</label></div>
-<div class="item"><input id="b3"><span class="p r">🔴</span><label for="b3"><b>Правила скидок</b>: суммируются ли −10% (второй ребёнок) с −10% (многодетные)? Лена уже насчитала маме двойную. Да/нет.</label></div>
-<div class="item"><input id="b4"><span class="p o">🟠</span><label for="b4">Аккаунт Ирины в МойКласс (inGolovina19@yandex.ru) — без него ей нельзя ставить задачи и мерить статистику.</label></div>
-<div class="item"><input id="b5"><span class="p o">🟠</span><label for="b5">Старые долги 2024–25 (~326 000 ₽: Помыткин, Чупановы, Мельников…) — взыскивать или списывать. Список: База знаний → «Возвраты и долги».</label></div>
-<div class="item"><input id="b6"><span class="p o">🟠</span><label for="b6">Токены ВК и Телеграм-канала — кнопка «Опубликовать» готова и простаивает.</label></div>
-<div class="item"><input id="b7"><span class="p y">🟡</span><label for="b7">Номер Лизы для WhatsApp-пушей «🔥 ждут ответа» · Cloudflare + ключ для «Спросить Клода» · да/нет по рефералке 1000 бонусных ₽.</label></div>
-<div class="item"><input id="b8"><span class="p y">🟡</span><label for="b8">Вечером — 2 минуты: /promo (подтверждённые контакты и доплаты) и Обзвон → Факт.</label></div>
-</div>
+<h2>Восемь каналов на 130 заявок — и что у нас с каждым</h2>
+<div class="tbl"><table class="chan">
+<tr><th>Канал</th><th>План</th><th>Статус</th><th></th></tr>
+<tr><td>Листовки и промоутеры</td><td class="w">50</td><td>Работает: 110 контактов, 9 записей. Руслан окупается, Виталий — нет</td><td><div class="bar"><i style="width:70%"></i></div></td></tr>
+<tr><td>Рассылки по базе</td><td class="w">20</td><td>Работает: 526 отправлено, 24 ответа. Упирается в дневной лимит</td><td><div class="bar"><i style="width:60%"></i></div></td></tr>
+<tr><td>Соцсети</td><td class="w">10</td><td>Контент-план есть, публикации не идут — нет токенов ВК и ТГ</td><td><div class="bar"><i style="width:20%"></i></div></td></tr>
+<tr><td>Реклама в пабликах и чатах</td><td class="w">10</td><td>Не начато. Нужен список пабликов района в МАКС, ТГ, ВК</td><td><div class="bar"><i style="width:0"></i></div></td></tr>
+<tr><td>Расклейки и партнёрства</td><td class="w">10</td><td>Не начато. По плану — 3–5 партнёров по геолокации</td><td><div class="bar"><i style="width:0"></i></div></td></tr>
+<tr><td>Блогеры</td><td class="w">10</td><td>Не начато. Нужны 3–5 местных мам-блогеров</td><td><div class="bar"><i style="width:0"></i></div></td></tr>
+<tr><td>Конкурс с чат-ботом</td><td class="w">10</td><td>Не начато. Шаблоны бота есть в материалах марафона</td><td><div class="bar"><i style="width:0"></i></div></td></tr>
+<tr><td>Реферальная программа</td><td class="w">10</td><td>Не начато. По плану старт 31.08 — успеваем, если решить на неделе</td><td><div class="bar"><i style="width:0"></i></div></td></tr>
+</table></div>
+<div class="close">Пять каналов из восьми не запущены вовсе — это <strong>50 заявок</strong>
+из плановых 130. Именно здесь лежит разница между 3,1 и 8,6 записи в день, а не в количестве
+звонков действующих админов.</div>
 
-<div class="sec" data-who="Маша">
-<h3><span class="who">Маша · директор-маркетолог</span> Трафик и точки контакта</h3>
-<div class="item"><input id="m1"><span class="p r">🔴</span><label for="m1">Объявить промоутерам правила оплаты: 600 ₽ — только подтверждённый (дозвонились + записался), 200 ₽ — был в базе, 0 ₽ — фейк. Сверить 3 «непробиваемых» номера с пометкой «в базе» и 6 сомнительных цифр листа Виталия.</label></div>
-<div class="item"><input id="m2"><span class="p o">🟠</span><label for="m2">Публикации после даты-якоря: тексты — /content, макеты — /makety. План на 2 недели + посевы в районных пабликах и мамских чатах.</label></div>
-<div class="item"><input id="m3"><span class="p o">🟠</span><label for="m3">Указатель к входу от Дикси/шлагбаума — три семьи заблудились, одну Аня встречала на улице.</label></div>
-<div class="item"><input id="m4"><span class="p o">🟠</span><label for="m4">Чат лагеря с ежедневным фотоотчётом (жалоба Кукарской «раньше был чат — теперь нет»). 10 минут, инструмент удержания.</label></div>
-<div class="item"><input id="m5"><span class="p y">🟡</span><label for="m5">Разбирать «Лиды» на портале ежедневно — рассылка 12.08 уже дала 3 записи и 1 оплату.</label></div>
-</div>
-
-<div class="sec" data-who="Звонки">
-<h3><span class="who">Лена · Аня · Ира</span> Прозвон и записи</h3>
-<div class="item"><input id="a1"><span class="p r">🔴</span><label for="a1"><b>Правило №1: «записываю» = запись в группу в CRM сразу.</b> Три шага: карточка (поиск «/») → запись в конкретную группу (колеблются — «Заявки» предмета) → статус. Вчера 0 записей при 5+ устных «да».</label></div>
-<div class="item"><input id="a2"><span class="p r">🔴</span><label for="a2">Дообзвонить все 110 промо-контактов (Руслан 65, Виталий 36, Маша 9). После разговора — статус: за подтверждённых промоутерам платят, статусы = деньги.</label></div>
-<div class="item"><input id="a3"><span class="p o">🟠</span><label for="a3">Горячие сегодня: Виктория (мини-сад, «будем записывать» — дожать с ценой!), Эльвира (лагерь 24–28, звонить до 14:00), Тимур (перезвон до обеда), городской 74951376442 (звонил трижды).</label></div>
-<div class="item"><input id="a4"><span class="p o">🟠</span><label for="a4">Продления «Мисс Марта» до записей: Злата, Денис (пн/чт 19:00), Аня вт/вс + вопрос по Марии 12 л.</label></div>
-<div class="item"><input id="a5"><span class="p y">🟡</span><label for="a5">Ира: шпаргалка заведения промо-контакта — База знаний. Каждый работает под своим аккаунтом МойКласс.</label></div>
-<div class="item"><input id="a6"><span class="p y">🟡</span><label for="a6">Одна версия дат и цен: <b>до 31.08 — цены прошлого года</b>; все скидки по 10% (2-й ребёнок / 2-й предмет / многодетные / день пробного), действует ОДНА, не суммируются.</label></div>
-<div class="item"><input id="a7"><span class="p r">🔴</span><label for="a7"><b>Тренинг 18.08 внедрён:</b> разговор по 5 этапам, возражения по схеме СУАЗ, запись предлагаем в 100% разговоров, после звонка — дубль договорённостей в WhatsApp. Методичка «Продажи и возражения» в Базе знаний — прочитать всем.</label></div>
-<div class="item"><input id="a8"><span class="p o">🟠</span><label for="a8">Пробные: напоминание за день И в день занятия («вы придёте?»); после пробного — обратная связь педагога письменно + «записываю в группу, верно?»; купили — welcome-серия (шаблоны в методичке).</label></div>
-</div>
-
-<div class="sec" data-who="Лиза">
-<h3><span class="who">Лиза · онлайн-операционка</span> Чаты, деньги, документы</h3>
-<div class="item"><input id="l1"><span class="p r">🔴</span><label for="l1">Бейдж «ждут ответа» держать на нуле (страница «Ответы»), цель — 15 минут. Сейчас ждут: Смирнов Роман (расписание занятий! с 9:15), Семина («будет ли нулевой класс»), «Запуск речи» (лид назвал интерес), Нилова (документы не нашли).</label></div>
-<div class="item"><input id="l2"><span class="p r">🔴</span><label for="l2">Вписать причины к 10 возвратам лета (271 855 ₽) и обзвонить должников 2026 (~160 000 ₽, среди них Денисова 11 000 ₽ — та самая «готова оплатить»). Готовая сводка: База знаний → «Возвраты и долги».</label></div>
-<div class="item"><input id="l3"><span class="p o">🟠</span><label for="l3">Закрыть занятия прошлой недели в МойКласс (поручение Бориса).</label></div>
-<div class="item"><input id="l4"><span class="p o">🟠</span><label for="l4">Обещания с дедлайном: Киреевы (варианты в Max — просрочено!), сава (материалы «до 1-го»), меню Селезневым.</label></div>
-<div class="item"><input id="l5"><span class="p y">🟡</span><label for="l5">Вводная Ире: статусы, причины отказов, запись в группу, портал.</label></div>
-</div>
-
-<div class="sec" data-who="Клод">
-<h3><span class="who">Клод · системы</span> Работает само + очередь</h3>
-<div class="item"><input id="k1"><span class="p o">🟠</span><label for="k1">Ежечасный разбор звонков и вечерний разбор переписок → комментарии, статусы, задачи. Работает.</label></div>
-<div class="item"><input id="k2"><span class="p o">🟠</span><label for="k2">Вечерняя сверка реестра промоутеров с базой (правки цифр Иры) + отчёт по подтверждённым и доплатам.</label></div>
-<div class="item"><input id="k3"><span class="p o">🟠</span><label for="k3">После ответов Бориса: цены в 75 групп (с бэкапом) → мануалы/скрипты/фабрика на одну формулу → памятка админам.</label></div>
-<div class="item"><input id="k4"><span class="p y">🟡</span><label for="k4">Ежедневная автосверка базы со снапшотом · автовозврат слетевших тегов · ночная чистка источника «Иное» · склейка 4 дублей (задачи стоят).</label></div>
-<div class="item"><input id="k5"><span class="p y">🟡</span><label for="k5">Включить Ирину в ротацию задач и дисциплину, как появится её аккаунт. Рефералка — после «да».</label></div>
-</div>
-
-<h2>Воронка и каналы (методика курса, ×3)</h2>
-<div class="sec">
-<p class="small" style="margin-top:0">Нужно <b>387 заявок за 43 дня</b> (≈163 новых ученика при конверсии 42% + 226 продлений своих). Каналы: <b>листовки/промоутеры 150</b> (запущен: 110 контактов уже в работе) · рассылки по базе 60 (идёт: лагерная рассылка, 22 ответа) · паблики и чаты 30 · расклейки и гео-партнёры 30 · соцсети и Яндекс.Карты 30 (ждёт токены) · конкурс с ботом 30 · блогеры 30 · рефералка 30 (ждёт «да»). Календарь: <b>до 23.08 подготовка</b> (Маша: паблики, партнёры, блогеры, печать) → <b>24.08 общий старт</b> → 29.08 праздник → 30.08 дедлайн «старые цены» → 31.08–6.09 открытые уроки + старт рефералки → два круга каналов до 30.09.</p>
-</div>
-
-<h2>⚠️ Грабли последних дней — не наступать повторно</h2>
-<div class="sec grabli">
-<ul>
-<li><b>Устные «да» без записи в CRM</b> — место никто не держит, статистика врёт. Лечится правилом трёх шагов.</li>
-<li><b>Четыре версии дат и три версии скидок в звонках</b> — клиентов звали даже на «30 сентября». Одна формула для всех.</li>
-<li><b>Цены «на слух»</b> — Аня не знала цен лагеря, Лена суммировала скидки по памяти. Прайс должен жить в CRM, а не в головах.</li>
-<li><b>Чаты после 16:00 без ответа</b> — «готова оплатить 11 000 ₽» провисело до ночи. Последняя проверка чатов — перед уходом.</li>
-<li><b>Дубли карточек</b> — 4 за два дня. Перед заведением — поиск по номеру (клавиша «/»).</li>
-<li><b>Промо-карточки без фамилий и родителей</b> — «даша» среди пяти даш не найти. Заводим полностью с листа.</li>
-<li><b>Пропущенные без перезвона</b> — субботние звонки ждали 32 часа. Теперь ловит страница «Ответы», но её надо открывать.</li>
+<h2><span class="pri p1">СРОЧНО</span>Сегодня и завтра — иначе теряем деньги</h2>
+<ul class="ck" id="g1">
+<li>Девять денежных вопросов без движения по 5 дней: возвраты 33 400 ₽ и 3 400 ₽, «готова оплатить 11 000 ₽» ждёт с 17.08, чек Пушкаревой, перерасчёт Егор/Андрей, справка Войнову <span class="own">Лиза</span></li>
+<li>Шесть детей со статусом «Записался», но без записи в группу — педагог их не ждёт <span class="own">Аня</span></li>
+<li>Тринадцать промо-контактов без единого разговора: за них уже уплачено 7 800 ₽ <span class="own">Аня и Лена</span></li>
+<li>Бутовке названо 18:00, группа в 17:00 — исправить и написать точное время <span class="own">Аня</span></li>
+<li>Иванова ждёт расчёт по саду без питания с 08:50 вторника <span class="own">Лиза + цена от Бориса</span></li>
+<li>Решение по темпу рассылки: 726 сообщений в очереди, при лимите 60/день не успеваем до праздника <span class="own">Борис</span></li>
 </ul>
-</div>
-<p class="small">Реестр всех дел с фильтрами — отдельная страница «Реестр дел KidsUP» в артефактах. Портал: app.kidsup.ru · Вопросы — Клоду в чат.</p>
-</div>
+
+<h2><span class="pri p1">СРОЧНО</span>До 29 августа — подготовка трёх событий</h2>
+<ul class="ck" id="g2">
+<li>Согласовать площадку в парке «Янтарная горка» с управой или ТСЖ <span class="own">Борис</span></li>
+<li>Заказать аниматоров и передать им памятку: без игр на скорость, без соревнований, звать к столику регистрации <span class="own">Маша</span></li>
+<li>Закупить: шарики, призы для лотереи и лототрон, мелки, пузыри, угощение, воду <span class="own">Маша</span></li>
+<li>Распечатать анкеты гостя и чек-листы — <a href="/base/sobytiya_29_31">карточка событий</a> <span class="own">Лиза</span></li>
+<li>Собрать старт-пакеты: памятка о занятии, расписание и цены, купон, подарок <span class="own">Лиза</span></li>
+<li>Расписание мастер-классов ДОД по возрастам, 4–5 флагманских направлений <span class="own">Маша</span></li>
+<li>Проверить материалы для творчества: карандаши, фломастеры, кисти, фартуки <span class="own">Аня</span></li>
+<li>28.08 — рассылка «Вы придёте?» по всем приглашённым <span class="own">Клод автоматически</span></li>
+</ul>
+
+<h2><span class="pri p2">ВАЖНО</span>Каналы, которые ещё не запущены</h2>
+<ul class="ck" id="g3">
+<li>Реферальная программа: старт 31.08, механика «приведи друга» с бонусом обеим семьям. Материалы готовы в марафоне <span class="own">Борис решает, Клод запускает</span></li>
+<li>Три-пять партнёров по геолокации: детская стоматология, магазин игрушек, парикмахерская, кофейня — обмен аудиторией и сбор телефонов <span class="own">Маша</span></li>
+<li>Реклама в районных пабликах и чатах: собрать список каналов Богородского и Бульвара Рокоссовского в ТГ, ВК и МАКС <span class="own">Маша</span></li>
+<li>Три-пять местных мам-блогеров: совместный рилс с конкурсом или серия сторис <span class="own">Маша</span></li>
+<li>Конкурс с чат-ботом для сбора подписчиков — шаблоны бота есть <span class="own">Маша</span></li>
+<li>Расклейки и плакаты в ЖК «Богородский» и соседних домах <span class="own">Маша</span></li>
+<li>Токены ВК и Telegram — без них публикации не уходят, кнопка простаивает <span class="own">Борис</span></li>
+</ul>
+
+<h2><span class="pri p2">ВАЖНО</span>Работа с базой — главный резерв</h2>
+<ul class="ck" id="g4">
+<li>142 семьи, плативших этим летом и не записанных на год: возвращены из архива, задачи расставлены <span class="own">Ира и Аня</span></li>
+<li>317 клиентов прошлого учебного года — следующая волна после летних <span class="own">Ира</span></li>
+<li>41% контактов промоутеров — недозвон: вторая попытка в другое время суток, третья в другой день, потом мессенджер <span class="own">все</span></li>
+<li>Подготовка к школе — 110 свободных мест, самый большой дефицит: звонить семьям с детьми 5–7 лет в первую очередь <span class="own">все</span></li>
+<li>Раннее развитие — 82 места: семьи с детьми 1,3–3 года <span class="own">все</span></li>
+</ul>
+
+<h2><span class="pri p3">СИСТЕМА</span>Что уже работает само</h2>
+<ul class="ck" id="g5">
+<li>Разбор каждого звонка с расшифровкой → комментарий и задача в карточку</li>
+<li>Ежедневный разбор переписок вечером</li>
+<li>Резюме клиенту сразу после записи: адрес, время, что взять</li>
+<li>Напоминание о пробном накануне в 18:00 с вопросом «Вы подойдёте?»</li>
+<li>Окно 24 часов после пробного: сообщение со скидкой и задача админу с открытым вопросом</li>
+<li>Обработка неявки: сообщение клиенту и задача перезаписать</li>
+<li>Контроль дисциплины: если ошибки не исправляются второй день — сигнал руководителю</li>
+<li>Возврат задач, закрытых без единого звонка или сообщения</li>
+<li>Ежедневная чистка задач по клиентам, ушедшим в архив</li>
+</ul>
+
+<h2><span class="pri p3">ПОТОМ</span>Сентябрь: удержание вместо набора</h2>
+<ul class="ck" id="g6">
+<li>С третьей недели сентября — конвейер удержания: обратная связь педагога каждому новичку</li>
+<li>Контроль продления первых абонементов: у кого заканчивается, кто не продлил</li>
+<li>Допродажа второго предмета — в сентябре прошлого года таких сделок было 131, больше чем новых клиентов</li>
+<li>Публикация остатков мест в соцсетях как триггер дефицита</li>
+</ul>
+
+<div class="warn"><strong>Как считаем результат.</strong> Две цифры рядом: <strong>дети</strong>
+и <strong>записи</strong>. Один ребёнок на логопеде дважды в неделю — это один ребёнок и две
+записи; ребёнок на двух предметах — тоже один и две. Заполнение групп меряем записями,
+работу администратора — детьми.</div>
+
 <script>
-const KEY='kidsup-plan-3';
-const saved=JSON.parse(localStorage.getItem(KEY)||'{}');
-document.querySelectorAll('.item input').forEach(cb=>{
- cb.type='checkbox';cb.checked=!!saved[cb.id];
- cb.closest('.item').classList.toggle('done',cb.checked);
- cb.addEventListener('change',()=>{saved[cb.id]=cb.checked;
-  localStorage.setItem(KEY,JSON.stringify(saved));
-  cb.closest('.item').classList.toggle('done',cb.checked);});
+document.querySelectorAll('.ck li').forEach((li, i) => {
+  const key = 'plan26_' + (li.closest('ul').id || 'x') + '_' + i;
+  if (localStorage.getItem(key) === '1') li.classList.add('on');
+  li.addEventListener('click', () => {
+    li.classList.toggle('on');
+    localStorage.setItem(key, li.classList.contains('on') ? '1' : '0');
+  });
 });
-const btns=document.querySelectorAll('#flt .f');
-btns.forEach(b=>b.addEventListener('click',()=>{
- btns.forEach(x=>x.classList.remove('on'));b.classList.add('on');
- const k=b.dataset.k;
- document.querySelectorAll('.sec[data-who]').forEach(s=>{
-  s.style.display=(k==='all'||k==='red'||s.dataset.who===k)?'':'none';});
- document.querySelectorAll('.item').forEach(it=>{
-  it.style.display=(k==='red'&&!it.querySelector('.p.r'))?'none':'';});
-}));
 </script>
+</div>
