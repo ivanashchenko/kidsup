@@ -1031,6 +1031,52 @@ def missed_calls() -> None:
                    "Когда удобно созвониться? Или ответьте здесь — подберём группу 😊")
 
 
+def card_quality() -> None:
+    """Проверка новых карточек: без даты рождения и телефона карточка почти
+    бесполезна — по ней не подобрать группу и не перезвонить. Раз в день
+    собираем такие за последние 3 дня и отдаём одной задачей тому, кто их завёл."""
+    import re as _re
+    mk = _client()
+    try:
+        since = (_today() - timedelta(days=3)).isoformat()
+        users = mk.fetch_all("/v1/company/users", ["users"],
+                             params={"createdAt": [since, (_today() + timedelta(days=1)).isoformat()],
+                                     "limit": 500})
+        bad_bd, bad_phone, bad_name = [], [], []
+        MSG = _re.compile(r"\((телеграмм?|telegram|tg|max|макс|whats?app|ватсап|вайбер)\)", _re.I)
+        AGE = _re.compile(r"\b\d{1,2}\s*(лет|год|года|мес)\b")
+        for u in users:
+            name = (u.get("name") or "").strip()
+            attrs = {a.get("attributeAlias"): a.get("value") for a in (u.get("attributes") or [])}
+            if not attrs.get("birthday"):
+                bad_bd.append(name or str(u.get("id")))
+            if not u.get("phone"):
+                bad_phone.append(name or str(u.get("id")))
+            if MSG.search(name) or AGE.search(name) or (name[:1].islower() if name else False) \
+                    or _re.match(r"^7?9\d{9}$", name.replace(" ", "")):
+                bad_name.append(name)
+        if not (bad_bd or bad_phone or bad_name):
+            return
+        admins = _admins_today() or _admins()
+        if not admins:
+            return
+        who = admins[_today().toordinal() % len(admins)]["managerId"]
+        parts = []
+        if bad_bd:
+            parts.append(f"без даты рождения {len(bad_bd)}")
+        if bad_phone:
+            parts.append(f"без телефона {len(bad_phone)}")
+        if bad_name:
+            parts.append(f"кривое имя {len(bad_name)}")
+        body = ("🤖 Клод: качество карточек за 3 дня — " + ", ".join(parts) +
+                ". Дозаполнить: дата рождения нужна для подбора группы, телефон — чтобы перезвонить. "
+                "В имени — только имя ребёнка (не мессенджер, не возраст, не телефон).")
+        _task(mk, who, None, body[:250])
+        log.info("card_quality: %s", ", ".join(parts))
+    finally:
+        mk.close()
+
+
 def _queues() -> tuple[dict[int, list[int]], dict[int, str]]:
     """Очереди обзвона: (admin_index -> [user_id, ...], user_id -> тип звонка).
 
@@ -1641,6 +1687,11 @@ def _loop() -> None:
                         _sla.verify_closed()
                 except Exception:
                     log.exception("модуль SLA упал — продолжаем")
+            if now.hour >= 9 and _mark("card_quality", str(_today())):
+                try:
+                    card_quality()
+                except Exception:
+                    log.exception("проверка качества карточек не удалась")
             if now.hour >= 20 and _mark("digest", str(_today())):
                 daily_digest()
             if now.hour >= 21 and db.get_setting("roistat_pushed_day") != str(_today()):
