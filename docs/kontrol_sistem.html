@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Глаза и уши KidsUP</title>
+<style>
+:root{
+  --paper:#FBFAF7; --ink:#1A1D2E; --muted:#666B80; --line:#E2E1DC; --card:#FFFFFF;
+  --fill:#F1F0EC;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#E8E6F4; --sky-soft:#E2F2FB; --green-soft:#EAF2DD;
+  --amber-soft:#FBEEDA; --red-soft:#FAE3E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#12131C; --ink:#E6E6EE; --muted:#989DB2; --line:#282A38; --card:#191B26;
+    --fill:#1E202C;
+    --indigo:#9C93E8; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#1E1D36; --sky-soft:#12252F; --green-soft:#1B2415;
+    --amber-soft:#2C2313; --red-soft:#2E1818; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.65 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-variant-numeric:tabular-nums}
+.wrap{max-width:64rem;margin:0 auto;padding:2.4rem 1.25rem 5rem}
+h1{font-size:2.2rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.42rem;font-weight:750;letter-spacing:-.015em;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1.03rem;font-weight:720;margin:1.6rem 0 .45rem}
+p{margin:.55rem 0;max-width:49rem}
+.kicker{font-size:.74rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:49rem}
+section{margin-top:2.7rem;padding-top:1.8rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+code{background:var(--fill);border:1px solid var(--line);border-radius:5px;padding:.08em .35em;
+  font:.85em/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+a{color:var(--sky)}
+
+/* цифры */
+.nums{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));margin:1.4rem 0 .3rem}
+.num{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:.85rem 1rem}
+.num .v{font-size:1.8rem;font-weight:800;letter-spacing:-.035em;line-height:1.08;color:var(--indigo)}
+.num.red .v{color:var(--red)} .num.amber .v{color:var(--amber)} .num.green .v{color:var(--green)}
+.num .l{font-size:.82rem;color:var(--muted);margin-top:.25rem;line-height:1.42}
+
+/* таблицы */
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:34rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap;vertical-align:bottom}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+td.n,th.n{text-align:right;white-space:nowrap}
+
+/* система */
+.sys{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.2rem;margin:.85rem 0}
+.sys .hd{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;margin-bottom:.15rem}
+.sys .nm{font-size:1.1rem;font-weight:780;letter-spacing:-.015em}
+.sys .role{font-size:.82rem;color:var(--muted)}
+.cols{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));margin-top:.8rem}
+.col h4{margin:0 0 .3rem;font-size:.71rem;letter-spacing:.08em;text-transform:uppercase;font-weight:750}
+.col.see h4{color:var(--green)} .col.blind h4{color:var(--red)} .col.fix h4{color:var(--sky)}
+.col ul{margin:0;padding-left:1.05rem;font-size:.9rem} .col li{margin:.22rem 0}
+
+/* бейджи */
+.badge{font-size:.68rem;font-weight:750;letter-spacing:.05em;text-transform:uppercase;
+  border-radius:999px;padding:.16rem .55rem;white-space:nowrap}
+.b-live{background:var(--green-soft);color:var(--green)}
+.b-new{background:var(--sky-soft);color:var(--sky)}
+.b-need{background:var(--amber-soft);color:var(--amber)}
+.b-blind{background:var(--red-soft);color:var(--red)}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:49rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:49rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:49rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:49rem} ul.plain li{margin:.32rem 0}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="kicker">Внутренний документ · только для Бориса</div>
+<h1>Глаза и уши</h1>
+<p class="sub">Что я сейчас вижу и слышу в каждой системе, где у меня слепые зоны,
+через какие из них проходят деньги — и что нужно докрутить, чтобы к 30 сентября
+группы были полными, а не просто «мы очень старались».</p>
+
+<div class="nums">
+  <div class="num red"><div class="v">510 920 ₽</div><div class="l">августовских оплат без подписи менеджера — 38 из 77</div></div>
+  <div class="num amber"><div class="v">15</div><div class="l">записей за август, у которых нет автора вообще</div></div>
+  <div class="num red"><div class="v">0</div><div class="l">клиентов, где ответственными числятся Аня или Ирина</div></div>
+  <div class="num green"><div class="v">8</div><div class="l">пунктов скрипта, по которым я теперь оцениваю каждый разговор</div></div>
+</div>
+
+<div class="warn"><b>Главный вывод одной фразой.</b> Мы неплохо видим <em>что</em> произошло
+и почти не видим <em>кто это сделал</em>. Под половиной августовских денег не стоит ничьей
+подписи; ответственный в карточке — исторический и врёт; единственная надёжная нить —
+поле «Менеджер» на записи в группу. Это одновременно ломает бонусы, делает невозможным
+разбор ошибок по именам и оставляет дыру, через которую деньги могут пройти мимо кассы
+и этого никто не заметит.</div>
+
+<!-- ==================================================== КАРТА ПОКРЫТИЯ -->
+<section>
+<div class="seclabel">Часть 1</div>
+<h2>Карта покрытия: что я вижу в каждой системе</h2>
+<p class="sub">Честно, без «в целом всё под контролем». Зелёное — вижу и использую;
+красное — слепая зона; голубое — чем закрываю.</p>
+
+<div class="sys">
+  <div class="hd"><span class="nm">МойКласс</span>
+    <span class="badge b-live">основной источник</span>
+    <span class="role">деньги, дети, группы, задачи</span></div>
+  <div class="cols">
+    <div class="col see"><h4>Вижу</h4><ul>
+      <li>Все карточки, статусы, теги, атрибуты</li>
+      <li>Оплаты, суммы, назначения, возвраты</li>
+      <li>Записи в группы и их статусы</li>
+      <li>Задачи: постановку, срок и факт закрытия</li>
+      <li>Журнал посещений — 38 717 отметок</li>
+    </ul></div>
+    <div class="col blind"><h4>Не вижу</h4><ul>
+      <li><b>Кто провёл оплату</b> — у 49% приходов поле пустое</li>
+      <li><b>Кто изменил запись задним числом</b> — в API нет журнала изменений</li>
+      <li>Удалённые карточки и записи — просто исчезают из выгрузки</li>
+      <li>Основание скидки — поля для него нет</li>
+      <li>Кто отметил посещение и когда именно</li>
+    </ul></div>
+    <div class="col fix"><h4>Чем закрываю</h4><ul>
+      <li>Ночной снимок ключевых полей и сравнение с предыдущим: любая правка
+        задним числом всплывает в ленте</li>
+      <li>Утренний список неподписанных оплат — задачей на смену</li>
+      <li>Эталон цены по медиане прошлых оплат того же курса — ловит скидки вне правил</li>
+    </ul></div>
+  </div>
+</div>
+
+<div class="sys">
+  <div class="hd"><span class="nm">Mango</span>
+    <span class="badge b-live">слышу</span>
+    <span class="role">звонки, записи разговоров</span></div>
+  <div class="cols">
+    <div class="col see"><h4>Вижу и слышу</h4><ul>
+      <li>Журнал звонков: кто, кому, когда, с какого добавочного</li>
+      <li>Записи разговоров — расшифровываю и разбираю каждый час</li>
+      <li>Пропущенные входящие</li>
+      <li>Добавочные: 10 — Ирина, 12 — Елена, 15 — Аня</li>
+    </ul></div>
+    <div class="col blind"><h4>Не слышу</h4><ul>
+      <li><b>Звонки с личных мобильных</b> — их в АТС просто нет</li>
+      <li>Разговоры в центре лицом к лицу</li>
+      <li>Добавочные 20 и 21 — чужой центр, исключены намеренно</li>
+    </ul></div>
+    <div class="col fix"><h4>Чем закрываю</h4><ul>
+      <li>Расшифровки теперь сохраняются, а не умирают после заметки в карточке</li>
+      <li>Каждый разговор получает балл 0–8 по пунктам скрипта</li>
+      <li>Стоп-слова в речи: «переведите мне», «без чека», «я сама проведу»</li>
+      <li>Клиент платит, но за 45 дней ни звонка, ни переписки — в ленту</li>
+    </ul></div>
+  </div>
+</div>
+
+<div class="sys">
+  <div class="hd"><span class="nm">Wazzup</span>
+    <span class="badge b-need">нужен вебхук</span>
+    <span class="role">переписка в WhatsApp</span></div>
+  <div class="cols">
+    <div class="col see"><h4>Вижу</h4><ul>
+      <li>Диалоги за день — выгрузкой</li>
+      <li>Доставку рассылок и ответы на них</li>
+      <li>Три номера-отправителя и их суточные потолки</li>
+    </ul></div>
+    <div class="col blind"><h4>Не вижу</h4><ul>
+      <li><b>Сообщения в момент отправки</b> — только пачкой позже</li>
+      <li>Личный WhatsApp сотрудника</li>
+      <li>Точное время первого ответа, а значит и настоящий SLA</li>
+    </ul></div>
+    <div class="col fix"><h4>Чем закрываю</h4><ul>
+      <li>Стоп-слова по тексту переписки — те же, что в звонках,
+        плюс «мой личный номер» и «бесплатное пробное»</li>
+      <li>Очередь «родитель написал последним» — должна быть нулевой к концу смены</li>
+    </ul></div>
+  </div>
+</div>
+
+<div class="sys">
+  <div class="hd"><span class="nm">app.kidsup.ru</span>
+    <span class="badge b-new">мозг</span>
+    <span class="role">сводит всё вместе</span></div>
+  <div class="cols">
+    <div class="col see"><h4>Уже делает</h4><ul>
+      <li>Автозадачи админам и проверку, что задача закрыта не формально</li>
+      <li>Эскалацию просрочек и контроль повторяющихся ошибок</li>
+      <li>Базу знаний, скрипты, расписание, макеты</li>
+      <li>Рассылки с честной статистикой доставки</li>
+    </ul></div>
+    <div class="col blind"><h4>Чего не хватало</h4><ul>
+      <li>Единого места, где видно все расхождения сразу</li>
+      <li>Оценки качества разговоров в цифре</li>
+      <li>Экрана «пульс набора» для команды</li>
+    </ul></div>
+    <div class="col fix"><h4>Включено сегодня</h4><ul>
+      <li><b>Лента аномалий</b> — <code>app.kidsup.ru/audit</code></li>
+      <li>Утренний аудит вчерашних денег в 9:00</li>
+      <li>Оценка звонка 0–8 и средний балл по команде</li>
+    </ul></div>
+  </div>
+</div>
+
+<div class="sys">
+  <div class="hd"><span class="nm">Сайт kidsup.ru</span>
+    <span class="badge b-blind">главная дыра</span>
+    <span class="role">вход в воронку</span></div>
+  <div class="cols">
+    <div class="col see"><h4>Вижу</h4><ul>
+      <li>5 487 визитов в Roistat, коллтрекинг работает</li>
+      <li>Заявки, которые доходят до <code>/api/public/lead</code></li>
+    </ul></div>
+    <div class="col blind"><h4>Не вижу</h4><ul>
+      <li><b>Из какой рекламы пришла оплата</b> — из 70 августовских оплат
+        к визиту привязана одна</li>
+      <li>Заявки со старого сайта — форма не передаёт номер визита</li>
+      <li>Что происходит ночью и в выходные: записаться самому нельзя</li>
+    </ul></div>
+    <div class="col fix"><h4>Чем закрыть</h4><ul>
+      <li>Поле <code>roistat_visit</code> в форме и атрибут в карточке</li>
+      <li>Онлайн-запись прямо в группу, а не «оставьте заявку»</li>
+      <li>Квиз «портфель навыков» с выдачей карты развития за телефон</li>
+    </ul></div>
+  </div>
+</div>
+</section>
+
+<!-- ==================================================== МАХИНАЦИИ -->
+<section>
+<div class="seclabel">Часть 2</div>
+<h2>Десять способов увести деньги — и что ловит каждый из них</h2>
+<p class="sub">Это не обвинение никому конкретно. Это список того, что в детских центрах
+случается, и проверка: увидим ли мы это, если случится у нас. Половина пунктов до сегодня
+не ловилась вообще.</p>
+
+<div class="tbl">
+<table>
+<thead><tr><th>Схема</th><th>По какому следу видно</th><th>Где ловится</th><th>Статус</th></tr></thead>
+<tbody>
+<tr><td class="w">Оплата на личную карту</td>
+  <td>Ребёнок ходит и отмечен на занятиях, а оплат в CRM нет; в разговоре звучит
+    «переведите мне» или «без чека»</td>
+  <td>Сверка посещений с оплатами + стоп-слова в расшифровке</td>
+  <td><span class="badge b-new">включено сегодня</span></td></tr>
+<tr><td class="w">Оплата без подписи, а потом «это была моя продажа»</td>
+  <td>У прихода пустое поле «Менеджер»</td>
+  <td>Утренний список неподписанных оплат</td>
+  <td><span class="badge b-new">включено сегодня</span></td></tr>
+<tr><td class="w">Скидка своим или «по знакомству»</td>
+  <td>Сумма ниже обычной по этому курсу больше чем на 25%</td>
+  <td>Эталон по медиане оплат за полгода</td>
+  <td><span class="badge b-new">включено сегодня</span></td></tr>
+<tr><td class="w">Возврат с последующим приёмом налом</td>
+  <td>Возврат крупнее 3 000 ₽, а ребёнок продолжает ходить</td>
+  <td>Каждый возврат — карточкой Борису в тот же день</td>
+  <td><span class="badge b-new">включено сегодня</span></td></tr>
+<tr><td class="w">Приписка посещения отсутствующему</td>
+  <td>Отметка «был» есть, а родитель в переписке пишет «мы не приходили»;
+    у педагога вся группа отмечена одним махом</td>
+  <td>Сверка журнала с перепиской и списанием абонемента</td>
+  <td><span class="badge b-need">нужна ежедневная сверка</span></td></tr>
+<tr><td class="w">Фиктивное «посетил пробное» ради бонуса</td>
+  <td>Пробное отмечено, но нет ни звонка накануне, ни сообщения после</td>
+  <td>Конвейер «до и после пробного» — обе точки обязательны</td>
+  <td><span class="badge b-live">уже работает</span></td></tr>
+<tr><td class="w">Увод клиента на частные занятия</td>
+  <td>Клиент уходит в отказ, а в переписке или звонке был обмен личными
+    контактами; педагог освобождает то же время</td>
+  <td>Стоп-слова + отказы без внятной причины</td>
+  <td><span class="badge b-new">включено сегодня</span></td></tr>
+<tr><td class="w">Выдуманные промо-контакты</td>
+  <td>Номер не в WhatsApp, не отвечает, дубль существующего, номера подряд</td>
+  <td>Реестр промо-контактов: проверка на дубли и на наличие в мессенджере</td>
+  <td><span class="badge b-live">уже работает</span></td></tr>
+<tr><td class="w">Задача закрыта без действия</td>
+  <td>Задача «выполнена», а по клиенту в этот день ни звонка, ни сообщения,
+    ни комментария</td>
+  <td>Проверка закрытых задач против журнала действий</td>
+  <td><span class="badge b-live">починено 19.08</span></td></tr>
+<tr><td class="w">Работа мимо всех систем</td>
+  <td>Клиент платит, но за 45 дней ни звонка через АТС, ни переписки</td>
+  <td>Проверка «вне каналов»</td>
+  <td><span class="badge b-new">включено сегодня</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="note"><b>Принцип, по которому это построено.</b> Ни одна проверка не судит
+человека. Каждая находит <b>расхождение между системами</b> — там, где два независимых
+следа не сходятся. Дальше решает человек: в ленте две кнопки, «не нарушение» и
+«нарушение». Ложные срабатывания — нормальная часть работы, важно, чтобы расхождение
+не оставалось незамеченным.</div>
+</section>
+
+<!-- ==================================================== ЧТО ВКЛЮЧЕНО -->
+<section>
+<div class="seclabel">Часть 3</div>
+<h2>Что заработало сегодня</h2>
+
+<h3>Лента аномалий — <code>app.kidsup.ru/audit</code></h3>
+<p>Один экран, куда стекаются все расхождения. Красное — деньги, разбирается в тот же день.
+Жёлтое — процесс, разбирается на планёрке. У каждой находки две кнопки. Повторный прогон
+не дублирует записи, так что проверки можно гонять хоть каждый час.</p>
+
+<h3>Оценка каждого разговора: 0–8</h3>
+<p>Раньше я слушал звонки и писал заметку в карточку — а расшифровка после этого исчезала.
+Теперь она сохраняется, и по ней автоматически считается, сколько пунктов скрипта
+администратор реально закрыл:</p>
+<ul class="plain">
+  <li>поздоровался и представился</li>
+  <li>спросил имя ребёнка</li>
+  <li>спросил возраст</li>
+  <li>спросил про прошлый опыт занятий</li>
+  <li>выявил, что для родителя важно</li>
+  <li>предложил <b>конкретное</b> время, а не «приходите когда удобно»</li>
+  <li>назвал адрес и ориентир</li>
+  <li>зафиксировал следующий шаг</li>
+</ul>
+<p>Средний балл за смену идёт в светофор администратора. Это же снимает вечный спор
+«я хорошо отработала» — теперь у разговора есть цифра и список того, что пропущено.</p>
+
+<h3>Утренний аудит денег в 9:00</h3>
+<p>Список вчерашних неподписанных оплат уходит задачей тому, кто сегодня на смене,
+возвраты — сразу Борису. Правило простое и уже в документе по бонусам:
+<b>оплата без менеджера в бонус не идёт</b>.</p>
+</section>
+
+<!-- ==================================================== ЧТО ДОКРУТИТЬ -->
+<section>
+<div class="seclabel">Часть 4</div>
+<h2>Что докрутить дальше — по системам</h2>
+
+<h3>МойКласс</h3>
+<div class="tbl"><table>
+<thead><tr><th>Что</th><th>Зачем</th><th>От кого</th></tr></thead>
+<tbody>
+<tr><td class="w">Ночной снимок и сравнение</td><td>Единственная защита от правок задним
+  числом: в API МойКласс журнала изменений нет</td><td>делаю я</td></tr>
+<tr><td class="w">Ежедневная сверка «посещение ↔ абонемент ↔ оплата»</td>
+  <td>Ловит и долги, и приписки посещений, и оплату мимо кассы</td><td>делаю я</td></tr>
+<tr><td class="w">Расставить ответственных</td>
+  <td>Сейчас у Ани и Ирины нет ни одного клиента — значит их работа нигде
+    не отражается</td><td>решение Бориса, ставлю я</td></tr>
+<tr><td class="w">Поле «основание скидки»</td><td>Чтобы «на каком основании 25%»
+  не выяснялось задним числом</td><td>настройка в CRM</td></tr>
+<tr><td class="w">Резервная копия по расписанию</td>
+  <td>14.08 массовая операция затёрла 1 844 карточки. Восстановили, но копия была разовой</td>
+  <td>подтверждение Бориса</td></tr>
+</tbody>
+</table></div>
+
+<h3>Mango</h3>
+<div class="tbl"><table>
+<thead><tr><th>Что</th><th>Зачем</th><th>От кого</th></tr></thead>
+<tbody>
+<tr><td class="w">Длительность и добавочный в журнале звонков</td>
+  <td>Без длительности нельзя отличить разговор от «набрал и бросил» — а на этом
+    держится августовская ставка 30 ₽ за разговор</td><td>делаю я</td></tr>
+<tr><td class="w">Пропущенный без перезвона за 15 минут</td>
+  <td>Самая дешёвая утечка денег: человек звонил, ему не перезвонили, он ушёл
+    к соседям</td><td>делаю я</td></tr>
+<tr><td class="w">Правило «клиент звонит только на линию»</td>
+  <td>Разговор с личного мобильного не существует ни для CRM, ни для контроля</td>
+  <td>решение Бориса</td></tr>
+</tbody>
+</table></div>
+
+<h3>Wazzup</h3>
+<div class="tbl"><table>
+<thead><tr><th>Что</th><th>Зачем</th><th>От кого</th></tr></thead>
+<tbody>
+<tr><td class="w">Вебхук на все сообщения</td><td>Даёт настоящий SLA первого ответа
+  вместо суточной выгрузки</td><td>настройка в кабинете + делаю я</td></tr>
+<tr><td class="w">WABA на 79165610077</td><td>Легальные шаблоны без риска бана и потолок
+  в разы выше нынешних ~165 сообщений в день</td><td>Борис: реквизиты и верификация</td></tr>
+<tr><td class="w">Очередь «родитель написал последним»</td>
+  <td>Ноль на конец смены — простое и проверяемое правило</td><td>делаю я</td></tr>
+</tbody>
+</table></div>
+
+<h3>Портал и сайт</h3>
+<div class="tbl"><table>
+<thead><tr><th>Что</th><th>Зачем</th><th>От кого</th></tr></thead>
+<tbody>
+<tr><td class="w">Экран «пульс набора»</td><td>Одна цифра на стене: сколько мест осталось
+  и сколько дней до 30.09. Команда должна видеть это каждый день</td><td>делаю я</td></tr>
+<tr><td class="w">Светофор администратора за смену</td>
+  <td>Разговоры, средний балл звонка, ответы в срок, записи, доведённые до пробного</td>
+  <td>делаю я</td></tr>
+<tr><td class="w">Поле <code>roistat_visit</code> на форме</td>
+  <td>Иначе мы навсегда не узнаем, какая реклама приносит оплаты</td>
+  <td>Борис: доступ к сайту</td></tr>
+<tr><td class="w">Онлайн-запись в конкретную группу</td>
+  <td>Ночью и в выходные заявки сейчас просто теряются</td><td>Борис: доступ к сайту</td></tr>
+<tr><td class="w">Квиз «портфель навыков» с картой развития</td>
+  <td>Готовый лид-магнит уже есть — обменивается на телефон, лид сразу в CRM</td>
+  <td>делаю я после доступа к сайту</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<!-- ==================================================== СВЯЗЬ С НАБОРОМ -->
+<section>
+<div class="seclabel">Часть 5</div>
+<h2>Как контроль превращается в полные группы</h2>
+<p class="sub">Контроль ради контроля никому не нужен. Вот прямая связь каждой
+проверки с местами в группах.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Проверка</th><th>Что она возвращает в воронку</th></tr></thead>
+<tbody>
+<tr><td class="w">Пропущенный без перезвона</td>
+  <td>Каждый такой звонок — это родитель, который уже искал занятия. Вернуть его
+    дешевле всего: он звонил сам</td></tr>
+<tr><td class="w">«Записан», но не в группе</td>
+  <td>Ребёнка не ждёт педагог, места в списке нет. Такие дети теряются молча</td></tr>
+<tr><td class="w">Промо-контакт без единого разговора</td>
+  <td>За контакт уже заплачено 600 ₽. Непрозвонённый контакт — выброшенные деньги
+    и потерянное место</td></tr>
+<tr><td class="w">Оценка разговора 0–8</td>
+  <td>Разница между «прислала расписание» и «предложила конкретное время» —
+    это и есть разница между заявкой и записью</td></tr>
+<tr><td class="w">Оплата без подписи</td>
+  <td>Не поймём, что работает, — не сможем усилить то, что приносит деньги</td></tr>
+<tr><td class="w">Клиент вне каналов</td>
+  <td>Семья, с которой никто не разговаривает, не продлится в сентябре.
+    А удержать дешевле, чем набрать нового</td></tr>
+</tbody>
+</table></div>
+
+<div class="ok"><b>Что я прошу решить на этой неделе.</b> Три вещи, и все три — не про
+технику, а про правила: (1) оплата всегда подписывается менеджером; (2) клиенту звоним
+только с рабочей линии; (3) ответственные в карточках расставляются заново под нынешнюю
+команду. Остальное я закрою сам — от ночных снимков до светофора на смене.</div>
+</section>
+
+<div class="foot">
+  Собрано 20.08.2026 по фактическому состоянию МойКласс, Mango, Wazzup, Roistat
+  и портала. Цифры не оценочные: 38 из 77 неподписанных оплат и 510 920 ₽ —
+  прямой подсчёт по августовским приходам.<br>
+  🤖 Клод, ИИ-сотрудник KidsUP
+</div>
+
+</div>
+</body>
+</html>

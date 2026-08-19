@@ -1,6 +1,7 @@
 """KidsUp Analytics — выгрузка и аналитика данных из CRM МойКласс."""
 
 import csv
+import html
 import io
 import json
 import logging
@@ -751,6 +752,10 @@ DOC_GROUPS = [
     ("Планы и деньги", [
         ("mega_plan", "🎯 Мега-план набора до 30.09",
          "Интерактивный план: цифры, роли, воронка, грабли. Галочки сохраняются"),
+        ("kontrol_sistem", "👁 Глаза и уши: что я вижу в каждой системе",
+         "Карта покрытия по МойКласс, Mango, Wazzup и сайту, десять схем увода денег и что докручиваем"),
+        ("smm_zhurnal", "📮 Контент до 30 сентября",
+         "СММ-журнал Полины, переложенный на KidsUP: шесть недель, готовые тексты, пиар-задания"),
         ("it_zadachi_borisa", "🔑 ИТ-задачи владельца: доступы и решения",
          "18 задач Бориса по всем системам и рекламе — с приоритетом, временем и что я делаю после"),
         ("bonusy_adminov", "💰 Бонусы администратора: ставки и расчёт ЗП",
@@ -2076,7 +2081,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-20.03"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-20.05"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2819,6 +2824,96 @@ async def api_roistat_push(since: str = "", dry_run: int = 1, collect: int = 1):
     if out.get("sent"):
         db.set_setting("roistat_pushed_day", str(date.today()))
     return {**result, **out}
+
+
+@app.get("/api/audit", dependencies=AUTH)
+async def api_audit(status: str = "new", limit: int = 200):
+    """Лента аномалий: деньги без подписи, возвраты, скидки вне правил,
+    стоп-слова в разговорах и переписке."""
+    from . import audit
+    return {"summary": audit.summary(), "flags": audit.feed(status, limit)}
+
+
+@app.post("/api/audit/run", dependencies=AUTH)
+async def api_audit_run(day: str = ""):
+    from . import audit
+    r = audit.daily_audit(day or None)
+    return {k: (len(v) if isinstance(v, list) else v) for k, v in r.items()}
+
+
+@app.post("/api/audit/resolve", dependencies=AUTH)
+async def api_audit_resolve(flag_id: int, status: str = "ok"):
+    from . import audit
+    if status not in ("ok", "violation", "new"):
+        raise HTTPException(400, "status: ok | violation | new")
+    return {"ok": audit.resolve(flag_id, status)}
+
+
+@app.get("/audit", response_class=HTMLResponse, dependencies=AUTH)
+async def audit_page():
+    """Лента аномалий человеческим лицом: красное сверху, кнопки разбора."""
+    from . import audit
+    s = audit.summary()
+    flags = audit.feed("new", 200)
+    colors = {"high": "#A3282B", "mid": "#9A5B00", "low": "#6E7264"}
+    rows = []
+    for f in flags:
+        c = colors.get(f["level"], "#6E7264")
+        rows.append(
+            f'<div class="f" data-id="{f["id"]}">'
+            f'<div class="dot" style="background:{c}"></div>'
+            f'<div><b>{html.escape(f["title"] or "")}</b>'
+            f'<div class="d">{html.escape(f["detail"] or "")}</div>'
+            f'<div class="m">{html.escape(f["kind"] or "")} · {f["day"]}</div></div>'
+            f'<div class="btns"><button onclick="mark({f["id"]},\'ok\')">не нарушение</button>'
+            f'<button class="v" onclick="mark({f["id"]},\'violation\')">нарушение</button></div>'
+            f'</div>')
+    body = "".join(rows) or '<p class="empty">Лента пуста — за вчера расхождений нет.</p>'
+    kinds = " · ".join(f"{k}: {v}" for k, v in (s.get("by_kind") or {}).items()) or "—"
+    return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Лента аномалий — KidsUP</title>
+<style>
+:root{{--paper:#FAF9F5;--ink:#22271F;--muted:#6E7264;--line:#E3E1D6;--card:#fff}}
+@media (prefers-color-scheme:dark){{:root{{--paper:#151812;--ink:#E7E6DD;--muted:#9B9F90;
+  --line:#2C3026;--card:#1A1E16}}}}
+body{{background:var(--paper);color:var(--ink);margin:0;font:16px/1.6 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}}
+.wrap{{max-width:56rem;margin:0 auto;padding:2rem 1rem 4rem}}
+h1{{font-size:1.8rem;margin:.2rem 0 .3rem;letter-spacing:-.02em}}
+.sub{{color:var(--muted);margin:0 0 1.2rem}}
+.nums{{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1.4rem}}
+.n{{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:.6rem .9rem}}
+.n b{{font-size:1.4rem;display:block;line-height:1.2}}
+.n span{{font-size:.8rem;color:var(--muted)}}
+.f{{display:grid;grid-template-columns:10px 1fr auto;gap:.75rem;align-items:start;
+  background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.8rem .95rem;margin:.5rem 0}}
+.dot{{width:10px;height:10px;border-radius:99px;margin-top:.45rem}}
+.d{{font-size:.9rem;color:var(--ink);margin-top:.15rem}}
+.m{{font-size:.76rem;color:var(--muted);margin-top:.25rem;text-transform:uppercase;letter-spacing:.05em}}
+.btns{{display:flex;gap:.35rem;flex-wrap:wrap}}
+button{{font:inherit;font-size:.82rem;padding:.35rem .6rem;border-radius:7px;
+  border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}}
+button.v{{border-color:#A3282B;color:#A3282B}}
+.f.done{{opacity:.35}}
+.empty{{color:var(--muted)}}
+</style></head><body><div class="wrap">
+<h1>Лента аномалий</h1>
+<p class="sub">Расхождения между тем, что записано в системах, и тем, что должно быть.
+Разбирается за одно утро: «не нарушение» убирает из ленты, «нарушение» оставляет след.</p>
+<div class="nums">
+  <div class="n"><b>{s.get('high', 0)}</b><span>красных — деньги</span></div>
+  <div class="n"><b>{s.get('mid', 0)}</b><span>жёлтых — процесс</span></div>
+  <div class="n"><b>{s.get('calls_scored', 0)}</b><span>разговоров оценено</span></div>
+  <div class="n"><b>{s.get('avg_call_score', 0)}</b><span>средний балл звонка из 8</span></div>
+</div>
+<p class="sub">{html.escape(kinds)}</p>
+{body}
+</div><script>
+async function mark(id, st) {{
+  await fetch('/api/audit/resolve?flag_id=' + id + '&status=' + st, {{method: 'POST'}});
+  const el = document.querySelector('.f[data-id="' + id + '"]');
+  if (el) el.classList.add('done');
+}}
+</script></body></html>""")
 
 
 @app.get("/api/duty", dependencies=AUTH)

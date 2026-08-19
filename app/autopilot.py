@@ -1539,6 +1539,40 @@ def discipline_check() -> dict:
     return {"today": stat, "yesterday": prev, "worse": [w[0] for w in worse]}
 
 
+def audit_yesterday() -> dict:
+    """Утренний аудит вчерашних денег.
+
+    Неподписанная оплата — это не мелочь учёта: под ней не стоит ничьей
+    подписи, поэтому её нельзя ни зачесть в бонус, ни отличить от денег,
+    прошедших мимо кассы. Поэтому каждое утро список уходит задачей тому,
+    кто сегодня на смене, а красные находки — сразу Борису."""
+    from . import audit as _audit
+    res = _audit.daily_audit()
+    unsigned, refunds = res["unsigned"], res["refunds"]
+    if not unsigned and not refunds and not res["discounts"]:
+        return res
+
+    mk = _client()
+    try:
+        if unsigned:
+            total = sum(x["summa"] for x in unsigned)
+            names = ", ".join((x["name"] or str(x["user_id"]))[:22] for x in unsigned[:6])
+            body = (f"🤖 Клод: вчера {len(unsigned)} оплат на "
+                    f"{total:,.0f} ₽ без менеджера. ".replace(",", " ") +
+                    f"Открой каждую и поставь себя ответственным: {names}. "
+                    "Без подписи оплата не попадает в твой бонус.")
+            for a in (_admins_today() or [])[:2]:
+                _task(mk, a["managerId"], None, body[:250])
+        if refunds:
+            lines = ["🤖 Клод: возвраты за вчера — проверь основания.", ""]
+            lines += [f"• {r['name']}: {r['summa']:,.0f} ₽".replace(",", " ")
+                      for r in refunds[:8]]
+            _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines))
+    finally:
+        mk.close()
+    return res
+
+
 def daily_digest() -> None:
     day = _today().isoformat()
     try:
@@ -1989,6 +2023,13 @@ def _loop() -> None:
                     discipline_check()
                 except Exception:
                     log.exception("проверка дисциплины не удалась")
+            # аудит вчерашнего дня: неподписанные оплаты, возвраты, скидки.
+            # В 9 утра, чтобы находки попадали в утренние задачи админам.
+            if now.hour >= 9 and _mark("audit_day", str(_today())):
+                try:
+                    audit_yesterday()
+                except Exception:
+                    log.exception("аудит не удался — продолжаем")
             if now.hour >= 8 and _mark("close_dead_tasks", str(_today())):
                 try:
                     close_dead_tasks()
