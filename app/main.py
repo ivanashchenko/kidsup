@@ -554,8 +554,9 @@ def courses_page(request: Request, c: str = ""):
         plain = re.sub(r"<[^>]+>", "", plain)
         plain = re.sub(r"\n{3,}", "\n\n", plain).strip()
         trial = None
-        if cc["key"] in ("minisad", "zeroclass", "dance"):
-            pass  # у сада пробный день описан в тексте, у танцев условия партнёра
+        if cc["key"] in ("minisad", "zeroclass", "dance",
+                         "choreography", "football", "martial", "acrobatics"):
+            pass  # сад/нулевой — пробный день; лист ожидания — условия при старте группы
         else:
             trial = descr_mod.TRIAL
         items.append({**cc, "title": TITLES.get(cc["key"], cc["course"]),
@@ -2060,7 +2061,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-19.3"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-19.4"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
