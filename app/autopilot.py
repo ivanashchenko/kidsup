@@ -64,6 +64,8 @@ SKIP_STATES = SKIP_HARD | SKIP_FUNNEL | {ST_CLIENT}
 NEW_JOIN_STATUS = 50509   # «1. Новая заявка»
 ST_NEDOZVON = 345768      # «2. Недозвон (в работе)»
 ST_REJECT = 125957        # «Отказ»
+ST_BOOKED = 125952        # «3. Записался на пробное»
+ST_PROMO = 347075         # «От промоутера»: контакт есть, разговора ещё не было
 
 CAMP_COURSE = "Английский летний клуб"
 
@@ -1380,6 +1382,76 @@ def auto_reject(mk: MoyklassClient) -> None:
         log.info("auto_reject: %s (%d попыток) -> Отказ", uid, counts.get(p, 0))
 
 
+DISCIPLINE_RULES = [
+    # (ключ, что проверяем, как объясняем админу)
+    ("booked_no_join", "статус «Записался на пробное» без записи в группу 2026/27",
+     "педагог не знает, что ребёнка ждать, и в списке группы его нет"),
+    ("promo_never_called", "лидов без единого разговора (статусы «от промоутера» и «новый лид»)",
+     "за промо-контакты уже заплачено по 600 ₽, а заявки просто стынут"),
+    ("no_comment", "разговор состоялся, а комментария в карточке нет",
+     "следующий, кто позвонит этому клиенту, будет звонить вслепую"),
+]
+
+
+def discipline_check() -> dict:
+    """Проверка, что команда исправляет повторяющиеся ошибки, а не копит их.
+
+    Каждый день считаем одни и те же нарушения и сравниваем со вчерашним днём.
+    Если число не падает второй день подряд — это уже не случайность, и задача
+    уходит не админу, а руководителю: значит замечание не работает.
+    Заведено 19.08.2026 после дня, где одни и те же ошибки повторялись
+    у всех троих: «бесплатное пробное» пять раз, время записи не совпало
+    с договорённостью, шесть детей «записаны» мимо групп."""
+    mk = _client()
+    stat: dict[str, int] = {}
+    try:
+        classes = mk.fetch_all("/v1/company/classes", ["classes"]) or []
+        ids2627 = {c["id"] for c in classes if (c.get("name") or "").startswith("2627")}
+
+        booked = mk.fetch_all("/v1/company/users", ["users"], {"clientStateId": ST_BOOKED}) or []
+        bad = []
+        for u in booked:
+            joins = mk.get("/v1/company/joins", {"userId": u["id"]}).get("joins") or []
+            if not any(j.get("classId") in ids2627 for j in joins):
+                bad.append(u)
+        stat["booked_no_join"] = len(bad)
+
+        never = 0
+        for state in (ST_PROMO, 125951):
+            never += len(mk.fetch_all("/v1/company/users", ["users"],
+                                      {"clientStateId": state}) or [])
+        stat["promo_never_called"] = never
+    except Exception:
+        log.exception("discipline_check: не удалось собрать статистику")
+        mk.close()
+        return {}
+
+    prev = {}
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS discipline_log (
+            day TEXT, rule TEXT, n INTEGER, PRIMARY KEY (day, rule))""")
+        yday = (_today() - timedelta(days=1)).isoformat()
+        for r, n in conn.execute("SELECT rule, n FROM discipline_log WHERE day = ?", (yday,)):
+            prev[r] = n
+        for rule, n in stat.items():
+            conn.execute("INSERT OR REPLACE INTO discipline_log (day, rule, n) VALUES (?,?,?)",
+                         (_today().isoformat(), rule, n))
+
+    worse = [(r, n, prev.get(r)) for r, n in stat.items()
+             if prev.get(r) is not None and n >= prev[r] and n > 0]
+    if worse and _mark("discipline_alert", _today().isoformat()):
+        lines = ["🤖 Клод: ошибки не исправляются второй день подряд.", ""]
+        for rule, n, was in worse:
+            title = next((t for k, t, _ in DISCIPLINE_RULES if k == rule), rule)
+            why = next((w for k, _, w in DISCIPLINE_RULES if k == rule), "")
+            lines.append(f"• {title}: было {was}, стало {n} — {why}.")
+        lines += ["", "Замечание озвучено, поведение не изменилось. Нужен разбор на смене."]
+        _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines))
+        log.warning("discipline_check: не исправлено — %s", worse)
+    mk.close()
+    return {"today": stat, "yesterday": prev, "worse": [w[0] for w in worse]}
+
+
 def daily_digest() -> None:
     day = _today().isoformat()
     try:
@@ -1823,6 +1895,11 @@ def _loop() -> None:
                     card_quality()
                 except Exception:
                     log.exception("проверка качества карточек не удалась")
+            if now.hour >= 19 and _mark("discipline_day", str(_today())):
+                try:
+                    discipline_check()
+                except Exception:
+                    log.exception("проверка дисциплины не удалась")
             if now.hour >= 8 and _mark("close_dead_tasks", str(_today())):
                 try:
                     close_dead_tasks()

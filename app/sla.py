@@ -144,23 +144,33 @@ def _had_action(user_id: int | None, since: datetime) -> bool:
         if len(p) < 10:
             return True
         s = since.isoformat(timespec="seconds")
+        checked = 0
         for sql in ("SELECT 1 FROM wazzup_outbox WHERE substr(phone,-10)=? AND ts>=? LIMIT 1",
                     "SELECT 1 FROM mango_calls WHERE substr(phone,-10)=? AND ts>=? LIMIT 1"):
             try:
                 if conn.execute(sql, (p, s)).fetchone():
                     return True
+                checked += 1
             except Exception:
-                continue
+                continue          # таблицы ещё нет — этот источник просто молчит
+        if not checked:
+            return True           # проверить нечем: молчание ≠ доказательство бездействия
     return False
 
 
 def verify_closed() -> dict:
-    """Закрытые за последний час задачи без единого действия — открываем заново."""
+    """Закрытые сегодня задачи без единого действия — открываем заново.
+
+    Фильтровать закрытые обязательно по beginDate: без него API отдаёт первые
+    100 задач вообще, а это архив 2022 года — проверка молча перебирала его
+    и до сегодняшних задач не доходила ни разу (замер 19.08.2026)."""
     mk = _client()
     reopened = 0
     try:
         since = _now() - timedelta(hours=1)
-        d = mk.get("/v1/company/tasks", {"isComplete": "true", "limit": 100})
+        today = _now().date().isoformat()
+        d = mk.get("/v1/company/tasks",
+                   {"isComplete": "true", "beginDate": [today, today], "limit": 200})
         tasks = d.get("tasks") if isinstance(d, dict) else d
         for t in tasks or []:
             begin = _parse(t.get("beginDate"))
