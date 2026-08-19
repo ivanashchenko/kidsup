@@ -1291,7 +1291,7 @@ def constructor_page(request: Request, age: str = "", day: str = "",
 DRAFT_RULES = [
     (("цен", "стоимост", "сколько стоит", "прайс"),
      "Ответить цену по нужному предмету + позвать на условно-бесплатное первое занятие: "
-     "«Абонемент 8 занятий — X ₽ с 1 сентября. Первое занятие бесплатное — на какой день записать?»"),
+     "«Абонемент 8 занятий — X ₽ с 1 сентября. Первое занятие условно-бесплатное (не понравится — платить не нужно, понравится — войдёт в абонемент) — на какой день записать?»"),
     (("расписан", "какие есть заняти", "время"),
      "Прислать расписание по возрасту (кнопка «скопировать расписание» на странице подсказки) "
      "и закрыть вопросом: «Какое время удобнее — будни вечером или суббота?»"),
@@ -2068,7 +2068,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-19.11"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-19.12"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2255,10 +2255,10 @@ def _build_schedule():
             waitlist[k] = g["enrolled"]
     try:
         with db.get_conn() as conn:
-            synced = conn.execute(
-                "SELECT value FROM sync_state WHERE key IN ('last_light_sync','last_sync') "
-                "ORDER BY key DESC LIMIT 1").fetchone()
-        data_updated = synced[0] if synced else None
+            rows = conn.execute(
+                "SELECT value FROM sync_state WHERE key IN ('last_light_sync','last_sync')").fetchall()
+        vals = [r[0] for r in rows if r and r[0]]
+        data_updated = max(vals) if vals else None
     except Exception:
         data_updated = None
     data = {"generated": datetime.now().isoformat(timespec="seconds"),
@@ -2297,6 +2297,8 @@ def _find_client(mk, phone: str) -> tuple[int | None, int]:
     живой поиск в МойКласс — локальная копия отстаёт до нескольких минут,
     и без этого шага на каждый повторный звонок плодился дубль карточки."""
     p10 = phone[-10:]
+    if len(set(p10)) <= 2:        # 7777777777 и подобные стоят у десятков карточек
+        return None, 0
     try:
         with db.get_conn() as conn:
             rows = conn.execute(
@@ -2467,7 +2469,7 @@ async def public_lead(request: Request):
     lead["lead_id"] = await run_in_threadpool(_store)
     if throttled:
         log.warning("лимит заявок с IP %s: заявка +%s сохранена в журнал без CRM", ip, digits)
-        return JSONResponse({"ok": True}, headers=_PUB_CORS)
+        return JSONResponse({"ok": True, "throttled": True}, headers=_PUB_CORS)
     import threading
     threading.Thread(target=lambda: _safe_lead(lead), daemon=True).start()
     return JSONResponse({"ok": True}, headers=_PUB_CORS)
@@ -2507,7 +2509,9 @@ def public_leads_list(limit: int = 50):
     with db.get_conn() as conn:
         try:
             rows = conn.execute(
-                "SELECT ts, phone, child, age, course, note, roistat, ip "
+                "SELECT ts, phone, child, age, course, note, roistat, ip, "
+                "COALESCE(crm_status,'?') crm_status, COALESCE(attempts,0) attempts, "
+                "COALESCE(last_error,'') last_error, mk_user_id "
                 "FROM site_leads ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         except Exception:
             return {"count": 0, "leads": []}

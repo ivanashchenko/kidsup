@@ -1623,13 +1623,18 @@ def _loop() -> None:
                     log.exception("модуль SLA упал — продолжаем")
             if now.hour >= 20 and _mark("digest", str(_today())):
                 daily_digest()
-            if now.hour >= 21 and _mark("roistat", str(_today())):
+            if now.hour >= 21 and db.get_setting("roistat_pushed_day") != str(_today()):
                 try:
                     from . import roistat as _ro
                     from datetime import timedelta as _td
-                    _ro.push(since=(_today() - _td(days=2)).isoformat(), dry_run=False)
+                    last = db.get_setting("roistat_last_push") or ""
+                    since = min(last, (_today() - _td(days=3)).isoformat()) if last \
+                        else (_today() - _td(days=3)).isoformat()
+                    _ro.push(since=since, dry_run=False)
+                    # отметку ставим ТОЛЬКО после успеха, иначе сбой съедал бы весь день
+                    db.set_setting("roistat_pushed_day", str(_today()))
                 except Exception:
-                    log.exception("roistat push не удался")
+                    log.exception("roistat push не удался — повторим на следующем круге")
         except Exception:
             log.exception("autopilot: ошибка цикла")
         time.sleep(60)

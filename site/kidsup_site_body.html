@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KidsUP — детский центр и английский сад на Бульваре Рокоссовского</title>
-<meta name="description" content="Учебный год 2026/27 стартует 31 августа. Научим читать за 3 месяца, заговорит по-английски за год. 13 направлений для детей от 1,3 до 12 лет. Первое занятие — условно-бесплатное, с диагностикой. До 31.08 — цены прошлого года.">
+<meta name="description" content="Учебный год 2026/27 стартует 31 августа. Научим читать за 3 месяца, заговорит по-английски за год. 12 направлений для детей от 1,3 до 12 лет и 7 новых в наборе. Первое занятие — условно-бесплатное, с диагностикой. До 31.08 — цены прошлого года.">
 <link rel="canonical" href="https://kidsup.ru/">
 <meta name="theme-color" content="#312783">
 <meta property="og:type" content="website">
@@ -37,7 +37,7 @@ section{padding:56px 0}
 .btn{display:inline-block;border:0;border-radius:999px;padding:.95rem 1.9rem;font:700 1rem Rubik,sans-serif;
   cursor:pointer;text-decoration:none;text-align:center;transition:transform .15s,box-shadow .15s}
 .btn:active{transform:scale(.97)}
-.btn-green{background:var(--green-cta);color:#fff;box-shadow:0 8px 24px rgba(125,185,40,.35)}
+.btn-green{background:var(--green);color:var(--indigo);box-shadow:0 8px 24px rgba(125,185,40,.35)}
 .btn-green:hover{box-shadow:0 10px 30px rgba(125,185,40,.5);transform:translateY(-2px)}
 .btn-line{border:2px solid var(--indigo);color:var(--indigo);background:#fff}
 .btn-wa{background:#25D366;color:#fff}
@@ -145,6 +145,11 @@ section{padding:56px 0}
 .form-box input:focus,.form-box select:focus{outline:2px solid var(--blue);border-color:var(--blue)}
 .form-box .btn{width:100%;margin-top:1.2rem}
 .form-box .alt{text-align:center;font-size:.85rem;color:var(--muted);margin-top:.8rem}
+.form-box p,.form-box h3{color:var(--ink)}
+.form-box .done{text-align:center}
+.form-box .done h3{color:var(--green-ink);font-family:Rubik,sans-serif;font-size:1.15rem}
+.form-box .done p{color:var(--ink);margin:.7rem 0;font-size:.95rem}
+.form-box .done .btn{margin:.3rem .3rem 0;padding:.55rem 1.1rem;font-size:.9rem;width:auto;display:inline-block}
 .form-box .consent{display:flex;gap:.55rem;align-items:flex-start;margin-top:1rem;font-size:.8rem;color:var(--muted);line-height:1.4}
 .form-box .consent input{width:auto;margin-top:.15rem;flex:0 0 auto}
 .form-box .consent a{color:var(--indigo);font-weight:600}
@@ -170,7 +175,7 @@ footer img{height:40px}
 footer a{color:#fff}
 /* свободные места */
 .spots{display:inline-block;align-self:flex-start;font:700 .74rem Rubik;color:#8a5a00;background:#FFF3D6;border-radius:999px;padding:.25rem .7rem;margin:0 0 .8rem}
-.spots.low{color:#fff;background:var(--red-ink)}
+.spots.low{color:#fff;background:var(--red)}
 /* квиз подбора занятия */
 .quiz{background:var(--soft)}
 .q-box{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;max-width:760px;margin:0 auto}
@@ -195,7 +200,7 @@ footer a{color:#fff}
 .sched summary{list-style:none;cursor:pointer;padding:.85rem 1.1rem;font:700 1rem Rubik;color:var(--indigo);position:relative}
 .sched summary::after{content:"+";position:absolute;right:1.1rem;color:var(--blue);font-size:1.2rem;transition:transform .2s}
 .sched details[open] summary::after{transform:rotate(45deg)}
-.sched summary .sfree{font:600 .8rem Inter;color:var(--green);margin-left:.5rem}
+.sched summary .sfree{font:600 .8rem Inter;color:var(--green-ink);margin-left:.5rem}
 .sched .s-tbl{width:100%;border-collapse:collapse;font-size:.9rem}
 .sched .s-tbl td{padding:.55rem .9rem;border-top:1px solid var(--line);vertical-align:middle}
 .sched .s-tbl .lvl{color:var(--muted);font-size:.8rem}
@@ -346,8 +351,9 @@ body.js .reveal.in{opacity:1;transform:none}
         <div class="d">31 августа — 6 сентября</div>
         <h3>📚 Неделя открытых уроков</h3>
         <p>Группы стартуют по расписанию, и на первое занятие можно прийти познакомиться:
-        не понравится — платить не нужно.</p>
-        <span class="free">KidsUPweek.ru</span>
+        не понравится — платить не нужно, понравится — занятие войдёт в первый абонемент.</p>
+        <span class="free">Условно-бесплатное первое занятие</span>
+        <p style="margin-top:.4rem;font-size:.85rem"><a href="https://KidsUPweek.ru" target="_blank" rel="noopener" style="color:#9BD7F5">KidsUPweek.ru</a></p>
         <a class="btn btn-green" href="#signup" data-ev="📚 Открытый урок (31.08–06.09)">Выбрать открытый урок</a>
       </div>
     </div>
@@ -360,7 +366,7 @@ body.js .reveal.in{opacity:1;transform:none}
     <div class="grid">
       <div class="step reveal"><span class="n">1</span>
         <h3>Выберите занятие</h3>
-        <p>13 направлений для детей от 1,3 до 12 лет. Не уверены, что подойдёт?
+        <p>12 направлений для детей от 1,3 до 12 лет и 7 новых в наборе. Не уверены, что подойдёт?
         Позвоните — подберём под возраст и характер ребёнка.</p></div>
       <div class="step reveal"><span class="n">2</span>
         <h3>Придите на первое занятие</h3>
@@ -948,7 +954,7 @@ body.js .reveal.in{opacity:1;transform:none}
         <option>Подобрать под ребёнка</option>
       </select>
       <input class="hp" id="f-web" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <label class="consent"><input type="checkbox" id="f-ok" name="consent" required checked>
+      <label class="consent"><input type="checkbox" id="f-ok" name="consent" required>
         <span>Соглашаюсь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки
         персональных данных</a> и на обработку моих данных для записи на занятие</span></label>
       <button class="btn btn-green" type="submit">Отправить заявку</button>
@@ -985,10 +991,13 @@ body.js .reveal.in{opacity:1;transform:none}
     <details><summary>Мы ещё не определились с расписанием на год</summary>
       <p>Так у большинства в августе! Начните с пробного и диагностики — расписание у нас
       гибкое: если что-то поменяется, переведём в другую группу по тому же предмету.
-      А открытые уроки с диагностикой идут только с 31.08 по 6.09 — удобный момент
-      попробовать без обязательств.</p></details>
+      Неделя открытых уроков идёт с 31.08 по 06.09 — в это время знакомиться приходят целыми
+      группами, это самый живой момент. Но прийти на первое условно-бесплатное занятие можно
+      в любое время года. У мини-сада и нулевого класса вместо занятия — бесплатный пробный день.</p></details>
     <details><summary>Как проходит оплата?</summary>
-      <p>Помесячно, абонементами по 8 занятий (у сада — 8/12/20 посещений).
+      <p>Помесячно. У большинства направлений абонемент на 8 занятий; у логопеда,
+      ментальной арифметики и робототехники — на 4 занятия; у сада и нулевого класса —
+      8/12/20 посещений.
       Оплатить можно на ресепшене или по ссылке. До 31 августа сентябрь стоит
       по ценам прошлого года.</p></details>
   </div>
@@ -997,7 +1006,7 @@ body.js .reveal.in{opacity:1;transform:none}
 <section class="rev" id="reviews">
   <div class="wrap">
     <h2>Что говорят родители</h2>
-    <p style="color:var(--muted)">Отзывы с Яндекс.Карт — настоящие, их нельзя отредактировать или удалить.</p>
+    <p style="color:var(--muted)">Отзывы с Яндекс.Карт — мы не можем их редактировать или удалять, виджет показывает всё как есть.</p>
     <div class="rev-grid">
       <div class="rev-widget">
         <div class="rev-fallback">Загружаем отзывы с Яндекс.Карт…<br>
@@ -1007,6 +1016,7 @@ body.js .reveal.in{opacity:1;transform:none}
       <div class="rev-note reveal">
         <div class="rev-stars">⭐️⭐️⭐️⭐️⭐️</div>
         <h3>5,0 на Яндекс.Картах · 253 отзыва</h3>
+        <p style="font-size:.78rem;color:var(--muted);margin:.1rem 0 .4rem">данные на 19 августа 2026</p>
         <p style="color:var(--ink);font-size:.95rem;margin-top:.2rem"><b>«Хорошее место 2026»</b> — награда Яндекса
         центрам, которые родители выбирают и рекомендуют чаще других.</p>
         <p>12 лет в районе: многие приводят уже второго и третьего ребёнка, а выпускники
@@ -1055,7 +1065,7 @@ body.js .reveal.in{opacity:1;transform:none}
         <span class="ico ico-tg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.04 15.47 8.7 20.2c.5 0 .72-.22.98-.48l2.35-2.25 4.87 3.57c.9.5 1.53.24 1.77-.83l3.2-15.02c.29-1.33-.48-1.85-1.35-1.53L1.36 9.86C.06 10.37.08 11.1 1.14 11.42l4.83 1.5L17.2 6.1c.53-.33 1-.15.61.2z"/></svg></span>
         <span><b>Telegram</b><span>Чат с администратором</span></span>
       </a>
-      <a class="mcard" href="https://max.ru/u/f9LHodD0cOL7ouxX67LQufADpyAmbvMGRUdMqaGj2Ya-F1EuIVQMGWeU9gc" target="_blank" rel="noopener">
+      <a class="mcard" href="https://app.kidsup.ru/go/max?src=site" target="_blank" rel="noopener">
         <span class="ico ico-max"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5zm0 2.3 6.5 3.6L12 11.5 5.5 7.9 12 4.3zM5 9.6l6 3.3v6.4l-6-3.3V9.6zm8 9.7v-6.4l6-3.3v6.4l-6 3.3z"/></svg></span>
         <span><b>MAX</b><span>Наш профиль в MAX</span></span>
       </a>
@@ -1124,10 +1134,14 @@ body.js .reveal.in{opacity:1;transform:none}
 const NAMES = ["Подготовка к школе", "Английский язык", "Английский мини-сад", "Нулевой класс", "Раннее развитие", "Логопед", "Ментальная арифметика", "Шахматы", "ИЗО-студия", "Скорочтение (техника чтения)", "Каллиграфия + грамота", "Робототехника"];
 const sel = document.getElementById('f-course');
 NAMES.forEach(n => { const o = document.createElement('option'); o.textContent = n; sel.append(o); });
-const og1 = document.createElement('optgroup'); og1.label = 'События (бесплатно)';
-['🎉 Праздник 29.08 (11:00)', '🚪 День открытых дверей 30.08', '📚 Открытый урок (31.08–06.09)']
+const og1 = document.createElement('optgroup'); og1.label = 'События — вход свободный';
+['🎉 Праздник 29.08 (11:00)', '🚪 День открытых дверей 30.08']
   .forEach(n => { const o = document.createElement('option'); o.textContent = n; og1.append(o); });
 sel.append(og1);
+const og1b = document.createElement('optgroup'); og1b.label = 'Открытый урок — первое занятие условно-бесплатное';
+['📚 Открытый урок (31.08–06.09)']
+  .forEach(n => { const o = document.createElement('option'); o.textContent = n; og1b.append(o); });
+sel.append(og1b);
 const og2 = document.createElement('optgroup'); og2.label = 'Новые направления — лист ожидания';
 ['💃 Спортивно-бальные танцы (лист ожидания)', '⚽ Футбол (лист ожидания)', '🥋 Единоборства (лист ожидания)', '🤸 Акробатика (лист ожидания)', '🩰 Хореография (лист ожидания)', '🎭 Актёрское мастерство (лист ожидания)', '🎤 Техника речи (лист ожидания)']
   .forEach(n => { const o = document.createElement('option'); o.textContent = n; og2.append(o); });
@@ -1201,15 +1215,22 @@ document.getElementById('lead').addEventListener('submit', async e => {
                                    (location.search || '').slice(1)).slice(0, 250),
                             website: document.getElementById('f-web').value})});
     const j = await r.json();
+    if (j.ok && j.throttled) {
+      e.target.innerHTML = '<div class="done"><h3 style="color:#8a5a00">Похоже, заявка уже отправлена</h3>' +
+        '<p>Мы её видим и скоро позвоним. Если срочно — напишите нам:</p>' +
+        '<a class="btn btn-green" href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">WhatsApp</a></div>';
+      return;
+    }
     if (j.ok) {
       try { ym(69569509, 'reachGoal', 'lead', {course: c}); } catch (_) {}
       try { VK.Goal('lead'); } catch (_) {}
       try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
       e.target.setAttribute('role', 'status'); e.target.setAttribute('aria-live', 'polite');
-      e.target.innerHTML = '<h3 style="color:var(--green-ink);font-family:Rubik,sans-serif">✅ Заявка отправлена!</h3>' +
-        '<p style="margin:.6rem 0">Администратор позвонит вам в ближайшее время — в рабочие часы обычно в течение 15 минут.</p>' +
-        '<p>Не хочется ждать звонка? Напишите нам в <a href="https://app.kidsup.ru/go/whatsapp" target="_blank" rel="noopener">WhatsApp</a> ' +
-        'или <a href="https://app.kidsup.ru/go/telegram" target="_blank" rel="noopener">Telegram</a>.</p>';
+      e.target.innerHTML = '<div class="done"><h3>✅ Заявка отправлена!</h3>' +
+        '<p>Администратор позвонит вам в ближайшее время — в рабочие часы обычно в течение 15 минут.</p>' +
+        '<p>Не хочется ждать звонка? Напишите нам:</p>' +
+        '<a class="btn btn-green" href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">WhatsApp</a>' +
+        '<a class="btn btn-line" href="https://app.kidsup.ru/go/telegram?src=site" target="_blank" rel="noopener">Telegram</a></div>';
       return;
     }
     if (j.error) { alert(j.error); btn.disabled = false; btn.textContent = 'Отправить заявку'; return; }
@@ -1247,8 +1268,8 @@ fetch('https://app.kidsup.ru/api/public/schedule').then(r => {
     if (free === 0) {
       el.className = 'spots low';
       el.textContent = 'Мест нет — записываем в лист ожидания';
-    } else if (free <= 6) {
-      el.className = 'spots' + (free <= 3 ? ' low' : '');
+    } else if (free <= 2) {
+      el.className = 'spots low';
       el.textContent = `🔥 Осталось ${free} ${plural(free, ['место', 'места', 'мест'])}`;
     } else {
       el.className = 'spots';
@@ -1376,6 +1397,34 @@ sel.addEventListener('change', () => { window._grp = ''; });  // ручной в
       }
     }
   });
+})();
+/* номер визита Roistat и метки — во все ссылки мессенджеров и соцсетей */
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    const rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
+    const utm = (location.search || '').replace(/^\?/, '');
+    document.querySelectorAll('a[href*="app.kidsup.ru/go/"]').forEach(a => {
+      const extra = (rv ? '&rv=' + encodeURIComponent(rv) : '') + (utm ? '&' + utm : '');
+      if (extra) a.href = a.href + extra;
+    });
+  }, 1200);   // ждём, пока Roistat выставит cookie
+});
+/* В10: после дедлайна прячем счётчик и прошедшие события — сайт не должен врать */
+(function(){
+  const MSK = new Date().getTime() + (new Date().getTimezoneOffset() + 180) * 60000;
+  const now = new Date(MSK);
+  const past = (m, d) => now > new Date(2026, m - 1, d, 23, 59);
+  if (past(8, 31)) {
+    const c = document.getElementById('cnt');
+    if (c) c.closest('.hero-card').innerHTML =
+      '<h3>Учебный год идёт</h3><p class="note">Группы 2026/27 уже занимаются — свободные места ' +
+      'смотрите в расписании ниже, присоединиться можно в любой момент.</p>';
+    document.querySelectorAll('.badge.hot').forEach(b => b.remove());
+  }
+  const evs = [['#events .ev:nth-child(1)', 8, 29], ['#events .ev:nth-child(2)', 8, 30]];
+  evs.forEach(([sel2, m, d]) => { if (past(m, d)) { const el = document.querySelector(sel2); if (el) el.remove(); } });
+  const nav = document.querySelector('.top nav a[href="#events"]');
+  if (past(9, 6) && nav) nav.remove();
 })();
 /* Roistat — сквозная аналитика */
 (function(w, d, s, h, id) {
