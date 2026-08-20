@@ -233,12 +233,25 @@ def refunds(day: str | None = None, threshold: float = 3000) -> list[dict]:
 
 
 def off_price(day: str | None = None) -> list[dict]:
-    """Оплата, сильно выпадающая из привычной суммы по этому же курсу.
+    """Оплата, сильно выпадающая из привычной суммы по этому же тарифу.
 
-    Прайса в API нет, поэтому эталон берём из фактов: медиана приходов по
-    тому же тексту курса за последние полгода. Отклонение вниз больше чем
-    на 25% — повод спросить, на каком основании скидка. У нас максимум 10%,
-    и скидки не суммируются."""
+    Прайса в API нет, поэтому эталон берём из фактов — но эталон бывает
+    только там, где суммы действительно однородны.
+
+    Инцидент 20.08.2026. Первая версия сравнивала оплату с медианой по
+    названию курса до первого « - »: «Английский летний клуб». Под это имя
+    попали и полдня, и полный день, и одна неделя, и пять — суммы от 750 ₽
+    до 144 000 ₽. Медиана такой смеси (33 400 ₽) не значит ничего, и
+    типовая оплата за полдня 11 000 ₽ получила ярлык «на 67% ниже обычной».
+    Лиза справедливо ответила: «мы уже все оплаты провели». Ложный флаг
+    хуже пропущенного: он приучает не читать ленту.
+
+    Что изменено: сравниваем с оплатами по ТОЧНО такому же комментарию
+    (тариф, формат, группа целиком), а не по префиксу. И перед тем как
+    что-то утверждать, проверяем однородность: если между четвертью самых
+    дешёвых и четвертью самых дорогих разрыв больше 30% медианы, значит
+    тариф продаётся разными объёмами и эталонной цены у него нет — молчим.
+    """
     d = day or (date.today() - timedelta(days=1)).isoformat()
     since = (date.fromisoformat(d) - timedelta(days=180)).isoformat()
     out = []
@@ -250,26 +263,37 @@ def off_price(day: str | None = None) -> list[dict]:
             WHERE p.date = ? AND p.optype = 'income' AND p.summa > 0
               AND p.comment IS NOT NULL AND p.comment <> ''""", (d,)).fetchall()
         for r in rows:
-            base = (r["comment"] or "").split(" - ")[0][:40]
+            base = (r["comment"] or "").strip()
             if not base:
                 continue
             peers = [x[0] for x in conn.execute("""
                 SELECT summa FROM payments
                 WHERE optype='income' AND summa > 0 AND date BETWEEN ? AND ?
-                  AND comment LIKE ? AND id <> ?""",
-                (since, d, base + "%", r["id"])).fetchall()]
-            if len(peers) < 5:
+                  AND comment = ? AND id <> ?""",
+                (since, d, base, r["id"])).fetchall()]
+            if len(peers) < 8:
                 continue                      # мало данных — не выдумываем эталон
             peers.sort()
             med = peers[len(peers) // 2]
-            if med <= 0 or r["summa"] >= med * 0.75:
+            if med <= 0:
+                continue
+            q1, q3 = peers[len(peers) // 4], peers[(3 * len(peers)) // 4]
+            if (q3 - q1) > med * 0.30:
+                continue                      # тариф продаётся разными объёмами
+            # медиана должна быть подтверждена, а не оказаться серединой
+            # между двумя разными ценами: рядом с ней нужно ещё три оплаты
+            if sum(1 for p in peers if abs(p - med) <= med * 0.05) < 3:
+                continue
+            if r["summa"] >= med * 0.75:
                 continue
             off = round((1 - r["summa"] / med) * 100)
+            short = base[:46] + ("…" if len(base) > 46 else "")
             out.append({"id": r["id"], "summa": r["summa"], "median": med, "off": off})
             add_flag("скидка", f"disc{r['id']}", MID,
-                     f"Оплата на {off}% ниже обычной по «{base}»",
+                     f"Оплата на {off}% ниже обычной по «{short}»",
                      f"{r['name'] or r['user_id']} · заплатил {r['summa']:,.0f} ₽, "
-                     f"обычно {med:,.0f} ₽".replace(",", " "),
+                     f"по этому же тарифу обычно {med:,.0f} ₽ "
+                     f"({len(peers)} оплат для сравнения)".replace(",", " "),
                      user_id=r["user_id"], day=d)
     return out
 
