@@ -2096,7 +2096,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-20.25"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-20.26"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2447,6 +2447,22 @@ async def public_lead(request: Request):
         payload = {}
     if not isinstance(payload, dict):     # POST [] или "abc" не должны валить сервер
         payload = {}
+    if not payload:
+        # Вебхук Tilda шлёт форму как x-www-form-urlencoded или multipart,
+        # а не JSON. Без этой ветки заявки с боевых доменов (kidsup.ru,
+        # kidsupday.ru, kidsupweek.ru — все три на Tilda) до CRM не доходят.
+        try:
+            form = await request.form()
+            payload = {k: v for k, v in form.items() if isinstance(v, str)}
+        except Exception:
+            payload = {}
+        # Tilda называет поля с большой буквы и по-своему
+        alias = {"Name": "name", "Phone": "phone", "Email": "email",
+                 "Age": "age", "Course": "course", "Comment": "note",
+                 "tranid": "tilda_id", "formid": "form"}
+        for src, dst in alias.items():
+            if payload.get(src) and not payload.get(dst):
+                payload[dst] = payload[src]
     if str(payload.get("website") or "").strip():   # honeypot — люди его не видят
         return JSONResponse({"ok": True}, headers=_PUB_CORS)
 
