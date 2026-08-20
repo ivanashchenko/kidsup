@@ -607,11 +607,20 @@ def _broadcast_tick() -> None:
             "ORDER BY campaign = 'no1_apology' DESC, campaign LIKE 'invite%' DESC, id "
             "LIMIT 30").fetchall()
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
+    team = _team_phones()
     for rid, phone, child, text, tried in rows:
         if "whatsapp=" in tried:
             with db.get_conn() as conn:
                 conn.execute("UPDATE broadcast_queue SET status='undeliverable' "
                              "WHERE id=?", (rid,))
+            continue
+        # свои номера в очередь попадают легко: у сотрудников и педагогов
+        # бывают карточки детей. Продающая рассылка своему человеку —
+        # позор, поэтому проверяем перед каждой отправкой, а не при постановке
+        if (phone or "")[-10:] in team:
+            with db.get_conn() as conn:
+                conn.execute("UPDATE broadcast_queue SET status='cancelled' WHERE id=?", (rid,))
+            log.info("broadcast: #%s — свой номер (%s), не шлём", rid, team[phone[-10:]])
             continue
         if _wa_unanswered(phone):
             continue  # ждёт ответа админа — не сбрасываем непрочитанное, вернёмся позже
@@ -1162,24 +1171,81 @@ def missed_inbound(mk: MoyklassClient) -> None:
         log.info("missed_inbound: +7%s — задача и сообщение", num)
 
 
+MISSED_COLD = (
+    "Здравствуйте! Это детский центр KidsUP (м. Бульвар "
+    "Рокоссовского). Звонили вам по поводу занятий 2026/27 "
+    "учебного года — идёт набор групп.\n"
+    "Ближайшее, куда можно просто прийти и посмотреть:\n"
+    "🎉 сб 29.08 в 11:00 — праздник в парке «Янтарная горка» "
+    "(рядом с ЖК Богородский): аниматоры, конкурсы, беспроигрышная "
+    "лотерея, вход свободный\n"
+    "🚪 вс 30.08 — день открытых дверей в центре (KidsUPday.ru)\n"
+    "📚 с 31.08 — первое занятие своей группы (условно-бесплатное, "
+    "с диагностикой)\n"
+    "При оплате до 31.08 сентябрь — по ценам прошлого года. "
+    "Когда удобно созвониться? Или ответьте здесь — подберём группу 😊")
+
+MISSED_OUR = (
+    "Здравствуйте! Это KidsUP (Бульвар Рокоссовского) 🎈\n"
+    "Звонили вам{child} — не дозвонились. Хотели обсудить расписание "
+    "на 2026/27 учебный год: с 31 августа стартует новый год, и мы "
+    "закрепляем места в группах.\n"
+    "Когда удобно созвониться? Или напишите здесь — всё подскажем 😊")
+
+
+def _missed_kind(mk: MoyklassClient, phone: str) -> tuple[str, str]:
+    """Кому мы звонили: своим, действующему клиенту или холодному контакту.
+
+    Инцидент 20.08.2026: маме действующей ученицы (логопед три раза в неделю,
+    платит с июня) ушёл холодный текст «идёт набор групп, приходите посмотреть,
+    первое занятие условно-бесплатное». Для семьи, которая ходит к нам год,
+    это выглядит так, будто нас в центре никто не знает. Причина была в том,
+    что догон недозвона не смотрел на карточку вообще."""
+    p10 = phone[-10:]
+    if p10 in _team_phones():
+        return "team", ""
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, name, raw FROM users WHERE substr(phone,-10)=? LIMIT 1",
+            (p10,)).fetchone()
+    if not row:
+        return "cold", ""
+    child = _child_name(row["name"] or "") or ""
+    try:
+        state = json.loads(row["raw"] or "{}").get("clientStateId")
+    except ValueError:
+        state = None
+    if state == ST_CLIENT:
+        return "client", child
+    with db.get_conn() as conn:
+        learning = conn.execute(
+            "SELECT 1 FROM joins WHERE user_id=? AND status_id=2 LIMIT 1",
+            (row["id"],)).fetchone()
+    if learning or _paid_recently(row["id"], 120):
+        return "client", child
+    return "cold", child
+
+
 def missed_calls() -> None:
     today = _today().isoformat()
-    for m in mango.missed():
-        phone = m["phone"]
-        if len(phone) < 10 or not _mark("missed_wa", f"{today}:{phone}"):
-            continue
-        _wa(phone, "Здравствуйте! Это детский центр KidsUP (м. Бульвар "
-                   "Рокоссовского). Звонили вам по поводу занятий 2026/27 "
-                   "учебного года — идёт набор групп.\n"
-                   "Ближайшее, куда можно просто прийти и посмотреть:\n"
-                   "🎉 сб 29.08 в 11:00 — праздник в парке «Янтарная горка» "
-                   "(рядом с ЖК Богородский): аниматоры, конкурсы, беспроигрышная "
-                   "лотерея, вход свободный\n"
-                   "🚪 вс 30.08 — день открытых дверей в центре (KidsUPday.ru)\n"
-                   "📚 с 31.08 — первое занятие своей группы (условно-бесплатное, "
-                   "с диагностикой)\n"
-                   "При оплате до 31.08 сентябрь — по ценам прошлого года. "
-                   "Когда удобно созвониться? Или ответьте здесь — подберём группу 😊")
+    mk = _client()
+    try:
+        for m in mango.missed():
+            phone = m["phone"]
+            if len(phone) < 10 or not _mark("missed_wa", f"{today}:{phone}"):
+                continue
+            kind, child = _missed_kind(mk, phone)
+            if kind == "team":
+                log.info("missed_calls: %s — свой номер, автосообщение не шлём", phone[-4:])
+                continue
+            if kind == "client":
+                text = MISSED_OUR.format(child=f" по занятиям {_genitive(child)}" if child else "")
+            else:
+                text = MISSED_COLD
+            _wa(phone, text)
+            log.info("missed_calls: +7%s — %s", phone, kind)
+    finally:
+        mk.close()
 
 
 DEAD_STATES = {345759, 125957, 146328, 125954, 215202, 146330, 146513}
@@ -1850,6 +1916,19 @@ def _team_phones() -> dict[str, str]:
         ph, _, name = item.partition(":")
         if len(ph.strip()) >= 10:
             out[ph.strip()[-10:]] = name.strip() or "сотрудник"
+    # педагоги и бывшие сотрудники в admin_phones не заведены, а звонить им
+    # мы можем каждый день. Берём телефоны всех менеджеров прямо из CRM,
+    # иначе своему же человеку однажды уйдёт продающая рассылка.
+    try:
+        with db.get_conn() as conn:
+            for r in conn.execute("SELECT name, raw FROM managers").fetchall():
+                ph = "".join(ch for ch in
+                             str(json.loads(r["raw"] or "{}").get("phone") or "")
+                             if ch.isdigit())
+                if len(ph) >= 10:
+                    out.setdefault(ph[-10:], f"сотрудник ({r['name']})")
+    except Exception:
+        log.warning("_team_phones: телефоны менеджеров не прочитались")
     return out
 
 

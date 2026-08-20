@@ -2081,7 +2081,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-20.10"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-20.13"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2711,6 +2711,67 @@ def api_broadcast_peek(campaign: str = "", limit: int = 3):
             out["samples"].append({"campaign": r["campaign"], "child": r["child"],
                                    "phone": (r["phone"] or "")[-4:], "text": r["text"]})
     return out
+
+
+@app.get("/api/broadcast/log", dependencies=AUTH)
+def api_broadcast_log(day: str = "", limit: int = 100):
+    """Кому и когда реально ушла рассылка. Нужно, чтобы разбирать вопросы
+    «почему это пришло вот этому человеку» — по телефону сразу видно кампанию,
+    сегмент и время отправки."""
+    from . import autopilot
+    d = day or autopilot._today().isoformat()
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT campaign, phone, child, status, sent, created FROM broadcast_queue "
+            "WHERE substr(COALESCE(sent, created), 1, 10) = ? "
+            "ORDER BY COALESCE(sent, created) DESC LIMIT ?",
+            (d, max(1, min(500, limit)))).fetchall()
+        out = []
+        for r in rows:
+            ph = "".join(ch for ch in (r["phone"] or "") if ch.isdigit())
+            name = None
+            if len(ph) >= 10:
+                u = conn.execute("SELECT name FROM users WHERE substr(phone,-10)=? LIMIT 1",
+                                 (ph[-10:],)).fetchone()
+                name = u["name"] if u else None
+            out.append({"campaign": r["campaign"], "phone": ph, "crm_name": name,
+                        "child": r["child"], "status": r["status"],
+                        "sent": r["sent"], "created": r["created"]})
+    return {"day": d, "count": len(out), "rows": out}
+
+
+@app.get("/api/autopilot/log", dependencies=AUTH)
+def api_autopilot_log(kind: str = "", day: str = "", limit: int = 200):
+    """Что автопилот уже сделал: отметки из autopilot_state.
+
+    Нужно, чтобы отвечать на вопрос «почему это сообщение ушло вот этому
+    человеку»: автосообщения (недозвон, пропущенный, напоминание) идут мимо
+    очереди рассылки, и без этой выборки их адресата не восстановить."""
+    from . import autopilot
+    d = day or autopilot._today().isoformat()
+    with db.get_conn() as conn:
+        try:
+            q = "SELECT kind, key FROM autopilot_state WHERE key LIKE ?"
+            args = [f"{d}%"]
+            if kind:
+                q += " AND kind = ?"
+                args.append(kind)
+            rows = conn.execute(q + " ORDER BY rowid DESC LIMIT ?",
+                                (*args, max(1, min(500, limit)))).fetchall()
+        except Exception:
+            return {"day": d, "count": 0, "rows": []}
+        out = []
+        for r in rows:
+            key = r["key"]
+            phone = "".join(ch for ch in key.split(":")[-1] if ch.isdigit())
+            name = None
+            if len(phone) >= 10:
+                u = conn.execute("SELECT name FROM users WHERE substr(phone,-10)=? LIMIT 1",
+                                 (phone[-10:],)).fetchone()
+                name = u["name"] if u else None
+            out.append({"kind": r["kind"], "key": key,
+                        "phone": phone if len(phone) >= 10 else None, "crm_name": name})
+    return {"day": d, "count": len(out), "rows": out}
 
 
 @app.post("/api/broadcast/cancel", dependencies=AUTH)
