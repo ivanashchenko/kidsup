@@ -602,9 +602,13 @@ def _broadcast_tick() -> None:
         rows = conn.execute(
             "SELECT id, phone, child, text, COALESCE(tried,'') FROM broadcast_queue "
             "WHERE status='pending' "
-            # приглашения на праздник 29.08 идут вперёд лагерной рассылки:
-            # у них жёсткий дедлайн — прийти до события, иначе смысла нет
-            "ORDER BY campaign = 'no1_apology' DESC, campaign LIKE 'invite%' DESC, id "
+            # Всё, у чего дедлайн — события 29.08–06.09, идёт вперёд лагерной
+            # рассылки: после события такое сообщение теряет смысл целиком.
+            # promo_nedozvon сюда добавлен 20.08: 57 промо-контактов, до которых
+            # не дозвонились, стояли в самом хвосте очереди и по темпу дошли бы
+            # до отправки уже после праздника — то есть никогда.
+            "ORDER BY campaign = 'no1_apology' DESC, "
+            "(campaign LIKE 'invite%' OR campaign = 'promo_nedozvon') DESC, id "
             "LIMIT 30").fetchall()
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
     team = _team_phones()
