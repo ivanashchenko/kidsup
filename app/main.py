@@ -2085,7 +2085,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-20.15"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-20.16"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2995,6 +2995,135 @@ button.v{{border-color:#A3282B;color:#A3282B}}
 </div>
 <p class="sub">{html.escape(kinds)}</p>
 {body}
+</div><script>
+async function mark(id, st) {{
+  await fetch('/api/audit/resolve?flag_id=' + id + '&status=' + st, {{method: 'POST'}});
+  const el = document.querySelector('.f[data-id="' + id + '"]');
+  if (el) el.classList.add('done');
+}}
+</script></body></html>""")
+
+
+@app.get("/api/rules", dependencies=AUTH)
+async def api_rules():
+    """Сводка по соблюдению правил посещения."""
+    from . import rules as _rules
+    return {"summary": _rules.summary(), "flags": _rules.open_flags(200)}
+
+
+@app.post("/api/rules/run", dependencies=AUTH)
+async def api_rules_run(since: str = ""):
+    from . import rules as _rules
+    r = _rules.check(since or None)
+    return {k: len(v) for k, v in r.items()}
+
+
+@app.get("/api/rules/baseline", dependencies=AUTH)
+async def api_rules_baseline(since: str = "2025-09-01"):
+    """Как жил центр до правил — счёт без флагов, чтобы видеть масштаб."""
+    from . import rules as _rules
+    return _rules.baseline(since)
+
+
+@app.get("/pravila-kontrol", response_class=HTMLResponse, dependencies=AUTH)
+async def rules_page():
+    """Кто как соблюдает правила посещения. Не рейтинг стыда, а список
+    того, что надо поправить в карточках — с именем и абонементом."""
+    from . import rules as _rules
+    s = _rules.summary()
+    flags = _rules.open_flags(200)
+    base = _rules.baseline()
+    colors = {"high": "#A3282B", "mid": "#9A5B00", "low": "#6E7264"}
+    RU = {"freeze-offbook": "заморозка мимо системы", "freeze-over": "заморозка сверх нормы",
+          "freeze-back": "заморозка задним числом", "makeup-late": "отработка позже месяца",
+          "makeup-repeat": "повторная отработка", "makeup-post": "отработка задним числом",
+          "disc-noreason": "скидка без объяснения", "disc-stack": "две скидки",
+          "comp-nostreak": "компенсация без непрерывности"}
+    rows = []
+    for f in flags:
+        c = colors.get(f["level"], "#6E7264")
+        rule = RU.get((f["key"] or "").split(":")[0], "правило")
+        rows.append(
+            f'<div class="f" data-id="{f["id"]}">'
+            f'<div class="dot" style="background:{c}"></div>'
+            f'<div><b>{html.escape(f["title"] or "")}</b>'
+            f'<div class="d">{html.escape(f["detail"] or "")}</div>'
+            f'<div class="m">{html.escape(rule)} · {f["day"] or ""}</div></div>'
+            f'<div class="btns"><button onclick="mark({f["id"]},\'ok\')">по правилам</button>'
+            f'<button class="v" onclick="mark({f["id"]},\'violation\')">нарушение</button></div>'
+            f'</div>')
+    body = ("".join(rows) or
+            '<p class="empty">Расхождений нет — правила соблюдаются.</p>')
+    mgr = "".join(
+        f'<tr><td>{html.escape(m["name"])}</td><td>{m["high"]}</td>'
+        f'<td>{m["mid"]}</td><td>{m["low"]}</td></tr>'
+        for m in s.get("managers", [])) or '<tr><td colspan="4">пока пусто</td></tr>'
+    mute = " · ".join(f"{html.escape(k)} {v}" for k, v in
+                      (base.get("discount_mute_by_manager") or {}).items()) or "—"
+    return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Соблюдение правил — KidsUP</title>
+<style>
+:root{{--paper:#FAF9F5;--ink:#22271F;--muted:#6E7264;--line:#E3E1D6;--card:#fff}}
+@media (prefers-color-scheme:dark){{:root{{--paper:#151812;--ink:#E7E6DD;--muted:#9B9F90;
+  --line:#2C3026;--card:#1A1E16}}}}
+body{{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.6 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}}
+.wrap{{max-width:58rem;margin:0 auto;padding:2rem 1rem 4rem}}
+h1{{font-size:1.8rem;margin:.2rem 0 .3rem;letter-spacing:-.02em}}
+h2{{font-size:1.05rem;margin:2rem 0 .6rem;letter-spacing:-.01em}}
+.sub{{color:var(--muted);margin:0 0 1.2rem}}
+.nums{{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem}}
+.n{{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:.6rem .9rem}}
+.n b{{font-size:1.4rem;display:block;line-height:1.2}}
+.n span{{font-size:.8rem;color:var(--muted)}}
+.f{{display:grid;grid-template-columns:10px 1fr auto;gap:.75rem;align-items:start;
+  background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:.8rem .95rem;margin:.5rem 0}}
+.dot{{width:10px;height:10px;border-radius:99px;margin-top:.45rem}}
+.d{{font-size:.9rem;margin-top:.15rem}}
+.m{{font-size:.76rem;color:var(--muted);margin-top:.25rem;
+  text-transform:uppercase;letter-spacing:.05em}}
+.btns{{display:flex;gap:.35rem;flex-wrap:wrap}}
+button{{font:inherit;font-size:.82rem;padding:.35rem .6rem;border-radius:7px;
+  border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}}
+button.v{{border-color:#A3282B;color:#A3282B}}
+.f.done{{opacity:.35}}
+.empty{{color:var(--muted)}}
+table{{border-collapse:collapse;width:100%;background:var(--card);
+  border:1px solid var(--line);border-radius:10px;overflow:hidden}}
+th,td{{text-align:left;padding:.5rem .8rem;border-bottom:1px solid var(--line);
+  font-variant-numeric:tabular-nums}}
+th{{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}}
+tr:last-child td{{border-bottom:none}}
+.hist{{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:.9rem 1.1rem;font-size:.92rem}}
+</style></head><body><div class="wrap">
+<h1>Соблюдение правил</h1>
+<p class="sub">Правила посещения приняты 20 августа 2026 — <a href="/base/pravila_kidsup">текст здесь</a>.
+Проверки идут по данным МойКласс каждое утро. Задним числом никого не судим:
+в ленту попадает только то, что случилось после 20 августа.</p>
+<div class="nums">
+  <div class="n"><b>{s.get('high', 0)}</b><span>красных</span></div>
+  <div class="n"><b>{s.get('mid', 0)}</b><span>жёлтых</span></div>
+  <div class="n"><b>{s.get('low', 0)}</b><span>серых</span></div>
+</div>
+{body}
+<h2>По администраторам за 30 дней</h2>
+<table><tr><th>кто</th><th>красных</th><th>жёлтых</th><th>серых</th></tr>{mgr}</table>
+<h2>Что было до правил — для понимания масштаба</h2>
+<div class="hist">
+За учебный год 2025/26 продано <b>{base.get('subs', 0)}</b> абонементов.
+Из них <b>{base.get('discount_big', 0)}</b> дешевле чем −10%, и у
+<b>{base.get('discount_mute', 0)}</b> в комментарии нет причины ({mute}).
+Заморозок в тексте комментария — <b>{base.get('freeze_in_text', 0)}</b>,
+оформленных полями «заморозить с/по» — <b>{base.get('freeze_in_system', 0)}</b>:
+поэтому «две недели за год» до сих пор посчитать было нельзя.
+Отработок — <b>{base.get('makeups', 0)}</b>, из них
+<b>{base.get('makeup_late', 0)}</b> закрыты позже месяца.
+До 20 августа этих правил не было, поэтому ничего из перечисленного
+нарушением не считается — это отправная точка.
+</div>
 </div><script>
 async function mark(id, st) {{
   await fetch('/api/audit/resolve?flag_id=' + id + '&status=' + st, {{method: 'POST'}});

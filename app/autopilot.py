@@ -1701,6 +1701,74 @@ def audit_yesterday() -> dict:
     return res
 
 
+RULE_TASK = {
+    "freeze-offbook": "Заморозку надо ставить полями «заморозить с/по» в абонементе, "
+                      "а не словами в комментарии. Иначе две недели за год не "
+                      "посчитать, а со стороны это выглядит как скидка от себя.",
+    "freeze-over": "У клиента заморозка сверх двух недель за год. Сверх нормы — "
+                   "только по справке о стационаре. Приложи справку или сними.",
+    "freeze-back": "Заморозка оформлена задним числом. Заявление пишется ДО начала.",
+    "makeup-late": "Отработка выдана позже месяца после пропуска. Просроченная "
+                   "сгорает — если решили дать, согласуй с Борисом и напиши почему.",
+    "makeup-repeat": "Один пропуск отработан дважды. Неявка на отработку её сжигает.",
+    "makeup-post": "Отработка оформлена задним числом. Только по предварительной "
+                   "записи — иначе правило про сгорание не работает.",
+    "disc-noreason": "Скидка выше 10% без причины в абонементе. Напиши основание "
+                     "в комментарии: пересчёт, заморозка, компенсация, справка.",
+    "disc-stack": "На абонементе две скидки. Скидки не суммируются — одна, наибольшая.",
+    "comp-nostreak": "Компенсация 50% дана, а предыдущий абонемент закончился "
+                     "с перерывом. Компенсация полагается только при покупке подряд.",
+}
+
+
+def rules_check() -> dict:
+    """Следим, что администраторы работают по правилам посещения.
+
+    Правило, за которым никто не следит, живёт две недели. Поэтому каждое
+    утро прогоняем проверки по данным МойКласс и адресно возвращаем находку
+    тому, кто её сделал: не «команде», а конкретному администратору, с
+    указанием абонемента и того, что именно поправить. Красные — сразу
+    Борису, потому что скидка без объяснения неотличима от увода денег."""
+    from . import rules as _rules
+    res = _rules.check()
+    fresh = _rules.open_flags(200)
+    if not fresh:
+        return {"flags": 0}
+
+    # группируем по администратору: одна задача на человека, а не пять
+    by_mgr: dict[int, list[dict]] = {}
+    for f in fresh:
+        if f.get("manager_id"):
+            by_mgr.setdefault(f["manager_id"], []).append(f)
+
+    mk = _client()
+    try:
+        for mgr, items in by_mgr.items():
+            rule = (items[0].get("key") or "").split(":")[0]
+            hint = RULE_TASK.get(rule, "Проверь по правилам: /base/pravila_kidsup")
+            what = "; ".join(f["title"] for f in items[:3])
+            body = (f"🤖 Клод: правила посещения — {len(items)} расхождение(й). "
+                    f"{what}. {hint}")
+            try:
+                _task(mk, mgr, items[0].get("user_id"), body[:250])
+            except Exception:
+                log.warning("правила: задача для %s не поставилась", mgr)
+
+        high = [f for f in fresh if f["level"] == "high"]
+        if high:
+            lines = [f"🤖 Клод: {len(high)} нарушений правил, требующих тебя:", ""]
+            lines += [f"• {f['title']} — {(f['detail'] or '')[:90]}" for f in high[:6]]
+            lines.append("")
+            lines.append("Разбор: https://app.kidsup.ru/pravila-kontrol")
+            _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines))
+    finally:
+        mk.close()
+    log.info("правила: %d флагов, задачи %d администраторам",
+             len(fresh), len(by_mgr))
+    return {"flags": len(fresh), "managers": len(by_mgr),
+            "by_rule": {k: len(v) for k, v in res.items() if v}}
+
+
 def daily_digest() -> None:
     day = _today().isoformat()
     try:
@@ -2177,6 +2245,13 @@ def _loop() -> None:
                     audit_yesterday()
                 except Exception:
                     log.exception("аудит не удался — продолжаем")
+            # контроль правил посещения: в 9:30, после аудита денег, чтобы
+            # находка приходила администратору вместе с утренними задачами
+            if (now.hour, now.minute) >= (9, 30) and _mark("rules_day", str(_today())):
+                try:
+                    rules_check()
+                except Exception:
+                    log.exception("контроль правил не удался — продолжаем")
             if now.hour >= 8 and _mark("close_dead_tasks", str(_today())):
                 try:
                     close_dead_tasks()
