@@ -65,6 +65,38 @@ def channels() -> list[dict]:
     return [c for c in r.json() if c.get("state") == "active"]
 
 
+def all_channels() -> list[dict]:
+    """Все каналы, включая blocked, — нужно, чтобы заметить отвалившийся номер."""
+    r = httpx.get(f"{API}/channels", headers=_headers(), timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+OUR_HOOK = "https://app.kidsup.ru/wazzup/webhook"
+
+
+def webhook_uri() -> str:
+    r = httpx.get(f"{API}/webhooks", headers=_headers(), timeout=30)
+    r.raise_for_status()
+    return (r.json() or {}).get("webhooksUri") or ""
+
+
+def set_webhook(uri: str = OUR_HOOK) -> bool:
+    """Вернуть вебхук на наш портал.
+
+    Wazzup хранит ровно ОДИН адрес. Интеграция МойКласс при пересохранении
+    перезаписывает его на свой — и мы перестаём видеть переписку, а
+    рассылка перестаёт получать статусы доставки. Инцидент 19.08.2026:
+    события пропали в 13:02 и не приходили 20 часов, пока не заметили.
+    Наш эндпоинт пересылает всё в МойКласс сам, поэтому чаты в CRM
+    от возврата адреса не страдают."""
+    r = httpx.patch(f"{API}/webhooks", headers=_headers(), timeout=40, json={
+        "webhooksUri": uri,
+        "subscriptions": {"messagesAndStatuses": True, "contactsAndDealsCreation": True,
+                          "channelsUpdates": True, "wabaTemplatesStatus": False}})
+    return r.status_code < 300
+
+
 def _pick(chans: list[dict], transport: str) -> dict | None:
     cand = [c for c in chans if c.get("transport") == transport]
     if transport == "whatsapp":

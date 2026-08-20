@@ -1539,6 +1539,68 @@ def discipline_check() -> dict:
     return {"today": stat, "yesterday": prev, "worse": [w[0] for w in worse]}
 
 
+def wazzup_watchdog() -> dict:
+    """Сторож канала Wazzup: вебхук и живые каналы.
+
+    Две поломки, каждая из которых происходит молча.
+    1. Адрес вебхука в Wazzup один на всех. Интеграция МойКласс при
+       пересохранении перезаписывает его на свой — и мы перестаём видеть
+       входящие сообщения и статусы доставки рассылки. 19.08 так потеряли
+       20 часов переписки, и заметили это только со слов админов.
+    2. Номер-отправитель может отвалиться (state != active) — рассылка
+       тогда молча уходит в пустоту.
+    Проверяем каждые полчаса, вебхук чиним сами, про номера пишем Борису."""
+    from . import wazzup as wz
+    res = {}
+    try:
+        uri = wz.webhook_uri()
+        res["uri"] = uri
+        if uri != wz.OUR_HOOK:
+            res["restored"] = wz.set_webhook()
+            log.warning("вебхук Wazzup был на %s — вернули на себя (%s)", uri, res["restored"])
+            if _mark("wz_hook_alert", f"{_today()}:{uri[:40]}"):
+                _wa(db.get_setting("digest_phone") or "79104526673",
+                    "🤖 Клод: вебхук Wazzup был переписан на "
+                    f"{uri[:60]} — мы не видели переписку и статусы доставки. "
+                    "Вернул на наш портал, чаты в МойКласс продолжают работать "
+                    "через пересылку. Если адрес слетит снова — значит его "
+                    "меняет интеграция МойКласс при пересохранении.")
+    except Exception as e:
+        log.warning("watchdog: вебхук не проверился: %s", e)
+
+    try:
+        senders = [s.strip() for s in (db.get_setting("wa_senders") or "").split(",") if s.strip()]
+        alive = {c.get("plainId") for c in wz.all_channels()
+                 if c.get("transport") == "whatsapp" and c.get("state") == "active"}
+        dead = [s for s in senders if s not in alive]
+        res["dead_senders"] = dead
+        if dead and _mark("wz_dead_sender", f"{_today()}:{','.join(dead)}"):
+            _wa(db.get_setting("digest_phone") or "79104526673",
+                "🤖 Клод: отвалились номера WhatsApp — " + ", ".join(dead) +
+                ". Рассылка с них не уходит. Нужно переподключить канал в Wazzup "
+                "(сканировать QR заново).")
+            log.warning("watchdog: мёртвые отправители %s", dead)
+    except Exception as e:
+        log.warning("watchdog: каналы не проверились: %s", e)
+
+    # тишина в вебхуке — тоже симптом: события идут постоянно в рабочие часы
+    try:
+        with db.get_conn() as conn:
+            last = conn.execute("SELECT MAX(ts) FROM wazzup_raw").fetchone()[0]
+        res["last_event"] = last
+        if last and 9 <= _now().hour < 20:
+            quiet = (_now() - datetime.fromisoformat(last)).total_seconds() / 3600
+            res["quiet_hours"] = round(quiet, 1)
+            if quiet >= 4 and _mark("wz_quiet", f"{_today()}:{int(quiet)}"):
+                _wa(db.get_setting("digest_phone") or "79104526673",
+                    f"🤖 Клод: от Wazzup нет событий {int(quiet)} ч подряд. "
+                    "Обычно в рабочие часы они идут постоянно — похоже, канал "
+                    "или вебхук отвалились. Проверяю автоматически каждые полчаса.")
+    except Exception as e:
+        log.warning("watchdog: тишина не проверилась: %s", e)
+    return res
+
+
 def audit_yesterday() -> dict:
     """Утренний аудит вчерашних денег.
 
@@ -2023,6 +2085,12 @@ def _loop() -> None:
                     discipline_check()
                 except Exception:
                     log.exception("проверка дисциплины не удалась")
+            # сторож Wazzup: вебхук один на всех, его перезаписывает МойКласс
+            if now.minute % 30 < 2:
+                try:
+                    wazzup_watchdog()
+                except Exception:
+                    log.exception("сторож Wazzup упал — продолжаем")
             # аудит вчерашнего дня: неподписанные оплаты, возвраты, скидки.
             # В 9 утра, чтобы находки попадали в утренние задачи админам.
             if now.hour >= 9 and _mark("audit_day", str(_today())):
