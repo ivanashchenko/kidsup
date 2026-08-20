@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Правила посещения KidsUP</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:730;margin:1.5rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+/* правила карточками */
+.rules{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));margin:1.1rem 0}
+.rule{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.05rem;
+  display:grid;grid-template-columns:2rem 1fr;gap:.7rem;align-items:start}
+.rule .ic{font-size:1.25rem;line-height:1.3}
+.rule b{display:block;font-weight:730;margin-bottom:.15rem;font-size:.97rem}
+.rule span{font-size:.9rem;color:var(--muted);line-height:1.5}
+
+/* решения Бориса */
+.dec{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);
+  border-radius:0 11px 11px 0;padding:.95rem 1.15rem;margin:.8rem 0}
+.dec .q{font-weight:750;font-size:1rem;margin-bottom:.3rem}
+.dec .why{font-size:.88rem;color:var(--muted);margin-bottom:.5rem}
+.opts{display:flex;flex-direction:column;gap:.35rem}
+.opt{background:var(--fill);border-radius:8px;padding:.5rem .7rem;font-size:.9rem}
+.opt b{color:var(--amber)}
+.opt.rec{background:var(--green-soft)} .opt.rec b{color:var(--green)}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.3rem 0}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} .dec{display:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="kicker">Для печати на ресепшен и в старт-пакет</div>
+<h1>Правила посещения KidsUP</h1>
+<p class="sub">Собрано 20.08.2026 по образцу, которым поделилась Нина Окнянская
+(«Дом волшебников»), и по чек-листу старт-пакета из третьего урока интенсива —
+там правила клуба стоят обязательным вложением. Переложено под наш центр:
+наши формулировки, наши скидки, наш адрес.</p>
+
+<div class="warn"><b>Прежде чем печатать.</b> Бытовая часть ниже готова целиком.
+А вот денежная — заморозка, отработка пропусков, возвраты — заполнена <b>как предложение</b>:
+у нас этих правил нет нигде в письменном виде, и именно поэтому сейчас висят
+возврат 33 400 ₽ пятый день, перерасчёты Ибадовым и Войновым и спор по чеку Пушкарёвой.
+Каждый такой случай разбирается вручную и по-разному. В разделе 4 — четыре решения,
+которые нужно принять один раз, и дальше их будет достаточно показать пальцем.</div>
+
+<!-- ======================================================= БЫТОВЫЕ -->
+<section>
+<div class="seclabel">Раздел 1</div>
+<h2>Чтобы всем было хорошо</h2>
+<p class="sub">Эта часть висит на ресепшене и лежит в старт-пакете каждого нового ученика.</p>
+
+<div class="rules">
+  <div class="rule"><span class="ic">💛</span><div><b>Доброжелательность — правило, а не пожелание</b>
+    <span>Физические наказания, угрозы и оскорбления в адрес детей внутри центра запрещены.
+    Это касается всех: и сотрудников, и родителей.</span></div></div>
+  <div class="rule"><span class="ic">👩‍👦</span><div><b>Малыши до 3 лет — вместе со взрослым</b>
+    <span>Занятия проходят совместно, и мы рады вашему активному участию.
+    С одним ребёнком на занятии присутствует один взрослый.</span></div></div>
+  <div class="rule"><span class="ic">🕒</span><div><b>Приходите за 10 минут</b>
+    <span>Не раньше: лишнее ожидание в фойе утомляет ребёнка и мешает предыдущей группе.
+    И не позже: опоздание сбивает начало занятия для всех.</span></div></div>
+  <div class="rule"><span class="ic">🛡</span><div><b>За детей старше 3 лет до и после занятия отвечает взрослый</b>
+    <span>Мы отвечаем за ребёнка во время занятия. В фойе, в раздевалке и на улице —
+    сопровождающий взрослый.</span></div></div>
+  <div class="rule"><span class="ic">👟</span><div><b>Сменная обувь</b>
+    <span>Бахилы в зоне ресепшена, сменная обувь в учебных комнатах. Бахилы у нас есть,
+    приносить не нужно.</span></div></div>
+  <div class="rule"><span class="ic">🤒</span><div><b>Только здоровые</b>
+    <span>К занятиям допускаются здоровые дети и взрослые. Если ребёнок заболел —
+    напишите нам, мы не начислим пропуск как прогул.</span></div></div>
+  <div class="rule"><span class="ic">🧸</span><div><b>Убираем за собой</b>
+    <span>Помогите ребёнку сложить игрушки и материалы перед уходом. Это часть занятия,
+    а не уборка после нас.</span></div></div>
+  <div class="rule"><span class="ic">📵</span><div><b>Телефон — беззвучный</b>
+    <span>На занятиях с детьми телефоном не пользуемся. Фото и видео — по договорённости
+    с педагогом.</span></div></div>
+  <div class="rule"><span class="ic">🔁</span><div><b>Замена педагога</b>
+    <span>Администрация вправе заменить педагога на время болезни или вынужденного
+    отсутствия. Мы предупредим заранее, если знаем.</span></div></div>
+  <div class="rule"><span class="ic">🤝</span><div><b>Спорные вопросы — к руководителю</b>
+    <span>Любой конфликт решается с руководителем центра, а не в переписке
+    родительского чата.</span></div></div>
+  <div class="rule"><span class="ic">🌿</span><div><b>Бережём пространство</b>
+    <span>Всё в центре сделано для ваших детей. Мебель, книги, пособия и техника —
+    общие, и мы просим относиться к ним по-хозяйски.</span></div></div>
+  <div class="rule"><span class="ic">😊</span><div><b>Хорошее настроение заразительно</b>
+    <span>Когда вы приходите к нам в настроении, оно передаётся детям и педагогам —
+    и занятие получается другим.</span></div></div>
+</div>
+</section>
+
+<!-- ======================================================= ЗАПИСЬ -->
+<section>
+<div class="seclabel">Раздел 2</div>
+<h2>Как начать заниматься</h2>
+
+<div class="tbl"><table>
+<thead><tr><th>Направление</th><th>Первое знакомство</th></tr></thead>
+<tbody>
+<tr><td class="w">Групповые занятия</td>
+  <td><b>Первое занятие условно-бесплатное:</b> не понравится — платить не нужно;
+    понравится — это занятие входит в первый абонемент.</td></tr>
+<tr><td class="w">Английский мини-сад,<br>нулевой класс</td>
+  <td>Бесплатный пробный день. Дальше — пробная неделя, её стоимость засчитывается
+    при покупке месяца в течение трёх дней.</td></tr>
+</tbody>
+</table></div>
+
+<h3>Как подбираем группу</h3>
+<ul class="plain">
+  <li>Сначала предмет и уровень, потом уже время — иначе ребёнок попадает туда,
+    где ему скучно или трудно.</li>
+  <li>Английский — по уровням Cambridge: Starters, Movers, Flyers.
+    Уровень определяет педагог на первом занятии, готовиться заранее не нужно.</li>
+  <li>Подготовка к школе — по чтению: ПШ1 для нечитающих, ПШ2 для читающих.</li>
+</ul>
+
+<h3>Скидки</h3>
+<ul class="plain">
+  <li><b>10%</b> — на второй предмет у того же ребёнка.</li>
+  <li><b>10%</b> — на второго ребёнка из одной семьи.</li>
+  <li><b>10%</b> — многодетным семьям и семьям участников СВО.</li>
+</ul>
+<p class="sub"><b>Скидки не суммируются</b> — действует одна, наибольшая.
+Учебный год 2026/27: с 31 августа по 31 мая.</p>
+</section>
+
+<!-- ======================================================= ОПЛАТА -->
+<section>
+<div class="seclabel">Раздел 3</div>
+<h2>Оплата</h2>
+<ul class="plain">
+  <li>Оплата вносится <b>до начала занятия</b>. Без оплаты ребёнок к занятию
+    не допускается, а место в группе за ним не сохраняется.</li>
+  <li>Абонементная форма: 4 занятия при посещении раз в неделю, 8 занятий —
+    при посещении дважды в неделю.</li>
+  <li>Мини-сад и нулевой класс оплачиваются фиксированно за месяц вперёд,
+    не позднее 27 числа предыдущего месяца.</li>
+  <li>Договор-оферта размещён на ресепшене и на сайте — ознакомьтесь до покупки
+    первого абонемента.</li>
+  <li>Оплатить занятия можно средствами <b>материнского капитала</b>:
+    у центра есть образовательная лицензия, документы готовим мы.</li>
+</ul>
+
+<div class="note"><b>Что даёт абонемент, кроме занятий.</b> Гостевой визит — раз в месяц
+можно привести друга или брата на занятие по возрасту, по записи и при наличии мест.
+Бесплатная консультация специалиста при покупке второго абонемента.
+Участие во всех праздниках, конкурсах и открытых уроках центра.</div>
+</section>
+
+<!-- ======================================================= РЕШЕНИЯ -->
+<section>
+<div class="seclabel">Раздел 4 · только для Бориса, в печать не идёт</div>
+<h2>Четыре решения, которые закроют половину наших споров</h2>
+<p class="sub">По каждому — как устроено у «Дома волшебников», чем это грозит у нас
+и что я рекомендую. Ответьте одной строкой на каждое, и я допишу правила
+и вложу в старт-пакет к 29 августа.</p>
+
+<div class="dec">
+  <div class="q">1. Отработка пропущенных занятий — есть или нет?</div>
+  <div class="why">У них: пропущенное можно отработать на другом кружке в течение месяца,
+    но только по предварительной записи; записался и не пришёл — отработка сгорает.
+    Либо 50% пропущенных компенсируются при покупке следующего абонемента подряд.
+    У нас правила нет вообще — поэтому каждый пропуск обсуждается заново.</div>
+  <div class="opts">
+    <div class="opt rec"><b>Рекомендую:</b> отработка на другом направлении в течение
+      месяца, по записи, максимум 2 занятия за абонемент. Не пришёл на отработку —
+      сгорает. Просто и проверяемо по CRM.</div>
+    <div class="opt"><b>Мягче:</b> компенсация 50% пропущенных при покупке следующего
+      абонемента без перерыва.</div>
+    <div class="opt"><b>Жёстче:</b> пропуск не компенсируется, кроме болезни со справкой.</div>
+  </div>
+</div>
+
+<div class="dec">
+  <div class="q">2. Заморозка абонемента — на сколько и по какому заявлению?</div>
+  <div class="why">У них: две недели за учебный год, по письменному заявлению до начала
+    заморозки, минимальный срок — неделя. Для мини-сада отдельно: при трёх занятиях
+    в неделю — 6 занятий заморозки, при двух — 4. У нас летом уезжает половина семей,
+    и каждый раз это ручной пересчёт.</div>
+  <div class="opts">
+    <div class="opt rec"><b>Рекомендую:</b> две недели за учебный год, заявление
+      до начала заморозки, минимум неделя. Ровно как у них — правило обкатанное.</div>
+    <div class="opt"><b>Вариант:</b> добавить отдельную летнюю заморозку для мини-сада.</div>
+  </div>
+</div>
+
+<div class="dec">
+  <div class="q">3. Возвраты — в какой срок и по каким основаниям?</div>
+  <div class="why">Прямо сейчас: возврат 33 400 ₽ висит пятый день, перерасчёты Ибадовым
+    и Войновым — третий, мама Ибадовых звонила повторно и была недовольна. Ни у кого
+    нет письменного основания сказать «да» или «нет», поэтому решение откладывается.</div>
+  <div class="opts">
+    <div class="opt rec"><b>Рекомендую:</b> заявление в письменном виде, рассмотрение
+      до 3 рабочих дней, возврат за вычетом использованных занятий по разовой цене.
+      Ответ клиенту даём в тот же день, даже если это «мы рассматриваем до пятницы».</div>
+    <div class="opt"><b>Обязательно в любом случае:</b> назначить одного ответственного
+      за денежные вопросы. Сейчас их девять и все на Лизе, которая на переписке.</div>
+  </div>
+</div>
+
+<div class="dec">
+  <div class="q">4. Болезнь и длительный пропуск</div>
+  <div class="why">У них: при лечении в стационаре стоимость переносится полностью
+    по справке; пропуск месяц и более рассматривается индивидуально.
+    У нас в правилах ничего нет, а случаи уже есть — у Ситковского реабилитация
+    до 11 сентября.</div>
+  <div class="opts">
+    <div class="opt rec"><b>Рекомендую:</b> справка от врача переносит занятия полностью,
+      без справки — по общему правилу отработки из пункта 1.</div>
+  </div>
+</div>
+</section>
+
+<!-- ======================================================= СТАРТ-ПАКЕТ -->
+<section>
+<div class="seclabel">Раздел 5</div>
+<h2>Старт-пакет: что кладём каждому новому ученику</h2>
+<p class="sub">Состав из третьего урока интенсива. Собираем к 29–31 августа —
+на трёх событиях он раздаётся всем, кто пришёл.</p>
+<div class="tbl"><table>
+<thead><tr><th>Что</th><th>Зачем именно это</th><th>Готово?</th></tr></thead>
+<tbody>
+<tr><td class="w">Расписание и цены</td><td>Родитель уходит с бумагой, а не с обещанием
+  «пришлём в WhatsApp» — которое, как мы уже видели, доходит не всегда</td><td>есть</td></tr>
+<tr><td class="w">Памятка о курсе</td><td>Цели, результаты за год, что понадобится
+  (учебники, форма), как родитель поймёт, что результат есть</td><td>пишем с педагогами</td></tr>
+<tr><td class="w">Правила клуба</td><td>Этот документ. Раздел 4 в печать не идёт</td>
+  <td>после ваших решений</td></tr>
+<tr><td class="w">Купон для друга</td><td>Реферальный канал, который у нас до сих пор
+  не запущен ни в каком виде</td><td>нужно напечатать</td></tr>
+<tr><td class="w">Небольшой подарок</td><td>Тот самый, что разыгрывается в лотерее
+  в конце события</td><td>закупка на вас</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<div class="foot">
+  Источники: правила «Дома волшебников» (прислала Нина Окнянская в чате руководителей),
+  урок 3 интенсива «Система набора групп за 30 дней» — чек-лист старт-пакета.
+  Переложено на KidsUP: наши скидки 10% вместо 15%, наша формулировка
+  «условно-бесплатное первое занятие», наш адрес и учебный год.<br>
+  🤖 Клод, ИИ-сотрудник KidsUP · 20.08.2026
+</div>
+
+</div>
+</body>
+</html>
