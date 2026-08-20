@@ -1368,6 +1368,167 @@ def card_quality() -> None:
         mk.close()
 
 
+def _subject_of(class_name: str) -> str | None:
+    """Предмет по названию группы. Нужен, чтобы звонить не «всем подряд»,
+    а под конкретную недобранную позицию."""
+    n = class_name or ""
+    if n.startswith(("ДОД", "МК")):
+        return None
+    if "_ПШ" in n or n.startswith("ПШ") or "одготовка" in n:
+        return "ПШ"
+    if "_АЯ" in n or n.startswith("АЯ") or "_ЛК" in n or "НЕЙРО Англ" in n:
+        return "АЯ"
+    if "ини-сад" in n or "нулевой" in n.lower():
+        return "Сад"
+    if ("МсМ" in n or "узыка и речь" in n or "_РР" in n or n.startswith("РР")
+            or "азвити" in n or "ицей" in n):
+        return "РР"
+    if "_ЛГ" in n or "огопед" in n:
+        return "Логопед"
+    if "ШАХ" in n or "ахмат" in n:
+        return "Шахматы"
+    if "ИЗО" in n:
+        return "ИЗО"
+    return None
+
+
+def _target_subject(subs: set[str], age: float | None) -> str:
+    """Куда зовём ребёнка в 2026/27 с учётом того, что он вырос.
+
+    Прошлогодний малыш с «Музыки и речи» — сегодняшний клиент подготовки
+    к школе, а вчерашний дошкольник с ПШ, пошедший в первый класс, — клиент
+    английского. Без этого пересчёта обзвон предлагает людям то, из чего
+    они уже выросли, и получает отказ на ровном месте."""
+    a = age or 0
+    if "ПШ" in subs:
+        return "АЯ" if a >= 7.3 else "ПШ"
+    if "АЯ" in subs:
+        return "АЯ"
+    if ("Сад" in subs or "РР" in subs) and a >= 4.2:
+        return "ПШ"
+    if 4.5 <= a <= 11:
+        return "АЯ"
+    return next(iter(sorted(subs))) if subs else "?"
+
+
+# План 21–30.08 (docs/plan_nabora_21_30.html): какая волна в какой день.
+# Волна определяет, кого автопилот кладёт в утренние задачи.
+WAVES = [
+    (date(2026, 8, 24), ("hot", "warm")),      # 21–24: лето, потом апрель-май
+    (date(2026, 8, 25), ("hot", "warm", "rr")),
+    (date(2026, 8, 27), ("rr", "warm", "hot")),   # 25–27: РР-волна и дожим
+    (date(2026, 8, 28), ()),                      # 28: только подтверждения
+    (date(2026, 8, 30), ()),                      # 29–30: события
+]
+
+
+def _wave_today() -> tuple[str, ...]:
+    d = _today()
+    for until, waves in WAVES:
+        if d <= until:
+            return waves
+    return ("hot", "warm", "rr", "cold")          # сентябрь — добираем всё
+
+
+# Роли администраторов из плана: кому какой сегмент достаётся первым.
+# Считано по 20.08: Лена 11 разговоров → 7 записей (закрыватель),
+# Ира 21 → 12 (объём), Аня 28 → 4 (реактив и короткий скрипт).
+ADMIN_ROLE = {202856: "closer", 232763: "volume", 232805: "reactive"}
+ROLE_ORDER = {"closer": ("hot", "warm", "rr"),
+              "volume": ("hot", "rr", "warm"),
+              "reactive": ("warm", "rr", "hot")}
+ADMIN_NORM = {202856: 40, 232763: 45, 232805: 45}
+
+
+def _plan_queues() -> tuple[dict[int, list[int]], dict[int, str]]:
+    """Очереди по плану 21–30.08: сегмент по теплоте и целевому предмету,
+    раздача — по сильным сторонам администратора, а не поровну.
+
+    Возвращает (admin_index -> [user_id]), (user_id -> сегмент)."""
+    import json as _json
+    with db.get_conn() as conn:
+        cls = {r[0]: r[1] or "" for r in conn.execute("SELECT id, name FROM classes")}
+        les = {r[0]: (r[1], r[2]) for r in
+               conn.execute("SELECT id, date, class_id FROM lessons")}
+        enrolled = {r[0] for r in conn.execute(
+            "SELECT DISTINCT j.user_id FROM joins j JOIN classes cl ON cl.id = j.class_id "
+            "WHERE cl.name LIKE '2627%' AND cl.name NOT LIKE '%Заявки%'")}
+        seen: dict[int, dict] = {}
+        for uid, lid in conn.execute(
+                "SELECT user_id, lesson_id FROM lesson_records WHERE visit = 1"):
+            d, cid = les.get(lid, (None, None))
+            if not d or d < "2025-09-01":
+                continue
+            s = _subject_of(cls.get(cid, ""))
+            if not s:
+                continue
+            k = seen.setdefault(uid, {"subs": set(), "last": ""})
+            k["subs"].add(s)
+            if d > k["last"]:
+                k["last"] = d
+        users = {r[0]: r for r in conn.execute(
+            "SELECT id, phone, client_state_id, raw FROM users")}
+    segs: dict[int, str] = {}
+    for uid, k in seen.items():
+        if uid in enrolled or uid not in users:
+            continue
+        u = users[uid]
+        if u[2] in (146328, 125954):              # «не писать», «некачественный»
+            continue
+        if len("".join(c for c in str(u[1] or "") if c.isdigit())) < 10:
+            continue
+        age = None
+        try:
+            for a in (_json.loads(u[3]).get("attributes") or []):
+                if a.get("attributeAlias") == "birthday" and a.get("value"):
+                    age = (date(2026, 9, 1)
+                           - date.fromisoformat(a["value"][:10])).days / 365.25
+        except Exception:
+            pass
+        tgt = _target_subject(k["subs"], age)
+        core = tgt in ("ПШ", "АЯ")
+        if k["last"] >= "2026-06-01" and core:
+            segs[uid] = "hot"
+        elif k["last"] >= "2026-04-01" and core:
+            segs[uid] = "warm"
+        elif tgt == "РР" or not core:
+            segs[uid] = "rr"
+        else:
+            segs[uid] = "cold"
+    active = _wave_today()
+    if not active:                                 # дни подтверждений и событий
+        return {}, segs
+    pool: dict[str, list[int]] = {s: [] for s in ("hot", "warm", "rr", "cold")}
+    for uid, s in segs.items():
+        if s in active:
+            pool[s].append(uid)
+    for s in pool:
+        pool[s].sort(key=lambda u: seen[u]["last"], reverse=True)
+    admins = _admins_today()
+    out: dict[int, list[int]] = {}
+    taken: set[int] = set()
+    for idx, adm in enumerate(admins):
+        role = ADMIN_ROLE.get(adm.get("managerId"), "volume")
+        order = [s for s in ROLE_ORDER[role] if s in active]
+        norm = ADMIN_NORM.get(adm.get("managerId"), 45)
+        mine: list[int] = []
+        for s in order:
+            for uid in pool[s]:
+                if len(mine) >= norm:
+                    break
+                if uid in taken:
+                    continue
+                taken.add(uid)
+                mine.append(uid)
+            if len(mine) >= norm:
+                break
+        out[idx] = mine
+    log.info("план-очереди: %s | сегменты %s",
+             {i: len(v) for i, v in out.items()},
+             {s: len(v) for s, v in pool.items()})
+    return out, segs
+
+
 def _queues() -> tuple[dict[int, list[int]], dict[int, str]]:
     """Очереди обзвона: (admin_index -> [user_id, ...], user_id -> тип звонка).
 
@@ -1450,7 +1611,33 @@ def morning_tasks(mk: MoyklassClient) -> None:
     if not admins:
         return
     per_admin = int(db.get_setting("daily_tasks_per_admin", "45") or 45)
-    queues, kinds = _queues()
+    # С 21.08 очередь строится по плану набора: сегмент по теплоте и целевому
+    # предмету, раздача по сильным сторонам администратора. Старый _queues()
+    # делил всех поровну и по дате последнего визита — без учёта того, что
+    # ребёнок вырос и ему нужен уже другой предмет.
+    plan_on = db.get_setting("plan_queues", "1") == "1"
+    if plan_on:
+        try:
+            queues, kinds = _plan_queues()
+            if not queues:      # день подтверждений или событий — новых не даём
+                log.info("morning_tasks: по плану сегодня без новых звонков")
+                return
+        except Exception:
+            log.exception("план-очереди упали — работаем по старой схеме")
+            queues, kinds = _queues()
+    else:
+        queues, kinds = _queues()
+    TEXT_HOT = ("🔥 Был у нас ЭТИМ ЛЕТОМ. Начни с «как вам лето у нас» — он "
+                "помнит педагога. Цель звонка: приход 29.08 (праздник), "
+                "30.08 (ДОД) или на Неделю уроков 31.08–06.09. В подсказке 🎯 — "
+                "чем занимался и что предлагать по возрасту.")
+    TEXT_WARM = ("Занимался у нас до апреля-мая — не ушёл, а закончил сезон. "
+                 "Повод: «группа нового года по его возрасту уже собирается». "
+                 "Цель — приход на событие, не продажа по телефону. "
+                 "До 30.08 сентябрь по ценам прошлого года.")
+    TEXT_RR = ("Раннее развитие: малыш подрос — предложи группу нового года "
+               "по возрасту (в подсказке 🎯). Свободных мест в РР больше всего. "
+               "Зови на Неделю открытых уроков 31.08–06.09.")
     TEXT_CONTIN = ("Продолжение занятий 2026/27: в подсказке 🎯 — чем занимался "
                    "ребёнок в прошлом году. Предложи продолжить в новой группе. "
                    "Если пошёл в школу — вместо подготовки к школе предлагай "
@@ -1465,10 +1652,13 @@ def morning_tasks(mk: MoyklassClient) -> None:
                   "по возрасту из подсказки 🎯. До 31.08 сентябрь по старым ценам.")
     TEXT_COLD = ("Обзвон набора 2026/27: открой карточку, прочитай подсказку 🎯, "
                  "позвони кнопкой и поставь статус по итогу.")
-    TEXTS = {"contin": TEXT_CONTIN, "camp": TEXT_CAMP, "regular": TEXT_RENEW}
+    TEXTS = {"contin": TEXT_CONTIN, "camp": TEXT_CAMP, "regular": TEXT_RENEW,
+             "hot": TEXT_HOT, "warm": TEXT_WARM, "rr": TEXT_RR}
     for idx, adm in enumerate(admins):
         made = 0
         errors = 0
+        if plan_on:
+            per_admin = ADMIN_NORM.get(adm.get("managerId"), per_admin)
         # Порция — это ДОБОРКА до нормы, а не «+40 сверх того, что уже стоит».
         # Иначе ручное перепланирование смены и утренний автопилот складываются,
         # и у администратора оказывается вдвое больше звонков, чем влезает в день.
