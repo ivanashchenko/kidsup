@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>План набора 21–30 августа</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:730;margin:1.5rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+/* правила карточками */
+.rules{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));margin:1.1rem 0}
+.rule{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.05rem;
+  display:grid;grid-template-columns:2rem 1fr;gap:.7rem;align-items:start}
+.rule .ic{font-size:1.25rem;line-height:1.3}
+.rule b{display:block;font-weight:730;margin-bottom:.15rem;font-size:.97rem}
+.rule span{font-size:.9rem;color:var(--muted);line-height:1.5}
+
+/* решения Бориса */
+.dec{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);
+  border-radius:0 11px 11px 0;padding:.95rem 1.15rem;margin:.8rem 0}
+.dec .q{font-weight:750;font-size:1rem;margin-bottom:.3rem}
+.dec .why{font-size:.88rem;color:var(--muted);margin-bottom:.5rem}
+.opts{display:flex;flex-direction:column;gap:.35rem}
+.opt{background:var(--fill);border-radius:8px;padding:.5rem .7rem;font-size:.9rem}
+.opt b{color:var(--amber)}
+.opt.rec{background:var(--green-soft)} .opt.rec b{color:var(--green)}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.3rem 0}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} .dec{display:none} }
+</style>
+
+.day{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:.95rem 1.1rem;margin:.7rem 0;display:grid;grid-template-columns:7.2rem 1fr;gap:1rem;align-items:start}
+.day .d{font-weight:800;color:var(--indigo);line-height:1.25}
+.day .d em{display:block;font-style:normal;font-size:.74rem;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.05em;margin-top:.15rem;font-weight:700}
+.day b{display:block;font-weight:740;margin-bottom:.2rem}
+.day p{margin:.25rem 0;font-size:.92rem}
+.day.peak{border-left:4px solid var(--green)}
+.day.alert{border-left:4px solid var(--red)}
+@media (max-width:34rem){ .day{grid-template-columns:1fr} }
+</style></head>
+<body>
+<div class="wrap">
+<div class="kicker">Решение · вечер 20 августа</div>
+<h1>План набора 21–30 августа</h1>
+<p class="sub">Стратегия, наложенная на реальный график смен. Логика: тёплые контакты —
+лучшему закрывателю, объём — лучшему по записям, подтверждения — в дни-одиночки,
+пиковая мощность 26–27 — на дожим и подтверждение, а не на новые звонки.</p>
+
+<div class="nums">
+  <div class="n"><b>16</b><span>админо-смен за 10 дней</span></div>
+  <div class="n warn"><b>4</b><span>дня центр держит один человек</span></div>
+  <div class="n good"><b>26–27</b><span>единственные дни втроём — пик</span></div>
+  <div class="n hot"><b>29–30</b><span>события — в смене одна Аня</span></div>
+</div>
+
+<section>
+<div class="seclabel">Почему так</div>
+<h2>Четыре принципа, из которых собран план</h2>
+<ul class="plain">
+  <li><b>Входящий всегда первый.</b> Скорость ответа на входящий решает больше, чем
+    любой обзвон: человек, которому перезвонили в первые минуты, конвертируется
+    кратно лучше, чем тот, кому перезвонили вечером. В дни-одиночки это значит:
+    обзвон идёт в окна 10:00–13:00 и 17:00–19:00, между ними — приём и входящие.</li>
+  <li><b>Каждому контакту — минимум два касания.</b> Одна попытка дозвона теряет
+    половину базы. Схема: звонок → недозвонившимся тем же вечером WhatsApp (это
+    делаю я автоматически) → вторая попытка звонка через 1–2 дня в другое время
+    суток → третья на пиковых днях.</li>
+  <li><b>Роли по силам, а не поровну.</b> Цифры 20.08: Лена — 11 разговоров,
+    7 записей, образцовый скрипт; Ира — 21 разговор, 12 записей, но треть времени
+    съедала диктовка почты; Аня — 28 разговоров, 4 записи. Поэтому: Лене — тёплых
+    и всех «думает» (она закрыватель), Ире — объём наборов и подтверждения,
+    Ане — короткий скрипт, реактив и события.</li>
+  <li><b>Подтверждение — отдельная работа, не «если успеем».</b> Обещание прийти
+    без подтверждения доводит до двери около половины; двойное подтверждение
+    (за 1–2 дня + напоминание утром) поднимает доходимость к 70%+. Под это
+    целиком отдан день 28-го.</li>
+</ul>
+</section>
+
+<section>
+<div class="seclabel">Волны</div>
+<h2>Кого звоним в каком порядке</h2>
+<div class="tbl"><table>
+<tr><th>волна</th><th>сегмент</th><th>сколько</th><th>когда</th></tr>
+<tr><td class="w">1 · горячая</td><td>Были у нас этим летом, целевой предмет ПШ/АЯ</td><td>162</td><td>21–24</td></tr>
+<tr><td class="w">2 · тёплая</td><td>Дошли до апреля–мая, ПШ/АЯ</td><td>83</td><td>22–25</td></tr>
+<tr><td class="w">3 · РР</td><td>Малыши и «Музыка и речь» — в РР-группы нового года (80 свободных мест)</td><td>171</td><td>25–27</td></tr>
+<tr><td class="w">4 · дожим</td><td>Все «думает» + недозвоны 2-й и 3-й попыткой + промо-хвосты</td><td>~150</td><td>26–27</td></tr>
+<tr><td class="w">5 · подтверждение</td><td>Все, кто обещал прийти 29–31</td><td>все обещания</td><td>27–28 + утро события</td></tr>
+</table></div>
+<p class="sub">Ранние ушедшие (сентябрь–март, 84 контакта) — резерв на сентябрь:
+звонить их сейчас — тратить пиковые дни на самый холодный сегмент.</p>
+</section>
+
+<section>
+<div class="seclabel">Календарь</div>
+<h2>По дням</h2>
+
+<div class="day"><div class="d">Чт 21<em>Ира одна</em></div><div>
+<b>Горячая волна, максимум наборов</b>
+<p>Лист obzvon_21_08 сверху вниз: сначала секция «Лена» (самые тёплые — её самой
+нет до 24-го), потом своя. Норма 45 наборов. Почту не диктуем. Вечером я шлю
+WhatsApp всем недозвонам.</p></div></div>
+
+<div class="day"><div class="d">Пт 22<em>Аня одна</em></div><div>
+<b>Тёплая волна + вторая попытка по недозвонам Иры</b>
+<p>Секция «Аня» (апрель–май) в другое время суток, чем звонила Ира. Короткий скрипт:
+ребёнок — чем занимался — конкретная группа — «на когда записать».</p></div></div>
+
+<div class="day"><div class="d">Сб 23<em>Аня одна</em></div><div>
+<b>Суббота — лучший дозвон</b>
+<p>Родители дома: добиваем горячую волну и недозвоны четверга-пятницы. Суббота
+днём даёт дозвон выше буднего — грех тратить её на что-то кроме звонков.</p></div></div>
+
+<div class="day"><div class="d">Вс 24<em>Аня + Лена</em></div><div>
+<b>Лена вышла — включается закрыватель</b>
+<p>Лена: все накопленные «думает» и самые тёплые остатки горячей волны. Аня: новые
+наборы по своему списку. Первый день двойной мощности — норма на двоих 70 наборов.</p></div></div>
+
+<div class="day"><div class="d">Пн 25<em>Лена + Ира</em></div><div>
+<b>Старт РР-волны</b>
+<p>Ира открывает РР-сегмент (171 контакт, 80 свободных мест в РР) — объём.
+Лена продолжает дожим тёплых. Все «думает» от Иры сразу передаются Лене.</p></div></div>
+
+<div class="day peak"><div class="d">Вт 26<em>Лена + Ира + Аня</em></div><div>
+<b>ПИК-1: единственные дни всей командой</b>
+<p>Не начинаем нового. Ира — РР-объём. Аня — третья попытка по недозвонам и
+промо-хвосты. Лена — только «думает» и возвраты. Вечером сверка: сколько обещаний
+прихода накоплено на 29–31.</p></div></div>
+
+<div class="day peak"><div class="d">Ср 27<em>Лена + Ира + Аня</em></div><div>
+<b>ПИК-2: последний полный день до событий</b>
+<p>Утром — добор РР и дожим. С обеда все трое переключаются на первое
+подтверждение: звонок каждому обещавшему («ждём в субботу, программа такая-то»).
+Вечером моя рассылка-напоминание всем подтверждённым.</p></div></div>
+
+<div class="day"><div class="d">Чт 28<em>Ира одна</em></div><div>
+<b>День подтверждений</b>
+<p>Никаких новых звонков. Ира прозванивает весь список «приду» на 29–30, закрывает
+листы регистрации, раскладывает старт-пакеты. Это её сильная сторона — фиксация.
+Не дозвонилась — я шлю WhatsApp, Лиза добивает в переписке.</p></div></div>
+
+<div class="day alert"><div class="d">Сб 29<em>Аня одна ⚠</em></div><div>
+<b>Праздник открытия — узкое место всего плана</b>
+<p>На событии одновременно: регистрация гостей, экскурсии, приём семей от педагогов
+после занятий (шаг 9 — «передача из рук в руки»), оформление абонементов, оплаты.
+<b>Один администратор физически не примет поток — очередь у стойки съест продажи,
+ради которых были все 156 звонков.</b> Нужен второй человек хотя бы на пик
+10:00–14:00: Лена или Ира на полдня (с отгулом после), или Лиза очно на
+регистрации, или Борис у входа. Решение за Борисом — но без него план теряет
+самое дорогое звено.</p></div></div>
+
+<div class="day alert"><div class="d">Вс 30<em>Аня одна ⚠</em></div><div>
+<b>День открытых дверей — то же узкое место</b>
+<p>Та же математика. Утром — моё напоминание всем записанным. Аня фиксирует
+каждую семью в CRM сразу, вечером я сверяю: у каждого пришедшего есть статус,
+запись и задача на дожим.</p></div></div>
+</section>
+
+<section>
+<div class="seclabel">Воронка</div>
+<h2>Что это даёт в цифрах</h2>
+<div class="tbl"><table>
+<tr><th>этап</th><th>расчёт</th><th>итог</th></tr>
+<tr><td class="w">Отработано контактов</td><td>ядро 245 (лето + апрель-май) + РР 171 + дожимы/промо</td><td>~500 касаний</td></tr>
+<tr><td class="w">Разговоров</td><td>дозвон ~55% при двух попытках + WhatsApp</td><td>~280</td></tr>
+<tr><td class="w">Обещаний прийти 29–31</td><td>~35% разговоров (цель звонка — приход, не продажа)</td><td>~100 семей</td></tr>
+<tr><td class="w">Дошло до событий</td><td>двойное подтверждение → ~65–70%</td><td>~65 семей</td></tr>
+<tr><td class="w">Купили на событии</td><td>педагог по девяти шагам, ~50–60%</td><td>~35 абонементов</td></tr>
+<tr><td class="w">Дожим Недели уроков</td><td>не купившие сразу + новые пробные 31.08–06.09</td><td>+15–25</td></tr>
+</table></div>
+<p><b>Итого к 7 сентября: с 66 занятых мест к ~115–125.</b> Это не 398, и это
+нормально: оставшиеся ~40% плана добираются в сентябре точечными звонками под
+конкретные незаполненные группы — по людям, которые уже были на событиях и уже
+видели центр. Попытка «продать всем всё сейчас» дала бы меньше, чем событийная
+воронка.</p>
+</section>
+
+<section>
+<div class="seclabel">Контроль</div>
+<h2>Что делаю я каждый день</h2>
+<ul class="plain">
+  <li>Утром — свежий лист обзвона под тех, кто в смене, задачами в МойКласс.</li>
+  <li>Каждый час — разбор звонков: обещания в задачи, нарушения скрипта — замечанием
+    в тот же час.</li>
+  <li>Вечером — WhatsApp-догон всех недозвонов дня и сводка Борису: наборы →
+    разговоры → обещания прихода, по каждому администратору.</li>
+  <li>28-го — контроль подтверждений: каждый «приду» без подтверждения уходит
+    задачей Лизе в переписку.</li>
+  <li>После событий — сверка CRM: пришедший без статуса и записи = задача на
+    следующее утро.</li>
+</ul>
+</section>
+
+<div class="foot">
+Составлено 20.08.2026 по графику смен от Бориса. Данные: 329 детей ядра ПШ+АЯ
+(162 — лето, 83 — апрель-май), РР-сегмент 171, свободно мест: ПШ 103, АЯ 58,
+РР 80. Смежное: <a href="/base/strategiya_nabora">стратегия набора</a> ·
+<a href="/base/obzvon_21_08">лист обзвона 21.08</a> ·
+<a href="/base/pedagog_probnoe">девять шагов педагога</a> ·
+<a href="/base/sobytiya_29_31">чек-листы событий</a>.
+</div>
+</div>
+</body>
+</html>
