@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Подключение WABA на номер 0918</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .4rem;text-wrap:balance}
+h3{font-size:1.03rem;font-weight:730;margin:1.6rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+code{background:var(--fill);padding:.1rem .35rem;border-radius:5px;font-size:.88em;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+.step{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:1rem 1.15rem;margin:.75rem 0;display:grid;grid-template-columns:2.1rem 1fr;gap:.85rem;align-items:start}
+.step .num{font-size:1.3rem;font-weight:800;color:var(--indigo);line-height:1.2;font-variant-numeric:tabular-nums}
+.step b{display:block;font-weight:740;margin-bottom:.25rem;font-size:1.01rem}
+.step p{margin:.3rem 0;font-size:.93rem}
+.step ul{margin:.4rem 0;padding-left:1.15rem;font-size:.93rem} .step li{margin:.25rem 0}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.35rem 0}
+.tpl{background:var(--fill);border:1px solid var(--line);border-radius:9px;
+  padding:.7rem .9rem;margin:.55rem 0;font-size:.92rem;max-width:47rem}
+.tpl em{display:block;font-style:normal;font-size:.74rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.25rem}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="kicker">Инструкция для Бориса · 20.08.2026</div>
+<h1>Подключение WABA на номер 0918</h1>
+<p class="sub">WhatsApp Business API на +7 916 017-09-18 — что это меняет, в каком
+порядке подключать, чтобы не остановить рассылку, и как связать с новым сайтом.</p>
+
+<!-- ================================================= ЧТО РЕШИТЬ ДО -->
+<section>
+<div class="seclabel">Прочитать до того, как нажимать</div>
+<h2>Три вещи, которые меняются необратимо</h2>
+
+<div class="warn"><b>1. Обычный WhatsApp на этом номере перестанет работать навсегда.</b>
+После перевода номера в WABA приложение WhatsApp и WhatsApp Business на нём больше
+не запустится. Переписка ведётся только через Wazzup или другой интерфейс поверх API.
+Обратный переход возможен, но это отдельная процедура с потерей истории.</div>
+
+<div class="warn"><b>2. Писать первым можно будет только шаблонами.</b> Это главное
+и самое неприятное. В WABA сообщение человеку, который нам не писал последние
+24 часа, уходит <b>только заранее одобренным Meta шаблоном</b>. Свободный текст —
+исключительно внутри 24-часового окна после сообщения клиента.
+<br><br>У нас прямо сейчас <b>688 сообщений в очереди рассылки</b> — все они
+инициирующие. На WABA они пойдут только шаблонами, каждый из которых Meta проверяет
+отдельно и может отклонить за «слишком рекламную» формулировку.</div>
+
+<div class="warn"><b>3. Каждый диалог платный.</b> Meta берёт деньги за диалоги
+по категориям: маркетинг, сервис, служебные. Маркетинговые — самые дорогие.
+Актуальный тариф уточните у Wazzup при подключении: он меняется, и я не хочу
+называть цифру, которая устареет. При наших объёмах это статья расходов,
+которую надо заложить.</div>
+
+<h3>Что мы получаем взамен</h3>
+<ul class="plain">
+  <li><b>Легальность.</b> Рассылку больше не банят за массовость — это официальный
+    канал. Наш основной 0077 уже ловил блокировку, 3507 сейчас отвалился по QR.</li>
+  <li><b>Зелёная галочка</b> и название «KidsUP» вместо номера — после верификации
+    бизнеса.</li>
+  <li><b>Кнопки в сообщениях</b>: «Записаться», «Посмотреть расписание» — родитель
+    отвечает в одно касание.</li>
+  <li><b>Стабильность.</b> Никаких QR, которые слетают, и никакого телефона,
+    который должен быть включён.</li>
+</ul>
+
+<div class="note"><b>Почему именно 0918 — правильный выбор.</b> Наш сайт уже ведёт
+на этот номер: кнопки WhatsApp идут через <code>app.kidsup.ru/go/whatsapp</code>
+на <code>wa.me/79160170918</code>. Ссылки <code>wa.me</code> работают с WABA
+без изменений, так что сайт править не придётся вообще.
+<br><br><b>Но у этого есть цена:</b> 0918 сейчас — наша главная рабочая лошадка
+рассылки, с него уходит основной объём. На время миграции и согласования шаблонов
+он выпадет. Поэтому порядок шагов ниже начинается не с миграции.</div>
+</section>
+
+<!-- ================================================= ПОДГОТОВКА -->
+<section>
+<div class="seclabel">Часть 1 · за 1–2 дня до</div>
+<h2>Подготовка, чтобы рассылка не встала</h2>
+
+<div class="step"><div class="num">0</div><div>
+<b>Починить резервные номера — это делаю я</b>
+<p>Сейчас из трёх WhatsApp-каналов реально живых два: 0918 (активен) и 0077
+(активен, но с историей банов). Номер <b>79199683507 висит в состоянии qridle</b> —
+QR слетел, канал не работает.</p>
+<p>До начала миграции нужно пересканировать QR для 3507, иначе на время перевода
+0918 весь объём ляжет на 0077, который мы бережём. От вас нужен доступ к телефону
+с этим номером на пять минут.</p>
+</div></div>
+
+<div class="step"><div class="num">1</div><div>
+<b>Собрать документы для верификации бизнеса</b>
+<p>Meta проверяет, что компания реальная. Понадобится:</p>
+<ul>
+  <li>ИНН и ОГРН юрлица или ИП, на которое оформлен центр;</li>
+  <li>подтверждение адреса — выписка или договор аренды;</li>
+  <li>сайт с указанием реквизитов — <b>у нас это уже есть</b> на kidsup.ru
+    (страницы оферты и политики);</li>
+  <li>почта на домене — сюда придёт код подтверждения. Если почты на kidsup.ru нет,
+    заводим: без неё верификация не проходит.</li>
+</ul>
+<p>Верификация занимает от суток до недели. Начинать надо с неё, а не с номера.</p>
+</div></div>
+
+<div class="step"><div class="num">2</div><div>
+<b>Завести Meta Business Manager</b>
+<p><code>business.facebook.com</code> → создать бизнес-аккаунт на KidsUP.
+Название — точно как в документах, иначе верификация отклонится. Туда же
+привязать способ оплаты: без него WABA не активируется.</p>
+</div></div>
+</section>
+
+<!-- ================================================= ПОДКЛЮЧЕНИЕ -->
+<section>
+<div class="seclabel">Часть 2 · сам перевод</div>
+<h2>Подключение номера</h2>
+
+<div class="step"><div class="num">3</div><div>
+<b>Заявка в Wazzup на WABA</b>
+<p>Wazzup — наш провайдер и официальный BSP, всё делается у них: личный кабинет →
+Каналы → Добавить канал → WhatsApp Business API. Они запросят Business Manager ID
+и проведут через подключение.</p>
+<p>Отдельно спросите у них две вещи, которые определят экономику:
+<b>актуальный тариф за диалоги по категориям</b> и <b>сроки согласования шаблонов</b>.</p>
+</div></div>
+
+<div class="step"><div class="num">4</div><div>
+<b>Освободить номер 0918 от обычного WhatsApp</b>
+<p>В приложении WhatsApp Business на этом номере: Настройки → Аккаунт → Удалить
+аккаунт. <b>Сделать это надо в момент миграции, не заранее</b> — иначе номер
+останется без связи вообще.</p>
+<p>Перед удалением — выгрузить историю переписки, если она нужна. После удаления
+её не вернуть.</p>
+</div></div>
+
+<div class="step"><div class="num">5</div><div>
+<b>Подтвердить номер и задать отображаемое имя</b>
+<p>Код придёт звонком или SMS на 0918. Display name — <b>KidsUP</b>. Meta не
+пропускает имена с рекламой, лишними словами и адресом; просто название бренда.
+Отклонённое имя можно подать заново, но это ещё сутки.</p>
+</div></div>
+</section>
+
+<!-- ================================================= ШАБЛОНЫ -->
+<section>
+<div class="seclabel">Часть 3 · самое важное</div>
+<h2>Шаблоны — заготовить заранее</h2>
+<p>Пока шаблоны не одобрены, писать первыми нельзя вообще. Подавать надо сразу
+после подключения номера, а лучше — иметь тексты готовыми до него.</p>
+
+<p>Категорию выбирайте честно: <b>marketing</b> для приглашений и предложений,
+<b>utility</b> для подтверждений записи и напоминаний. Utility дешевле и проходит
+модерацию легче, но если под ним отправить рекламу, Meta переклассифицирует
+шаблон и может ограничить аккаунт.</p>
+
+<h3>Что подать в первую очередь</h3>
+
+<div class="tpl"><em>utility · подтверждение записи на пробное</em>
+{{1}}, записали {{2}} на пробное занятие «{{3}}» — {{4}} в {{5}}.<br>
+Адрес: б-р Маршала Рокоссовского, 6к1В, 2 этаж, 7 подъезд.<br>
+Первое занятие условно-бесплатное: не понравится — платить не нужно.<br>
+<i>Кнопки: «Подтверждаю» · «Перенести»</i></div>
+
+<div class="tpl"><em>utility · напоминание накануне</em>
+{{1}}, напоминаем: завтра в {{2}} у {{3}} занятие «{{4}}» в KidsUP.<br>
+Возьмите сменную обувь. Если планы изменились — напишите сюда.<br>
+<i>Кнопка: «Буду» · «Не смогу»</i></div>
+
+<div class="tpl"><em>marketing · приглашение на событие</em>
+{{1}}, здравствуйте! Это KidsUP на Бульваре Рокоссовского.<br>
+{{2}} приглашаем на праздник открытия сезона, а с 31 августа по 6 сентября
+проходит Неделя открытых уроков — можно прийти на любые занятия.<br>
+<i>Кнопки: «Хочу прийти» · «Расписание»</i></div>
+
+<div class="tpl"><em>marketing · возвращение в новый учебный год</em>
+{{1}}, здравствуйте! {{2}} занимался у нас в прошлом году на направлении «{{3}}».<br>
+Мы набираем группы на 2026/27 — подобрали продолжение по возрасту.<br>
+<i>Кнопка: «Подобрать группу»</i></div>
+
+<div class="warn"><b>Чего Meta не пропустит.</b> Слов «бесплатно» в заголовке,
+восклицаний через одно слово, обещаний скидок без конкретики, ссылок на сторонние
+домены. И наше внутреннее правило здесь совпадает с требованиями Meta:
+пишем «условно-бесплатное первое занятие», а не «бесплатное пробное».</div>
+</section>
+
+<!-- ================================================= САЙТ -->
+<section>
+<div class="seclabel">Часть 4</div>
+<h2>Как связать с сайтом</h2>
+
+<div class="ok"><b>Хорошая новость: основное уже работает.</b> Кнопки WhatsApp
+на kidsup.ru, kidsupday.ru и kidsupweek.ru идут через
+<code>app.kidsup.ru/go/whatsapp</code> — мы фиксируем клик, номер визита Roistat
+и utm-метки, а потом переводим на <code>wa.me/79160170918</code>. Формат
+<code>wa.me</code> одинаково работает с обычным WhatsApp и с WABA, так что после
+перевода номера ссылки продолжат работать <b>без единой правки на сайте</b>.</div>
+
+<h3>Что добавится после WABA</h3>
+<div class="tbl"><table>
+<tr><th>возможность</th><th>что делаем</th></tr>
+<tr><td class="w">Автоответ на заявку</td>
+  <td>Форма на сайте уже шлёт лид в <code>/api/public/lead</code>. После WABA
+  я вешаю туда отправку utility-шаблона: человек оставил заявку — через минуту
+  получает подтверждение с адресом и временем. Сейчас так делать нельзя,
+  потому что инициирующие сообщения незнакомым рискуют баном.</td></tr>
+<tr><td class="w">Виджет на сайте</td>
+  <td>Wazzup даёт виджет-кнопку с выбором мессенджера. Ставится одной строкой
+  в шаблон, но требует проверки: наш сайт собирается скриптом
+  <code>site/build_site.py</code>, вставлять надо в него, а не в готовый html.</td></tr>
+<tr><td class="w">Реклама с переходом в чат</td>
+  <td>Click-to-WhatsApp Ads — объявление ведёт сразу в переписку, минуя сайт.
+  Для детского центра это обычно дешевле лида с формы. Доступно только после WABA
+  и верификации.</td></tr>
+<tr><td class="w">Сквозная аналитика</td>
+  <td>Мы уже склеиваем клик и обращение на странице <code>/clicks</code>.
+  После WABA к этому добавится статус доставки каждого шаблона — будет видно
+  не только «написал», но и «получил, прочитал, ответил».</td></tr>
+</table></div>
+</section>
+
+<!-- ================================================= ПОРЯДОК -->
+<section>
+<div class="seclabel">Итог</div>
+<h2>Порядок, чтобы ничего не встало</h2>
+<div class="tbl"><table>
+<tr><th>#</th><th>шаг</th><th>кто</th><th>сколько ждать</th></tr>
+<tr><td>1</td><td>Пересканировать QR на номере 3507</td><td>Борис + я</td><td>5 минут</td></tr>
+<tr><td>2</td><td>Почта на домене kidsup.ru</td><td>Борис</td><td>час</td></tr>
+<tr><td>3</td><td>Meta Business Manager + документы</td><td>Борис</td><td>1 час на подачу</td></tr>
+<tr><td>4</td><td>Верификация бизнеса</td><td>Meta</td><td>от суток до недели</td></tr>
+<tr><td>5</td><td>Заявка в Wazzup, тариф и сроки</td><td>Борис</td><td>1 день</td></tr>
+<tr><td>6</td><td>Перевод рассылки на 0077 и 3507</td><td>я</td><td>10 минут</td></tr>
+<tr><td>7</td><td>Удалить WhatsApp Business с 0918, подтвердить номер</td><td>Борис</td><td>30 минут</td></tr>
+<tr><td>8</td><td>Подать четыре шаблона</td><td>я готовлю, Борис подаёт</td><td>от часа до суток</td></tr>
+<tr><td>9</td><td>Вернуть рассылку на 0918, уже легально</td><td>я</td><td>10 минут</td></tr>
+<tr><td>10</td><td>Автоответ на заявку с сайта</td><td>я</td><td>полдня</td></tr>
+</table></div>
+
+<div class="note"><b>Про сроки.</b> Верификация бизнеса — единственный шаг, который
+мы не контролируем, и он же самый долгий. До событий 29 августа осталось девять
+дней; если верификация затянется, WABA к празднику не успеет. Поэтому предлагаю
+подать документы завтра, а рассылку приглашений вести как сейчас, с QR-номеров —
+и переезжать на WABA уже под сентябрьский дозаполнение групп.</div>
+</section>
+
+<div class="foot">
+Состояние каналов на 20.08.2026: WhatsApp 0918 активен, 0077 активен (были
+блокировки), 3507 в состоянии qridle. В очереди рассылки 688 сообщений,
+отправлено 597. Сайт ведёт на 0918 через <code>/go/whatsapp</code>.
+Смежное: <a href="/clicks">клики по мессенджерам</a> ·
+<a href="/base/kontrol_sistem">карта покрытия систем</a> ·
+<a href="/base/it_zadachi_borisa">ИТ-задачи владельца</a>.
+</div>
+
+</div>
+</body>
+</html>
