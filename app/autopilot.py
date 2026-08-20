@@ -607,8 +607,14 @@ def _broadcast_tick() -> None:
             # promo_nedozvon сюда добавлен 20.08: 57 промо-контактов, до которых
             # не дозвонились, стояли в самом хвосте очереди и по темпу дошли бы
             # до отправки уже после праздника — то есть никогда.
+            # promo_nedozvon — самый скоропортящийся сегмент: человек отдал номер
+            # промоутеру на улице и помнит нас несколько дней. Поставленный в
+            # общую группу с приглашениями, он всё равно уходил в хвост по id
+            # (заведён позже) и ждал бы отправки 3 дня. Поэтому отдельный,
+            # высший приоритет — выше приглашений.
             "ORDER BY campaign = 'no1_apology' DESC, "
-            "(campaign LIKE 'invite%' OR campaign = 'promo_nedozvon') DESC, id "
+            "campaign = 'promo_nedozvon' DESC, "
+            "campaign LIKE 'invite%' DESC, id "
             "LIMIT 30").fetchall()
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
     team = _team_phones()
