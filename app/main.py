@@ -2137,7 +2137,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.1"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.4"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2200,6 +2200,50 @@ async def api_set_setting(payload: dict):
         raise HTTPException(400, f"key должен быть одним из {sorted(SETTABLE)}")
     db.set_setting(key, str(value))
     return {"ok": True, key: db.get_setting(key)}
+
+
+@app.get("/api/ai/probe", dependencies=AUTH)
+async def api_ai_probe():
+    """Дошёл ли запрос до Anthropic и что ответил.
+
+    Разделяем состояния, которые снаружи выглядят одинаково «не работает»:
+    прокси не прописан, прокси не отвечает, секрет не принят, ключ неверен."""
+    from . import assistant
+    r = assistant.probe()
+    base = db.get_setting("anthropic_base_url") or "https://api.anthropic.com"
+    key = db.get_setting("anthropic_api_key") or ""
+    secret = db.get_setting("anthropic_proxy_secret") or ""
+    st = r.get("status")
+    via_proxy = "api.anthropic.com" not in base
+    body = (r.get("body") or "").lower()
+    if not r.get("reachable"):
+        verdict = ("Адрес не отвечает вовсе. Проверьте, что он написан без "
+                   "косой черты в конце и открывается в браузере.")
+    elif not via_proxy:
+        verdict = ("Прокси не прописан: запрос идёт напрямую на "
+                   "api.anthropic.com, оттуда отказ по региону.")
+    elif st == 500 and "shared_secret" in body:
+        # Воркер жив и отвечает, но в его настройках нет переменной.
+        # Частая причина: значение добавили, а Deploy не нажали.
+        verdict = ("Прокси работает, но в нём не задан SHARED_SECRET. "
+                   "В настройках воркера: Settings → Variables and Secrets → "
+                   "Add → тип Secret, имя SHARED_SECRET, значение — то же, "
+                   "что в anthropic_proxy_secret. После добавления обязательно "
+                   "нажмите Deploy, иначе переменная не применится.")
+    elif st == 403 and "forbidden" in body:
+        verdict = ("Прокси отвечает, но не принимает секрет: "
+                   "anthropic_proxy_secret должен совпадать с SHARED_SECRET "
+                   "в настройках воркера посимвольно.")
+    elif st == 401:
+        verdict = ("Регион в порядке, прокси работает — дело только в ключе. "
+                   "Проверьте, что он вписан целиком.")
+    elif st == 200:
+        verdict = "Всё работает: запрос дошёл до Anthropic и получил ответ."
+    else:
+        verdict = f"Неожиданный ответ {st}. Текст ниже поможет понять причину."
+    return {"вердикт": verdict, "адрес": base,
+            "ключ": ("вписан" if key else "НЕ вписан"),
+            "секрет": ("вписан" if secret else "НЕ вписан"), "детали": r}
 
 
 @app.post("/api/deploy", dependencies=AUTH)
