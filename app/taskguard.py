@@ -41,6 +41,41 @@ STAFF = {232763: "Ира", 232805: "Аня", 202856: "Лена",
          154181: "Лиза", 84116: "Борис", 229704: "Маша"}
 CAT_CALL, CAT_ORG = 104576, 104578
 
+# Владелец не должен получать работу администратора. Фильтр по смыслу стоял
+# только в autopilot._task(), а половина задач создаётся напрямую через API —
+# мимо него. 21.08 у Бориса из 20 задач владельческими были шесть: остальное —
+# «позвонить по заявке», «прислать программу в WhatsApp», «отправить ссылку
+# на оплату» и даже «вы на переписке одна» — текст, написанный для Лизы.
+# Сторож смотрит на результат, а не на точку создания, поэтому ловит всё.
+OWNER_ID = 84116
+CHAT_ADMIN = 154181                     # Лиза: переписка и деньги
+# Требует решения владельца: доступы, деньги компании, люди, обязательства.
+# Только то, чего администратор физически не может сделать: доступы, деньги
+# компании, люди, обязательства. Слабые слова сюда не годятся — «договор»
+# ловил «договорились», «кто ведёт» перевешивало «прислать программу»,
+# и задача «отправь клиенту программу и имя педагога» оставалась у владельца,
+# хотя отправляет её Лиза. Правило простое: получает тот, кто ИСПОЛНЯЕТ,
+# а недостающий факт вписывается в текст задачи.
+OWNER_WORK = re.compile(
+    r"доступ|логин|парол|токен|аренд|реклам|бюджет|нанять|найм|уволь|закуп|"
+    r"списать|учредител|юрлиц|лиценз|партнёр|стратег|на сайте|сайт вводит|"
+    r"правк\w+ сайта|домен|тариф|подписк|нов\w+ педагог|второй человек|"
+    r"^Решение:|внедрить",
+    re.I)
+# «сайт» голым словом сюда не годится: «заявка с сайта» — обычный лид
+# для обзвона, а не правка сайта владельцем. Ловим только формулировки
+# про сам сайт: «на сайте написано», «сайт вводит в заблуждение».
+# Работа администратора: звонок, переписка, оформление в CRM.
+ADMIN_WORK = re.compile(
+    r"позвонить|перезвонить|обзвон|📞|набрать|прислать|отправить|написать в|"
+    r"ссылк\w* на оплату|занести в CRM|перенести в карточк|записать [вна]|"
+    r"подтвердить приход|держать ответ|вы на переписке|ответить|"
+    r"клиент ждёт ответа|клиент писал|обещали", re.I)
+# Что уходит Лизе, а не звонящему: деньги и всё, что делается текстом.
+TO_CHAT = re.compile(r"оплат|возврат|счёт|счет|долг|абонемент|прайс|цен[аыу]|"
+                     r"написать|переписк|WhatsApp|Telegram|телеграм|чат|MAX",
+                     re.I)
+
 GHOST = re.compile(r"Закрыта без действия")
 MY_CLOSURE = re.compile(r"\[(дубль|закрыто|сведено|остыло|убрано)", re.I)
 URGENT_TEXT = re.compile(r"в течение \d+ минут", re.I)
@@ -136,6 +171,36 @@ def _rewrite(mk: MoyklassClient, t: dict, *, day: str | None = None,
         return False
 
 
+def _duty() -> int | None:
+    """Кто сегодня на звонках. Берём из живого расписания смен, а не из
+    памяти: администратор в отпуске не должен получать сегодняшний обзвон."""
+    try:
+        from .autopilot import _admins_today
+        a = _admins_today()
+        return a[0]["managerId"] if a else None
+    except Exception:
+        return None
+
+
+def _reassign(mk: MoyklassClient, t: dict, to: int) -> bool:
+    b = {k: t.get(k) for k in ("userId", "classIds", "filialIds", "ownerId",
+                              "reminds")}
+    b = {k: v for k, v in b.items() if v is not None}
+    b["managerIds"] = [to]
+    b["categoryId"] = t.get("categoryId") or CAT_CALL
+    b["isAllDay"] = False
+    d = (t.get("beginDate") or "")[:10] or date.today().isoformat()
+    b["beginDate"] = f"{d}T{msk_hour(t.get('beginDate'))}:00+03:00"
+    b["endDate"] = f"{d}T20:00:00+03:00"
+    b["body"] = (t.get("body") or "")[:250]
+    try:
+        mk.post(f"/v1/company/tasks/{t['id']}", b)
+        return True
+    except Exception:
+        log.warning("taskguard: не удалось передать задачу %s", t.get("id"))
+        return False
+
+
 def check(mk: MoyklassClient, fix: bool = True) -> dict:
     from .autopilot import _real_number
 
@@ -171,6 +236,14 @@ def check(mk: MoyklassClient, fix: bool = True) -> dict:
         if cur and cur < today:
             if fix and _rewrite(mk, t, day=today):
                 fixed["просрочка"] += 1
+            continue
+
+        # Задача владельцу, которая на самом деле — работа администратора.
+        if OWNER_ID in (t.get("managerIds") or []) and ADMIN_WORK.search(body) \
+                and not OWNER_WORK.search(body):
+            to = CHAT_ADMIN if TO_CHAT.search(body) else (_duty() or CHAT_ADMIN)
+            if fix and _reassign(mk, t, to):
+                fixed["передано администратору"] += 1
             continue
 
         if not t.get("categoryId"):
