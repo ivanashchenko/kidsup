@@ -30,6 +30,7 @@ from datetime import date, timedelta
 
 from .moyklass_client import MoyklassClient
 from . import sync
+from . import taskguard
 
 log = logging.getLogger("kidsup.tasktidy")
 
@@ -157,7 +158,7 @@ def plan(dry: bool = True) -> dict:
                                    "mgr": new_mgr, "body": body[:80]})
             # 3. переносившаяся задача идёт первой в своём дне
             m = CARRIED.search(body)
-            if m and int(m.group(1)) >= 1 and (t.get("beginDate") or "")[11:16] > "09:00":
+            if m and int(m.group(1)) >= 1 and taskguard.msk_hour(t.get("beginDate")) > "09:00":
                 acts["перенос ×N — вперёд"].append(
                     {"id": t["id"], "cur": cur, "body": body[:80]})
         log.info("tasktidy: %s", {k: len(v) for k, v in acts.items()})
@@ -191,7 +192,7 @@ def plan(dry: bool = True) -> dict:
                         body = f"{body} (перенос ×{n})"
                     elif n:
                         body = CARRIED.sub(f"(перенос ×{n})", body)
-                    hour = "09:00" if n else (t.get("beginDate") or "")[11:16] or "09:00"
+                    hour = "09:00" if n else taskguard.msk_hour(t.get("beginDate"))
                     b["body"] = body[:250]
                     b["beginDate"] = f"{day}T{hour}:00+03:00"
                     b["endDate"] = f"{day}T20:00:00+03:00"

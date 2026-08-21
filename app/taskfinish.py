@@ -205,7 +205,7 @@ def apply() -> dict:
             b = {k: v for k, v in b.items() if v is not None}
             b["isAllDay"] = False
             day = it.get("move_to") or (t.get("beginDate") or "")[:10]
-            hour = (t.get("beginDate") or "")[11:16] or "09:00"
+            hour = taskguard.msk_hour(t.get("beginDate"))
             b["beginDate"] = f"{day}T{hour}:00+03:00"
             b["endDate"] = f"{day}T20:00:00+03:00"
             if it["act"] == "закрыть":

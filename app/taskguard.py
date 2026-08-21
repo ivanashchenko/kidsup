@@ -30,7 +30,7 @@ import json
 import logging
 import re
 from collections import Counter, defaultdict
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from . import db
 from .moyklass_client import MoyklassClient
@@ -86,6 +86,30 @@ def _open_tasks(mk: MoyklassClient) -> list[dict]:
     return list({t["id"]: t for t in out}.values())
 
 
+MSK = timezone(timedelta(hours=3))
+
+
+def msk_hour(begin: str | None, default: str = "09:00") -> str:
+    """Час задачи в московском времени.
+
+    API отдаёт beginDate в UTC: «2026-08-21T08:00:00+00:00» — это 11:00 МСК.
+    Раньше час брался срезом [11:16], то есть читался UTC-час, и записывался
+    обратно с «+03:00» — каждое касание сдвигало задачу на три часа назад.
+    К вечеру 21.08 в CRM уже было 58 задач на 06:00 и 21 задача на 03:00 ночи,
+    а сторож, работающий дважды в день, продолжал их утаскивать. Уехав за
+    полночь, задача становится «вчерашней» и попадает под правило просрочки —
+    круг замыкается сам на себя."""
+    if not begin:
+        return default
+    try:
+        dt = datetime.fromisoformat(begin.replace("Z", "+00:00"))
+    except ValueError:
+        return default
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=MSK)
+    return dt.astimezone(MSK).strftime("%H:%M")
+
+
 def _rewrite(mk: MoyklassClient, t: dict, *, day: str | None = None,
              cat: int | None = None, close_why: str | None = None) -> bool:
     """Задача в МойКласс обновляется полной заменой: поле, которого нет
@@ -96,7 +120,7 @@ def _rewrite(mk: MoyklassClient, t: dict, *, day: str | None = None,
     b["categoryId"] = cat or t.get("categoryId") or CAT_CALL
     b["isAllDay"] = False
     d = day or (t.get("beginDate") or "")[:10] or date.today().isoformat()
-    hour = (t.get("beginDate") or "")[11:16] or "09:00"
+    hour = msk_hour(t.get("beginDate"))
     b["beginDate"] = f"{d}T{hour}:00+03:00"
     b["endDate"] = f"{d}T20:00:00+03:00"
     if close_why:

@@ -306,7 +306,7 @@ def apply() -> dict:
             b["categoryId"] = it.get("new_cat") or t.get("categoryId") or CAT_CALL
             b["isAllDay"] = False
             day = it.get("new_day") or (t.get("beginDate") or "")[:10]
-            hour = (t.get("beginDate") or "")[11:16] or "09:00"
+            hour = taskguard.msk_hour(t.get("beginDate"))
             b["beginDate"] = f"{day}T{hour}:00+03:00"
             b["endDate"] = f"{day}T20:00:00+03:00"
             if it["act"] == "закрыть":
