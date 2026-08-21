@@ -2137,7 +2137,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.8"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.9"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2295,6 +2295,18 @@ async def api_ai_hint(payload: dict):
         return {"профиль": profile, "подсказка": brain.call_hint(profile)}
     finally:
         mk.close()
+
+
+@app.post("/api/ai/dialog", dependencies=AUTH)
+async def api_ai_dialog(payload: dict):
+    """{"messages":[{"dir":"in|out","text":"…"}]} — намерение и следующий шаг."""
+    from . import brain
+    ms = payload.get("messages") or []
+    if not ms:
+        raise HTTPException(400, "нужен messages")
+    if not brain.enabled():
+        return {"error": "ключ Anthropic не вписан"}
+    return {"разбор": brain.read_dialog(ms)}
 
 
 @app.post("/api/deploy", dependencies=AUTH)
