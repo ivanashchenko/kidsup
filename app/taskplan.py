@@ -348,13 +348,16 @@ def decide() -> list[dict]:
                                if ABOUT_ENROLL.search(x.get("body") or "")):
             act, why = "закрыть", f"дубль: по клиенту ещё {len(mine)-1} задач"
 
-        elif OWNER in mgrs and not OWNER_ONLY.search(body) and LEAD.search(body):
-            # задача владельца, которая на самом деле обычный лид —
-            # отдаём в обзвон тому, кто сегодня звонит
-            act, mgr, why = "раздать", None, "лид — в обзвон, не владельцу"
-
         elif OWNER in mgrs and MONEY.search(body) and not OWNER_ONLY.search(body):
             act, mgr, why = "передать", CHAT_ADMIN, "деньги и документы — Лизе"
+
+        elif OWNER in mgrs and not OWNER_ONLY.search(body):
+            # Всё, что лежит на владельце и не требует ЕГО решения, — текучка,
+            # попавшая к нему по умолчанию. Признак лида не требуем: «Продолжение
+            # занятий 2026/27» — обычный обзвон, просто без слова «перезвонить».
+            # Владельцу остаётся только то, где нужны доступы, договор, деньги
+            # наружу или люди.
+            act, mgr, why = "раздать", None, "не требует решения владельца — в обзвон"
 
         else:
             # 4. срок назван в тексте
@@ -431,6 +434,18 @@ def decide() -> list[dict]:
                 x["why"] = ("не звонили ни разу" if x["rank"] == 0 else
                             "набирали, не дозвонились" if x["rank"] == 1 else
                             "уже разговаривали" if x["rank"] == 2 else "по плану смен")
+    # Ни одна задача не должна остаться в прошлом. Всё, что после разбора
+    # всё ещё стоит вчерашним днём, поднимается на сегодня: просроченная
+    # задача не выполняется, она просто перестаёт быть заметной.
+    for x in out:
+        if x["act"] == "закрыть":
+            continue
+        day = x.get("day") or x["cur"]
+        if day and day < today:
+            x["day"] = today
+            if x["act"] == "оставить":
+                x["act"] = "разложить"
+            x["why"] = (x["why"] + "; " if x["why"] else "") + "была просрочена"
     json.dump(out, open(f"{SP}/taskplan_decisions.json", "w"), ensure_ascii=False)
     return out
 
