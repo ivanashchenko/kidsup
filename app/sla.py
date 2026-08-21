@@ -158,6 +158,21 @@ def _had_action(user_id: int | None, since: datetime) -> bool:
     return False
 
 
+# Статусы, при которых отсутствие звонка — норма: не писать, некачественный,
+# отказ, архив набора. Задачу по такому клиенту переоткрывать нельзя.
+NO_CONTACT_STATES = {146328, 125954, 125957, 345759}
+
+
+def _skip_client(mk, user_id) -> bool:
+    if not user_id:
+        return False
+    try:
+        return mk.get(f"/v1/company/users/{user_id}").get("clientStateId") \
+            in NO_CONTACT_STATES
+    except Exception:
+        return False
+
+
 def verify_closed() -> dict:
     """Закрытые сегодня задачи без единого действия — открываем заново.
 
@@ -179,6 +194,12 @@ def verify_closed() -> dict:
             if not _mark("sla_verify", str(t["id"])):
                 continue
             if _had_action(t.get("userId"), begin):
+                continue
+            # По клиентам, которым мы сознательно не пишем и не звоним,
+            # «нет действия» — это правильный итог, а не халатность.
+            # 21.08 проверка переоткрыла задачи по тестовым карточкам, которые
+            # я сам закрыл часом раньше, и дежурная снова их набирала.
+            if _skip_client(mk, t.get("userId")):
                 continue
             body = ("⚠️ Закрыта без действия (нет ни звонка, ни сообщения). "
                     + (t.get("body") or ""))[:250]
