@@ -68,14 +68,7 @@ def _subject(name: str) -> str | None:
 def collect() -> list[dict]:
     mk = MoyklassClient(sync.get_api_key())
     try:
-        joins, off = [], 0
-        while off < 20000:
-            r = mk.get("/v1/company/joins", {"limit": 100, "offset": off})
-            js = r.get("joins") or []
-            if not js:
-                break
-            joins += js
-            off += 100
+        joins = taskguard.pull_all(mk, "/v1/company/joins", "joins")
         rc = mk.get("/v1/company/classes", {"limit": 500})
         cls = {c["id"]: (c.get("name") or "")
                for c in (rc.get("classes") if isinstance(rc, dict) else rc)}

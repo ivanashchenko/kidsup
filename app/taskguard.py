@@ -90,6 +90,30 @@ PHONE = re.compile(r"\+7(\d{10})")
 PAGE_CAP = 2000
 
 
+def pull_all(mk: MoyklassClient, path: str, key: str, params: dict | None = None,
+             cap: int = 40000) -> list[dict]:
+    """Выкачать эндпоинт целиком, а не первые N страниц.
+
+    21.08 выборка joins была ограничена тремя тысячами при 8082 записях
+    в CRM — две трети данных не дошли, и я сказал владельцу «в группах ПШ
+    ноль записей», хотя их был двадцать один. Молчаливое обрезание опаснее
+    ошибки: цифра выглядит правдоподобно и её никто не перепроверяет.
+    Поэтому предел здесь заведомо избыточный, а его достижение — громкое."""
+    out, off = [], 0
+    while off < cap:
+        q = dict(params or {})
+        q.update({"limit": 100, "offset": off})
+        r = mk.get(path, q)
+        rows = (r.get(key) if isinstance(r, dict) else r) or []
+        if not rows:
+            return out
+        out += rows
+        off += 100
+    log.error("pull_all: %s отдал больше %d строк — выборка обрезана, "
+              "цифрам по ней доверять нельзя", path, cap)
+    return out
+
+
 def all_tasks(mk: MoyklassClient, manager_id: int) -> list[dict]:
     """Все задачи менеджера, открытые и закрытые.
 
