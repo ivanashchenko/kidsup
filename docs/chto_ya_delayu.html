@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Что я делаю и что контролирую</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:730;margin:1.5rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+/* правила карточками */
+.rules{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));margin:1.1rem 0}
+.rule{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.05rem;
+  display:grid;grid-template-columns:2rem 1fr;gap:.7rem;align-items:start}
+.rule .ic{font-size:1.25rem;line-height:1.3}
+.rule b{display:block;font-weight:730;margin-bottom:.15rem;font-size:.97rem}
+.rule span{font-size:.9rem;color:var(--muted);line-height:1.5}
+
+/* решения Бориса */
+.dec{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);
+  border-radius:0 11px 11px 0;padding:.95rem 1.15rem;margin:.8rem 0}
+.dec .q{font-weight:750;font-size:1rem;margin-bottom:.3rem}
+.dec .why{font-size:.88rem;color:var(--muted);margin-bottom:.5rem}
+.opts{display:flex;flex-direction:column;gap:.35rem}
+.opt{background:var(--fill);border-radius:8px;padding:.5rem .7rem;font-size:.9rem}
+.opt b{color:var(--amber)}
+.opt.rec{background:var(--green-soft)} .opt.rec b{color:var(--green)}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.3rem 0}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} .dec{display:none} }
+</style>
+
+.row{background:var(--card);border:1px solid var(--line);border-radius:11px;
+  padding:.8rem 1rem;margin:.5rem 0;display:grid;grid-template-columns:5.4rem 1fr;gap:.9rem;align-items:start}
+.row .t{font-weight:750;color:var(--indigo);font-variant-numeric:tabular-nums;font-size:.92rem}
+.row b{display:block;font-weight:730;margin-bottom:.15rem;font-size:.96rem}
+.row p{margin:.2rem 0;font-size:.9rem}
+.row.auto{border-left:3px solid var(--green)}
+.row.man{border-left:3px solid var(--amber)}
+.row.you{border-left:3px solid var(--red)}
+.lg{display:flex;gap:1rem;flex-wrap:wrap;margin:1rem 0;font-size:.85rem;color:var(--muted)}
+.lg span{display:inline-flex;align-items:center;gap:.35rem}
+.lg i{width:10px;height:10px;border-radius:3px;display:inline-block;font-style:normal}
+@media (max-width:34rem){.row{grid-template-columns:1fr}}
+</style></head>
+<body>
+<div class="wrap">
+<div class="kicker">Ответ Борису · 21 августа</div>
+<h1>Что я делаю сам, что контролирую и где нужен человек</h1>
+<p class="sub">Честная карта: что работает без единого моего касания, что запускается
+по вашему сигналу, и что я в принципе делать не должен. С обоснованием, почему
+именно так, а не иначе.</p>
+
+<div class="lg">
+  <span><i style="background:var(--green)"></i> идёт само по расписанию</span>
+  <span><i style="background:var(--amber)"></i> по вашему сигналу</span>
+  <span><i style="background:var(--red)"></i> нужен человек, я не берусь</span>
+</div>
+
+<section>
+<div class="seclabel">Часть 1</div>
+<h2>День автопилота — по часам</h2>
+<p class="sub">Всё, что ниже зелёное, происходит без меня и без вас. Каждое
+действие ставит отметку в журнале, поэтому дважды за день не выполняется даже
+после перезапуска.</p>
+
+<div class="row auto"><div class="t">07:00</div><div>
+<b>Полная синхронизация с МойКласс</b>
+<p>Клиенты, записи, платежи, абонементы, занятия. Всё, что я потом проверяю,
+считается по свежим данным, а не по вчерашним.</p></div></div>
+
+<div class="row auto"><div class="t">08:00</div><div>
+<b>Утренние задачи на смену</b>
+<p>Очередь строится по плану набора: сегмент считается по теплоте и по целевому
+предмету с учётом того, что ребёнок вырос. Раздача — по сильным сторонам:
+Лене тёплые и «думает», Ире объём, Ане реактив. Нормы 40/45/45. Это добор
+до нормы, а не «плюс сорок сверху»: если задачи уже стоят, новых ставится меньше.</p></div></div>
+
+<div class="row auto"><div class="t">09:00</div><div>
+<b>Аудит вчерашних денег</b>
+<p>Оплаты без подписи менеджера, возвраты, скидки вне медианы тарифа. Находки
+уходят задачей тому, кто на смене, красные — вам в WhatsApp.</p></div></div>
+
+<div class="row auto"><div class="t">09:30</div><div>
+<b>Контроль правил посещения</b>
+<p>Заморозка мимо системы, отработка позже месяца или задним числом, повторная
+отработка одного пропуска, скидка выше 10% без причины, компенсация без
+непрерывности. Задача возвращается <b>тому, кто это сделал</b>, а не «команде».</p></div></div>
+
+<div class="row auto"><div class="t">09:40</div><div>
+<b>Проверка денег в CRM</b>
+<p>Абонемент выдан и расходуется, а оплата не пришла; минусовой баланс;
+бесплатные отметки сверх первого занятия; пропуски, не списанные с абонемента;
+посещения без счёта вообще.</p></div></div>
+
+<div class="row auto"><div class="t">09:50</div><div>
+<b>Состав групп</b>
+<p>Ребёнок не по возрасту группы, два уровня одного предмета у одного ребёнка,
+перебор мест, занятие прошло без отметок посещаемости. Вместе с находками
+показывается покрытие — сколько записей вообще поддаётся проверке.</p></div></div>
+
+<div class="row auto"><div class="t">10:00–20:00</div><div>
+<b>Непрерывный контур</b>
+<p>Каждые 5 минут — лёгкая синхронизация. Каждые 10 минут — просрочка задач
+и эскалация. Каждые 15 минут — новые заявки и неотвеченные входящие в чатах.
+Каждые 20 минут — проверка, что закрытая задача закрыта с результатом,
+а не «просто нажали галочку». Каждые 30 минут — сторож Wazzup: вебхук,
+мёртвые номера, тишина дольше четырёх часов. Раз в час — напоминания
+о пробных, сводка записей, разбор после пробного, неявки.</p></div></div>
+
+<div class="row auto"><div class="t">10:00–20:00</div><div>
+<b>Рассылка по очереди</b>
+<p>Догон недозвонов, приглашения на события, возвращение базы. Темп щадящий
+и с джиттером, чтобы номера не улетели в бан; отправка идёт с наименее
+загруженного номера. Своим сотрудникам продающие сообщения не уходят —
+проверка перед каждой отправкой.</p></div></div>
+
+<div class="row auto"><div class="t">18:00</div><div>
+<b>Напоминания о завтрашних пробных</b>
+<p>Каждому, у кого завтра пробное: время, группа, адрес.</p></div></div>
+
+<div class="row auto"><div class="t">19:00</div><div>
+<b>Дисциплина за день</b>
+<p>Кто из администраторов не двигал задачи, где просрочено, что закрыто
+без результата. Ухудшение по сравнению со вчера — сигнал вам.</p></div></div>
+
+<div class="row auto"><div class="t">19:45</div><div>
+<b>Автоотказы</b>
+<p>Карточки, где решение очевидно и висит слишком долго, закрываются
+с причиной, чтобы не забивали очередь живым людям.</p></div></div>
+
+<div class="row auto"><div class="t">20:00</div><div>
+<b>Вечерняя сводка вам</b>
+<p>Звонки, записи, деньги, что горит на завтра.</p></div></div>
+</section>
+
+<section>
+<div class="seclabel">Часть 2</div>
+<h2>Что идёт по вашему сигналу, а не само</h2>
+
+<div class="row man"><div class="t">каждый час</div><div>
+<b>Разбор звонков</b>
+<p>Скачиваю записи длиннее десяти секунд, расшифровываю, вытаскиваю обещания
+и сроки, пишу в карточку, ставлю задачу на каждое обещание, ловлю нарушения
+скрипта. Запускается вашим ежечасным заданием — между запусками разговоры
+не разбираются. Могу перевести на собственное расписание, скажите.</p></div></div>
+
+<div class="row man"><div class="t">19:30</div><div>
+<b>Разбор переписок за день</b>
+<p>Все диалоги, намерение, следующий шаг, задачи. Тоже по вашему заданию.</p></div></div>
+
+<div class="row man"><div class="t">по запросу</div><div>
+<b>Аналитика и документы</b>
+<p>Планы, разборы промоутеров, инструкции, листы обзвона, страницы вроде
+<a href="/dolgi">долгов</a> и <a href="/gruppy">состава групп</a>. Делаю,
+когда просите, — угадывать, что вам сегодня нужно, я не берусь.</p></div></div>
+</section>
+
+<section>
+<div class="seclabel">Часть 3</div>
+<h2>Чего я не делаю принципиально</h2>
+
+<div class="row you"><div class="t">никогда</div><div>
+<b>Не отмечаю посещения</b>
+<p>Технически могу — метод в API есть. Но отметка это утверждение о физической
+реальности: был ребёнок в комнате или нет. Я этого не вижу. А отметка списывает
+занятие с абонемента и двигает деньги: поставлю наугад — получим ровно те долги,
+которые сейчас разбираем, только созданные мной. Единственное исключение —
+оформление отработки, когда факт пропуска уже отмечен человеком, и я лишь
+связываю его с занятием по правилам.</p></div></div>
+
+<div class="row you"><div class="t">никогда</div><div>
+<b>Не списываю долги и не меняю отчётность</b>
+<p>227 425 ₽ в куче «списать» я подготовил к решению, но списание — ваша подпись,
+не моя.</p></div></div>
+
+<div class="row you"><div class="t">никогда</div><div>
+<b>Не меняю карточки сотрудников и не трогаю деньги клиентов</b>
+<p>Нашёл опечатку в телефоне Иры — сказал, но не исправил. Нашёл фиктивный
+номер у клиента с долгом — сказал, но не удалил.</p></div></div>
+
+<div class="row you"><div class="t">не могу</div><div>
+<b>Настройки телефонии</b>
+<p>В API МойКласс закрыты, в Манго доступны только на чтение. Могу точно
+сказать, что и где переключить, но руками — вы.</p></div></div>
+</section>
+
+<section>
+<div class="seclabel">Часть 4</div>
+<h2>Почему такой порядок — обоснование</h2>
+<ul class="plain">
+  <li><b>Проверки идут утром, до звонков.</b> Находка, пришедшая в 17:00, ложится
+    на человека, у которого смена кончается. Пришедшая в 9:40 — попадает в тот же
+    день, когда ошибку ещё помнят.</li>
+  <li><b>Задача возвращается автору ошибки, а не дежурному.</b> «Команда, обратите
+    внимание» не меняет поведения ни у кого. Именная задача с номером абонемента —
+    меняет.</li>
+  <li><b>Проверка всегда показывает покрытие.</b> Проверка, которая молчит, потому
+    что ей нечего читать, опаснее отсутствующей: она создаёт ложное спокойствие.
+    Поэтому рядом с «расхождений нет» всегда стоит «проверить смогли 32 из 56».</li>
+  <li><b>Порог задач — добор до нормы, а не добавка.</b> Иначе ручное планирование
+    и автопилот складываются, и у администратора выходит вдвое больше звонков,
+    чем влезает в день. Сегодня у Иры 187 открытых задач — это как раз накопленный
+    хвост, и его надо разгружать, а не докладывать сверху.</li>
+  <li><b>Состояние хранится на сервере, а не в контейнере.</b> Временный каталог
+    вчера обнулялся шесть раз. Список разобранных записей, график смен и настройки
+    живут в базе прода и переживают любой перезапуск.</li>
+</ul>
+</section>
+
+<div class="foot">
+Составлено 21.08.2026. Смежное: <a href="/base/plan_nabora_21_30">план набора 21–30.08</a> ·
+<a href="/base/strategiya_nabora">стратегия до 30 сентября</a> ·
+<a href="/dolgi">долги</a> · <a href="/gruppy">состав групп</a> ·
+<a href="/pravila-kontrol">соблюдение правил</a> · <a href="/audit">лента аномалий</a>.
+</div>
+</div>
+</body>
+</html>
