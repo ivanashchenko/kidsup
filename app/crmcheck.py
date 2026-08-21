@@ -313,6 +313,115 @@ def debt_buckets() -> dict:
     return buckets
 
 
+def debts_report() -> dict:
+    """Полная картина задолженности: счета, абонементы и занятия.
+
+    Источник — /v1/company/invoices: счёт хранит цену, оплаченное, дату
+    и `payUntil` — срок оплаты. По нему считается просрочка в днях, а по
+    `userSubscriptionId` долг делится на два вида:
+
+      • по абонементам — счёт выставлен за абонемент;
+      • по занятиям — счёт без абонемента, то есть разовые оплаты и
+        занятия, которые ничем не покрыты.
+
+    Плюс третья, самая тихая часть: занятия, посещённые вообще без счёта.
+    Денег по ним не ждёт даже система — их надо не собирать, а сначала
+    провести."""
+    from .moyklass_client import MoyklassClient
+    from . import sync
+    key = sync.get_api_key()
+    if not key:
+        return {"ready": False}
+    today = date.today()
+    mk = MoyklassClient(key)
+    try:
+        inv, off = [], 0
+        while off < 30000:
+            r = mk.get("/v1/company/invoices", {"limit": 500, "offset": off})
+            it = r.get("invoices") or []
+            if not it:
+                break
+            inv += it
+            off += 500
+        unpaid = [i for i in inv if (i.get("price") or 0) >
+                  ((i.get("payed") or 0) + (i.get("payedBonuses") or 0))]
+        uids = {i["userId"] for i in unpaid}
+        users, subs = {}, {}
+        for uid in uids:
+            try:
+                users[uid] = mk.get(f"/v1/company/users/{uid}")
+            except Exception:
+                users[uid] = {}
+            try:
+                for s in (mk.get("/v1/company/userSubscriptions",
+                                 {"userId": uid, "limit": 100}).get("subscriptions") or []):
+                    subs[s["id"]] = s
+            except Exception:
+                pass
+    finally:
+        mk.close()
+
+    MG = {84116: "Борис", 84117: "адм.84117", 88422: "Юлия", 154181: "Лиза",
+          202856: "Лена", 229704: "Маша", 232805: "Аня", 232763: "Ира"}
+    rows = []
+    for i in unpaid:
+        debt = (i.get("price") or 0) - (i.get("payed") or 0) - (i.get("payedBonuses") or 0)
+        u = users.get(i["userId"], {})
+        s = subs.get(i.get("userSubscriptionId")) or {}
+        try:
+            overdue = (today - date.fromisoformat((i.get("payUntil") or i["date"])[:10])).days
+        except Exception:
+            overdue = 0
+        state = u.get("clientStateId")
+        sell = s.get("sellDate") or i.get("date") or ""
+        if sell >= "2026-06-01" or state in (146950, 125952, 125953, 125955):
+            bucket = "собрать"
+        elif sell < "2025-09-01":
+            bucket = "списать"
+        else:
+            bucket = "разобрать"
+        rows.append({
+            "invoice": i["id"], "user_id": i["userId"],
+            "name": u.get("name") or f"клиент {i['userId']}",
+            "phone": (u.get("phone") or "")[-10:],
+            "debt": debt, "price": i.get("price") or 0,
+            "date": i.get("date"), "pay_until": i.get("payUntil"),
+            "overdue": max(0, overdue),
+            "kind": "абонемент" if i.get("userSubscriptionId") else "занятия",
+            "used": s.get("visitedCount") or 0, "quota": s.get("visitCount") or 0,
+            "manager": MG.get(s.get("managerId"), "—"),
+            "state": state, "bucket": bucket})
+    rows.sort(key=lambda r: -r["debt"])
+
+    # занятия, посещённые вообще без счёта — деньги, которых система не ждёт
+    with db.get_conn() as conn:
+        nobill = [dict(zip(("user_id", "name", "date", "class"), r)) for r in conn.execute("""
+            SELECT lr.user_id, u.name, l.date, c.name
+            FROM lesson_records lr
+            JOIN lessons l ON l.id = lr.lesson_id
+            LEFT JOIN classes c ON c.id = l.class_id
+            LEFT JOIN users u ON u.id = lr.user_id
+            WHERE l.date >= ? AND lr.visit = 1
+              AND json_extract(lr.raw, '$.free') = 0
+              AND json_extract(lr.raw, '$.bill') IS NULL
+            ORDER BY l.date DESC LIMIT 60""",
+            ((today.replace(day=1)).isoformat(),)).fetchall()]
+
+    def tot(pred):
+        sel = [r for r in rows if pred(r)]
+        return {"n": len(sel), "sum": round(sum(r["debt"] for r in sel))}
+
+    return {"ready": True, "as_of": today.isoformat(), "rows": rows,
+            "nobill": nobill,
+            "totals": {
+                "всего": tot(lambda r: True),
+                "абонементы": tot(lambda r: r["kind"] == "абонемент"),
+                "занятия": tot(lambda r: r["kind"] == "занятия"),
+                "собрать": tot(lambda r: r["bucket"] == "собрать"),
+                "разобрать": tot(lambda r: r["bucket"] == "разобрать"),
+                "списать": tot(lambda r: r["bucket"] == "списать")}}
+
+
 def main():
     import sys
     cmd = sys.argv[1] if len(sys.argv) > 1 else "fit"

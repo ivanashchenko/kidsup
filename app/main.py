@@ -2100,7 +2100,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-21.05"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-21.07"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -3186,139 +3186,119 @@ async def api_money_run():
     return {k: len(v) for k, v in _rules.money_check().items()}
 
 
+@app.get("/api/dolgi", dependencies=AUTH)
+async def api_dolgi():
+    from . import crmcheck
+    return crmcheck.debts_report()
+
+
 @app.get("/dolgi", response_class=HTMLResponse, dependencies=AUTH)
 async def money_page():
-    """Долги и расхождения по деньгам в CRM — с объяснением, откуда они берутся."""
-    from . import rules as _rules
-    flags = [f for f in _rules.open_flags(300) if f.get("kind") == "деньги"]
-    colors = {"high": "#A3282B", "mid": "#9A5B00", "low": "#6E7264"}
-    RU = {"sub-unpaid": "абонемент не оплачен", "neg-balance": "минус на балансе",
-          "free-marks": "бесплатные занятия", "absence-free": "пропуски не списаны",
-          "visit-nobill": "занятие без счёта"}
-    groups: dict[str, list] = {}
-    for f in flags:
-        groups.setdefault((f["key"] or "").split(":")[0], []).append(f)
+    """Долги: по абонементам и по занятиям, разложенные по тому, что с ними
+    реально можно сделать. Данные тянутся из МойКласс при каждом открытии."""
+    from . import crmcheck
+    d = crmcheck.debts_report()
+    if not d.get("ready"):
+        return HTMLResponse("<p>Нет ключа МойКласс</p>")
+    t = d["totals"]
+    rows, nobill = d["rows"], d["nobill"]
+    BUCKET = {
+        "собрать": ("Собрать", "#2E6B2A",
+                    "Абонемент свежий или семья ещё с нами — эти деньги живые."),
+        "разобрать": ("Разобрать руками", "#9A5B00",
+                      "Пограничные: могла быть оплата мимо CRM или ошибка проведения."),
+        "списать": ("Списать", "#6E7264",
+                    "Абонементы прошлых лет, израсходованы, семьи в архиве. "
+                    "Не вернуть — но пока висят, баланс врёт."),
+    }
+    def money(v):
+        return f"{v:,.0f}".replace(",", " ") + " ₽"
     blocks = []
-    for k, items in sorted(groups.items(), key=lambda x: -len(x[1])):
-        rows = "".join(
-            f'<div class="f" data-id="{f["id"]}">'
-            f'<div class="dot" style="background:{colors.get(f["level"], "#6E7264")}"></div>'
-            f'<div><b>{html.escape(f["title"] or "")}</b>'
-            f'<div class="d">{html.escape(f["detail"] or "")}</div></div>'
-            f'<div class="btns"><button onclick="mark({f["id"]},\'ok\')">норма</button>'
-            f'<button class="v" onclick="mark({f["id"]},\'violation\')">долг</button>'
-            f'</div></div>' for f in items)
-        blocks.append(f'<h2>{html.escape(RU.get(k, k))} — {len(items)}</h2>{rows}')
-    body = "".join(blocks) or '<p class="empty">Расхождений нет.</p>'
+    for b, (title, color, why) in BUCKET.items():
+        sel = [r for r in rows if r["bucket"] == b]
+        if not sel:
+            continue
+        trs = "".join(
+            f'<tr><td><b>{html.escape(str(r["name"]))}</b>'
+            f'<div class="m">{html.escape(r["kind"])} · счёт от {r["date"]}'
+            + (f' · занятий {r["used"]}/{r["quota"]}' if r["quota"] else "")
+            + (f' · оформил {html.escape(r["manager"])}' if r["manager"] != "—" else "")
+            + f'</div></td>'
+            f'<td class="num">{money(r["debt"])}</td>'
+            f'<td class="num">{r["overdue"]} дн.</td>'
+            f'<td class="w"><a href="tel:+7{r["phone"]}">+7{r["phone"]}</a></td></tr>'
+            for r in sel)
+        blocks.append(
+            f'<section><h2><span class="chip" style="background:{color}"></span>'
+            f'{title} — {len(sel)} на {money(sum(r["debt"] for r in sel))}</h2>'
+            f'<p class="sub">{why}</p>'
+            f'<div class="tbl"><table>'
+            f'<tr><th>кто и за что</th><th class="num">долг</th>'
+            f'<th class="num">просрочка</th><th>телефон</th></tr>{trs}</table></div></section>')
+    nb = ""
+    if nobill:
+        nb = ('<section><h2>Занятия без счёта — ' + str(len(nobill)) + '</h2>'
+              '<p class="sub">Ребёнок был на занятии, а счёта нет вообще: ни абонемента, '
+              'ни разовой оплаты. Этих денег не ждёт даже система — их надо не собирать, '
+              'а сначала провести.</p><div class="tbl"><table>'
+              '<tr><th>ребёнок</th><th>дата</th><th>группа</th></tr>'
+              + "".join(f'<tr><td>{html.escape(str(x["name"] or x["user_id"]))}</td>'
+                        f'<td class="w">{x["date"]}</td>'
+                        f'<td>{html.escape(str(x["class"] or ""))}</td></tr>'
+                        for x in nobill) + '</table></div></section>')
     return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Долги и деньги в CRM</title><style>
-:root{{--paper:#FAF9F5;--ink:#22271F;--muted:#6E7264;--line:#E3E1D6;--card:#fff}}
-@media (prefers-color-scheme:dark){{:root{{--paper:#151812;--ink:#E7E6DD;--muted:#9B9F90;
-  --line:#2C3026;--card:#1A1E16}}}}
+<title>Долги по абонементам и занятиям</title><style>
+:root{{--paper:#FCFBF7;--ink:#1B1D2B;--muted:#5F6478;--line:#E7E4DA;--card:#fff;--fill:#F3F1E9}}
+@media (prefers-color-scheme:dark){{:root{{--paper:#14151D;--ink:#E7E6EC;--muted:#9A9EAE;
+  --line:#292B37;--card:#1B1D26;--fill:#20222C}}}}
+*{{box-sizing:border-box}}
 body{{background:var(--paper);color:var(--ink);margin:0;
   font:16px/1.6 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}}
-.wrap{{max-width:58rem;margin:0 auto;padding:2rem 1rem 4rem}}
-h1{{font-size:1.8rem;margin:.2rem 0 .3rem;letter-spacing:-.02em}}
-h2{{font-size:1.05rem;margin:2rem 0 .5rem}}
-.sub{{color:var(--muted);margin:0 0 1.2rem;max-width:44rem}}
+.wrap{{max-width:62rem;margin:0 auto;padding:2rem 1rem 4rem}}
+h1{{font-size:1.9rem;margin:.2rem 0 .3rem;letter-spacing:-.025em}}
+h2{{font-size:1.12rem;margin:0 0 .3rem;display:flex;align-items:center;gap:.5rem}}
+.chip{{width:10px;height:10px;border-radius:99px;display:inline-block}}
+.sub{{color:var(--muted);margin:0 0 .9rem;max-width:46rem;font-size:.92rem}}
+section{{margin-top:2.2rem;padding-top:1.4rem;border-top:1px solid var(--line)}}
+.nums{{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));margin:1.2rem 0}}
+.n{{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:.7rem .9rem}}
+.n b{{font-size:1.45rem;display:block;line-height:1.15;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}}
+.n span{{font-size:.78rem;color:var(--muted);display:block;margin-top:.1rem}}
+.tbl{{overflow-x:auto;border:1px solid var(--line);border-radius:11px;background:var(--card)}}
+table{{border-collapse:collapse;width:100%;font-size:.91rem;min-width:34rem}}
+th{{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);padding:.5rem .8rem;white-space:nowrap}}
+td{{padding:.55rem .8rem;border-top:1px solid var(--line);vertical-align:top}}
+td.num,th.num{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
+td.w{{white-space:nowrap}}
+.m{{font-size:.78rem;color:var(--muted);margin-top:.1rem}}
 .how{{background:var(--card);border:1px solid var(--line);border-left:3px solid #9A5B00;
-  border-radius:0 10px 10px 0;padding:.9rem 1.1rem;margin:1.2rem 0;max-width:44rem;font-size:.93rem}}
+  border-radius:0 10px 10px 0;padding:.9rem 1.1rem;margin:1.2rem 0;max-width:46rem;font-size:.93rem}}
 .how ol{{margin:.5rem 0;padding-left:1.2rem}} .how li{{margin:.3rem 0}}
-.f{{display:grid;grid-template-columns:10px 1fr auto;gap:.75rem;align-items:start;
-  background:var(--card);border:1px solid var(--line);border-radius:10px;
-  padding:.8rem .95rem;margin:.5rem 0}}
-.dot{{width:10px;height:10px;border-radius:99px;margin-top:.45rem}}
-.d{{font-size:.9rem;margin-top:.15rem}}
-.btns{{display:flex;gap:.35rem;flex-wrap:wrap}}
-button{{font:inherit;font-size:.82rem;padding:.35rem .6rem;border-radius:7px;
-  border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}}
-button.v{{border-color:#A3282B;color:#A3282B}}
-.f.done{{opacity:.35}} .empty{{color:var(--muted)}}
+a{{color:inherit}}
 </style></head><body><div class="wrap">
-<h1>Долги и деньги в CRM</h1>
-<p class="sub">Расхождения между тем, что записано в МойКласс, и тем, что должно
-быть записано. Проверяется каждое утро в 9:40.</p>
-<div class="how"><b>Откуда вообще берётся долг.</b>
+<h1>Долги по абонементам и занятиям</h1>
+<p class="sub">Данные тянутся из МойКласс при каждом открытии страницы —
+на {d["as_of"]}. Источник: счета с датой оплаты, поэтому просрочка считается точно.</p>
+<div class="nums">
+  <div class="n"><b>{money(t["всего"]["sum"])}</b><span>всего, {t["всего"]["n"]} счетов</span></div>
+  <div class="n"><b>{money(t["абонементы"]["sum"])}</b><span>по абонементам — {t["абонементы"]["n"]}</span></div>
+  <div class="n"><b>{money(t["занятия"]["sum"])}</b><span>по занятиям — {t["занятия"]["n"]}</span></div>
+  <div class="n"><b>{money(t["собрать"]["sum"])}</b><span>можно собрать</span></div>
+</div>
+<div class="how"><b>Откуда берётся долг.</b>
 <ol>
-<li>Администратор заводит абонемент — можно создать его, не проведя оплату.
-Карточка выглядит нормально, ребёнок ходит.</li>
-<li>Отметка посещения списывает занятие с этого абонемента и ставит
-«оплачено». Это значит «списано с абонемента», а не «деньги получены».</li>
+<li>Абонемент можно завести, не проведя оплату — карточка выглядит нормально.</li>
+<li>Отметка посещения списывает занятие с абонемента и ставит «оплачено».
+Это значит «списано с абонемента», а не «деньги получены».</li>
 <li>Если абонемент не оплачен, каждое занятие уводит баланс в минус.
 Ошибки на экране не появляется — долг растёт молча.</li>
-</ol>
-Поэтому долг рождается на первом шаге. Ловить его надо по абонементам:
-занятий с пометкой «не оплачено» у нас нет вообще.</div>
-{body}
-</div><script>
-async function mark(id, st) {{
-  await fetch('/api/audit/resolve?flag_id=' + id + '&status=' + st, {{method: 'POST'}});
-  const el = document.querySelector('.f[data-id="' + id + '"]');
-  if (el) el.classList.add('done');
-}}
-</script></body></html>""")
-
-
-@app.get("/gruppy", response_class=HTMLResponse, dependencies=AUTH)
-async def groups_page():
-    """Состав групп: кто сидит не по возрасту, где перебор, где не отмечена
-    посещаемость."""
-    from . import crmcheck, rules as _rules
-    flags = [f for f in _rules.open_flags(400) if f.get("kind") == "группы"]
-    colors = {"high": "#A3282B", "mid": "#9A5B00", "low": "#6E7264"}
-    RU = {"fit": "не по возрасту", "level": "два уровня одного предмета",
-          "over": "перебор в группе", "unmarked": "посещаемость не отмечена"}
-    groups: dict = {}
-    for f in flags:
-        groups.setdefault((f["key"] or "").split(":")[0], []).append(f)
-    blocks = []
-    for k, items in sorted(groups.items(), key=lambda x: -len(x[1])):
-        rows = "".join(
-            f'<div class="f" data-id="{f["id"]}">'
-            f'<div class="dot" style="background:{colors.get(f["level"], "#6E7264")}"></div>'
-            f'<div><b>{html.escape(f["title"] or "")}</b>'
-            f'<div class="d">{html.escape(f["detail"] or "")}</div></div>'
-            f'<div class="btns"><button onclick="mark({f["id"]},\'ok\')">так и надо</button>'
-            f'<button class="v" onclick="mark({f["id"]},\'violation\')">исправить</button>'
-            f'</div></div>' for f in items)
-        blocks.append(f'<h2>{html.escape(RU.get(k, k))} — {len(items)}</h2>{rows}')
-    body = "".join(blocks) or '<p class="empty">Расхождений нет.</p>'
-    return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Состав групп</title><style>
-:root{{--paper:#FAF9F5;--ink:#22271F;--muted:#6E7264;--line:#E3E1D6;--card:#fff}}
-@media (prefers-color-scheme:dark){{:root{{--paper:#151812;--ink:#E7E6DD;--muted:#9B9F90;
-  --line:#2C3026;--card:#1A1E16}}}}
-body{{background:var(--paper);color:var(--ink);margin:0;
-  font:16px/1.6 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}}
-.wrap{{max-width:58rem;margin:0 auto;padding:2rem 1rem 4rem}}
-h1{{font-size:1.8rem;margin:.2rem 0 .3rem;letter-spacing:-.02em}}
-h2{{font-size:1.05rem;margin:2rem 0 .5rem}}
-.sub{{color:var(--muted);margin:0 0 1.2rem;max-width:44rem}}
-.f{{display:grid;grid-template-columns:10px 1fr auto;gap:.75rem;align-items:start;
-  background:var(--card);border:1px solid var(--line);border-radius:10px;
-  padding:.8rem .95rem;margin:.5rem 0}}
-.dot{{width:10px;height:10px;border-radius:99px;margin-top:.45rem}}
-.d{{font-size:.9rem;margin-top:.15rem}}
-.btns{{display:flex;gap:.35rem;flex-wrap:wrap}}
-button{{font:inherit;font-size:.82rem;padding:.35rem .6rem;border-radius:7px;
-  border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}}
-button.v{{border-color:#A3282B;color:#A3282B}}
-.f.done{{opacity:.35}} .empty{{color:var(--muted)}}
-</style></head><body><div class="wrap">
-<h1>Состав групп</h1>
-<p class="sub">Возраст и уровень берутся из названия группы — другого носителя
-этой информации в CRM нет. Возраст ребёнка считается на 1 сентября,
-допуск полгода. Проверяется каждое утро в 9:50.</p>
-{body}
-</div><script>
-async function mark(id, st) {{
-  await fetch('/api/audit/resolve?flag_id=' + id + '&status=' + st, {{method: 'POST'}});
-  const el = document.querySelector('.f[data-id="' + id + '"]');
-  if (el) el.classList.add('done');
-}}
-</script></body></html>""")
+</ol></div>
+{"".join(blocks)}
+{nb}
+</div></body></html>""")
 
 
 @app.get("/api/duty", dependencies=AUTH)
