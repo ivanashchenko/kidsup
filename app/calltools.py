@@ -37,7 +37,66 @@ AUTH = ("admin", os.environ.get("APP_PASSWORD", "CGWstart8*"))
 # Добавочные 20 и 21 — «Клуб Буракова», чужой центр в том же здании.
 # Их разговоры не наши: не скачиваем, не расшифровываем, не считаем.
 FOREIGN = {"20", "21"}
-EXT = {"10": "Ира", "12": "Лена", "15": "Аня"}
+
+# Привычная рассадка. Но администраторы пересаживаются: 21.08 Ира работала
+# одна и села за аппарат 12, который обычно Ленин. Жёсткая карта в такие дни
+# приписывает звонки человеку, которого нет на смене, — и статистика,
+# и замечания уходят не тому. Поэтому карта только подсказка, а решает
+# график смен: см. who_for_ext().
+EXT_DEFAULT = {"10": "Ира", "12": "Лена", "15": "Аня"}
+MANAGER_BY_NAME = {"Ира": 232763, "Лена": 202856, "Аня": 232805,
+                   "Маша": 229704, "Лиза": 154181}
+
+
+def _schedule() -> dict:
+    """График смен. Сначала с прода: разбор часто идёт из контейнера, где
+    локальная база отстаёт на неделю и графика в ней просто нет."""
+    try:
+        r = httpx.get(f"{PORTAL}/api/settings", auth=AUTH, timeout=60)
+        s = json.loads(r.json().get("admin_schedule") or "{}")
+        if s:
+            return s
+    except Exception:
+        pass
+    try:
+        return json.loads(db.get_setting("admin_schedule") or "{}")
+    except Exception:
+        return {}
+
+
+def _shift_names(day: str | None = None) -> list[str]:
+    """Кто сегодня на смене — по настройке admin_schedule."""
+    day = day or datetime.now(MSK).strftime("%Y-%m-%d")
+    sched = _schedule()
+    ids = sched.get(day)
+    if ids is None:
+        return []
+    if not isinstance(ids, list):
+        ids = [ids]
+    back = {v: k for k, v in MANAGER_BY_NAME.items()}
+    return [back[i] for i in ids if i in back]
+
+
+def who_for_ext(ext: str, day: str | None = None) -> str:
+    """Кому засчитать звонок с этого добавочного.
+
+    Если на смене один человек — все добавочные его, кто бы за каким
+    аппаратом ни сидел. Если несколько — работает привычная карта, но
+    только для тех, кто действительно на смене."""
+    on = _shift_names(day)
+    if len(on) == 1:
+        return on[0]
+    name = EXT_DEFAULT.get(ext)
+    if name and (not on or name in on):
+        return name
+    # За аппаратом отсутствующего человека сидит кто-то из работающих, но кто
+    # именно — из журнала АТС не видно. Честнее показать «доб. 10», чем
+    # приписать разговор тому, кого сегодня нет.
+    return f"доб.{ext}" if ext else "?"
+
+
+# оставлено для обратной совместимости с ручными разборами
+EXT = EXT_DEFAULT
 
 SP = os.environ.get("KIDSUP_SCRATCH") or "/tmp/kidsup-calls"
 os.makedirs(SP, exist_ok=True)
@@ -133,7 +192,7 @@ def fetch(rows: list[dict] | None = None, min_dur: int = 10) -> list[dict]:
     got = []
     for i, r in enumerate(todo):
         phone = (r["from"] if r["dir"] == "in" else r["to"])[-10:]
-        who = EXT.get(r["from_ext"] or r["to_ext"], "?")
+        who = who_for_ext(r["from_ext"] or r["to_ext"])
         name = f"{SP}/r{i}_{phone}_{who}_{r['dir']}_{r['dur']}s.mp3"
         body = json.dumps({"recording_id": r["rec"], "action": "download"},
                           separators=(",", ":"))
@@ -179,8 +238,8 @@ def day_report(rows: list[dict] | None = None) -> dict:
     st = defaultdict(lambda: {"нет_ответа": 0, "сброс": 0, "разговор": 0,
                               "сек": 0, "входящих": 0, "вх_сек": 0})
     for r in rows:
-        if r["dir"] == "out" and r["from_ext"] in EXT:
-            k = st[EXT[r["from_ext"]]]
+        if r["dir"] == "out" and r["from_ext"] in EXT_DEFAULT:
+            k = st[who_for_ext(r["from_ext"])]
             if not r["answer"]:
                 k["нет_ответа"] += 1
             elif r["dur"] < 10:
@@ -188,8 +247,8 @@ def day_report(rows: list[dict] | None = None) -> dict:
             else:
                 k["разговор"] += 1
                 k["сек"] += r["dur"]
-        elif r["dir"] == "in" and r["to_ext"] in EXT and r["dur"] >= 10:
-            k = st[EXT[r["to_ext"]]]
+        elif r["dir"] == "in" and r["to_ext"] in EXT_DEFAULT and r["dur"] >= 10:
+            k = st[who_for_ext(r["to_ext"])]
             k["входящих"] += 1
             k["вх_сек"] += r["dur"]
     return dict(st)
@@ -201,7 +260,7 @@ def main():
         rows = pull(int(sys.argv[2]) if len(sys.argv) > 2 else 90)
         print(f"строк: {len(rows)}")
         for r in rows:
-            who = EXT.get(r["from_ext"] or r["to_ext"], "?")
+            who = who_for_ext(r["from_ext"] or r["to_ext"])
             ph = (r["from"] if r["dir"] == "in" else r["to"])[-10:]
             print(f"  {r['ts']} {r['dir']:3s} {r['dur']:4d}с {who:4s} {ph:11s} {r['reason']}")
     elif cmd == "fetch":
