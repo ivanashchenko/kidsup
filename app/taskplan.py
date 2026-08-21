@@ -226,6 +226,38 @@ def collect() -> dict:
                 cm = cm.get("comments") or cm.get("userComments") or []
             except Exception:
                 cm = []
+            # Действия администраторов по клиенту: кто вёл, кто менял статус,
+            # кто оформлял записи, оплаты и абонементы. Без этого непонятно,
+            # почему клиент в таком состоянии и с кого спрашивать.
+            try:
+                pays = _retry(mk.get, "/v1/company/payments",
+                              {"userId": uid, "limit": 50}).get("payments") or []
+            except Exception:
+                pays = []
+            try:
+                subs = _retry(mk.get, "/v1/company/userSubscriptions",
+                              {"userId": uid, "limit": 30}).get("subscriptions") or []
+            except Exception:
+                subs = []
+            actions = []
+            for j in js:
+                if j.get("managerId"):
+                    actions.append({"who": NAMES.get(j["managerId"], j["managerId"]),
+                                    "what": "запись в " + (cls.get(j["classId"], "")[:34]),
+                                    "when": (j.get("createdAt") or "")[:10]})
+            for pm in pays[:10]:
+                if pm.get("managerId"):
+                    actions.append({"who": NAMES.get(pm["managerId"], pm["managerId"]),
+                                    "what": f"оплата {pm.get('summa')} ₽",
+                                    "when": (pm.get("date") or "")[:10]})
+            for sb in subs[:10]:
+                if sb.get("managerId"):
+                    actions.append({"who": NAMES.get(sb["managerId"], sb["managerId"]),
+                                    "what": f"абонемент {sb.get('price')} ₽ "
+                                            f"(оплачено {sb.get('payed')})",
+                                    "when": (sb.get("sellDate") or "")[:10]})
+            actions.sort(key=lambda x: x["when"] or "", reverse=True)
+
             enrolled = [cls.get(j["classId"], "") for j in js
                         if j.get("statusId") in ENROLLED_JOIN
                         and (cls.get(j["classId"], "")).startswith("2627")
@@ -240,7 +272,10 @@ def collect() -> dict:
                 "balance": u.get("balans"), "enrolled": enrolled, "trial": trial,
                 "comments": [{"date": (c.get("createdAt") or "")[:10],
                               "text": (c.get("comment") or "")[:400]}
-                             for c in cm[:8]]}
+                             for c in cm[:8]],
+                "actions": actions[:12],
+                "changed": (u.get("stateChangedAt") or "")[:10],
+                "responsible": [NAMES.get(x, x) for x in (u.get("responsibles") or [])]}
             if i % 50 == 0:
                 log.info("клиентов собрано: %d/%d", i, len(uids))
         data = {"tasks": tasks, "clients": clients,
@@ -317,11 +352,53 @@ def decide() -> list[dict]:
                 act, day = "срок", tomorrow
                 why = "записан на пробное: " + (c["trial"][0][:34])
 
-        out.append({"id": t["id"], "uid": uid, "name": c.get("name"),
+        # Приоритет внутри «оставить»: кого ещё ни разу не набирали, тот
+        # ценнее любого повторного звонка — у непрозвоненного шанс нулевой.
+        # Дальше по теплоте: с кем недавно говорили, тот уже в работе.
+        if act == "оставить" and ABOUT_ENROLL.search(body):
+            if not hist:
+                rank = 0                       # не звонили ни разу
+            elif not talks:
+                rank = 1                       # набирали, но не дозвонились
+            else:
+                rank = 2                       # уже разговаривали
+        else:
+            rank = 3
+        out.append({"rank": rank, "id": t["id"], "uid": uid, "name": c.get("name"),
                     "phone": ph, "cur": cur, "mgr_now": mgrs,
                     "act": act, "day": day, "mgr": mgr, "why": why,
                     "body": body[:120], "last_talk": last_talk,
                     "last_try": last_try, "chat_in": chat.get("in", "")[:10]})
+    # Раскладка «оставить» по дням смен: сначала непрозвоненные, норма 40.
+    SHIFTS = {232763: ["2026-08-21", "2026-08-25", "2026-08-26", "2026-08-27"],
+              232805: ["2026-08-22", "2026-08-23", "2026-08-24", "2026-08-26", "2026-08-27"],
+              202856: ["2026-08-24", "2026-08-25", "2026-08-26", "2026-08-27"],
+              CHAT_ADMIN: ["2026-08-21", "2026-08-22", "2026-08-23", "2026-08-24",
+                           "2026-08-25", "2026-08-26", "2026-08-27", "2026-08-28"]}
+    CAP = {232763: 40, 232805: 40, 202856: 40, CHAT_ADMIN: 35}
+    HOUR = {0: "09:00", 1: "11:00", 2: "14:00", 3: "16:00"}
+    keep: dict[int, list] = defaultdict(list)
+    for x in out:
+        if x["act"] != "оставить":
+            continue
+        mgr = next((m for m in x["mgr_now"] if m in SHIFTS), None)
+        if mgr:
+            keep[mgr].append(x)
+    for mgr, items in keep.items():
+        items.sort(key=lambda x: (x["rank"], x["last_try"] or "", x["id"]))
+        days, cap, load, di = SHIFTS[mgr], CAP[mgr], defaultdict(int), 0
+        for x in items:
+            if di < len(days) and load[days[di]] >= cap:
+                di += 1
+            day = days[di] if di < len(days) else "2026-09-02"
+            load[day] += 1
+            if day != x["cur"] or True:
+                x["act"] = "разложить"
+                x["day"] = day
+                x["hour"] = HOUR[x["rank"]]
+                x["why"] = ("не звонили ни разу" if x["rank"] == 0 else
+                            "набирали, не дозвонились" if x["rank"] == 1 else
+                            "уже разговаривали" if x["rank"] == 2 else "по плану смен")
     json.dump(out, open(f"{SP}/taskplan_decisions.json", "w"), ensure_ascii=False)
     return out
 
@@ -356,8 +433,9 @@ def apply() -> dict:
                 b["isComplete"] = True
             else:
                 day = it.get("day") or (t.get("beginDate") or "")[:10]
+                hour = it.get("hour") or "09:00"
                 b["body"] = body[:250]
-                b["beginDate"] = f"{day}T09:00:00+03:00"
+                b["beginDate"] = f"{day}T{hour}:00+03:00"
                 b["endDate"] = f"{day}T20:00:00+03:00"
             try:
                 _retry(mk.post, f"/v1/company/tasks/{it['id']}", b)
