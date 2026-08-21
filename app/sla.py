@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timedelta
 
 from . import db
@@ -163,6 +164,14 @@ def _had_action(user_id: int | None, since: datetime) -> bool:
 NO_CONTACT_STATES = {146328, 125954, 125957, 345759}
 
 
+# Задачу закрываю не только администратор, но и я сам — разбором дублей,
+# сведением цепочек, остывшими реакциями. Своё закрытие я помечаю в теле
+# в квадратных скобках. Без этой проверки 21.08 родилось 9 задач-призраков
+# «Закрыта без действия» поверх дублей, которые я час назад схлопнул: звонка
+# по ним и не должно было быть, работа идёт по оставшейся задаче.
+MY_CLOSURE = re.compile(r"\[(дубль|закрыто|сведено|остыло)", re.I)
+
+
 def _skip_client(mk, user_id) -> bool:
     if not user_id:
         return False
@@ -200,6 +209,8 @@ def verify_closed() -> dict:
             # 21.08 проверка переоткрыла задачи по тестовым карточкам, которые
             # я сам закрыл часом раньше, и дежурная снова их набирала.
             if _skip_client(mk, t.get("userId")):
+                continue
+            if MY_CLOSURE.search(t.get("body") or ""):
                 continue
             body = ("⚠️ Закрыта без действия (нет ни звонка, ни сообщения). "
                     + (t.get("body") or ""))[:250]
