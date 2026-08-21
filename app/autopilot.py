@@ -938,6 +938,35 @@ def _got_broadcast(conn, phone: str, days: int = 14) -> bool:
         return False
 
 
+def _is_phone(x: str) -> bool:
+    """Российский мобильный, а не идентификатор чата.
+
+    У клиентов из Telegram и MAX номер не передаётся — приходит внутренний
+    id аккаунта. Раньше он подставлялся в задачу как «+5113895858»: выглядит
+    телефоном, набрать нельзя, найти человека тоже. Администратор видел
+    задачу и не понимал, кому отвечать."""
+    d = "".join(c for c in str(x or "") if c.isdigit())[-10:]
+    # Тот же критерий, что и для пропущенных звонков: российский код зоны
+    # начинается с 3, 4, 8 (география и сервисные) или 9 (мобильные).
+    # Проверять только «начинается с девятки» нельзя — городские номера
+    # 495 и 812 живые, и они уехали бы в «Telegram».
+    return _real_number(d)
+
+
+def _who_label(phone: str, name: str, chat_type: str | None) -> str:
+    """Как назвать собеседника в теле задачи."""
+    kind = {"telegram": "Telegram", "tgapi": "Telegram", "max": "MAX",
+            "instagram": "Instagram", "vk": "ВКонтакте"}.get(
+        (chat_type or "").lower(), "")
+    if _is_phone(phone):
+        return f"+7{''.join(c for c in phone if c.isdigit())[-10:]}" + \
+               (f", {name}" if name else "")
+    tail = ''.join(c for c in str(phone or '') if c.isdigit())[-6:]
+    src = kind or "мессенджер"
+    return (f"{name}, {src}" if name
+            else f"{src}, чат …{tail} — телефона нет, искать чат в Wazzup")
+
+
 def unanswered_inbound(mk: MoyklassClient) -> None:
     """Клиент написал в Wazzup, прошло UNANSWERED_MIN минут, ответа от нас нет →
     задача админу. Смайлик от получателя рассылки — тёплый сигнал (мы сами
@@ -960,7 +989,7 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
     chat_admin = int(db.get_setting("chat_admin", "154181") or 154181)
     admins = _admins_today()
     fallback = admins[0]["managerId"] if admins else chat_admin
-    for phone, ts_in, _chat, text in inbox:
+    for phone, ts_in, chat_type, text in inbox:
         text = (text or "").strip()
         reaction = _is_reaction(text)
         warm = reaction and after_broadcast.get(phone)   # ответ смайликом на рассылку
@@ -981,7 +1010,7 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
         except Exception:
             log.warning("unanswered_inbound: клиент по номеру %s не найден", phone[-10:])
         hot = any(w in text.lower() for w in HOT_WORDS)
-        who = f"+{phone[-11:]}{', ' + name if name else ''}"
+        who = _who_label(phone, name, chat_type)
         if warm:
             # мы просили «ответьте смайликом» — смайлик и есть ответ: тёплый
             body = (f"🔥 Ответил(а) на рассылку смайликом {text[:6]} ({ts_in[11:16]}, {who}) — "
@@ -990,8 +1019,9 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
             owner = admins[0]["managerId"] if admins else chat_admin   # это звонок
         else:
             head = "🔥 КЛИЕНТ ЖДЁТ ОТВЕТА" if hot else "Клиент писал, ответа нет"
+            where = "в WhatsApp" if _is_phone(phone) else "в том же чате"
             body = (f"{head} ({ts_in[11:16]}, {who}): «{text[:90]}» — "
-                    f"ответить в WhatsApp и поставить следующий шаг.")
+                    f"ответить {where} и поставить следующий шаг.")
             owner = chat_admin or fallback
         _task(mk, owner, uid, body[:250])
         log.info("unanswered_inbound: задача по %s (%s)", phone[-10:],
