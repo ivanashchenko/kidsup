@@ -231,6 +231,53 @@ def transcribe(items: list[dict] | None = None) -> list[dict]:
 
 
 # ── сводка за день ────────────────────────────────────────────────────────
+def mark_touched(days: int = 10) -> int:
+    """Записать номера, по которым уже был исходящий звонок.
+
+    Нужно для правила «сначала охват, потом дозвоны»: пока по контакту не
+    было ни одной попытки, он ценнее любого повторного набора — у
+    непрозвоненного шанс ровно нулевой. Список ведём по журналу АТС, а не по
+    закрытым задачам: задачу могут закрыть не позвонив, а набор в журнале
+    не подделаешь.
+
+    Хранится в настройке прода, поэтому переживает очистку контейнера."""
+    now = datetime.now(MSK)
+    r = _post("/stats/request", {
+        "date_from": int((now - timedelta(days=days)).timestamp()),
+        "date_to": int(now.timestamp()),
+        "fields": "start,from_extension,to_number"})
+    if r.status_code not in (200, 202):
+        return 0
+    key = r.json().get("key")
+    for _ in range(40):
+        time.sleep(4)
+        rr = _post("/stats/result", {"key": key})
+        if rr.status_code == 200 and rr.text.strip():
+            break
+    else:
+        return 0
+    phones = set()
+    for line in rr.text.strip().splitlines():
+        p = line.split(";")
+        if len(p) < 3:
+            continue
+        _, fext, tnum = p[0], p[1], p[2]
+        if not fext or fext in FOREIGN:
+            continue                      # входящие и чужой центр не считаем
+        d = "".join(ch for ch in (tnum or "") if ch.isdigit())[-10:]
+        if len(d) == 10:
+            phones.add(d)
+    try:
+        cur = json.loads(httpx.get(f"{PORTAL}/api/settings", auth=AUTH, timeout=60)
+                         .json().get("called_phones") or "[]")
+    except Exception:
+        cur = []
+    out = sorted(set(cur) | phones)
+    httpx.post(f"{PORTAL}/api/settings", auth=AUTH, timeout=90,
+               json={"key": "called_phones", "value": json.dumps(out)})
+    return len(out)
+
+
 def day_report(rows: list[dict] | None = None) -> dict:
     """Исходящие по администраторам. Отдельно «не взяли трубку» и «взяли и
     сразу разорвали»: первое — про базу, второе — про манеру набирать."""

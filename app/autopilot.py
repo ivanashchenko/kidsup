@@ -1498,12 +1498,34 @@ def _plan_queues() -> tuple[dict[int, list[int]], dict[int, str]]:
     active = _wave_today()
     if not active:                                 # дни подтверждений и событий
         return {}, segs
+    # Сначала охват, потом дозвоны (решение Бориса 21.08). Пока по контакту
+    # не было ни одной попытки, он ценнее любого повторного набора: у
+    # непрозвоненного шанс ровно нулевой, а недозвонившемуся я в тот же
+    # вечер шлю WhatsApp — второе касание он получает и без второго звонка.
+    # Повторные наборы копятся и достаются, только когда первый проход
+    # по сегменту закончен.
+    try:
+        called = set(json.loads(db.get_setting("called_phones") or "[]"))
+    except Exception:
+        called = set()
+
+    def _p10(uid):
+        u = users.get(uid)
+        return "".join(c for c in str(u[1] if u else "") if c.isdigit())[-10:]
+
     pool: dict[str, list[int]] = {s: [] for s in ("hot", "warm", "rr", "cold")}
+    retry: dict[str, list[int]] = {s: [] for s in pool}
     for uid, s in segs.items():
-        if s in active:
-            pool[s].append(uid)
+        if s not in active:
+            continue
+        (retry if _p10(uid) in called else pool)[s].append(uid)
     for s in pool:
         pool[s].sort(key=lambda u: seen[u]["last"], reverse=True)
+        retry[s].sort(key=lambda u: seen[u]["last"], reverse=True)
+        pool[s] += retry[s]                # дозвоны — в хвост, после охвата
+    log.info("охват: не звонили %s, повторные %s",
+             {s: len(v) - len(retry[s]) for s, v in pool.items() if v},
+             {s: len(v) for s, v in retry.items() if v})
     admins = _admins_today()
     out: dict[int, list[int]] = {}
     taken: set[int] = set()
