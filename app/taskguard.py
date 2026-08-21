@@ -49,21 +49,40 @@ TEMPLATE = re.compile(r"^(?:\[[^\]]*\]\s*)?(?:⚠️[^.]*\.\s*)?"
 PHONE = re.compile(r"\+7(\d{10})")
 
 
+# Предел пагинации. На 21.08 самый нагруженный список — 408 задач у Лизы,
+# так что запас четырёхкратный. Достижение предела логируется: молча
+# обрезанная выборка выглядит как «задач стало меньше» и лечится не тем.
+PAGE_CAP = 2000
+
+
+def all_tasks(mk: MoyklassClient, manager_id: int) -> list[dict]:
+    """Все задачи менеджера, открытые и закрытые.
+
+    Параметр `date` у /v1/company/tasks НЕ ФИЛЬТРУЕТ — проверено 21.08:
+    date=2026-08-21, date=2020-01-01, date="zzz" и запрос вообще без date
+    возвращают один и тот же набор из 171 задачи. Поэтому его здесь нет,
+    а день выбирается из поля beginDate самой задачи. Раньше он стоял
+    в запросах и создавал ложное впечатление фильтра по дню."""
+    out, off = [], 0
+    while off < PAGE_CAP:
+        r = mk.get("/v1/company/tasks",
+                   {"limit": 100, "offset": off, "managerId": manager_id})
+        ts = r.get("tasks") or []
+        if not ts:
+            break
+        out += ts
+        off += 100
+    else:
+        log.warning("taskguard: у менеджера %s больше %d задач — выборка "
+                    "обрезана, подними PAGE_CAP", manager_id, PAGE_CAP)
+    return out
+
+
 def _open_tasks(mk: MoyklassClient) -> list[dict]:
-    today = date.today().isoformat()
     out = []
     for mid in STAFF:
-        off = 0
-        while off < 900:
-            r = mk.get("/v1/company/tasks",
-                       {"date": today, "limit": 100, "offset": off,
-                        "managerId": mid})
-            ts = r.get("tasks") or []
-            if not ts:
-                break
-            out += [t for t in ts
-                    if not t.get("isComplete") and not t.get("isCompleted")]
-            off += 100
+        out += [t for t in all_tasks(mk, mid)
+                if not t.get("isComplete") and not t.get("isCompleted")]
     return list({t["id"]: t for t in out}.values())
 
 

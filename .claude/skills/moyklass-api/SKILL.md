@@ -23,6 +23,17 @@ description: >-
   data/kidsup.db (или выгрузка users через API) — потом запуск.
 
 ## Задачи
+- **GET /v1/company/tasks ИГНОРИРУЕТ параметр `date`** — проверено 21.08.2026:
+  `date=2026-08-21`, `date=2020-01-01`, `date="zzz"` и запрос вообще без него
+  дают ОДИН И ТОТ ЖЕ набор. Фильтра по дню у эндпоинта нет: бери все задачи
+  менеджера через `managerId` + пагинацию и отбирай день по полю `beginDate`
+  самой задачи. Используй `taskguard.all_tasks(mk, manager_id)`.
+- `totalItems` в ответе отсутствует — размер выборки считай по строкам.
+- **Автора и времени закрытия задачи в API НЕТ**: ни `completedAt`, ни
+  `completedBy`; `managerIds` — это «на кого назначена», а не «кто закрыл».
+  Эндпоинтов истории нет (`/tasks/{id}/history`, `/company/audit` → 404).
+  Значит «сколько задач закрыл сотрудник» по API НЕ ВЫЧИСЛЯЕТСЯ — не строй
+  на этом оценку работы человека.
 - Обновление задачи = полный POST /v1/company/tasks/{id} (тоже full replace).
 - beginDate/endDate строго "YYYY-MM-DDTHH:MM:SS+00:00" (UTC = МСК−3);
   "YYYY-MM-DD HH:MM" → RequestValidationError.

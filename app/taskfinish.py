@@ -32,6 +32,7 @@ from collections import Counter, defaultdict
 from datetime import date
 
 from . import hint, sync
+from . import taskguard
 from .moyklass_client import MoyklassClient
 
 log = logging.getLogger("kidsup.taskfinish")
@@ -106,17 +107,9 @@ def _subject_of(name: str) -> str | None:
 def collect(mk: MoyklassClient) -> list[dict]:
     out = []
     for mid in STAFF:
-        off = 0
-        while off < 900:
-            r = mk.get("/v1/company/tasks",
-                       {"date": date.today().isoformat(), "limit": 100,
-                        "offset": off, "managerId": mid})
-            ts = r.get("tasks") or []
-            if not ts:
-                break
-            out += [t for t in ts
-                    if not t.get("isComplete") and not t.get("isCompleted")]
-            off += 100
+        out += [t for t in taskguard.all_tasks(mk, mid)
+                if not t.get("isComplete")
+                and not t.get("isCompleted")]
     return list({t["id"]: t for t in out}.values())
 
 
