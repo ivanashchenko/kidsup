@@ -2501,6 +2501,27 @@ def _loop() -> None:
                     money_check()
                 except Exception:
                     log.exception("проверка денег не удалась — продолжаем")
+            # состав групп: возраст, уровень, перебор, неотмеченная
+            # посещаемость. В 9:50, после проверки денег
+            if (now.hour, now.minute) >= (9, 50) and _mark("fit_day", str(_today())):
+                try:
+                    from . import crmcheck as _cc
+                    r = _cc.fit_check()
+                    n = sum(len(v) for k, v in r.items() if not k.startswith('_'))
+                    if n:
+                        mk = _client()
+                        try:
+                            for a in (_admins_today() or [])[:1]:
+                                _task(mk, a["managerId"], None,
+                                      f"🤖 Клод: состав групп — {n} расхождений "
+                                      f"(возраст {len(r['age'])}, уровень "
+                                      f"{len(r['level'])}, перебор {len(r['over'])}, "
+                                      f"неотмеченных занятий {len(r['unmarked'])}). "
+                                      f"Разбор: app.kidsup.ru/gruppy"[:250])
+                        finally:
+                            mk.close()
+                except Exception:
+                    log.exception("проверка состава групп не удалась")
             if now.hour >= 8 and _mark("close_dead_tasks", str(_today())):
                 try:
                     close_dead_tasks()
