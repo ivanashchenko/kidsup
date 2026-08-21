@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Прогресс ребёнка: система отчётности</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:730;margin:1.5rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+/* правила карточками */
+.rules{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));margin:1.1rem 0}
+.rule{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.05rem;
+  display:grid;grid-template-columns:2rem 1fr;gap:.7rem;align-items:start}
+.rule .ic{font-size:1.25rem;line-height:1.3}
+.rule b{display:block;font-weight:730;margin-bottom:.15rem;font-size:.97rem}
+.rule span{font-size:.9rem;color:var(--muted);line-height:1.5}
+
+/* решения Бориса */
+.dec{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);
+  border-radius:0 11px 11px 0;padding:.95rem 1.15rem;margin:.8rem 0}
+.dec .q{font-weight:750;font-size:1rem;margin-bottom:.3rem}
+.dec .why{font-size:.88rem;color:var(--muted);margin-bottom:.5rem}
+.opts{display:flex;flex-direction:column;gap:.35rem}
+.opt{background:var(--fill);border-radius:8px;padding:.5rem .7rem;font-size:.9rem}
+.opt b{color:var(--amber)}
+.opt.rec{background:var(--green-soft)} .opt.rec b{color:var(--green)}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.3rem 0}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} .dec{display:none} }
+</style>
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;
+  padding:1.05rem 1.2rem;margin:.9rem 0}
+.card h3{margin:0 0 .5rem;font-size:1.08rem;font-weight:780}
+.mile{display:flex;gap:.55rem;align-items:flex-start;font-size:.92rem;margin:.32rem 0}
+.mile i{flex:0 0 1.55rem;height:1.55rem;border-radius:99px;background:var(--fill);
+  color:var(--indigo);font-style:normal;font-weight:750;font-size:.76rem;
+  display:flex;align-items:center;justify-content:center;margin-top:.05rem}
+.msg{background:var(--green-soft);border-left:3px solid var(--green);
+  border-radius:0 9px 9px 0;padding:.75rem .95rem;margin:.7rem 0;font-size:.92rem;
+  white-space:pre-line;max-width:44rem}
+.msg em{display:block;font-style:normal;font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.35rem}
+.who{display:inline-block;font-size:.74rem;font-weight:750;letter-spacing:.04em;
+  text-transform:uppercase;padding:.12rem .45rem;border-radius:5px;
+  background:var(--indigo-soft);color:var(--indigo);margin-right:.4rem}
+.who.ped{background:var(--green-soft);color:var(--green)}
+.who.klod{background:var(--sky-soft);color:var(--sky)}
+.who.adm{background:var(--amber-soft);color:var(--amber)}
+</style></head>
+<body><div class="wrap">
+<div class="kicker">Проект · 21 августа</div>
+<h1>Прогресс ребёнка: что видит родитель</h1>
+<p class="sub">Система отчётности для родителей по всем направлениям. Строится
+на том, что в МойКласс уже есть и оплачено, но не включено ни на одном занятии.</p>
+
+<div class="warn"><b>Что я проверил перед тем, как проектировать.</b> В МойКласс
+встроены оценки за занятие и за домашнее задание, текстовые задания, ответы
+учеников с файлами и родительский кабинет, где всё это видно. За четыре
+проверенных учебных дня — <b>ноль оценок и ноль заданий</b>. Инфраструктура
+стоит нетронутой. Значит строить параллельную систему не нужно: нужно включить
+существующую и добавить сверху то, чего в ней нет.</div>
+
+<section>
+<div class="seclabel">Принцип</div>
+<h2>Почему оценки не работают, а вехи работают</h2>
+<p>«Пятёрка за занятие» ничего не говорит матери пятилетнего ребёнка. Она не
+знает, пятёрка из чего и что это меняет. Через месяц таких пятёрок родитель
+по-прежнему не понимает, за что платит, — и уходит, когда появляется
+дешевле.</p>
+<p><b>Веха — это конкретный навык, который либо есть, либо нет:</b> «узнаёт
+15 букв», «читает слоги из двух букв», «пишет своё имя», «отвечает на вопрос
+What's your name». Родитель читает это и сразу видит движение. Педагог
+отмечает вехи за минуту. А главное — вехи обслуживают <b>гарантию чтения</b>:
+без зафиксированного старта и промежуточных точек гарантия неисполнима,
+и через три месяца мы не докажем, с чего начинали.</p>
+<div class="note"><b>Правило системы:</b> ни одна веха не ставится «на глаз в конце
+месяца». Она ставится в тот день, когда ребёнок её взял, — иначе это не отчёт,
+а сочинение.</div>
+</section>
+
+<section>
+<div class="seclabel">Ядро</div>
+<h2>Подготовка к школе — вехи под гарантию</h2>
+<div class="card">
+<h3>Чтение: путь от нуля до трёхбуквенных слов</h3>
+<div class="mile"><i>0</i><div><b>Диагностика на первом занятии.</b> Что ребёнок
+уже умеет: сколько букв узнаёт, складывает ли. <b>Без этой записи гарантия
+не действует</b> — и это надо сказать родителю сразу.</div></div>
+<div class="mile"><i>1</i><div>Узнаёт первые 5 букв</div></div>
+<div class="mile"><i>2</i><div>Узнаёт 15 букв</div></div>
+<div class="mile"><i>3</i><div>Складывает открытый слог: МА, ПА, НО</div></div>
+<div class="mile"><i>4</i><div>Складывает закрытый слог: АМ, ОН</div></div>
+<div class="mile"><i>5</i><div><b>Читает трёхбуквенное слово: ДОМ, МАК, СОК</b>
+— это и есть точка гарантии</div></div>
+<div class="mile"><i>6</i><div>Читает слово из двух слогов: МА-МА, КО-ЗА</div></div>
+<div class="mile"><i>7</i><div>Читает короткое предложение</div></div>
+<p class="sub" style="margin-top:.6rem">Параллельно идут ещё три линии, по три-четыре
+вехи каждая: <b>счёт</b> (числа до 10 → состав числа → сложение),
+<b>рука</b> (обводит по контуру → печатные буквы → письменные),
+<b>внимание</b> (удерживает задание 5 минут → 10 → работает в тетради самостоятельно).</p>
+</div>
+</section>
+
+<section>
+<div class="seclabel">Ядро</div>
+<h2>Английский — вехи по уровням Cambridge</h2>
+<div class="card">
+<h3>Starters, первый год</h3>
+<div class="mile"><i>0</i><div>Диагностика: что уже знает</div></div>
+<div class="mile"><i>1</i><div>Здоровается и прощается, называет своё имя</div></div>
+<div class="mile"><i>2</i><div>Называет 20 слов по темам (цвета, животные, семья)</div></div>
+<div class="mile"><i>3</i><div>Отвечает на What's your name? How old are you?</div></div>
+<div class="mile"><i>4</i><div>Считает до 20, называет цвета в речи, а не по карточке</div></div>
+<div class="mile"><i>5</i><div>Составляет фразу из 3–4 слов: I have a red car</div></div>
+<div class="mile"><i>6</i><div>Понимает инструкцию педагога без перевода</div></div>
+<div class="mile"><i>7</i><div><b>Отвечает на вопрос предложением, а не словом</b>
+— готов к Movers</div></div>
+<p class="sub" style="margin-top:.6rem">Для Movers и Flyers — свои цепочки, они
+уже привязаны к структуре кембриджского экзамена, и это отдельный аргумент
+для родителя: видно, куда ребёнок движется по международной шкале.</p>
+</div>
+</section>
+
+<section>
+<div class="seclabel">Ежедневный ритм</div>
+<h2>Мини-сад и нулевой класс — здесь всё иначе</h2>
+<p>Ребёнок проводит у нас полдня или день целиком, и родитель его не видит.
+Месячного отчёта тут мало: тревога копится ежедневно. Поэтому две петли.</p>
+<div class="card">
+<h3>Каждый день — короткая сводка</h3>
+<div class="msg"><em>уходит родителю в 13:30, автоматически</em>
+Мирослава сегодня: пришла в 9:00, настроение хорошее 🌿
+Ели: завтрак — всё, обед — суп полностью, второе половину.
+Сон: 1 ч 20 мин.
+Занятия: английский (животные), лепка, прогулка 40 минут.
+Отдельно: сама попросилась в туалет — первый раз!</div>
+<p class="sub">Педагог отмечает четыре поля в телефоне: еда, сон, настроение,
+одна строка «что важного». Занятия подставляются из расписания. Всё остальное
+собираю и отправляю я.</p>
+</div>
+<div class="card">
+<h3>Раз в месяц — разбор по линиям развития</h3>
+<p>Самостоятельность, речь, общение со сверстниками, режим, подготовка к школе
+(для нулевого класса). По каждой — где был в начале месяца, где сейчас,
+что делаем дальше. Это то, ради чего родитель платит 35 500 ₽ в месяц,
+и это же ответ на вопрос «а не зря ли».</p>
+</div>
+</section>
+
+<section>
+<div class="seclabel">Остальные</div>
+<h2>Ритм по каждому направлению</h2>
+<div class="tbl"><table>
+<tr><th>направление</th><th>что видит родитель</th><th>как часто</th></tr>
+<tr><td class="w">Подготовка к школе</td><td>Карта вех по четырём линиям + что делаем дальше</td><td>раз в месяц</td></tr>
+<tr><td class="w">Английский</td><td>Вехи уровня + 2–3 фразы, которые ребёнок освоил</td><td>раз в месяц</td></tr>
+<tr><td class="w">Мини-сад, нулевой класс</td><td>Сводка дня + месячный разбор по линиям</td><td>ежедневно + месяц</td></tr>
+<tr><td class="w">Логопед</td><td>Что отрабатывали, что делать дома на этой неделе</td><td>после каждого занятия</td></tr>
+<tr><td class="w">Раннее развитие</td><td>Короткая заметка «что нового получилось»</td><td>раз в месяц</td></tr>
+<tr><td class="w">ИЗО</td><td>Фото работы с занятия</td><td>после занятия</td></tr>
+<tr><td class="w">Шахматы, менталка</td><td>Уровень, результат партии или скорость счёта</td><td>раз в месяц</td></tr>
+</table></div>
+</section>
+
+<section>
+<div class="seclabel">Как это работает в жизни</div>
+<h2>Кто что делает</h2>
+<div class="card">
+<p><span class="who ped">Педагог</span> После занятия отмечает в телефоне: кто был,
+взятые вехи, одна строка про занятие. Для сада — ещё еда, сон, настроение.
+<b>Две минуты.</b> Домашнее задание — текстом в занятие, там же, где отмечает
+посещаемость.</p>
+<p><span class="who klod">Клод</span> Собираю всё за месяц, собираю отчёт словами,
+а не цифрами, и отправляю родителю в WhatsApp. Ежедневные сводки сада — сам.
+Слежу за пробелами: если по ребёнку месяц нет ни одной вехи, это сигнал
+администратору. Считаю, кто из детей идёт к гарантии, а кто отстаёт —
+и предупреждаю <b>заранее</b>, а не когда три месяца прошли.</p>
+<p><span class="who adm">Администратор</span> Не заполняет ничего. Использует отчёт
+как повод для звонка: «Ване осталась одна веха до чтения — продлеваем?»
+Это самый лёгкий продающий звонок из всех возможных.</p>
+</div>
+</section>
+
+<section>
+<div class="seclabel">Что мешает начать</div>
+<h2>Один блокер, и он же из другого разговора</h2>
+<div class="warn"><b>Педагогов в МойКласс почти нет.</b> Всего 12 сотрудников,
+из них с ролью «Преподаватель» пятеро, а групп 78. Ни у одного занятия
+не проставлен педагог, флаг «требовать педагога в занятии» выключен везде.
+<br><br>Пока это так, отмечать вехи некому: у педагогов нет доступа. Это тот же
+блокер, что и с закрытием занятий, — и решается он одним действием:
+завести педагогов, привязать к группам, включить требование.
+От вас нужен список: кто какую группу ведёт.</div>
+</section>
+
+<section>
+<div class="seclabel">С чего начать</div>
+<h2>Порядок запуска</h2>
+<div class="tbl"><table>
+<tr><th>#</th><th>шаг</th><th>кто</th><th>когда</th></tr>
+<tr><td>1</td><td>Список педагогов и их групп</td><td>Борис</td><td>до 26.08</td></tr>
+<tr><td>2</td><td>Завести педагогов, привязать к группам, дать доступ</td><td>я</td><td>полдня</td></tr>
+<tr><td>3</td><td>Карта вех по ПкШ и английскому — на бумаге для педагогов</td><td>я</td><td>к 29.08</td></tr>
+<tr><td>4</td><td><b>Диагностика на первом занятии</b> — с 31.08, у всех новых</td><td>педагоги</td><td>с 31.08</td></tr>
+<tr><td>5</td><td>Ежедневные сводки мини-сада</td><td>я + педагог сада</td><td>с 01.09</td></tr>
+<tr><td>6</td><td>Первые месячные отчёты родителям</td><td>я</td><td>30.09</td></tr>
+</table></div>
+<div class="ok"><b>Почему начинать надо с диагностики, а не с отчётов.</b>
+Гарантия чтения объявлена, дети придут 31 августа. Если первое занятие пройдёт
+без фиксации стартового уровня, гарантия по этим детям не будет действовать —
+а сказать им об этом через три месяца уже нельзя. Диагностика 31 августа
+важнее всей остальной системы, и её можно сделать даже до того,
+как педагоги появятся в CRM — на бумажном бланке.</div>
+</section>
+
+<div class="foot">Составлено 21.08.2026. Проверено по API МойКласс: оценки,
+задания и родительский кабинет доступны и не используются.
+Смежное: <a href="/base/pravila_kidsup">правила и гарантия чтения</a> ·
+<a href="/base/predmety_shpargalka">шпаргалка по предметам</a> ·
+<a href="/base/pedagog_probnoe">девять шагов педагога</a>.</div>
+</div></body></html>
