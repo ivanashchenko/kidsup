@@ -410,6 +410,177 @@ def compensation_without_streak(since: str | None = None) -> list[dict]:
 
 
 # ── сводка по администраторам ─────────────────────────────────────────────
+# ── деньги: абонементы и посещаемость ─────────────────────────────────────
+# Как в МойКласс вообще появляется долг — это не очевидно, и до 21.08 мы это
+# не проверяли. Механика такая:
+#
+#   1. Администратор заводит абонемент. Он может создать его, не проведя
+#      оплату — карточка выглядит нормально, ребёнок ходит.
+#   2. На каждом занятии отметка посещения списывает одно занятие с этого
+#      абонемента и ставит записи paid=true. «Оплачено» здесь значит
+#      «списано с абонемента», а НЕ «деньги получены».
+#   3. Если абонемент не оплачен, каждое списание уводит баланс клиента
+#      в минус. Никакой ошибки на экране не появляется.
+#
+# Поэтому долг всегда рождается на шаге 1 и растёт молча. Ловить его надо
+# по абонементам, а не по занятиям: посещений с paid=false у нас ноль,
+# и искать дыру там бессмысленно.
+
+def unpaid_subscriptions(since: str | None = None, min_debt: float = 1000) -> list[dict]:
+    """Абонемент выдан и расходуется, а деньги за него не пришли."""
+    since = since or _year_start(date.today()).isoformat()
+    out, names = [], _names()
+    for d in _subs(since):
+        price, payed = d.get("price") or 0, d.get("payed") or 0
+        debt = price - payed
+        if price <= 0 or debt < min_debt:
+            continue
+        used = d.get("visitedCount") or 0
+        if d.get("statusId") == 1:            # отменённый абонемент — не долг
+            continue
+        level = HIGH if (debt >= 10000 or used >= 3) else MID
+        out.append({"id": d["id"], "user_id": d.get("userId"), "debt": debt,
+                    "used": used, "manager_id": d.get("managerId")})
+        add_flag("деньги", f"sub-unpaid:{d['id']}", level,
+                 f"Абонемент не оплачен: долг {debt:,.0f} ₽".replace(",", " "),
+                 f"{names.get(d.get('userId'), d.get('userId'))} · продан "
+                 f"{d.get('sellDate')} за {price:,.0f} ₽, оплачено {payed:,.0f} ₽, "
+                 f"уже использовано занятий: {used}. Оформил "
+                 f"{_who(d.get('managerId'))}. Каждое следующее занятие "
+                 f"увеличивает долг — либо берём оплату, либо ставим "
+                 f"абонемент на паузу.".replace(",", " "),
+                 user_id=d.get("userId"), manager_id=d.get("managerId"),
+                 day=d.get("sellDate"))
+    return out
+
+
+def negative_balance(threshold: float = -3000) -> list[dict]:
+    """Клиенты, ушедшие в минус. Итог всех незакрытых абонементов."""
+    out = []
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, name, balance FROM users WHERE balance < ? ORDER BY balance",
+            (threshold,)).fetchall()
+        for r in rows:
+            out.append({"id": r[0], "name": r[1], "balance": r[2]})
+            add_flag("деньги", f"neg-balance:{r[0]}:{date.today():%Y-%m}",
+                     HIGH if r[2] <= -20000 else MID,
+                     f"Долг клиента {abs(r[2]):,.0f} ₽".replace(",", " "),
+                     f"{r[1]} · баланс {r[2]:,.0f} ₽. Разобрать: это "
+                     f"неоплаченный абонемент, ошибка проведения или "
+                     f"реальная задолженность семьи.".replace(",", " "),
+                     user_id=r[0])
+    return out
+
+
+def free_marks(days: int = 30) -> list[dict]:
+    """Занятия, отмеченные бесплатными вне пробных.
+
+    Отметка «бесплатно» не списывает занятие с абонемента и не создаёт счёт —
+    то есть это подарок за счёт центра. Для первого условно-бесплатного
+    занятия так и надо. Для всех остальных случаев должно быть основание."""
+    since = (date.today() - timedelta(days=days)).isoformat()
+    out = []
+    with db.get_conn() as conn:
+        if not conn.execute("SELECT COUNT(*) FROM sqlite_master "
+                            "WHERE name='lesson_records'").fetchone()[0]:
+            return []
+        rows = conn.execute("""
+            SELECT lr.user_id, u.name, l.date, c.name cls, COUNT(*) n
+            FROM lesson_records lr
+            JOIN lessons l ON l.id = lr.lesson_id
+            LEFT JOIN classes c ON c.id = l.class_id
+            LEFT JOIN users u ON u.id = lr.user_id
+            WHERE lr.visit = 1 AND l.date >= ?
+              AND json_extract(lr.raw, '$.free') = 1
+            GROUP BY lr.user_id HAVING n >= 2
+            ORDER BY n DESC""", (since,)).fetchall()
+        for r in rows:
+            out.append({"user_id": r[0], "name": r[1], "count": r[4]})
+            add_flag("деньги", f"free-marks:{r[0]}:{since}", MID,
+                     f"{r[4]} бесплатных занятий за {days} дней",
+                     f"{r[1] or r[0]} · «{(r[3] or '')[:40]}». Бесплатным бывает "
+                     f"только первое условно-бесплатное занятие. Дальше — либо "
+                     f"абонемент, либо отработка, либо письменное основание.",
+                     user_id=r[0])
+    return out
+
+
+def absences_not_billed(days: int = 30) -> list[dict]:
+    """Пропуски, не списанные с абонемента и без уважительной причины.
+
+    По правилам пропуск либо отрабатывается, либо сгорает. Пропуск, который
+    просто не списали, — это занятие, подаренное задним числом."""
+    since = (date.today() - timedelta(days=days)).isoformat()
+    out = []
+    with db.get_conn() as conn:
+        if not conn.execute("SELECT COUNT(*) FROM sqlite_master "
+                            "WHERE name='lesson_records'").fetchone()[0]:
+            return []
+        rows = conn.execute("""
+            SELECT lr.user_id, u.name, COUNT(*) n
+            FROM lesson_records lr
+            JOIN lessons l ON l.id = lr.lesson_id
+            LEFT JOIN users u ON u.id = lr.user_id
+            WHERE l.date >= ? AND lr.visit = 0
+              AND json_extract(lr.raw, '$.paid') = 0
+              AND json_extract(lr.raw, '$.free') = 0
+              AND json_extract(lr.raw, '$.goodReason') = 0
+              AND json_extract(lr.raw, '$.missedLessonRecordId') IS NULL
+            GROUP BY lr.user_id HAVING n >= 3
+            ORDER BY n DESC LIMIT 40""", (since,)).fetchall()
+        for r in rows:
+            out.append({"user_id": r[0], "name": r[1], "count": r[2]})
+            add_flag("деньги", f"absence-free:{r[0]}:{since}", MID,
+                     f"{r[2]} пропусков не списаны с абонемента",
+                     f"{r[1] or r[0]} · пропуски без отработки, без справки "
+                     f"и без списания. Либо оформить отработку, либо списать: "
+                     f"сейчас это занятия за счёт центра.",
+                     user_id=r[0])
+    return out
+
+
+def visits_without_bill(days: int = 30) -> list[dict]:
+    """Ребёнок был на занятии, а счёта нет — занятие не привязано ни к
+    абонементу, ни к разовой оплате. Чаще всего это забытый абонемент."""
+    since = (date.today() - timedelta(days=days)).isoformat()
+    out = []
+    with db.get_conn() as conn:
+        if not conn.execute("SELECT COUNT(*) FROM sqlite_master "
+                            "WHERE name='lesson_records'").fetchone()[0]:
+            return []
+        rows = conn.execute("""
+            SELECT lr.user_id, u.name, l.date, c.name cls
+            FROM lesson_records lr
+            JOIN lessons l ON l.id = lr.lesson_id
+            LEFT JOIN classes c ON c.id = l.class_id
+            LEFT JOIN users u ON u.id = lr.user_id
+            WHERE l.date >= ? AND lr.visit = 1
+              AND json_extract(lr.raw, '$.free') = 0
+              AND json_extract(lr.raw, '$.bill') IS NULL
+            ORDER BY l.date DESC LIMIT 40""", (since,)).fetchall()
+        for r in rows:
+            out.append({"user_id": r[0], "name": r[1], "date": r[2]})
+            add_flag("деньги", f"visit-nobill:{r[0]}:{r[2]}", MID,
+                     "Занятие посещено, но не оплачено ничем",
+                     f"{r[1] or r[0]} · {r[2]} «{(r[3] or '')[:40]}». Ни "
+                     f"абонемента, ни разовой оплаты. Проверить: либо провести "
+                     f"оплату, либо привязать к абонементу.",
+                     user_id=r[0], day=r[2])
+    return out
+
+
+def money_check() -> dict:
+    """Прогон денежных проверок: абонементы, балансы, отметки посещений."""
+    res = {"unpaid_subs": unpaid_subscriptions(),
+           "negative_balance": negative_balance(),
+           "free_marks": free_marks(),
+           "absences_not_billed": absences_not_billed(),
+           "visits_without_bill": visits_without_bill()}
+    log.info("деньги: %s", ", ".join(f"{k}={len(v)}" for k, v in res.items()))
+    return res
+
+
 def check(since: str | None = None) -> dict:
     """Один прогон всех проверок правил."""
     res = {

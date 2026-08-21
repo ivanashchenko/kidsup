@@ -2100,7 +2100,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-21.01"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-21.02"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -3155,6 +3155,86 @@ tr:last-child td{{border-bottom:none}}
 До 20 августа этих правил не было, поэтому ничего из перечисленного
 нарушением не считается — это отправная точка.
 </div>
+</div><script>
+async function mark(id, st) {{
+  await fetch('/api/audit/resolve?flag_id=' + id + '&status=' + st, {{method: 'POST'}});
+  const el = document.querySelector('.f[data-id="' + id + '"]');
+  if (el) el.classList.add('done');
+}}
+</script></body></html>""")
+
+
+@app.post("/api/money/run", dependencies=AUTH)
+async def api_money_run():
+    from . import rules as _rules
+    return {k: len(v) for k, v in _rules.money_check().items()}
+
+
+@app.get("/dolgi", response_class=HTMLResponse, dependencies=AUTH)
+async def money_page():
+    """Долги и расхождения по деньгам в CRM — с объяснением, откуда они берутся."""
+    from . import rules as _rules
+    flags = [f for f in _rules.open_flags(300) if f.get("kind") == "деньги"]
+    colors = {"high": "#A3282B", "mid": "#9A5B00", "low": "#6E7264"}
+    RU = {"sub-unpaid": "абонемент не оплачен", "neg-balance": "минус на балансе",
+          "free-marks": "бесплатные занятия", "absence-free": "пропуски не списаны",
+          "visit-nobill": "занятие без счёта"}
+    groups: dict[str, list] = {}
+    for f in flags:
+        groups.setdefault((f["key"] or "").split(":")[0], []).append(f)
+    blocks = []
+    for k, items in sorted(groups.items(), key=lambda x: -len(x[1])):
+        rows = "".join(
+            f'<div class="f" data-id="{f["id"]}">'
+            f'<div class="dot" style="background:{colors.get(f["level"], "#6E7264")}"></div>'
+            f'<div><b>{html.escape(f["title"] or "")}</b>'
+            f'<div class="d">{html.escape(f["detail"] or "")}</div></div>'
+            f'<div class="btns"><button onclick="mark({f["id"]},\'ok\')">норма</button>'
+            f'<button class="v" onclick="mark({f["id"]},\'violation\')">долг</button>'
+            f'</div></div>' for f in items)
+        blocks.append(f'<h2>{html.escape(RU.get(k, k))} — {len(items)}</h2>{rows}')
+    body = "".join(blocks) or '<p class="empty">Расхождений нет.</p>'
+    return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Долги и деньги в CRM</title><style>
+:root{{--paper:#FAF9F5;--ink:#22271F;--muted:#6E7264;--line:#E3E1D6;--card:#fff}}
+@media (prefers-color-scheme:dark){{:root{{--paper:#151812;--ink:#E7E6DD;--muted:#9B9F90;
+  --line:#2C3026;--card:#1A1E16}}}}
+body{{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.6 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}}
+.wrap{{max-width:58rem;margin:0 auto;padding:2rem 1rem 4rem}}
+h1{{font-size:1.8rem;margin:.2rem 0 .3rem;letter-spacing:-.02em}}
+h2{{font-size:1.05rem;margin:2rem 0 .5rem}}
+.sub{{color:var(--muted);margin:0 0 1.2rem;max-width:44rem}}
+.how{{background:var(--card);border:1px solid var(--line);border-left:3px solid #9A5B00;
+  border-radius:0 10px 10px 0;padding:.9rem 1.1rem;margin:1.2rem 0;max-width:44rem;font-size:.93rem}}
+.how ol{{margin:.5rem 0;padding-left:1.2rem}} .how li{{margin:.3rem 0}}
+.f{{display:grid;grid-template-columns:10px 1fr auto;gap:.75rem;align-items:start;
+  background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:.8rem .95rem;margin:.5rem 0}}
+.dot{{width:10px;height:10px;border-radius:99px;margin-top:.45rem}}
+.d{{font-size:.9rem;margin-top:.15rem}}
+.btns{{display:flex;gap:.35rem;flex-wrap:wrap}}
+button{{font:inherit;font-size:.82rem;padding:.35rem .6rem;border-radius:7px;
+  border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}}
+button.v{{border-color:#A3282B;color:#A3282B}}
+.f.done{{opacity:.35}} .empty{{color:var(--muted)}}
+</style></head><body><div class="wrap">
+<h1>Долги и деньги в CRM</h1>
+<p class="sub">Расхождения между тем, что записано в МойКласс, и тем, что должно
+быть записано. Проверяется каждое утро в 9:40.</p>
+<div class="how"><b>Откуда вообще берётся долг.</b>
+<ol>
+<li>Администратор заводит абонемент — можно создать его, не проведя оплату.
+Карточка выглядит нормально, ребёнок ходит.</li>
+<li>Отметка посещения списывает занятие с этого абонемента и ставит
+«оплачено». Это значит «списано с абонемента», а не «деньги получены».</li>
+<li>Если абонемент не оплачен, каждое занятие уводит баланс в минус.
+Ошибки на экране не появляется — долг растёт молча.</li>
+</ol>
+Поэтому долг рождается на первом шаге. Ловить его надо по абонементам:
+занятий с пометкой «не оплачено» у нас нет вообще.</div>
+{body}
 </div><script>
 async function mark(id, st) {{
   await fetch('/api/audit/resolve?flag_id=' + id + '&status=' + st, {{method: 'POST'}});

@@ -1969,6 +1969,47 @@ def rules_check() -> dict:
             "by_rule": {k: len(v) for k, v in res.items() if v}}
 
 
+def money_check() -> dict:
+    """Ежедневная проверка денег в CRM: абонементы, балансы, отметки.
+
+    Долг в МойКласс растёт молча: отметка посещения списывает занятие
+    с абонемента независимо от того, оплачен он или нет. Ошибки на экране
+    не появляется, поэтому находят такое обычно через месяцы. Проверяем
+    каждое утро и возвращаем находку тому, кто заводил абонемент."""
+    from . import rules as _rules
+    res = _rules.money_check()
+    flags = [f for f in _rules.open_flags(300) if f.get("kind") == "деньги"]
+    if not flags:
+        return {"flags": 0}
+    by_mgr: dict[int, list[dict]] = {}
+    for f in flags:
+        if f.get("manager_id"):
+            by_mgr.setdefault(f["manager_id"], []).append(f)
+    mk = _client()
+    try:
+        for mgr, items in by_mgr.items():
+            total = len(items)
+            what = "; ".join(f["title"] for f in items[:2])
+            body = (f"🔥 Клод: деньги в CRM — {total} расхождение(й). {what}. "
+                    f"Абонемент без оплаты продолжает списывать занятия и растит "
+                    f"долг молча. Разбор: app.kidsup.ru/dolgi")
+            try:
+                _task(mk, mgr, items[0].get("user_id"), body[:250], )
+            except Exception:
+                log.warning("деньги: задача для %s не поставилась", mgr)
+        high = [f for f in flags if f["level"] == "high"]
+        if high:
+            lines = [f"🤖 Клод: {len(high)} денежных расхождений в CRM:", ""]
+            lines += [f"• {f['title']} — {(f['detail'] or '')[:80]}" for f in high[:6]]
+            lines += ["", "Разбор: https://app.kidsup.ru/dolgi"]
+            _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines))
+    finally:
+        mk.close()
+    log.info("деньги: %d флагов, задачи %d администраторам", len(flags), len(by_mgr))
+    return {"flags": len(flags), "managers": len(by_mgr),
+            "by_rule": {k: len(v) for k, v in res.items() if v}}
+
+
 def daily_digest() -> None:
     day = _today().isoformat()
     try:
@@ -2452,6 +2493,14 @@ def _loop() -> None:
                     rules_check()
                 except Exception:
                     log.exception("контроль правил не удался — продолжаем")
+            # деньги в CRM: неоплаченные абонементы, минусовые балансы,
+            # бесплатные отметки и несписанные пропуски — в 9:40, следом
+            # за контролем правил
+            if (now.hour, now.minute) >= (9, 40) and _mark("money_day", str(_today())):
+                try:
+                    money_check()
+                except Exception:
+                    log.exception("проверка денег не удалась — продолжаем")
             if now.hour >= 8 and _mark("close_dead_tasks", str(_today())):
                 try:
                     close_dead_tasks()
