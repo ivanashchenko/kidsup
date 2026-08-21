@@ -60,9 +60,18 @@ def _hint(c: dict) -> str:
     was = ", ".join(c.get("was") or []) or "подготовку к школе"
     age = c.get("age")
     a = f"{age:g}".replace(".", ",") if age else "?"
-    return (f"«Помню {nm}, {'он' if not _fem(nm) else 'она'} ходил"
-            f"{'а' if _fem(nm) else ''} к нам на {was}» — {_when(c.get('last') or '')}. "
-            f"Сейчас {a} — как раз наш возраст для ПШ.")
+    head = (f"«Помню {nm}, {'она' if _fem(nm) else 'он'} ходил"
+            f"{'а' if _fem(nm) else ''} к нам на {was}» — {_when(c.get('last') or '')}.")
+    if age and age >= 7.0:
+        # Ребёнок уже в школе: предлагать подготовку к школе — значит показать,
+        # что мы не знаем, сколько ему лет. Разговор идёт про другое.
+        return (f"{head} Сейчас {a} — уже школьник. ПШ не предлагать: "
+                f"английский по уровню, ментальная арифметика, скорочтение, шахматы.")
+    if age and age < 4.0:
+        return f"{head} Сейчас {a} — рано для ПШ: музыка и речь, раннее развитие."
+    if not age:
+        return f"{head} Возраст в карточке не заполнен — спросить первым делом."
+    return f"{head} Сейчас {a} — как раз наш возраст для ПШ."
 
 
 _FEM_EXC = {"никита", "илья", "данила", "савва", "лука", "миша", "паша",
@@ -86,7 +95,11 @@ def _row(c: dict, i: int) -> str:
   <div class="top"><b>{i}. {nm}</b><span class="age">{a} лет</span></div>
   <div class="meta">{was} · {html.escape(_when(c.get('last') or ''))}</div>
   {busy}
-  <a class="tel" href="tel:+7{ph}">+7 {ph}</a>
+  <div class="acts">
+    <a class="tel" href="tel:+7{ph}">+7 {ph}</a>
+    <a class="crm" href="https://app.moyklass.com/client/{c['uid']}"
+       target="_blank" rel="noopener">карточка в МойКласс ↗</a>
+  </div>
   <div class="say">{html.escape(_hint(c))}</div>
   <div class="marks">
     <button data-m="записал">записал</button>
@@ -168,9 +181,11 @@ def build() -> str:
     d2 = rest + [c for c in data if c["seg"] == "младшая ПШ1 (4-5,5)"]
     later = [c for c in data if c["seg"] == "возраст неизвестен"]
 
+    older = [c for c in data if c["seg"] in ("школьники 7+", "малыши до 4")]
     rows1 = "\n".join(_row(c, i) for i, c in enumerate(d1, 1))
     rows2 = "\n".join(_row(c, i) for i, c in enumerate(d2, 1))
     rows3 = "\n".join(_row(c, i) for i, c in enumerate(later, 1))
+    rows4 = "\n".join(_row(c, i) for i, c in enumerate(older, 1))
 
     return f"""<!doctype html>
 <html lang="ru">
@@ -219,7 +234,9 @@ ul.plain{{padding-left:1.2rem}} ul.plain li{{margin:.35rem 0}}
 .tag{{display:inline-block;font-size:.72rem;font-weight:700;border-radius:5px;
   padding:.1rem .4rem;margin-top:.3rem}}
 .tag.busy{{background:var(--amber-soft);color:var(--amber)}}
-.tel{{display:inline-block;margin:.5rem 0 .2rem;font-size:1.15rem;font-weight:780;
+.acts{{display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:baseline;margin:.5rem 0 .1rem}}
+.crm{{font-size:.83rem;color:var(--sky);text-decoration:none;white-space:nowrap}}
+.tel{{display:inline-block;font-size:1.15rem;font-weight:780;
   color:var(--green);text-decoration:none;font-variant-numeric:tabular-nums}}
 .marks{{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.45rem}}
 .marks button{{font:inherit;font-size:.8rem;padding:.28rem .6rem;border-radius:99px;
@@ -240,7 +257,7 @@ ul.plain{{padding-left:1.2rem}} ul.plain li{{margin:.35rem 0}}
   <div class="num"><b>{len(d1)}</b><span>суббота 22.08<br>дети 5,5–7 лет</span></div>
   <div class="num"><b>{len(d2)}</b><span>воскресенье 23.08<br>остальные + 4–5,5</span></div>
   <div class="num"><b>0</b><span>записей сейчас<br>в 14 группах ПШ</span></div>
-  <div class="num"><b>112</b><span>свободных мест<br>в новом сезоне</span></div>
+  <div class="num"><b>{len(data)}</b><span>всего семей<br>из прошлого ПШ</span></div>
 </div>
 
 {SCRIPT}
@@ -265,6 +282,17 @@ ul.plain{{padding-left:1.2rem}} ul.plain li{{margin:.35rem 0}}
 <p class="sub">В карточке нет даты рождения. Спросите возраст первым делом:
 от него зависит всё предложение.</p>
 {rows3}
+</section>
+
+<section>
+<div class="seclabel">Отдельная волна · не в эти выходные</div>
+<h2>Школьники: {len(older)} семей, которым ПШ уже не нужен</h2>
+<p class="sub">Дети пошли в школу — подготовка им не подходит, и предлагать её
+значит показать, что мы не помним, сколько ребёнку лет. Зато это наши бывшие
+клиенты: английский по уровню, ментальная арифметика, скорочтение, шахматы.
+Эту волну лучше отдать администраторам на следующей неделе, а выходные
+потратить на тех, кому ПШ нужен прямо сейчас.</p>
+{rows4}
 </section>
 
 <div class="foot">🤖 Клод, ИИ-сотрудник KidsUP · собрано {date.today().strftime('%d.%m.%Y')}.
