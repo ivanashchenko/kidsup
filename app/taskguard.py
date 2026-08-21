@@ -207,7 +207,7 @@ def check(mk: MoyklassClient, fix: bool = True) -> dict:
     today = date.today().isoformat()
     tasks = _open_tasks(mk)
     fixed: Counter = Counter()
-    seen_phone: dict[str, int] = {}
+    unclear: list[dict] = []
 
     for t in tasks:
         body = (t.get("body") or "").strip()
@@ -239,8 +239,15 @@ def check(mk: MoyklassClient, fix: bool = True) -> dict:
             continue
 
         # Задача владельцу, которая на самом деле — работа администратора.
-        if OWNER_ID in (t.get("managerIds") or []) and ADMIN_WORK.search(body) \
-                and not OWNER_WORK.search(body):
+        if OWNER_ID in (t.get("managerIds") or []) and ADMIN_WORK.search(body):
+            if OWNER_WORK.search(body):
+                # Признаки обоих сразу. Правило по словам тут уже врёт:
+                # «заявка с сайта» попадала во владельческое из-за слова
+                # «сайт», «договорились» — из-за «договор». Такие задачи
+                # автоматика НЕ трогает, а откладывает мне на разбор —
+                # я прихожу каждый час и читаю историю клиента целиком.
+                unclear.append({"id": t["id"], "body": body[:160]})
+                continue
             to = CHAT_ADMIN if TO_CHAT.search(body) else (_duty() or CHAT_ADMIN)
             if fix and _reassign(mk, t, to):
                 fixed["передано администратору"] += 1
@@ -266,7 +273,9 @@ def check(mk: MoyklassClient, fix: bool = True) -> dict:
         "когда": date.today().isoformat(),
         "открытых": len(live),
         "починено": dict(fixed),
-        "требует_меня": {"дублей": dups, "шаблонных": templates},
+        "требует_меня": {"дублей": dups, "шаблонных": templates,
+                         "спорных": len(unclear)},
+        "спорные": unclear[:20],
         "нагрузка": {who: dict(sorted(c.items())) for who, c in load.items()},
     }
     try:
@@ -275,9 +284,9 @@ def check(mk: MoyklassClient, fix: bool = True) -> dict:
         log.warning("taskguard: отчёт не сохранился")
     if fixed:
         log.info("taskguard: починено %s", dict(fixed))
-    if dups or templates:
-        log.warning("taskguard: разобрать руками — дублей %d, шаблонных %d",
-                    dups, templates)
+    if dups or templates or unclear:
+        log.warning("taskguard: разобрать руками — дублей %d, шаблонных %d, "
+                    "спорных %d", dups, templates, len(unclear))
     return report
 
 
