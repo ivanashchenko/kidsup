@@ -36,6 +36,7 @@ import time
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from . import brain
 from . import db, mango, wazzup
 from .moyklass_client import MoyklassClient
 from .sync import get_api_key
@@ -967,6 +968,24 @@ def _who_label(phone: str, name: str, chat_type: str | None) -> str:
             else f"{src}, чат …{tail} — телефона нет, искать чат в Wazzup")
 
 
+def _thread(phone: str, until: str, limit: int = 12) -> list[dict]:
+    """Переписка по клиенту до указанного момента — модели нужен разговор
+    целиком, а не последняя реплика: «спасибо» после «пришлите цену»
+    и «спасибо» после «нам не подходит» означают разное."""
+    out = []
+    with db.get_conn() as conn:
+        for table, direction in (("wazzup_inbox", "in"), ("wazzup_outbox", "out")):
+            try:
+                rows = conn.execute(
+                    f"SELECT ts, text FROM {table} WHERE phone LIKE ? AND ts <= ? "
+                    f"ORDER BY ts DESC LIMIT ?",
+                    (f"%{phone[-10:]}", until, limit)).fetchall()
+            except Exception:
+                rows = []
+            out += [{"ts": ts, "dir": direction, "text": t or ""} for ts, t in rows]
+    return sorted(out, key=lambda m: m["ts"])[-limit:]
+
+
 def unanswered_inbound(mk: MoyklassClient) -> None:
     """Клиент написал в Wazzup, прошло UNANSWERED_MIN минут, ответа от нас нет →
     задача админу. Смайлик от получателя рассылки — тёплый сигнал (мы сами
@@ -1009,7 +1028,15 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
                 uid, name = users[0].get("id"), (users[0].get("name") or "")[:28]
         except Exception:
             log.warning("unanswered_inbound: клиент по номеру %s не найден", phone[-10:])
-        hot = any(w in text.lower() for w in HOT_WORDS)
+        # Срочность и намерение — смыслом, а не списком слов. «Мы подумаем
+        # и вернёмся в сентябре» и «подумайте, как записаться прямо сейчас»
+        # содержат одно и то же слово, но требуют разного. Модель читает
+        # переписку целиком; если её нет — работает прежний список слов.
+        sense = None
+        if brain.enabled():
+            sense = brain.read_dialog(_thread(phone, ts_in))
+        hot = (sense.get("срочность") == "горит" if sense
+               else any(w in text.lower() for w in HOT_WORDS))
         who = _who_label(phone, name, chat_type)
         if warm:
             # мы просили «ответьте смайликом» — смайлик и есть ответ: тёплый
@@ -1020,9 +1047,23 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
         else:
             head = "🔥 КЛИЕНТ ЖДЁТ ОТВЕТА" if hot else "Клиент писал, ответа нет"
             where = "в WhatsApp" if _is_phone(phone) else "в том же чате"
-            body = (f"{head} ({ts_in[11:16]}, {who}): «{text[:90]}» — "
-                    f"ответить {where} и поставить следующий шаг.")
+            if sense and sense.get("следующий_шаг"):
+                # Модель говорит, что именно сделать, — это полезнее общего
+                # «ответить и поставить следующий шаг».
+                what = sense["следующий_шаг"]
+                mark = f"[{sense.get('намерение')}] " if sense.get("намерение") else ""
+                body = (f"{head} ({ts_in[11:16]}, {who}): «{text[:70]}» — "
+                        f"{mark}{what} Ответить {where}.")
+            else:
+                body = (f"{head} ({ts_in[11:16]}, {who}): «{text[:90]}» — "
+                        f"ответить {where} и поставить следующий шаг.")
             owner = chat_admin or fallback
+            # Отказ не требует ответа в чате — он требует пометки в карточке,
+            # иначе человека продолжат звать и раздражать.
+            if sense and sense.get("намерение") == "отказ" \
+                    and not sense.get("ждёт_ответа"):
+                body = (f"Отказ ({ts_in[11:16]}, {who}): «{text[:80]}» — "
+                        f"поставить статус «Отказ» с причиной и не звонить.")
         _task(mk, owner, uid, body[:250])
         log.info("unanswered_inbound: задача по %s (%s)", phone[-10:],
                  "тёплый-смайлик" if warm else ("горячий" if hot else "обычный"))

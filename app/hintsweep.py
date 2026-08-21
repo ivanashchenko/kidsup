@@ -29,6 +29,7 @@ import re
 import time
 from datetime import date
 
+from . import brain
 from . import hint, sync, taskguard
 from .moyklass_client import MoyklassClient
 
@@ -113,6 +114,64 @@ def _facts(mk: MoyklassClient, uid: int, cache: dict, classes: dict) -> dict:
     return c
 
 
+def _profile(mk: MoyklassClient, uid: int, c: dict, was) -> str:
+    """Всё, что мы знаем о семье, — одним текстом для модели.
+
+    Комментарии в карточке важнее статистики: там лежат обещания, обиды
+    и договорённости, из-за которых один и тот же по цифрам клиент
+    требует совершенно разного разговора."""
+    parts = [f"Ребёнок: {c.get('name') or '—'}"]
+    if c.get("birthday"):
+        a = hint.age_on_season(c["birthday"])
+        if a:
+            parts.append(f"Возраст на 1 сентября: {a}")
+    if was:
+        parts.append("Посещал: " + ", ".join(sorted(set(was))))
+    if c.get("last_visit"):
+        parts.append(f"Последний визит: {c['last_visit']}")
+    if c.get("enrolled"):
+        parts.append("Записан на 2026/27: " + str(c["enrolled"][0])[:60])
+    else:
+        parts.append("На 2026/27 НЕ записан")
+    try:
+        r = mk.get("/v1/company/userComments", {"userId": uid, "limit": 8})
+        cm = r.get("comments") or r.get("userComments") or []
+    except Exception:
+        cm = []
+    human = []
+    for x in cm:
+        t = (x.get("comment") or "").strip()
+        # Свои же подсказки в профиль не кладём — иначе модель пересказывает
+        # саму себя вместо того, чтобы читать историю клиента.
+        if not t or t.startswith(("🎯", "🤖")) or "ПОДСКАЗКА ДЛЯ ЗВОНКА" in t:
+            continue
+        human.append(f"· {(x.get('createdAt') or '')[:10]}: {t[:220]}")
+    if human:
+        parts.append("Из карточки:\n" + "\n".join(human[:6]))
+    return "\n".join(parts)
+
+
+def _personal(mk: MoyklassClient, uid, c: dict, was) -> str | None:
+    if not brain.enabled():
+        return None
+    h = brain.call_hint(_profile(mk, int(uid), c, was))
+    if not h or not h.get("начать"):
+        return None
+    out = ["👤 ПОД ЭТУ СЕМЬЮ",
+           "НАЧАТЬ ТАК: " + h["начать"]]
+    if h.get("вопрос"):
+        out.append("СПРОСИТЬ И ЗАМОЛЧАТЬ: " + h["вопрос"])
+    if h.get("главное"):
+        out.append("ГЛАВНОЕ: " + h["главное"])
+    if h.get("вторым"):
+        out.append("ВТОРЫМ (−10%): " + h["вторым"])
+    if h.get("закрыть"):
+        out.append("ЗАКРЫТЬ: " + h["закрыть"])
+    if h.get("внимание"):
+        out.append("⚠️ " + h["внимание"])
+    return "\n".join(out)
+
+
 def run(apply: bool = False, limit: int = 0) -> dict:
     mk = MoyklassClient(sync.get_api_key())
     stat = {"карточек": 0, "подсказок": 0, "уже была": 0, "без имени": 0,
@@ -155,6 +214,13 @@ def run(apply: bool = False, limit: int = 0) -> dict:
             text = hint.build(c["name"], birthday=c.get("birthday"), was=was,
                               last_visit=c.get("last_visit"),
                               enrolled=c.get("enrolled") or None)
+            # Поверх шаблонной подсказки — разбор под конкретную семью.
+            # Шаблон остаётся основой: он гарантирует, что обязательные
+            # формулировки и события названы, а модель добавляет то, чего
+            # шаблон знать не может — историю, обиды, незакрытые обещания.
+            personal = _personal(mk, uid, c, was)
+            if personal:
+                text = personal + "\n\n" + text
             if len(samples) < 3:
                 samples.append(text)
             if apply:

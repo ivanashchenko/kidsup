@@ -2137,7 +2137,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.7"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.8"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2272,6 +2272,29 @@ async def api_ai_route(payload: dict):
     if not brain.enabled():
         return {"error": "ключ Anthropic не вписан"}
     return {"разбор": brain.route_task(body)}
+
+
+@app.post("/api/ai/hint", dependencies=AUTH)
+async def api_ai_hint(payload: dict):
+    """{"userId": N} — подсказка под конкретную семью из её карточки."""
+    from . import brain, hintsweep, sync
+    from .moyklass_client import MoyklassClient
+    uid = payload.get("userId")
+    if not uid:
+        raise HTTPException(400, "нужен userId")
+    if not brain.enabled():
+        return {"error": "ключ Anthropic не вписан"}
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        u = mk.get(f"/v1/company/users/{uid}")
+        c = {"name": u.get("name") or "", "phone": (u.get("phone") or "")[-10:]}
+        for a in (u.get("attributes") or []):
+            if a.get("attributeAlias") == "birthday" and a.get("value"):
+                c["birthday"] = a["value"][:10]
+        profile = hintsweep._profile(mk, int(uid), c, None)
+        return {"профиль": profile, "подсказка": brain.call_hint(profile)}
+    finally:
+        mk.close()
 
 
 @app.post("/api/deploy", dependencies=AUTH)
