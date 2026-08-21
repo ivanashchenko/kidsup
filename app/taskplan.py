@@ -56,6 +56,21 @@ os.makedirs(SP, exist_ok=True)
 
 CHAT_ADMIN = 154181
 CALL_ADMINS = [232763, 232805, 202856]
+OWNER = 84116                              # Борис
+OTHER = [229704]                           # Маша — редкие организационные задачи
+
+# Что действительно требует владельца: решение, доступ, деньги наружу, люди.
+# Всё остальное, что копится у него, — это лиды и текучка, попавшие к нему
+# по умолчанию. За четыре дня так набралось 178 просроченных задач.
+OWNER_ONLY = re.compile(
+    r"реши|решени|согласова|доступ|логин|парол|токен|подписк|договор|аренд|"
+    r"реклам|бюджет|нанять|найм|педагог|уволь|закуп|купить|оплатить счёт|"
+    r"списать|учредител|юрлиц|лиценз|партнёр|стратег", re.I)
+# Признаки обычного лида, который должен уйти в обзвон.
+LEAD = re.compile(
+    r"ответил|реакци|рассылк|горячий|тёплый|теплый|заявк|перезвонить|"
+    r"пригласи|обзвон|продающий звонок|не дозвонил|недозвон|смайлик|"
+    r"пропущенн|написал", re.I)
 NAMES = {84116: "Борис", 154181: "Лиза", 202856: "Лена",
          229704: "Маша", 232763: "Ира", 232805: "Аня"}
 DEAD_STATES = {125954, 125957, 146328}     # некачественный, отказ, не писать
@@ -188,7 +203,7 @@ def collect() -> dict:
     mk = _mk()
     try:
         tasks = []
-        for mid in CALL_ADMINS + [CHAT_ADMIN]:
+        for mid in CALL_ADMINS + [CHAT_ADMIN, OWNER] + OTHER:
             off = 0
             while off < 1500:
                 r = _retry(mk.get, "/v1/company/tasks",
@@ -333,6 +348,14 @@ def decide() -> list[dict]:
                                if ABOUT_ENROLL.search(x.get("body") or "")):
             act, why = "закрыть", f"дубль: по клиенту ещё {len(mine)-1} задач"
 
+        elif OWNER in mgrs and not OWNER_ONLY.search(body) and LEAD.search(body):
+            # задача владельца, которая на самом деле обычный лид —
+            # отдаём в обзвон тому, кто сегодня звонит
+            act, mgr, why = "раздать", None, "лид — в обзвон, не владельцу"
+
+        elif OWNER in mgrs and MONEY.search(body) and not OWNER_ONLY.search(body):
+            act, mgr, why = "передать", CHAT_ADMIN, "деньги и документы — Лизе"
+
         else:
             # 4. срок назван в тексте
             want = deadline_in_text(body)
@@ -378,10 +401,19 @@ def decide() -> list[dict]:
     CAP = {232763: 40, 232805: 40, 202856: 40, CHAT_ADMIN: 35}
     HOUR = {0: "09:00", 1: "11:00", 2: "14:00", 3: "16:00"}
     keep: dict[int, list] = defaultdict(list)
+    # «раздать» — лиды, снятые с владельца: кладём тому, кто в смене,
+    # по очереди, чтобы нагрузка легла ровно
+    give = [x for x in out if x["act"] == "раздать"]
+    ring = [232763, 232805, 202856]
+    for i, x in enumerate(give):
+        x["mgr"] = ring[i % len(ring)]
+        x["act"] = "оставить"          # дальше раскладывается общим правилом
+        x["mgr_now"] = [x["mgr"]]
+        x["why"] = "лид снят с Бориса — в обзвон"
     for x in out:
         if x["act"] != "оставить":
             continue
-        mgr = next((m for m in x["mgr_now"] if m in SHIFTS), None)
+        mgr = x.get("mgr") or next((m for m in x["mgr_now"] if m in SHIFTS), None)
         if mgr:
             keep[mgr].append(x)
     for mgr, items in keep.items():

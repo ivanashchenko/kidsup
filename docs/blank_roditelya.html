@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Анкета родителя</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+  --pen:#B9B5A8;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819;
+    --pen:#454857; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:730;margin:1.5rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+/* правила карточками */
+.rules{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));margin:1.1rem 0}
+.rule{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.05rem;
+  display:grid;grid-template-columns:2rem 1fr;gap:.7rem;align-items:start}
+.rule .ic{font-size:1.25rem;line-height:1.3}
+.rule b{display:block;font-weight:730;margin-bottom:.15rem;font-size:.97rem}
+.rule span{font-size:.9rem;color:var(--muted);line-height:1.5}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.say{background:var(--sky-soft);border-left:3px solid var(--sky);
+  border-radius:0 8px 8px 0;padding:.55rem .8rem;margin:.5rem 0;font-size:.92rem;max-width:47rem}
+.say em{display:block;font-style:normal;font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.2rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.3rem 0}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+
+/* ——— бланк ——— */
+.sheet{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:1.2rem 1.35rem;margin:1.1rem 0}
+.fields{display:flex;flex-wrap:wrap;gap:.55rem 1.1rem;margin:.2rem 0 .1rem}
+.fld{flex:1 1 12rem;display:flex;align-items:flex-end;gap:.4rem;font-size:.88rem;color:var(--muted)}
+.fld.wide{flex:1 1 100%}
+.fld .ln{flex:1 1 auto}
+.ln{display:inline-block;border-bottom:1px solid var(--pen);height:1.35rem;min-width:3rem}
+.where{font-size:.84rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:.3rem 1.4rem;margin-top:.5rem}
+.where .o{font-size:.84rem}
+
+.q{margin:1.15rem 0 0;break-inside:avoid}
+.q h3{margin:0 0 .1rem;font-size:1.04rem;font-weight:780;color:var(--indigo);
+  display:grid;grid-template-columns:1.5rem 1fr;gap:.35rem;align-items:baseline}
+.q h3 i{font-style:normal;font-weight:800;color:var(--sky)}
+.q .hint{font-size:.82rem;color:var(--muted);margin:0 0 .35rem 1.85rem}
+.opts2{display:grid;grid-template-columns:1fr 1fr;gap:.1rem 1.1rem;margin:.1rem 0 0 1.85rem}
+.o{display:grid;grid-template-columns:1.05rem 1fr;gap:.5rem;align-items:start;
+  font-size:.94rem;line-height:1.42;padding:.17rem 0}
+.o.full{grid-column:1/-1}
+.cb{width:1.02rem;height:1.02rem;flex:0 0 auto;border:1.5px solid var(--indigo);
+  border-radius:4px;margin-top:.16rem;background:transparent}
+.o .ln{min-width:55%;height:1.1em;border-bottom:1px solid var(--pen)}
+
+.adm{border:1.5px dashed var(--pen);border-radius:12px;padding:.75rem .95rem;margin:1.3rem 0 .4rem}
+.adm .seclabel{margin-bottom:.35rem}
+.parentfoot{font-size:.82rem;color:var(--muted);margin:.7rem 0 0;max-width:none}
+@media (max-width:44rem){ .opts2{grid-template-columns:1fr} }
+
+/* ——— печать ——— */
+@page{ size:A4; margin:11mm 12mm 9mm }
+@media print{
+  :root{ --paper:#fff; --ink:#111318; --muted:#4a4f60; --line:#D8D4C8; --card:#fff; --fill:#F2F0E8;
+    --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+    --indigo-soft:#EDEBF7; --sky-soft:#E8F4FC; --green-soft:#EFF6E4; --amber-soft:#FCF2E0; --red-soft:#FBE7E6;
+    --pen:#9A968A; }
+  body{background:#fff;font-size:10.2pt;line-height:1.4;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .wrap{max-width:none;padding:0}
+  .noprint{display:none!important}
+  h1{font-size:17.5pt;margin:.15rem 0 .3rem}
+  h2{font-size:13pt}
+  h3{font-size:11pt}
+  p{margin:.35rem 0;max-width:none}
+  .sub{max-width:none}
+  .sheet{border:none;padding:0;margin:.5rem 0 0}
+  .q{margin-top:.75rem}
+  .o{font-size:9.7pt;padding:.11rem 0}
+  .cb{border-width:1.2px}
+  .adm{margin-top:.9rem}
+  .note,.warn,.ok,.say,ul.plain{max-width:none}
+  section{margin-top:1.1rem;padding-top:.8rem;break-inside:auto}
+  .guide{break-before:page;page-break-before:always;border-top:none;margin-top:0;padding-top:0}
+  table{font-size:9pt;min-width:0}
+  th{padding:.3rem .5rem} td{padding:.35rem .5rem}
+  .tbl{overflow:visible}
+  tr{break-inside:avoid}
+  .foot{margin-top:1.2rem;padding-top:.6rem;font-size:8.5pt}
+}
+</style></head>
+<body><div class="wrap">
+
+<div class="noprint">
+  <div class="kicker">Печатный бланк · раздаём 29 и 30 августа</div>
+  <h1>Анкета родителя</h1>
+  <p class="sub">Лист А4, двусторонний. Лицевая сторона — три вопроса для родителя,
+  оборот — инструкция администратору: как читать ответы. Печатать двусторонне,
+  инструкция уходит на вторую страницу автоматически. Раздаём, пока родитель
+  ждёт ребёнка с занятия или мастер-класса.</p>
+</div>
+
+<div class="kicker">KidsUP · 29–30 августа</div>
+<h1>Три вопроса о вашем ребёнке</h1>
+<p class="sub">Пока ребёнок занят — три минуты для вас. Это не тест и не анкета
+для рассылки: правильных ответов здесь нет. Отметьте то, что откликается, — и нам
+будет проще предложить именно то, что нужно вам, а не всё подряд. А если у нас
+этого нет, мы честно так и скажем.</p>
+
+<div class="sheet">
+
+  <div class="fields">
+    <div class="fld" style="flex:2 1 18rem">Имя ребёнка <span class="ln"></span></div>
+    <div class="fld" style="flex:0 1 7rem">Возраст <span class="ln"></span></div>
+    <div class="fld" style="flex:1 1 12rem">Телефон <span class="ln"></span></div>
+    <div class="fld wide">Что уже посмотрели сегодня <span class="ln"></span></div>
+  </div>
+  <div class="where">
+    <span class="o"><span class="cb"></span><span>29 августа, праздник в парке</span></span>
+    <span class="o"><span class="cb"></span><span>30 августа, День открытых дверей в центре</span></span>
+  </div>
+
+  <div class="q">
+    <h3><i>1</i><span>Что для вас самое важное при выборе занятий?</span></h3>
+    <div class="hint">Отметьте 2–3 варианта — те, без которых вам будет не то.</div>
+    <div class="opts2">
+      <div class="o"><span class="cb"></span><span>Чтобы ребёнок шёл с удовольствием и без слёз</span></div>
+      <div class="o"><span class="cb"></span><span>Чтобы педагог знал моего ребёнка и его особенности</span></div>
+      <div class="o"><span class="cb"></span><span>Чтобы ребёнок активно развивался, а не просто находился</span></div>
+      <div class="o"><span class="cb"></span><span>Сильная подготовка к школе</span></div>
+      <div class="o"><span class="cb"></span><span>Чтобы научился общаться и стал самостоятельнее</span></div>
+      <div class="o"><span class="cb"></span><span>Чтобы не возить после сада ещё по кружкам</span></div>
+      <div class="o"><span class="cb"></span><span>Чтобы я понимала, как проходит его день</span></div>
+      <div class="o full"><span class="cb"></span><span>Своё: <span class="ln"></span></span></div>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3><i>2</i><span>Представьте: прошло полгода. Какие изменения заставят вас сказать — да, мы сделали правильный выбор?</span></h3>
+    <div class="hint">Отметьте 2–3 варианта. Это то, по чему вы будете нас проверять, — и это честно.</div>
+    <div class="opts2">
+      <div class="o"><span class="cb"></span><span>С удовольствием идёт на занятия утром</span></div>
+      <div class="o"><span class="cb"></span><span>Стал увереннее и самостоятельнее</span></div>
+      <div class="o"><span class="cb"></span><span>Появились друзья</span></div>
+      <div class="o"><span class="cb"></span><span>Стал больше говорить и рассказывать</span></div>
+      <div class="o"><span class="cb"></span><span>Видно развитие знаний и навыков</span></div>
+      <div class="o"><span class="cb"></span><span>Стал усидчивее</span></div>
+      <div class="o"><span class="cb"></span><span>Раскрыл новые способности</span></div>
+      <div class="o"><span class="cb"></span><span>Хорошо подготовлен к школе</span></div>
+      <div class="o full"><span class="cb"></span><span>Своё: <span class="ln"></span></span></div>
+    </div>
+  </div>
+
+  <div class="q">
+    <h3><i>3</i><span>А чего вы точно <b>не</b> хотите получить?</span></h3>
+    <div class="hint">Отметьте 1–2 варианта. Это важнее всего остального: то, что здесь, мы обсудим первым.</div>
+    <div class="opts2">
+      <div class="o"><span class="cb"></span><span>Постоянных слёз и тяжёлой адаптации</span></div>
+      <div class="o"><span class="cb"></span><span>Большой группы, где ребёнок — один из многих</span></div>
+      <div class="o"><span class="cb"></span><span>Чтобы ребёнок просто был под присмотром</span></div>
+      <div class="o"><span class="cb"></span><span>Постоянной смены педагогов</span></div>
+      <div class="o"><span class="cb"></span><span>Недостатка развивающих занятий</span></div>
+      <div class="o"><span class="cb"></span><span>Необходимости искать ещё три кружка</span></div>
+      <div class="o"><span class="cb"></span><span>Отсутствия обратной связи о ребёнке</span></div>
+      <div class="o"><span class="cb"></span><span>Давления и строгости</span></div>
+      <div class="o full"><span class="cb"></span><span>Своё: <span class="ln"></span></span></div>
+    </div>
+  </div>
+
+  <div class="adm">
+    <div class="seclabel">Заполняет администратор KidsUP</div>
+    <div class="fields">
+      <div class="fld wide">Предмет и уровень, который предложили <span class="ln"></span></div>
+      <div class="fld wide">Почему именно он — словами родителя из вопроса 2 <span class="ln"></span></div>
+      <div class="fld" style="flex:1 1 8rem">Записали на: дата <span class="ln"></span></div>
+      <div class="fld" style="flex:1 1 7rem">время <span class="ln"></span></div>
+      <div class="fld" style="flex:1 1 10rem">группа / педагог <span class="ln"></span></div>
+      <div class="fld wide">Если не записали — что помешало и когда перезвонить <span class="ln"></span></div>
+      <div class="fld" style="flex:1 1 12rem">Администратор <span class="ln"></span></div>
+    </div>
+  </div>
+
+  <p class="parentfoot">Первое занятие условно-бесплатное: не понравится — платить
+  не нужно; понравится — оно входит в первый абонемент. Занятия начинаются
+  31 августа. У мини-сада и английского сада — бесплатный пробный день.<br>
+  KidsUP · б-р Маршала Рокоссовского, 6 к1В, 7-й подъезд, 2 этаж · kidsup.ru</p>
+
+</div>
+
+<section class="guide">
+<div class="seclabel">Оборот листа · для администратора, родителю не отдаём</div>
+<h2>Как читать заполненный бланк</h2>
+<p class="sub">Три вопроса — это не «анкета», а три разные вещи. Читайте их
+не по порядку номеров, а так: сначала 3, потом 1, потом 2.</p>
+
+<div class="rules">
+  <div class="rule"><span class="ic">1️⃣</span><div><b>Вопрос 1 — мотив</b>
+    <span>За что родитель готов заплатить. Отсюда берём, какое направление
+    называть первым. Говорим только про отмеченное: всё остальное про центр
+    он сегодня не услышит.</span></div></div>
+  <div class="rule"><span class="ic">2️⃣</span><div><b>Вопрос 2 — критерий</b>
+    <span>По этому родитель через полгода решит, правильно ли выбрал. Это то,
+    чем мы будем закрывать сделку и что обязаны показать в отчёте. Повторите
+    его формулировку вслух и запишите в карточку дословно.</span></div></div>
+  <div class="rule"><span class="ic">3️⃣</span><div><b>Вопрос 3 — страх</b>
+    <span>Что мешает сказать «да» сегодня. Снимается первым — до программы,
+    до расписания и до цены. Пока страх не назван вслух, остальное не работает.</span></div></div>
+</div>
+
+<h3>Связки: что отметил → что предлагаем</h3>
+<div class="tbl"><table>
+<tr><th>Отметил родитель</th><th>Что предлагаем</th><th>Чем подкрепляем</th></tr>
+
+<tr><td class="w">«Шёл с удовольствием, без слёз»<br>+ «постоянных слёз и тяжёлой адаптации»</td>
+<td><b>Мягкую адаптацию и малую группу</b>, а не программу и не список предметов.
+Про содержание занятий — вторым абзацем, если спросят.</td>
+<td>Раннее развитие: занятие вместе с мамой, в группе максимум шесть человек.
+«Первое занятие условно-бесплатное — посмотрите сами, ни к чему не обязывает».</td></tr>
+
+<tr><td class="w">«Сильная подготовка к школе»<br>+ «хорошо подготовлен к школе»</td>
+<td><b>Гарантию чтения и диагностику</b> на первом занятии. Уровень — по чтению,
+а не по возрасту: ПШ1 нечитающие, ПШ2 читающие.</td>
+<td>«Ребёнок с нуля за три месяца начинает читать трёхбуквенные слова. Не зачитал —
+дальше занимается бесплатно, пока не зачитает». Четыре условия проговариваем
+вслух <b>до</b> покупки: диагностика на первом занятии, посещаемость от 80%,
+домашние задания, три месяца от первого занятия ребёнка.</td></tr>
+
+<tr><td class="w">«Не возить после сада ещё по кружкам»<br>+ «искать ещё три кружка»</td>
+<td><b>Всё в одном месте.</b> Называем два направления под возраст ребёнка,
+не весь список — список читается как реклама и не запоминается.</td>
+<td>Восемь направлений в одном здании. Второй предмет у того же ребёнка — минус 10%.
+ИЗО и шахматы — самый удобный второй предмет: ИЗО «уносит домой готовую работу
+с каждого занятия».</td></tr>
+
+<tr><td class="w">«Чтобы я понимала, как проходит день»<br>+ «отсутствия обратной связи»</td>
+<td><b>Прозрачность, а не занятия.</b> Показываем, как именно родитель будет
+видеть движение — это отдельный продукт, а не приятное дополнение.</td>
+<td>Карта вех: конкретный навык, который либо есть, либо нет — «узнаёт 15 букв»,
+«читает ДОМ, МАК», «отвечает на What’s your name». Отчёт раз в месяц; у логопеда —
+после каждого занятия; ИЗО — фото работы. В английском саду — видеотрансляция:
+открыли телефон и видите ребёнка.</td></tr>
+
+<tr><td class="w">«Педагог знал моего ребёнка»<br>+ «большой группы» / «смены педагогов»</td>
+<td><b>Размер группы и постоянство педагога.</b> Называем реальные цифры,
+а не «у нас маленькие группы» — цифра снимает страх, оценка не снимает.</td>
+<td>Раннее развитие — максимум шесть человек в группе. У логопеда за семьёй
+закрепляется конкретный день и время. Если родитель хочет — знакомим с педагогом
+до записи, на открытом уроке 31.08–06.09.</td></tr>
+
+<tr><td class="w">«Стал больше говорить и рассказывать»</td>
+<td><b>Сначала диагностика, потом обещания.</b> Молчащего в 2,5 года ведём
+к логопеду на диагностику, а не в развивашку.</td>
+<td>«Диагностика бесплатная. По её результату скажем точно, сколько занятий нужно
+и что будет через три месяца». Речь как результат раннего развития <b>не обещаем</b>.
+Логопед — самое востребованное направление, мест мало; говорим об этом сразу.</td></tr>
+</table></div>
+
+<p class="sub"><b>Ещё три быстрых.</b> «Стал усидчивее» и «раскрыл новые способности» →
+шахматы («учит думать на два хода вперёд и спокойно проигрывать — это про характер»)
+и ментальная арифметика 7–12 лет, хорошо идёт вторым предметом к английскому.
+«Появились друзья» и «научился общаться» → группа как среда: мини-сад и нулевой класс,
+бесплатный пробный день, дальше пробная неделя с зачётом стоимости при покупке месяца
+в течение трёх дней. «Чтобы активно развивался, а не просто находился» +
+«просто был под присмотром» → та же карта вех: показываем, что именно ребёнок
+возьмёт за первый месяц.</p>
+
+<h3>Две фразы, которыми бланк отдают и забирают</h3>
+<div class="say"><em>Отдавая бланк</em>«Пока ждёте — вот три вопроса про вашего
+ребёнка. Это не для рассылки: просто чтобы мы предложили то, что нужно именно вам,
+а не всё подряд. Три минуты».</div>
+<div class="say"><em>Забирая бланк</em>«Спасибо. Можно я вслух проговорю, что понял?
+Вам важно, чтобы <i>[вопрос 1]</i>, и вы точно не хотите <i>[вопрос 3]</i>.
+А через полгода вы хотите увидеть, что <i>[вопрос 2]</i>. Тогда смотрите…» —
+и дальше одно направление, а не три.</div>
+
+<div class="note"><b>Что делать с бланком после разговора.</b> Телефон и ответ
+на вопрос 2 — дословно в карточку МойКласс, в комментарий: через месяц именно эту
+фразу вы вернёте родителю в отчёте. Бланки складываем на ресепшене, не выбрасываем:
+по ним 1 сентября видно, что чаще всего отмечали и чего боялись, — это готовый
+материал для сентябрьских текстов. Если сегодня не записались, перезваниваем
+в течение двух дней и начинаем с его же формулировки, а не с «мы вам звоним из KidsUP».</div>
+
+<div class="warn"><b>Четыре вещи, которых на этом разговоре быть не должно.</b>
+Не говорим «бесплатное пробное» — только «первое занятие условно-бесплатное».
+Не говорим «осталось два места», если это не подтверждено CRM. Не обещаем речь
+как результат раннего развития. И не давим срочностью: бланк нужен, чтобы родитель
+сам себе сформулировал критерий, а не чтобы дожать его сегодня.</div>
+
+<div class="warn"><b>Перед печатью уточните у руководителя одну дату.</b>
+До какого числа сентябрь идёт по ценам прошлого года: в разных источниках стоит
+30 и 31 августа. На бланке этой даты намеренно нет — называйте её голосом
+только после сверки, иначе через неделю будет спор на ресепшене.</div>
+</section>
+
+<div class="foot">🤖 Клод, ИИ-сотрудник KidsUP · версия от 21.08.2026 ·
+формулировки и цифры — из правил и живых данных МойКласс на 21.08.
+Смежное: <a href="/base/pravila_kidsup">правила и гарантия чтения</a> ·
+<a href="/base/predmety_shpargalka">шпаргалка по предметам</a> ·
+<a href="/base/progress_detei">карта вех</a> ·
+<a href="/base/sobytiya_29_31">события 29–31 августа</a>.</div>
+
+</div></body></html>

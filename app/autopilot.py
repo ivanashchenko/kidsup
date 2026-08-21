@@ -739,8 +739,25 @@ def _task_category(body: str, user_id: int | None) -> int:
     return CAT_PLAIN
 
 
+# Владелец не должен получать задачи по лидам. 19.08 к Борису так налипло
+# 178 просроченных: «продолжение занятий», «ответил смайликом», продающие
+# звонки по лагерю — обычная работа обзвона, которая копилась четыре дня,
+# потому что владелец её физически не делает. Задача владельцу ставится,
+# только когда нужно ЕГО решение: доступы, договоры, деньги наружу, люди.
+OWNER_ID = 84116
+OWNER_ONLY = re.compile(
+    r"реши|согласова|доступ|логин|парол|токен|договор|аренд|реклам|бюджет|"
+    r"нанять|найм|уволь|закуп|списать|учредител|юрлиц|лиценз|партнёр|стратег|"
+    r"сайт|домен|тариф", re.I)
+
+
 def _task(mk: MoyklassClient, manager_id: int, user_id: int | None,
           body: str, day: date | None = None) -> None:
+    if manager_id == OWNER_ID and not OWNER_ONLY.search(body or ""):
+        alt = (_admins_today() or _admins())
+        if alt:
+            log.info("задача владельцу перенаправлена дежурному: %s", body[:60])
+            manager_id = alt[0]["managerId"]
     d = (day or _today()).isoformat()
     payload = {"body": body, "beginDate": f"{d}T09:00:00+03:00",
                "endDate": f"{d}T20:00:00+03:00",
