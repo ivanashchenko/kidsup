@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Предметы: что держать в голове</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:730;margin:1.5rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+/* правила карточками */
+.rules{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));margin:1.1rem 0}
+.rule{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.05rem;
+  display:grid;grid-template-columns:2rem 1fr;gap:.7rem;align-items:start}
+.rule .ic{font-size:1.25rem;line-height:1.3}
+.rule b{display:block;font-weight:730;margin-bottom:.15rem;font-size:.97rem}
+.rule span{font-size:.9rem;color:var(--muted);line-height:1.5}
+
+/* решения Бориса */
+.dec{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);
+  border-radius:0 11px 11px 0;padding:.95rem 1.15rem;margin:.8rem 0}
+.dec .q{font-weight:750;font-size:1rem;margin-bottom:.3rem}
+.dec .why{font-size:.88rem;color:var(--muted);margin-bottom:.5rem}
+.opts{display:flex;flex-direction:column;gap:.35rem}
+.opt{background:var(--fill);border-radius:8px;padding:.5rem .7rem;font-size:.9rem}
+.opt b{color:var(--amber)}
+.opt.rec{background:var(--green-soft)} .opt.rec b{color:var(--green)}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.3rem 0}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} .dec{display:none} }
+</style>
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;
+  padding:1.1rem 1.25rem;margin:1rem 0}
+.card h3{margin:0 0 .1rem;font-size:1.15rem;font-weight:790}
+.card .facts{font-size:.82rem;color:var(--muted);margin-bottom:.7rem;
+  font-variant-numeric:tabular-nums}
+.card .hook{font-size:1.02rem;font-weight:700;color:var(--indigo);
+  margin:.5rem 0 .6rem;line-height:1.4}
+.say{background:var(--sky-soft);border-left:3px solid var(--sky);
+  border-radius:0 8px 8px 0;padding:.55rem .8rem;margin:.5rem 0;font-size:.92rem}
+.say em{display:block;font-style:normal;font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.2rem}
+.card ul{margin:.4rem 0;padding-left:1.15rem;font-size:.92rem}
+.card li{margin:.25rem 0}
+.hot{border-left:4px solid var(--red)}
+.free{display:inline-block;background:var(--amber-soft);color:var(--amber);
+  border-radius:6px;padding:.1rem .45rem;font-size:.78rem;font-weight:700}
+</style></head>
+<body><div class="wrap">
+<div class="kicker">Шпаргалка админа · 21 августа</div>
+<h1>Предметы: что держать в голове</h1>
+<p class="sub">По каждому направлению — одна фраза, ради которой родитель говорит
+«да», и три факта, которые нельзя перепутать. Читается за пять минут,
+работает весь набор. Цифры свободных мест живые на 21.08.</p>
+
+<div class="warn"><b>Три правила поверх всего.</b>
+Говорим «первое занятие <b>условно-бесплатное</b>» — никогда «бесплатное пробное».
+До 30 августа сентябрь по ценам прошлого года.
+Скидки 10% (второй предмет, второй ребёнок, многодетным, семьям СВО) не суммируются —
+действует одна, наибольшая.</div>
+
+<div class="card hot">
+<h3>Подготовка к школе</h3>
+<div class="facts">свободно <span class="free">103 места из 120</span> · 16 групп ·
+8 400 ₽ за 8 занятий (до 30.08 — 8 200 ₽) · уровни ПШ1 нечитающие / ПШ2 читающие</div>
+<div class="hook">«Научим читать за 3 месяца. Если ребёнок с нуля не зачитает —
+дальше занимается бесплатно, пока не зачитает».</div>
+<p>Это наш самый сильный аргумент на рынке и самая пустая позиция одновременно.
+Гарантия натуральная: мы не возвращаем деньги, мы доводим результат.</p>
+<ul>
+  <li><b>Условия гарантии называем сразу, до покупки</b> — все четыре:
+    диагностика на первом занятии фиксирует старт; посещаемость не ниже 80%
+    (из 24 занятий пропустить можно пять, и пропуски отработать);
+    домашние задания выполняются; три месяца считаются от первого занятия
+    ребёнка, а не от старта группы.</li>
+  <li>Уровень определяем <b>по чтению, а не по возрасту</b>: ПШ1 — не читает,
+    ПШ2 — уже читает. Сначала уровень, потом расписание.</li>
+  <li>Что внутри: чтение, математика, подготовка руки к письму, печатные
+    и письменные буквы, интеллектуальное развитие.</li>
+</ul>
+<div class="say"><em>Как звучит целиком</em>
+«Ване шесть, читает? Нет — тогда ПШ1. Мы даём гарантию: за три месяца
+он начнёт читать трёхбуквенные слова. Если нет — продолжает ходить бесплатно,
+пока не зачитает. Условие простое: ходить регулярно и делать домашние задания,
+чтение складывается и дома тоже».</div>
+</div>
+
+<div class="card hot">
+<h3>Раннее развитие</h3>
+<div class="facts">свободно <span class="free">80 мест из 88</span> · 16 групп ·
+8 600 ₽ за 8 занятий (до 30.08 — 8 200 ₽) · от 1,3 до 3 лет, дальше «Лицей для малышей»</div>
+<div class="hook">«Занятие вместе с мамой, в группе максимум шесть человек.
+Дети быстро начинают говорить и легче идут в сад».</div>
+<ul>
+  <li><b>Малая группа — главный аргумент.</b> Шесть человек максимум,
+    педагог видит каждого. Это то, чего нет в больших центрах.</li>
+  <li>Что развиваем: речь, внимание, память, мелкая и крупная моторика,
+    сенсорика. Два раза в неделю по 50 минут, обычно первая половина дня.</li>
+  <li><b>Речь не обещаем как результат.</b> Если мама говорит «ребёнок молчит
+    в два с половиной» — это к логопеду на диагностику, а не к развивашке.
+    Обещать запуск речи на группе нельзя.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Английский язык</h3>
+<div class="facts">свободно <span class="free">58 мест из 64</span> · 9 групп ·
+8 400 ₽ за 8 занятий (до 30.08 — 8 200 ₽) · уровни Cambridge: Starters / Movers / Flyers</div>
+<div class="hook">«Заговорит по-английски за год. Уровни по международной системе
+Cambridge — видно, куда ребёнок движется».</div>
+<ul>
+  <li><b>Уровень спрашиваем первым</b>, до расписания: учил раньше или с нуля.
+    С нуля — Starters, второй год — Movers, третий — Flyers.</li>
+  <li>Два раза в неделю, группы по возрасту: 3–5, 5–8, школьники отдельно.</li>
+  <li>Школьникам говорим прямо: <b>наш английский не дублирует школьный</b> —
+    у нас говорят, а не переводят упражнения.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Английский детский сад</h3>
+<div class="facts">свободно <span class="free">28 мест из 30</span> ·
+35 500 ₽ в месяц (до 30.08 — 34 500 ₽) · лицензия, маткапитал, вычет 13%</div>
+<div class="hook">«Билингвальная среда весь день — и видеотрансляция:
+вы в любой момент открываете телефон и видите своего ребёнка».</div>
+<ul>
+  <li><b>Видеотрансляция — наш козырь</b>, его почти ни у кого нет. Называем всегда.</li>
+  <li>Оплата <b>материнским капиталом</b> и налоговый вычет 13% — работает,
+    у нас образовательная лицензия. Для сада это главный денежный аргумент.</li>
+  <li>Первый день пробный бесплатно, дальше пробная неделя с зачётом стоимости,
+    если оформляют месяц в течение трёх дней.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Логопед</h3>
+<div class="facts">свободно <span class="free">всего 11 мест из 32</span> ·
+78% заполнено — самое востребованное · 2 700 ₽ за занятие, разово, абонемента нет</div>
+<div class="hook">«Диагностика бесплатная. По её результату скажем точно,
+сколько занятий нужно и что будет через три месяца».</div>
+<ul>
+  <li><b>Мест почти нет — говорим это честно и сразу.</b> Здесь дефицит
+    настоящий, и он работает лучше любой акции.</li>
+  <li>Занятия <b>разовые</b>, каждый раз оплачиваются отдельно, скидок нет.
+    За семьёй закрепляется конкретный день и время.</li>
+  <li>Сюда отправляем всех, у кого «ребёнок не говорит», «каша во рту»,
+    «не выговаривает» — это не к раннему развитию.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Ментальная арифметика</h3>
+<div class="facts">свободно <span class="free">10 мест из 14</span> ·
+8 600 ₽ за 8 занятий (до 30.08 — 8 000 ₽) · 7–12 лет</div>
+<div class="hook">«Считает в уме быстрее, чем на калькуляторе — и заодно
+вырастает внимание и память».</div>
+<ul>
+  <li>Для школьника это <b>видимый результат, которым он хвастается</b>.
+    Родителю показываем именно это.</li>
+  <li>Хорошо продаётся вторым предметом к английскому: скидка 10%.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>Шахматы</h3>
+<div class="facts">свободно <span class="free">15 мест из 16</span> ·
+самая пустая позиция · 7 000 ₽ (до 30.08 — 6 800 ₽) · 4–12 лет</div>
+<div class="hook">«Учит думать на два хода вперёд и спокойно проигрывать —
+это про характер, а не про шахматы».</div>
+<ul>
+  <li><b>Занято одно место из шестнадцати.</b> Предлагаем всем мальчикам
+    и девочкам от четырёх, особенно вторым предметом.</li>
+  <li>Расписание сейчас пятница вечер + воскресенье утро. Если родителю
+    неудобно — записываем интерес, время можем подвинуть.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>ИЗО-студия</h3>
+<div class="facts">свободно <span class="free">29 мест из 34</span> ·
+7 000 ₽ за 8 занятий (до 30.08 — 6 800 ₽) · 4–11 лет</div>
+<div class="hook">«Ребёнок уносит домой готовую работу с каждого занятия —
+результат видно сразу, а не через год».</div>
+<ul>
+  <li>Живопись, лепка, картины великих художников. Материалы наши.</li>
+  <li>Идеальный второй предмет: не грузит после школы, а разгружает.</li>
+</ul>
+</div>
+
+<section>
+<div class="seclabel">Общее</div>
+<h2>Что спрашивать в любом разговоре</h2>
+<ul class="plain">
+  <li><b>Имя ребёнка и возраст</b> — до всего остального. По возрасту сразу
+    видно, какие направления вообще подходят.</li>
+  <li><b>Занимался раньше?</b> Для английского и подготовки к школе это
+    определяет уровень, а уровень определяет группу.</li>
+  <li><b>Что для вас важно?</b> Ответ — это и есть то, что вы будете продавать:
+    «чтобы читал», «чтобы не возить по кружкам», «чтобы заговорил».</li>
+  <li><b>Приглашаем на событие, а не продаём по телефону.</b> Праздник 29.08,
+    День открытых дверей 30.08, Неделя открытых уроков 31.08–06.09.
+    Решение родитель примет в центре, а не в трубке.</li>
+</ul>
+<div class="note"><b>Почта по телефону — не диктуем.</b> Вместо «продиктуйте
+электронную почту по буквам» говорим: «я вам сейчас напишу в WhatsApp на этот
+номер» — и пишем. Диктовка адреса съедает половину разговора и злит родителя.</div>
+</section>
+
+<div class="foot">Собрано 21.08.2026, свободные места живые из МойКласс.
+Смежное: <a href="/base/pravila_kidsup">правила посещения</a> ·
+<a href="/base/pedagog_probnoe">девять шагов педагога</a> ·
+<a href="/enrollment">заполнение групп</a> · <a href="/base/skripty_nabora">скрипты</a>.</div>
+</div></body></html>
