@@ -129,8 +129,9 @@ def facts(force: bool = False) -> dict:
         if not cap:
             continue
         busy = taken.get(c["id"], 0)
-        groups.append({"subject": s, "name": nm, "when": _time_of(nm),
-                       "cap": cap, "busy": busy, "free": max(0, cap - busy)})
+        groups.append({"id": c["id"], "subject": s, "name": nm,
+                       "when": _time_of(nm), "cap": cap, "busy": busy,
+                       "free": max(0, cap - busy)})
 
     by_subj = defaultdict(lambda: {"free": 0, "cap": 0, "groups": []})
     for g in groups:

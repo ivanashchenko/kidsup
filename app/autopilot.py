@@ -2508,6 +2508,16 @@ def _loop() -> None:
                             mk.close()
                     except Exception:
                         log.exception("сторож задач упал — продолжаем")
+            # Звонки Надежды по нашей базе: она звонит из Люберец с доб.20,
+            # и её разговоры с нашими клиентами надо разбирать так же, как
+            # разговоры администраторов. Раз в час — чаще незачем.
+            if 9 <= now.hour < 21 and now.minute < 5 \
+                    and _mark("nadezhda", now.strftime("%Y-%m-%d %H")):
+                try:
+                    from . import nadezhda
+                    threading.Thread(target=nadezhda.run, daemon=True).start()
+                except Exception:
+                    log.exception("разбор звонков Надежды не запустился")
             _retry_forwards()
             # звонки — раз в минуту (бесплатная замена платных уведомлений Mango)
             if 8 <= now.hour < 21:
