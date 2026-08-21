@@ -2137,7 +2137,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.4"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.5"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2178,6 +2178,7 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
+            "anthropic_proxy_secret",
             "vk_token", "vk_group_id", "tg_bot_token", "tg_channel", "mango_ext_admins",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
@@ -2187,9 +2188,24 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "roistat_project", "roistat_key"}
 
 
+# Значения, которые нельзя отдавать целиком даже по авторизованному запросу.
+# Ключ Anthropic — это доступ к деньгам владельца, секрет прокси открывает
+# сам прокси. Показываем хвост: убедиться «тот ли вписан» можно,
+# скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
+# страница настроек открыта всем, у кого есть пароль администратора.
+SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret",
+               "vk_token", "tg_bot_token"}
+
+
+def _mask(key: str, value: str | None) -> str | None:
+    if not value or key not in SECRET_KEYS:
+        return value
+    return f"…{value[-4:]} ({len(value)} симв.)"
+
+
 @app.get("/api/settings", dependencies=AUTH)
 async def api_get_settings():
-    return {k: db.get_setting(k) for k in sorted(SETTABLE)}
+    return {k: _mask(k, db.get_setting(k)) for k in sorted(SETTABLE)}
 
 
 @app.post("/api/settings", dependencies=AUTH)
@@ -2198,8 +2214,8 @@ async def api_set_setting(payload: dict):
     key, value = (payload.get("key") or "").strip(), payload.get("value")
     if key not in SETTABLE or value is None:
         raise HTTPException(400, f"key должен быть одним из {sorted(SETTABLE)}")
-    db.set_setting(key, str(value))
-    return {"ok": True, key: db.get_setting(key)}
+    db.set_setting(key, str(value).strip())
+    return {"ok": True, key: _mask(key, db.get_setting(key))}
 
 
 @app.get("/api/ai/probe", dependencies=AUTH)
