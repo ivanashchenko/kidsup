@@ -2137,7 +2137,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.5"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.7"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2260,6 +2260,18 @@ async def api_ai_probe():
     return {"вердикт": verdict, "адрес": base,
             "ключ": ("вписан" if key else "НЕ вписан"),
             "секрет": ("вписан" if secret else "НЕ вписан"), "детали": r}
+
+
+@app.post("/api/ai/route", dependencies=AUTH)
+async def api_ai_route(payload: dict):
+    """Проверка разбора смыслом: {"body": "текст задачи"} → кому и почему."""
+    from . import brain
+    body = (payload.get("body") or "").strip()
+    if not body:
+        raise HTTPException(400, "нужен body")
+    if not brain.enabled():
+        return {"error": "ключ Anthropic не вписан"}
+    return {"разбор": brain.route_task(body)}
 
 
 @app.post("/api/deploy", dependencies=AUTH)

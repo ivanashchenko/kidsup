@@ -32,6 +32,7 @@ import re
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 
+from . import brain
 from . import db
 from .moyklass_client import MoyklassClient
 
@@ -265,12 +266,25 @@ def check(mk: MoyklassClient, fix: bool = True) -> dict:
         # Задача владельцу, которая на самом деле — работа администратора.
         if OWNER_ID in (t.get("managerIds") or []) and ADMIN_WORK.search(body):
             if OWNER_WORK.search(body):
-                # Признаки обоих сразу. Правило по словам тут уже врёт:
+                # Признаки обоих сразу — правило по словам тут врёт:
                 # «заявка с сайта» попадала во владельческое из-за слова
-                # «сайт», «договорились» — из-за «договор». Такие задачи
-                # автоматика НЕ трогает, а откладывает мне на разбор —
-                # я прихожу каждый час и читаю историю клиента целиком.
-                unclear.append({"id": t["id"], "body": body[:160]})
+                # «сайт», «договорились» — из-за «договор». Спрашиваем
+                # модель: она читает задачу целиком и отвечает, что здесь
+                # надо сделать и кто это делает.
+                verdict = brain.route_task(body) if brain.enabled() else None
+                if verdict and verdict.get("уверенность") == "высокая" \
+                        and verdict.get("кому") in ("лиза", "дежурный"):
+                    to = CHAT_ADMIN if verdict["кому"] == "лиза" \
+                        else (_duty() or CHAT_ADMIN)
+                    if fix and _reassign(mk, t, to):
+                        fixed["разобрано моделью"] += 1
+                        log.info("brain: задача %s → %s (%s)", t["id"],
+                                 verdict["кому"], verdict.get("почему", ""))
+                    continue
+                # Модель недоступна, не уверена или считает задачу
+                # владельческой — оставляем человеку, как и раньше.
+                unclear.append({"id": t["id"], "body": body[:160],
+                                "модель": (verdict or {}).get("почему", "")})
                 continue
             to = CHAT_ADMIN if TO_CHAT.search(body) else (_duty() or CHAT_ADMIN)
             if fix and _reassign(mk, t, to):
