@@ -1923,6 +1923,15 @@ def audit_yesterday() -> dict:
     return res
 
 
+# Кто есть кто. У звонящих администраторов (Ира, Аня, Лена) в задачах должны
+# быть ТОЛЬКО звонки и сообщения ради записи детей в группы. Деньги, долги,
+# правила, переписка и организационное — на Лизе: у неё это основная работа,
+# а у них список обзвона иначе тонет в чужих делах.
+CHAT_ADMIN = 154181                       # Лиза
+CALL_ADMINS = {232763, 232805, 202856}    # Ира, Аня, Лена
+MANAGER_NAMES = {84116: "Борис", 154181: "Лиза", 202856: "Лена",
+                 229704: "Маша", 232763: "Ира", 232805: "Аня"}
+
 RULE_TASK = {
     "freeze-offbook": "Заморозку надо ставить полями «заморозить с/по» в абонементе, "
                       "а не словами в комментарии. Иначе две недели за год не "
@@ -1969,10 +1978,15 @@ def rules_check() -> dict:
             rule = (items[0].get("key") or "").split(":")[0]
             hint = RULE_TASK.get(rule, "Проверь по правилам: /base/pravila_kidsup")
             what = "; ".join(f["title"] for f in items[:3])
-            body = (f"🤖 Клод: правила посещения — {len(items)} расхождение(й). "
-                    f"{what}. {hint}")
+            # Разбирает всё это Лиза: у звонящих администраторов в задачах
+            # должны быть ТОЛЬКО звонки и сообщения ради записи детей
+            # в группы. Деньги, правила и разбор ошибок — не их работа,
+            # иначе список обзвона тонет в бухгалтерии (решение Бориса 21.08).
+            who = MANAGER_NAMES.get(mgr, f"менеджер {mgr}")
+            body = (f"🤖 Клод: правила посещения, оформил {who} — "
+                    f"{len(items)} расхождение(й). {what}. {hint}")
             try:
-                _task(mk, mgr, items[0].get("user_id"), body[:250])
+                _task(mk, CHAT_ADMIN, items[0].get("user_id"), body[:250])
             except Exception:
                 log.warning("правила: задача для %s не поставилась", mgr)
 
@@ -2012,11 +2026,13 @@ def money_check() -> dict:
         for mgr, items in by_mgr.items():
             total = len(items)
             what = "; ".join(f["title"] for f in items[:2])
-            body = (f"🔥 Клод: деньги в CRM — {total} расхождение(й). {what}. "
-                    f"Абонемент без оплаты продолжает списывать занятия и растит "
-                    f"долг молча. Разбор: app.kidsup.ru/dolgi")
+            who = MANAGER_NAMES.get(mgr, f"менеджер {mgr}")
+            body = (f"🔥 Клод: деньги в CRM, оформил {who} — {total} "
+                    f"расхождение(й). {what}. Абонемент без оплаты продолжает "
+                    f"списывать занятия и растит долг молча. "
+                    f"Разбор: app.kidsup.ru/dolgi")
             try:
-                _task(mk, mgr, items[0].get("user_id"), body[:250], )
+                _task(mk, CHAT_ADMIN, items[0].get("user_id"), body[:250])
             except Exception:
                 log.warning("деньги: задача для %s не поставилась", mgr)
         high = [f for f in flags if f["level"] == "high"]
@@ -2533,8 +2549,8 @@ def _loop() -> None:
                     if n:
                         mk = _client()
                         try:
-                            for a in (_admins_today() or [])[:1]:
-                                _task(mk, a["managerId"], None,
+                            if True:
+                                _task(mk, CHAT_ADMIN, None,
                                       f"🤖 Клод: состав групп — {n} расхождений "
                                       f"(возраст {len(r['age'])}, уровень "
                                       f"{len(r['level'])}, перебор {len(r['over'])}, "
