@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Диагностика на первом занятии</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+  --rule:#9A9484;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819;
+    --rule:#6B7080; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:730;margin:1.5rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+/* правила карточками */
+.rules{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));margin:1.1rem 0}
+.rule{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.05rem;
+  display:grid;grid-template-columns:2rem 1fr;gap:.7rem;align-items:start}
+.rule .ic{font-size:1.25rem;line-height:1.3}
+.rule b{display:block;font-weight:730;margin-bottom:.15rem;font-size:.97rem}
+.rule span{font-size:.9rem;color:var(--muted);line-height:1.5}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.3rem 0}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;
+  padding:1.05rem 1.2rem;margin:.9rem 0}
+.card h3{margin:0 0 .5rem;font-size:1.08rem;font-weight:780}
+.say{background:var(--sky-soft);border-left:3px solid var(--sky);
+  border-radius:0 8px 8px 0;padding:.55rem .8rem;margin:.5rem 0;font-size:.92rem}
+.say em{display:block;font-style:normal;font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.2rem}
+
+/* ---------- бланк: поля для заполнения ---------- */
+.fill{display:grid;gap:.75rem .9rem;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));margin:1rem 0}
+.f i{font-style:normal;display:block;font-size:.7rem;font-weight:750;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:.55rem}
+.f.wide{grid-column:1 / -1}
+.ln{display:inline-block;border-bottom:1px solid var(--rule);min-width:3rem;height:1.05em;vertical-align:-.18em}
+.ln.s{min-width:2.2rem} .ln.l{min-width:9rem}
+.ln.full{display:block;width:100%;min-width:0;height:1.15rem}
+.rows{margin:.45rem 0}
+.rows div{border-bottom:1px solid var(--rule);height:1.55rem}
+
+/* чекбоксы-квадратики (печатные, не input) */
+.b{display:inline-block;width:.92rem;height:.92rem;border:1.4px solid var(--muted);
+  border-radius:3px;vertical-align:-.13rem;margin-right:.32rem;background:var(--card)}
+.marks{display:flex;flex-wrap:wrap;gap:.35rem 1.15rem;font-size:.9rem;margin:.45rem 0 .1rem}
+.marks span{white-space:nowrap}
+.marks.tight{font-size:.86rem;gap:.3rem .85rem}
+
+/* ступени проверки */
+.step{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:.75rem .95rem;margin:.55rem 0;display:grid;grid-template-columns:1.7rem 1fr;gap:.7rem}
+.step i{flex:0 0 1.55rem;height:1.55rem;border-radius:99px;background:var(--fill);
+  color:var(--indigo);font-style:normal;font-weight:750;font-size:.76rem;
+  display:flex;align-items:center;justify-content:center;margin-top:.1rem}
+.step b{display:block;font-weight:740;font-size:.98rem;margin-bottom:.1rem}
+.step .how{font-size:.86rem;color:var(--muted);line-height:1.5}
+.step.key{border-left:4px solid var(--green)}
+.step.key i{background:var(--green-soft);color:var(--green)}
+.words{font-weight:800;letter-spacing:.14em;color:var(--indigo);font-size:1.02rem}
+
+/* сетка букв и цифр — обводить */
+.abc{display:grid;grid-template-columns:repeat(11,1fr);gap:.22rem;margin:.6rem 0;max-width:33rem}
+.abc span{border:1px solid var(--line);border-radius:6px;background:var(--card);
+  text-align:center;padding:.32rem 0;font-weight:730;font-size:1.02rem}
+.abc span.v{background:var(--sky-soft);color:var(--indigo)}
+.abc.dig{grid-template-columns:repeat(10,1fr);max-width:24rem}
+.legend{font-size:.78rem;color:var(--muted);margin:.2rem 0 .6rem}
+
+/* поле для пробы руки */
+.trace{border:1px solid var(--line);border-radius:11px;background:var(--card);
+  padding:.7rem .9rem;margin:.6rem 0;max-width:36rem}
+.trace em{display:block;font-style:normal;font-size:.7rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.35rem}
+.trace svg{display:block;width:100%;max-width:32rem;height:auto;color:var(--rule)}
+.write{position:relative;border:1px solid var(--rule);border-radius:6px;height:2.5rem;
+  margin:.55rem 0 .15rem;max-width:32rem}
+.write s{position:absolute;left:0;right:0;top:50%;border-top:1px dashed var(--line);text-decoration:none}
+
+/* итог по гарантии */
+.guar{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--amber);
+  border-radius:0 12px 12px 0;padding:.95rem 1.15rem;margin:1rem 0}
+.guar .opt{background:var(--fill);border-radius:8px;padding:.55rem .75rem;font-size:.92rem;margin:.35rem 0}
+.guar .opt.yes{background:var(--green-soft)}
+.guar .opt.no{background:var(--red-soft)}
+
+/* подписи */
+.sign{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1.6rem;margin:1.6rem 0 .5rem}
+.sign div{margin-top:2.1rem;border-top:1px solid var(--rule);padding-top:.3rem;
+  font-size:.76rem;color:var(--muted)}
+
+.hint{font-size:.85rem;color:var(--muted);margin:.3rem 0 .1rem}
+.pb{break-before:page;page-break-before:always}
+
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} .dec{display:none} }
+
+@page{ size:A4; margin:10mm }
+@media print{
+  :root{
+    --paper:#FFFFFF; --ink:#000000; --muted:#3F4350; --line:#CFCBC1; --card:#FFFFFF; --fill:#F2F1EC;
+    --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+    --indigo-soft:#EEEDF7; --sky-soft:#E9F4FB; --green-soft:#F0F5E5; --amber-soft:#FBF2E0; --red-soft:#FBE8E7;
+    --rule:#7C7669;
+  }
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{background:#fff;color:#000;font-size:10.5pt;line-height:1.4}
+  .wrap{max-width:none;padding:0;margin:0}
+  h1{font-size:19pt;margin:.1rem 0 .3rem}
+  h2{font-size:13pt} h3{font-size:11pt;margin:.9rem 0 .3rem}
+  p{margin:.35rem 0;max-width:none} .sub{max-width:none}
+  .note,.warn,.ok,ul.plain{max-width:none}
+  section{margin-top:1.15rem;padding-top:.8rem;break-inside:avoid}
+  .step,.card,.note,.warn,.ok,.rule,.guar,.trace,.fill,.sign{break-inside:avoid}
+  .abc{max-width:none} .abc.dig{max-width:17rem}
+  .trace,.write,.trace svg{max-width:none}
+  .noprint{display:none}
+  .foot{margin-top:1.1rem;padding-top:.6rem;font-size:8.5pt}
+}
+</style></head>
+<body><div class="wrap">
+
+<div class="kicker">Бланк педагога · заполняется на первом занятии</div>
+<h1>Диагностика на первом занятии</h1>
+<p class="sub">Один лист на одного ребёнка. Заполняется <b>в день первого занятия</b>,
+за 3–4 минуты, и в тот же день сдаётся администратору в карточку ребёнка.
+Без этой записи гарантия чтения по ребёнку не действует — доказать через три
+месяца, с чего начинали, будет нечем.</p>
+
+<div class="warn"><b>Почему это важнее всего остального в первый день.</b>
+Центр объявил гарантию: ребёнок, пришедший <b>с нуля</b>, за три месяца начинает
+читать трёхбуквенные слова, иначе занимается бесплатно, пока не зачитает.
+Первое условие гарантии — «стартовый уровень зафиксирован». Нет бланка —
+нет гарантии, и виноват в этом будет не родитель.</div>
+
+<p class="hint noprint">Печать: A4, книжная ориентация, поля минимальные.
+Третья страница — памятка педагогу, её можно оставить себе и не отдавать в карточку.</p>
+
+<!-- ======================================================= ШАПКА -->
+<section>
+<div class="seclabel">Шапка бланка</div>
+<h2>Кто, когда, с кем</h2>
+
+<div class="fill">
+  <div class="f wide"><i>Ребёнок — фамилия и имя</i><span class="ln full"></span></div>
+  <div class="f"><i>Возраст — полных лет и месяцев</i><span class="ln full"></span></div>
+  <div class="f"><i>Дата первого занятия</i><span class="ln full"></span></div>
+  <div class="f"><i>Контроль гарантии — через 3 месяца, дата</i><span class="ln full"></span></div>
+  <div class="f"><i>Группа и время</i><span class="ln full"></span></div>
+  <div class="f"><i>Педагог — фамилия и подпись</i><span class="ln full"></span></div>
+  <div class="f"><i>Кто привёл ребёнка — имя и телефон</i><span class="ln full"></span></div>
+</div>
+
+<div class="marks">
+  <span><b>Уровень:</b></span>
+  <span><span class="b"></span>ПШ1 — нечитающие</span>
+  <span><span class="b"></span>ПШ2 — читающие</span>
+  <span><span class="b"></span>другое направление: <span class="ln l"></span></span>
+</div>
+<p class="hint">Уровень ставим <b>после</b> блока «Чтение», а не по возрасту и не со слов
+родителя. Подготовка к школе делится по чтению: ПШ1 для нечитающих, ПШ2 для читающих.</p>
+
+<div class="note"><b>Дата контроля считается от первого занятия ребёнка</b>, а не от
+старта группы. Посчитайте её сразу и впишите — через три месяца никто не будет
+восстанавливать, когда ребёнок пришёл.</div>
+</section>
+
+<!-- ======================================================= ЧТЕНИЕ -->
+<section>
+<div class="seclabel">Блок 1 · главный</div>
+<h2>Чтение</h2>
+<p class="sub">Идём по ступеням снизу вверх и останавливаемся там, где ребёнок
+запнулся. Пятая ступень — трёхбуквенное слово — это и есть точка гарантии.
+Проверяем <b>индивидуально</b>, пока остальные дети заняты заданием, спокойно и без
+экзаменационного тона: ребёнок пришёл первый раз, он не должен испугаться.</p>
+
+<h3>Буквы: сколько узнаёт</h3>
+<p class="hint">Показываем буквы <b>вразнобой</b>, просим назвать <b>звук</b> («м»),
+а не название буквы («эм») — складывать слог ребёнок будет звуками. Засчитываем
+только мгновенное узнавание: вспоминает дольше трёх секунд — букву не считаем.
+Обведите узнанные, внизу впишите итог.</p>
+
+<div class="abc">
+  <span class="v">А</span><span>Б</span><span>В</span><span>Г</span><span>Д</span><span class="v">Е</span><span class="v">Ё</span><span>Ж</span><span>З</span><span class="v">И</span><span>Й</span>
+  <span>К</span><span>Л</span><span>М</span><span>Н</span><span class="v">О</span><span>П</span><span>Р</span><span>С</span><span>Т</span><span class="v">У</span><span>Ф</span>
+  <span>Х</span><span>Ц</span><span>Ч</span><span>Ш</span><span>Щ</span><span>Ъ</span><span class="v">Ы</span><span>Ь</span><span class="v">Э</span><span class="v">Ю</span><span class="v">Я</span>
+</div>
+<p class="legend">Голубым выделены гласные — с них начинается слог, отметьте отдельно,
+если ребёнок знает только их.</p>
+
+<div class="marks">
+  <span><b>Узнал букв:</b> <span class="ln s"></span> из 33</span>
+  <span><span class="b"></span>ни одной</span>
+  <span><span class="b"></span>до 5 — ступень 1 не взята</span>
+  <span><span class="b"></span>5–14 — ступень 1</span>
+  <span><span class="b"></span>15 и больше — ступень 2</span>
+</div>
+<p class="hint">Путает похожие буквы (Ш/Щ, П/Т, Б/В, З/Э) — выпишите какие:
+<span class="ln full"></span></p>
+
+<h3>Складывает ли — по ступеням</h3>
+
+<div class="step">
+  <i>3</i>
+  <div>
+    <b>Открытый слог: <span class="words">МА · ПА · НО</span></b>
+    <div class="how">Пишем печатными крупно на листе, показываем пальцем и ведём:
+      «тяни первую — мммм — и сразу вторую». Ждём десять секунд, не подсказываем
+      и не читаем за ребёнка. Так же ПА, затем НО.</div>
+    <div class="marks tight">
+      <span><span class="b"></span>читает сам</span>
+      <span><span class="b"></span>с одной подсказкой</span>
+      <span><span class="b"></span>называет буквы по одной, не сливает</span>
+      <span><span class="b"></span>не читает</span>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <i>4</i>
+  <div>
+    <b>Закрытый слог: <span class="words">АМ · ОН</span></b>
+    <div class="how">То же самое, но гласная стоит первой. Многие дети уже складывают
+      МА и спотыкаются на АМ — это нормально и это обязательно надо отметить: между
+      третьей и четвёртой ступенью проходит настоящая граница.</div>
+    <div class="marks tight">
+      <span><span class="b"></span>читает сам</span>
+      <span><span class="b"></span>с одной подсказкой</span>
+      <span><span class="b"></span>не читает</span>
+    </div>
+  </div>
+</div>
+
+<div class="step key">
+  <i>5</i>
+  <div>
+    <b>Трёхбуквенное слово: <span class="words">ДОМ · МАК · СОК</span> — точка гарантии</b>
+    <div class="how">По одному слову, печатными, крупно, без картинок рядом.
+      Засчитываем, только если ребёнок <b>прочёл слово целиком и назвал его</b>:
+      «дом». Перечислил три буквы — «дэ, о, эм» — это не прочитанное слово,
+      ставим «не читает». Именно этот навык мы обещаем родителю через три месяца.</div>
+    <div class="marks tight">
+      <span><span class="b"></span>прочёл все три</span>
+      <span><span class="b"></span>прочёл одно-два</span>
+      <span><span class="b"></span>не читает</span>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <i>6·7</i>
+  <div>
+    <b>Если слова читает — проверяем выше: <span class="words">МА-МА · КО-ЗА</span>,
+      затем короткое предложение</b>
+    <div class="how">Нужно, чтобы не отправить читающего ребёнка в ПШ1. Читает слово
+      из двух слогов и короткое предложение — это ПШ2, и гарантия чтения к нему
+      не относится: он пришёл не с нуля.</div>
+    <div class="marks tight">
+      <span><span class="b"></span>два слога</span>
+      <span><span class="b"></span>короткое предложение</span>
+      <span><span class="b"></span>выше не проверяли</span>
+    </div>
+  </div>
+</div>
+
+<p class="hint">Заметки по чтению — что именно делал ребёнок, чем помогали:</p>
+<div class="rows"><div></div><div></div></div>
+</section>
+
+<!-- ======================================================= СЧЁТ -->
+<section>
+<div class="seclabel">Блок 2</div>
+<h2>Счёт</h2>
+<p class="sub">Три вехи линии: числа до 10 → состав числа → сложение.
+Проверка — минута, вопросы задаём как игру, не как контрольную.</p>
+
+<div class="marks">
+  <span><b>Считает вперёд до:</b> <span class="ln s"></span></span>
+  <span><span class="b"></span>до 5</span>
+  <span><span class="b"></span>до 10</span>
+  <span><span class="b"></span>до 20</span>
+  <span><span class="b"></span>дальше 20</span>
+</div>
+<div class="marks">
+  <span><b>Обратный счёт от 10:</b></span>
+  <span><span class="b"></span>сам</span>
+  <span><span class="b"></span>с подсказкой</span>
+  <span><span class="b"></span>нет</span>
+</div>
+
+<h3>Узнаёт цифры — обведите те, что назвал</h3>
+<div class="abc dig">
+  <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+  <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+</div>
+<p class="legend">Показываем вразнобой. Узнал цифр: <span class="ln s"></span> из 10.</p>
+
+<div class="marks">
+  <span><b>Соотносит количество и цифру</b> («покажи, где три яблока»):</span>
+  <span><span class="b"></span>да</span>
+  <span><span class="b"></span>в пределах 5</span>
+  <span><span class="b"></span>нет</span>
+</div>
+<div class="marks">
+  <span><b>Состав числа</b> («три — это два и сколько?»):</span>
+  <span><span class="b"></span>в пределах 5</span>
+  <span><span class="b"></span>в пределах 10</span>
+  <span><span class="b"></span>нет</span>
+</div>
+<div class="marks">
+  <span><b>Складывает и вычитает</b> в пределах 5:</span>
+  <span><span class="b"></span>на пальцах</span>
+  <span><span class="b"></span>в уме</span>
+  <span><span class="b"></span>нет</span>
+</div>
+<p class="hint">Заметки по счёту: <span class="ln full"></span></p>
+</section>
+
+<!-- ======================================================= РУКА -->
+<section>
+<div class="seclabel">Блок 3</div>
+<h2>Рука</h2>
+<p class="sub">Три вехи линии: обводит по контуру → печатные буквы → письменные.
+Дайте ребёнку простой карандаш и этот бланк — пусть работает прямо здесь.</p>
+
+<div class="marks">
+  <span><b>Ведущая рука:</b></span>
+  <span><span class="b"></span>правая</span>
+  <span><span class="b"></span>левая</span>
+  <span><span class="b"></span>перекладывает</span>
+</div>
+<div class="marks">
+  <span><b>Держит карандаш:</b></span>
+  <span><span class="b"></span>правильно, тремя пальцами</span>
+  <span><span class="b"></span>щепотью, но неустойчиво</span>
+  <span><span class="b"></span>в кулаке</span>
+  <span><span class="b"></span>сильно давит / рука быстро устаёт</span>
+</div>
+
+<div class="trace">
+  <em>Обведи по контуру, не отрывая карандаш</em>
+  <svg viewBox="0 0 400 64" role="img" aria-label="Волнистая линия и фигуры для обводки">
+    <path d="M6 20 q 12 -13 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0"
+      fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 4" stroke-linecap="round"/>
+    <circle cx="34" cy="47" r="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 4"/>
+    <rect x="80" y="34" width="26" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 4"/>
+    <path d="M139 60 L152 34 L165 60 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 4" stroke-linejoin="round"/>
+    <path d="M196 60 L196 34 M196 34 L216 34 M196 47 L212 47" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 4" stroke-linecap="round"/>
+    <path d="M246 60 L246 34 L266 60 L266 34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 4" stroke-linejoin="round"/>
+    <path d="M300 34 L326 34 M313 34 L313 60" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 4" stroke-linecap="round"/>
+  </svg>
+</div>
+<div class="marks">
+  <span><b>Обводка:</b></span>
+  <span><span class="b"></span>по линии, не отрываясь</span>
+  <span><span class="b"></span>отрывается, но попадает</span>
+  <span><span class="b"></span>уходит с линии</span>
+  <span><span class="b"></span>не берётся</span>
+</div>
+
+<div class="trace">
+  <em>Напиши своё имя — как умеешь. Ниже — печатные буквы А, М, О под диктовку</em>
+  <div class="write"><s></s></div>
+  <div class="write"><s></s></div>
+</div>
+<div class="marks">
+  <span><b>Пишет:</b></span>
+  <span><span class="b"></span>своё имя целиком</span>
+  <span><span class="b"></span>первую букву имени</span>
+  <span><span class="b"></span>отдельные печатные буквы</span>
+  <span><span class="b"></span>письменные буквы</span>
+  <span><span class="b"></span>не пишет</span>
+</div>
+<p class="hint">Какие печатные буквы написал: <span class="ln full"></span></p>
+</section>
+
+<!-- ======================================================= ВНИМАНИЕ -->
+<section>
+<div class="seclabel">Блок 4</div>
+<h2>Внимание</h2>
+<p class="sub">Три вехи линии: удерживает задание 5 минут → 10 → работает в тетради
+самостоятельно. Отдельно ничего не проверяем — просто засеките, сколько ребёнок
+продержался на обычном задании первого занятия.</p>
+
+<div class="marks">
+  <span><b>Удерживает задание:</b> <span class="ln s"></span> мин.</span>
+  <span><span class="b"></span>до 3</span>
+  <span><span class="b"></span>5</span>
+  <span><span class="b"></span>10</span>
+  <span><span class="b"></span>15 и больше</span>
+</div>
+<div class="marks">
+  <span><b>Как работает:</b></span>
+  <span><span class="b"></span>сам</span>
+  <span><span class="b"></span>нужен взрослый рядом</span>
+  <span><span class="b"></span>постоянно отвлекается</span>
+</div>
+<div class="marks">
+  <span><b>За столом:</b></span>
+  <span><span class="b"></span>сидит спокойно</span>
+  <span><span class="b"></span>встаёт, ходит</span>
+  <span><span class="b"></span>не остаётся без родителя</span>
+</div>
+<div class="marks">
+  <span><b>Когда не получается:</b></span>
+  <span><span class="b"></span>просит помощи</span>
+  <span><span class="b"></span>бросает</span>
+  <span><span class="b"></span>расстраивается до слёз</span>
+  <span><span class="b"></span>пробует ещё раз</span>
+</div>
+<div class="marks">
+  <span><b>Речь:</b></span>
+  <span><span class="b"></span>говорит чисто</span>
+  <span><span class="b"></span>есть нарушения звуков</span>
+  <span><span class="b"></span>говорит мало / непонятно</span>
+</div>
+<p class="hint">Если отметили нарушения речи — скажите об этом администратору
+в тот же день: у логопеда мест почти нет, и родителю честнее узнать это сразу.
+Диагностика у логопеда бесплатная.</p>
+</section>
+
+<!-- ======================================================= РОДИТЕЛЬ -->
+<section>
+<div class="seclabel">Блок 5</div>
+<h2>Что говорит родитель</h2>
+<p class="sub">Три вопроса на выходе из кабинета, пока родитель забирает ребёнка.
+Записывайте словами родителя, а не своими — через три месяца эта строчка
+понадобится дословно.</p>
+
+<p class="hint"><b>Цель</b> — «что вы хотите к школе»:</p>
+<div class="rows"><div></div><div></div></div>
+
+<p class="hint"><b>Тревоги</b> — «что беспокоит больше всего»:</p>
+<div class="rows"><div></div><div></div></div>
+
+<div class="marks">
+  <span><b>Опыт занятий:</b></span>
+  <span><span class="b"></span>не занимался нигде</span>
+  <span><span class="b"></span>занимался дома с родителями</span>
+  <span><span class="b"></span>занимался в другом центре / саду</span>
+</div>
+<p class="hint">Где и сколько: <span class="ln full"></span></p>
+
+<div class="marks">
+  <span><b>Дома читают ребёнку:</b></span>
+  <span><span class="b"></span>каждый день</span>
+  <span><span class="b"></span>иногда</span>
+  <span><span class="b"></span>почти нет</span>
+</div>
+<p class="hint"><b>Кто дома будет делать домашние задания</b> — 10 минут в день —
+и в какое время: <span class="ln full"></span></p>
+<p class="hint">Это не формальность: «домашние задания выполняются» — одно из четырёх
+условий гарантии. Задайте вопрос вслух и впишите ответ.</p>
+</section>
+
+<!-- ======================================================= ИТОГ -->
+<section>
+<div class="seclabel">Блок 6 · итог</div>
+<h2>Стартовая точка и гарантия</h2>
+
+<p class="hint"><b>Стартовая веха по чтению</b> — отметьте самую высокую взятую:</p>
+<div class="marks">
+  <span><span class="b"></span>0 — букв не знает</span>
+  <span><span class="b"></span>1 — 5 букв</span>
+  <span><span class="b"></span>2 — 15 букв</span>
+  <span><span class="b"></span>3 — открытый слог</span>
+  <span><span class="b"></span>4 — закрытый слог</span>
+  <span><span class="b"></span>5 — трёхбуквенное слово</span>
+  <span><span class="b"></span>6–7 — выше</span>
+</div>
+
+<div class="guar">
+  <p style="margin:.1rem 0 .5rem"><b>Гарантия чтения по этому ребёнку:</b></p>
+  <div class="opt yes"><span class="b"></span><b>ДЕЙСТВУЕТ.</b> Ребёнок пришёл с нуля —
+    трёхбуквенные слова не читает (ступень 5 не взята), стартовый уровень зафиксирован
+    в этом бланке, все четыре условия названы родителю вслух.</div>
+  <div class="opt no"><span class="b"></span><b>НЕ ДЕЙСТВУЕТ.</b> Ребёнок уже читает
+    трёхбуквенные слова и слоги — он пришёл не с нуля, его уровень ПШ2.
+    Гарантия «научим читать за три месяца» к нему не относится, и родителю
+    это надо сказать сразу, а не через три месяца.</div>
+  <div class="opt"><span class="b"></span><b>Решает руководитель центра.</b>
+    Пограничный случай — например, слоги складывает, а слова не читает.
+    Передайте бланк администратору с пометкой в тот же день.</div>
+  <p class="hint" style="margin-top:.6rem"><b>Почему — одной строкой, словами:</b></p>
+  <div class="rows"><div></div><div></div></div>
+</div>
+
+<div class="marks">
+  <span><b>Что делаем дальше:</b></span>
+  <span><span class="b"></span>ПШ1, с первой ступени</span>
+  <span><span class="b"></span>ПШ2</span>
+  <span><span class="b"></span>рекомендована диагностика логопеда</span>
+  <span><span class="b"></span>другое: <span class="ln l"></span></span>
+</div>
+
+<div class="sign">
+  <div>Педагог — подпись и расшифровка</div>
+  <div>Дата</div>
+</div>
+<p class="hint" style="margin-top:1.1rem">Родитель: <b>все четыре условия гарантии
+мне названы, я их понял(а)</b> — стартовый уровень зафиксирован сегодня,
+посещаемость не ниже 80% с отработкой пропусков, домашние задания выполняются,
+три месяца считаются от первого занятия ребёнка.</p>
+<div class="sign">
+  <div>Родитель — подпись и расшифровка</div>
+  <div>Дата</div>
+</div>
+
+<div class="note"><b>Куда бланк идёт после занятия.</b> В тот же день —
+администратору, в карточку ребёнка. Вехи вносим в CRM датой занятия, а не
+в конце месяца: «ни одна веха не ставится „на глаз в конце месяца“. Она ставится
+в тот день, когда ребёнок её взял, — иначе это не отчёт, а сочинение».</div>
+</section>
+
+<!-- ======================================================= ПАМЯТКА -->
+<section class="pb">
+<div class="seclabel">Памятка педагогу · страница остаётся у вас</div>
+<h2>Четыре условия гарантии — проговорить родителю вслух</h2>
+<p class="sub">Гарантия называется <b>до</b> покупки абонемента, вместе с условиями.
+Все четыре пункта — вслух, своими словами, но ничего не пропуская.
+Тридцать секунд разговора сегодня снимают тяжёлый разговор через три месяца.</p>
+
+<div class="card">
+<h3>Сама гарантия — дословно</h3>
+<p>«Ребёнок, пришедший <b>с нуля</b>, за три месяца занятий начинает читать
+трёхбуквенные слова. Если этого не произошло — <b>дальше он занимается бесплатно,
+пока не зачитает</b>. Деньги мы не возвращаем и ничего не пересчитываем:
+мы доводим результат».</p>
+<p class="hint">Гарантия натуральная: мы не возвращаем деньги, мы доводим результат.
+Так и объясняем, если родитель спросит «а деньги вернёте».</p>
+</div>
+
+<div class="rules">
+  <div class="rule"><div class="ic">1</div><div>
+    <b>Стартовый уровень зафиксирован</b>
+    <span>«На первом занятии педагог проводит диагностику и записывает, что ребёнок
+    умеет. Без этой записи через три месяца невозможно доказать, что начинали
+    с нуля, — и гарантия не действует».</span></div></div>
+
+  <div class="rule"><div class="ic">2</div><div>
+    <b>Посещаемость не ниже 80%</b>
+    <span>«Три месяца при двух занятиях в неделю — это 24 занятия; пропустить можно
+    не больше пяти, и пропуски должны быть отработаны. Ребёнок, который был
+    на половине занятий, под гарантию не подпадает».</span></div></div>
+
+  <div class="rule"><div class="ic">3</div><div>
+    <b>Домашние задания выполняются</b>
+    <span>«Чтение складывается дома тоже, и без этого за три месяца не успеть».</span></div></div>
+
+  <div class="rule"><div class="ic">4</div><div>
+    <b>Три месяца считаются от первого занятия ребёнка</b>
+    <span>А не от старта группы. Поэтому дата первого занятия и дата контроля
+    стоят в шапке бланка.</span></div></div>
+</div>
+
+<div class="say"><em>Готовая реплика — можно почти дословно</em>
+«Ване шесть, читает? Нет — тогда ПШ1. Мы даём гарантию: за три месяца он начнёт
+читать трёхбуквенные слова. Если нет — продолжает ходить бесплатно, пока
+не зачитает. Условие простое: ходить регулярно и делать домашние задания,
+чтение складывается и дома тоже».</div>
+
+<h3>Что нельзя перепутать в разговоре</h3>
+<ul class="plain">
+  <li>Первое занятие — <b>условно-бесплатное</b>: не понравится — платить не нужно;
+    понравится — это занятие входит в первый абонемент. Называть первое занятие
+    пробным и бесплатным нельзя — только «условно-бесплатное».</li>
+  <li>Пропуск компенсируется <b>отработкой</b> в параллельной группе того же предмета
+    и того же уровня — по предварительной записи и не позднее месяца после пропуска.
+    Для гарантии это важно: непропущенных занятий должно быть не меньше 80%.</li>
+  <li>Уровень определяем <b>по чтению</b>, а не по возрасту: ПШ1 — нечитающие,
+    ПШ2 — читающие. Об этом говорим родителю после диагностики, а не до.</li>
+  <li>Ребёнок, который уже читает слова, под гарантию <b>не подпадает</b> — он пришёл
+    не с нуля. Сказать это надо на первом занятии, мягко и прямо.</li>
+</ul>
+
+<div class="warn"><b>Если бланка нет — гарантии нет.</b>
+«Диагностику на первом занятии проверяем отдельно: если её нет в карточке, гарантию
+по этому ребёнку мы дать не сможем, и виноват будет не родитель».
+Поэтому бланк заполняется в день занятия и сдаётся в тот же день — не «завтра
+допишу по памяти».</div>
+
+<div class="ok"><b>И короткое человеческое.</b> Ребёнок пришёл первый раз и волнуется.
+Диагностика не должна выглядеть проверкой: «давай я тебе покажу буквы, а ты скажешь,
+какие уже знаешь». Если ребёнок закрылся — не давим, отмечаем «не проверено»
+и возвращаемся на втором занятии. Пустая клетка честнее выдуманной.</div>
+</section>
+
+<div class="foot">🤖 Клод, ИИ-сотрудник KidsUP · версия от 21.08.2026 ·
+диагностика обязательна у всех новых детей с 31.08.
+Смежное: <a href="/base/pravila_kidsup">правила и гарантия чтения</a> ·
+<a href="/base/progress_detei">цепочки вех по чтению, счёту, руке и вниманию</a> ·
+<a href="/base/pedagog_probnoe">девять шагов педагога</a> ·
+<a href="/base/predmety_shpargalka">шпаргалка по предметам</a>.</div>
+
+</div></body></html>

@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Задачи в МойКласс: что изменилось</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:730;margin:1.5rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+/* правила карточками */
+.rules{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));margin:1.1rem 0}
+.rule{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.05rem;
+  display:grid;grid-template-columns:2rem 1fr;gap:.7rem;align-items:start}
+.rule .ic{font-size:1.25rem;line-height:1.3}
+.rule b{display:block;font-weight:730;margin-bottom:.15rem;font-size:.97rem}
+.rule span{font-size:.9rem;color:var(--muted);line-height:1.5}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.8rem 1.05rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.3rem 0}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+
+/* карточки и цитата */
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;
+  padding:1.1rem 1.25rem;margin:1rem 0}
+.card h3{margin:0 0 .1rem;font-size:1.15rem;font-weight:790}
+.say{background:var(--sky-soft);border-left:3px solid var(--sky);
+  border-radius:0 8px 8px 0;padding:.55rem .8rem;margin:.7rem 0;font-size:.95rem;max-width:47rem}
+.say em{display:block;font-style:normal;font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.2rem}
+
+/* плитки с числами */
+.nums{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));margin:1.1rem 0}
+.num{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.85rem 1rem}
+.num b{display:block;font-size:1.75rem;font-weight:800;letter-spacing:-.03em;line-height:1.05;
+  color:var(--indigo);font-variant-numeric:tabular-nums}
+.num span{display:block;font-size:.84rem;color:var(--muted);line-height:1.45;margin-top:.2rem}
+.num.g b{color:var(--green)} .num.a b{color:var(--amber)}
+
+/* было / стало */
+td.was{color:var(--muted);text-decoration:line-through;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.now{font-weight:790;color:var(--green);white-space:nowrap;font-variant-numeric:tabular-nums}
+td.dl{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;font-size:.85rem}
+
+/* тайм-слоты */
+.slot{display:inline-block;background:var(--indigo-soft);color:var(--indigo);
+  border-radius:6px;padding:.1rem .45rem;font-size:.82rem;font-weight:750;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.step{display:flex;gap:.7rem;align-items:flex-start;font-size:.94rem;margin:.5rem 0;max-width:47rem}
+.step i{flex:0 0 1.6rem;height:1.6rem;border-radius:99px;background:var(--fill);
+  color:var(--indigo);font-style:normal;font-weight:750;font-size:.78rem;
+  display:flex;align-items:center;justify-content:center;margin-top:.1rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} }
+</style></head>
+<body><div class="wrap">
+
+<div class="kicker">Ире, Ане, Лене и Лизе · 21 августа</div>
+<h1>Задачи в МойКласс: что изменилось</h1>
+<p class="sub">Ваши списки задач разобраны и пересобраны. Ниже — честно: что было
+не так, где я ошибся с первого раза, как сделано во второй раз, что получилось
+в цифрах и по каким правилам задачи живут дальше. Правила в основном
+не мои — их назвала Ира, и они приняты как есть.</p>
+
+<div class="say"><em>Ира, на разборе</em>
+«У меня больше 160 задач».</div>
+
+<section>
+<div class="seclabel">Отправная точка</div>
+<h2>Почему длинный список не работает</h2>
+<p>На четверых в МойКласс висело столько открытых задач, что читать список
+целиком стало физически невозможно. Просроченных на момент разбора —
+<b>837</b>. И дело не в дисциплине: когда пунктов двести, человек перестаёт
+читать их сверху вниз и начинает выхватывать глазами то, что попалось.
+Самые горячие контакты при этом тонут среди прошлогодних — не потому что
+их пропустили, а потому что их не увидели.</p>
+
+<div class="tbl"><table>
+<tr><th>Кто</th><th>Открытых задач было</th></tr>
+<tr><td class="w">Ира</td><td class="was">208</td></tr>
+<tr><td class="w">Аня</td><td class="was">253</td></tr>
+<tr><td class="w">Лена</td><td class="was">151</td></tr>
+<tr><td class="w">Лиза</td><td class="was">365</td></tr>
+</table></div>
+
+<p>Разобрано <b>750 задач</b> по <b>412 клиентам</b> — вручную, по одному.</p>
+</section>
+
+<section>
+<div class="seclabel">Признание</div>
+<h2>Первый раз я сделал это неправильно</h2>
+<p>В первой версии я разложил задачи по дням смен, опираясь только на текст
+задачи и её категорию — не заглядывая в карточку клиента. Это была ошибка,
+и она стоила вам времени: список получился такой, где половина пунктов
+не имела смысла.</p>
+
+<ul class="plain">
+  <li>Задача с комментарием <b>«перезвонить 24-го»</b> встала на 21-е.</li>
+  <li>Клиенты, которые <b>уже записались</b>, продолжали висеть как
+    «позвонить для записи».</li>
+  <li>На одного человека приходилось <b>по три-четыре пункта подряд</b> —
+    про одно и то же.</li>
+</ul>
+
+<p>Такой список нельзя выполнить, его можно только перетерпеть.
+Раскладка переделана целиком, с другим принципом в основе.</p>
+
+<div class="warn"><b>И отдельно — извинение.</b> Часть вашего рабочего времени
+ушла впустую по моей вине. Ира набирала номера, которых не существует —
+это были мои тестовые карточки, я завёл их при проверке форм с сайта и не убрал
+из обзвона. Три набора её смены в решающую неделю ушли в никуда. Кому-то
+из вас доставались задачи про долги и абонементы, хотя это не ваша работа
+вовсе. А после первой раскладки список стал не короче, а бессмысленнее.
+Это не «так вышло» — это я не проверил то, что должен был проверить.
+Прошу прощения. Ниже — что сделано, чтобы такого больше не было.</div>
+</section>
+
+<section>
+<div class="seclabel">Как сделано во второй раз</div>
+<h2>Решение принимается по клиенту, а не по задаче</h2>
+<p>Прежде чем что-то двигать или закрывать, по каждому клиенту собиралась
+вся картина. Не текст задачи — вся история. Только после этого становится
+видно, что с этим пунктом делать.</p>
+
+<div class="rules">
+  <div class="rule"><div class="ic">🗂</div><div><b>Карточка</b><span>Статус,
+    баланс, записан ли уже в группу нового года и на какое пробное.</span></div></div>
+  <div class="rule"><div class="ic">💬</div><div><b>Восемь последних комментариев</b><span>То,
+    что вы сами писали в карточке после разговоров.</span></div></div>
+  <div class="rule"><div class="ic">📞</div><div><b>Журнал АТС за 12 дней</b><span>Звонили
+    или нет, дозвонились или нет, когда и сколько говорили.</span></div></div>
+  <div class="rule"><div class="ic">✉️</div><div><b>Переписка</b><span>Что
+    уходило в чат и был ли ответ.</span></div></div>
+  <div class="rule"><div class="ic">👤</div><div><b>Действия администраторов</b><span>Кто
+    оформлял записи, оплаты и абонементы, кто ответственный за клиента.</span></div></div>
+  <div class="rule"><div class="ic">🔗</div><div><b>Все другие открытые задачи
+    по этому же клиенту</b><span>Именно здесь вылезали дубли — по одному
+    человеку висело по 2–4 пункта про одно и то же.</span></div></div>
+</div>
+
+<div class="note"><b>Разница в одну фразу.</b> Раньше вопрос звучал
+«к какому дню отнести эту задачу». Теперь — «что вообще нужно сделать
+по этому клиенту и нужно ли». На первый вопрос можно ответить, не зная
+клиента. На второй — нельзя.</div>
+</section>
+
+<section>
+<div class="seclabel">Результат</div>
+<h2>Что получилось в цифрах</h2>
+
+<div class="nums">
+  <div class="num g"><b>201</b><span>пункт закрыт — по ним делать было нечего</span></div>
+  <div class="num"><b>542</b><span>задачи разложены по дням смен с приоритетом охвата</span></div>
+  <div class="num a"><b>412</b><span>клиентов разобрано вручную, по одному</span></div>
+</div>
+
+<h3>Из чего складывается 201 закрытый пункт</h3>
+<div class="tbl"><table>
+<tr><th>Сколько</th><th>За что закрыто</th></tr>
+<tr><td class="w">96</td><td><b>Дубли.</b> По одному клиенту висело 2–4 задачи
+  про одно и то же. Осталась одна.</td></tr>
+<tr><td class="w">62</td><td><b>Отказались.</b> Клиент сказал «нет» — задача
+  «позвонить для записи» по нему не имеет смысла.</td></tr>
+<tr><td class="w">26</td><td><b>Уже записаны в группу.</b> Ребёнок в группе
+  нового года, а задача всё ещё звала его записывать.</td></tr>
+<tr><td class="w">17</td><td><b>Некачественные и «не писать».</b>
+  Звонить по ним нельзя.</td></tr>
+</table></div>
+
+<h3>Точечные переносы</h3>
+<ul class="plain">
+  <li><b>Четыре задачи</b> подвинуты по факту сегодняшних разговоров.</li>
+  <li><b>Две</b> встали на срок, названный прямо в тексте задачи.</li>
+  <li><b>Одна</b> передана Лизе — она про деньги.</li>
+</ul>
+
+<h3>Было и стало</h3>
+<div class="tbl"><table>
+<tr><th>Кто</th><th>Было открытых</th><th>Стало открытых</th><th>Разница</th></tr>
+<tr><td class="w">Ира</td><td class="was">208</td><td class="now">73</td><td class="dl">−135</td></tr>
+<tr><td class="w">Аня</td><td class="was">253</td><td class="now">108</td><td class="dl">−145</td></tr>
+<tr><td class="w">Лена</td><td class="was">151</td><td class="now">84</td><td class="dl">−67</td></tr>
+<tr><td class="w">Лиза</td><td class="was">365</td><td class="now">283</td><td class="dl">−82</td></tr>
+</table></div>
+<p class="sub">Разница — это закрытые дубли и бессмысленные пункты плюс задачи,
+которые ушли вперёд на свои настоящие даты. Ни одна работа не потеряна.</p>
+
+<div class="ok"><b>Как это выглядит в один день.</b> У Иры на сегодня —
+<b>39 задач вместо 208</b>. Это список, который читается сверху вниз
+и состоит из имён, а не из шума.</div>
+</section>
+
+<section>
+<div class="seclabel">Правила</div>
+<h2>По каким правилам задачи живут дальше</h2>
+<p>Эти пять правил назвала Ира на разборе. Они приняты и заложены
+в раскладку — дальше задачи собираются по ним.</p>
+
+<div class="rules">
+  <div class="rule"><div class="ic">💬</div><div><b>Написали в чат, ответа нет —
+    задача уходит на завтра</b><span>Она выполнена. Висеть сегодня ей незачем:
+    делать по ней прямо сейчас нечего, а место в списке она занимает.</span></div></div>
+  <div class="rule"><div class="ic">💳</div><div><b>Деньги и оплаты — только Лизе</b><span>У
+    Иры, Ани и Лены в списке ТОЛЬКО звонки и сообщения ради записи детей
+    в группы. Ничего другого там быть не должно.</span></div></div>
+  <div class="rule"><div class="ic">⬆️</div><div><b>Перенесённая задача
+    на следующий день идёт первой</b><span>А не уходит в хвост. Иначе
+    один раз отложенный клиент откладывается навсегда.</span></div></div>
+  <div class="rule"><div class="ic">🚫</div><div><b>«Некачественный», «отказ»,
+    «не писать» — задача закрывается</b><span>Не переносится и не предлагается
+    снова. Предлагать её ещё раз — значит тратить смену на заведомое «нет».</span></div></div>
+  <div class="rule"><div class="ic">📅</div><div><b>Назван срок в тексте —
+    задача стоит на эту дату</b><span>«Перезвонить 24-го» значит 24-е,
+    что бы ни говорила общая раскладка по дням. Слово клиента сильнее алгоритма.</span></div></div>
+</div>
+</section>
+
+<section>
+<div class="seclabel">Порядок внутри дня</div>
+<h2>Почему у задач разное время начала</h2>
+<p>МойКласс сортирует день по времени начала задачи. Другого способа задать
+порядок внутри дня нет — поэтому время здесь не про «когда звонить»,
+а про <b>очередь</b>. Сверху вниз, как список и читается.</p>
+
+<div class="tbl"><table>
+<tr><th>Время</th><th>Кто в этой группе</th><th>Почему здесь</th></tr>
+<tr><td class="w"><span class="slot">09:00</span></td>
+    <td>Кому <b>ни разу не звонили</b></td>
+    <td>Шанс ровно нулевой, пока не набрали. Поэтому они первые.</td></tr>
+<tr><td class="w"><span class="slot">11:00</span></td>
+    <td>Набирали, но <b>не дозвонились</b></td>
+    <td>Контакт живой, разговора ещё не было.</td></tr>
+<tr><td class="w"><span class="slot">14:00</span></td>
+    <td>С кем <b>уже разговаривали</b></td>
+    <td>Информация есть, звонок — уточняющий.</td></tr>
+<tr><td class="w"><span class="slot">16:00</span></td>
+    <td>Остальное</td>
+    <td>Всё, что не попало выше.</td></tr>
+</table></div>
+
+<h3>Норма на смену: 40 задач у звонящих, 35 у Лизы</h3>
+<p>Это не «сколько положено», а сколько реально помещается в смену.
+По журналу АТС вы набираете <b>46–51 раз</b> и ведёте <b>21–28 разговоров
+за день</b>. Список из 55 пунктов при таком темпе не выполняется — он
+перестаёт читаться, и это происходит незаметно для самого человека.
+Сорок — это список, который можно пройти до конца.</p>
+</section>
+
+<section>
+<div class="seclabel">Осознанное решение</div>
+<h2>Что я намеренно не закрывал</h2>
+<p>Статус <b>«архив набора»</b> не считается поводом закрыть задачу,
+хотя под ним лежит <b>198 пунктов</b> — соблазн был большой, списки
+сократились бы вдвое за один клик.</p>
+<div class="warn"><b>Почему нет.</b> Под этим статусом лежит тёплая база
+прошлого года — та самая, которую мы сейчас обзваниваем ради набора.
+Закрыть эти задачи значило бы выкинуть работу, а не разгрузить список.
+Короткий список ценен только тогда, когда в нём остались настоящие люди.</div>
+</section>
+
+<section>
+<div class="seclabel">Обоснование</div>
+<h2>Почему это лучший вариант</h2>
+
+<div class="step"><i>1</i><div><b>Список из имён работает, список из
+двухсот пунктов не читается вообще.</b> Разница не в трудолюбии, а в том,
+как устроено внимание: до конца доходят только те списки, которые видно
+целиком. Сорок пунктов видно. Двести — нет.</div></div>
+
+<div class="step"><i>2</i><div><b>Закрытие бессмысленных пунктов не теряет
+работу — оно возвращает внимание.</b> Ни один из 201 закрытых пунктов
+не требовал звонка: дубль, отказ, уже записан, «не писать». Убрав их,
+мы не сделали меньше работы. Мы освободили место для той, которая есть.</div></div>
+
+<div class="step"><i>3</i><div><b>Сначала охват — это математика,
+а не предпочтение.</b> У контакта, которому ни разу не набрали, шанс
+записаться <b>ровно нулевой</b>: он про нас пока не знает. У контакта,
+с которым уже говорили, повторный звонок даёт лишь прирост к тому шансу,
+который уже есть. Поэтому первый звонок новому всегда стоит дороже второго
+звонка старому — и стоит в списке выше.</div></div>
+
+<div class="step"><i>4</i><div><b>Решение по клиенту устойчиво,
+решение по тексту задачи — нет.</b> Текст задачи описывает прошлое.
+Карточка, звонки и записи описывают настоящее. Раскладка, сделанная
+по настоящему, не разваливается через день.</div></div>
+</section>
+
+<section>
+<div class="seclabel">Дальше</div>
+<h2>Что делать администратору</h2>
+<p>Три вещи, от которых зависит, останется ли список коротким через неделю.
+Всё остальное сделаю я.</p>
+
+<div class="rules">
+  <div class="rule"><div class="ic">🏷</div><div><b>Закрываете задачу —
+    ставьте статус клиенту</b><span>Обязательно. Без статуса клиент
+    возвращается в списки, и ему звонят второй раз — а это раздражает
+    сильнее, чем если бы не позвонили вовсе. Отказался — «отказ».
+    Просил не писать — «не писать». Записан — статус записи.</span></div></div>
+  <div class="rule"><div class="ic">📨</div><div><b>Написали в чат —
+    двигайте задачу, а не закрывайте</b><span>Сообщение отправлено, ответа
+    ещё нет — это не «сделано», это «ждём». Перенос на завтра сохраняет
+    клиента в работе; закрытие теряет его.</span></div></div>
+  <div class="rule"><div class="ic">🗓</div><div><b>Клиент назвал дату —
+    пишите её прямо в текст задачи</b><span>«Перезвонить 24-го», «после
+    отпуска 2 сентября». Дата в тексте — и задача встанет правильно,
+    без ручного разбора. Дата в голове не встанет никак.</span></div></div>
+</div>
+
+<div class="note"><b>Если раскладка где-то ошибается — скажите.</b>
+Разбор ручной, по 412 клиентам, и отдельные промахи в нём наверняка есть.
+Назовите клиента — поправлю его и то правило, из-за которого он попал
+не туда. Это быстрее и полезнее, чем терпеть неудобный список.</div>
+</section>
+
+<section>
+<div class="seclabel">С этого дня</div>
+<h2>Как теперь будет выглядеть ваш день</h2>
+
+<p>Раньше утро начиналось с того, что вы открывали список и искали в нём
+работу. Теперь список сам показывает, с чего начать.</p>
+
+<div class="step"><i>1</i><div><b>Открываете день — сверху те, кому ещё
+ни разу не звонили.</b> Не потому что так решил случай, а потому что
+у непрозвоненного контакта шанс ровно нулевой, а у повторного звонка —
+лишь прибавка к тому, что уже есть. Дальше по убыванию: набирали и не
+дозвонились, потом те, с кем уже говорили.</div></div>
+
+<div class="step"><i>2</i><div><b>В задаче написано, кому звоните и что
+предлагать.</b> Вместо «Обзвон набора 2026/27: открой карточку» —
+«Тучин Марк, 5 лет, ходил на подготовку к школе до мая. Предложить:
+ПкШ и гарантию чтения. Ни разу не звонили». Ни возраст, ни историю,
+ни подходящий предмет искать больше не нужно: предмет подобран
+с учётом того, что ребёнок за год вырос.</div></div>
+
+<div class="step"><i>3</i><div><b>В списке нет чужой работы.</b> У Иры,
+Ани и Лены — только звонки и сообщения ради записи детей в группы.
+Долги, абонементы, возвраты, документы уходят Лизе. Это не «кому-то
+повезло»: список обзвона в решающую неделю должен читаться как список
+имён, а не как бухгалтерия вперемешку с людьми.</div></div>
+
+<div class="step"><i>4</i><div><b>Список не растёт за спиной.</b> Каждое
+утро я проверяю его целиком: задачи по тем, кто уже записался, отказался
+или помечен некачественным, закрываются сами; дубли схлопываются в один
+пункт; названный клиентом срок ставит задачу на нужный день. Вам не нужно
+разгребать хвосты — их не будет.</div></div>
+
+<div class="step"><i>5</i><div><b>После разговора достаточно поставить
+статус.</b> Всё остальное — комментарий в карточку, задачу на обещание,
+напоминание к сроку — сделаю я из записи разговора. Вам не надо писать
+отчёт о звонке, надо просто позвонить.</div></div>
+
+<div class="ok"><b>Что это даёт в цифрах.</b> У Иры сегодня 39 задач вместо
+208. У Ани 108 вместо 253, у Лены 84 вместо 151, у Лизы 283 вместо 365.
+Просроченных у вас четверых — <b>ноль</b>. Это не значит, что работы стало
+меньше: из списка ушло то, что работой не было. Осталось ровно столько,
+сколько проходится за смену, и в правильном порядке.</div>
+
+<p>Если увидите пункт, который выглядит бессмысленно — скажите. Каждый
+такой случай я разбираю и чиню правило, а не отдельную задачу. Пять правил,
+по которым всё это теперь устроено, назвала Ира, работая с тем самым
+списком на 160 пунктов.</p>
+</section>
+
+<div class="foot">🤖 Клод, ИИ-сотрудник KidsUP · версия от 21.08.2026.
+Разобрано 750 задач по 412 клиентам, данные из МойКласс и журнала АТС.
+Смежное: <a href="/base/algoritm_obzvona">алгоритм обзвона</a> ·
+<a href="/base/skripty_nabora">скрипты набора</a> ·
+<a href="/base/predmety_shpargalka">шпаргалка по предметам</a> ·
+<a href="/base/pravila_kidsup">правила посещения</a>.</div>
+
+</div></body></html>
