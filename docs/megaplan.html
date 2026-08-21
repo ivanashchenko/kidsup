@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мега-план набора до 30 сентября</title>
+<style>
+:root{--paper:#FCFBF7;--ink:#1B1D2B;--muted:#5F6478;--line:#E7E4DA;--card:#FFF;--fill:#F3F1E9;
+ --indigo:#312783;--sky:#1DA7E0;--green:#5C8C1E;--amber:#B26F00;--red:#B4131C;
+ --indigo-soft:#EAE8F5;--sky-soft:#E4F2FB;--green-soft:#EDF4E1;--amber-soft:#FBF0DC;--red-soft:#FAE4E3}
+@media (prefers-color-scheme:dark){:root{--paper:#14151D;--ink:#E7E6EC;--muted:#9A9EAE;
+ --line:#292B37;--card:#1B1D26;--fill:#20222C;--indigo:#A79EEE;--sky:#5EC0EC;--green:#9FD055;
+ --amber:#E5A63F;--red:#EC7C7C;--indigo-soft:#201E38;--sky-soft:#13252F;--green-soft:#1C2416;
+ --amber-soft:#2C2313;--red-soft:#2E1819}}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+ font:16px/1.62 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:56rem;margin:0 auto;padding:2rem 1.1rem 5rem}
+h1{font-size:2rem;font-weight:800;letter-spacing:-.025em;margin:.3rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.34rem;font-weight:760;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1.02rem;font-weight:730;margin:1.4rem 0 .45rem}
+p{margin:.5rem 0;max-width:46rem} .sub{color:var(--muted);max-width:46rem}
+.kicker{font-size:.72rem;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:var(--indigo)}
+section{margin-top:2.4rem;padding-top:1.6rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.7rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;
+ color:var(--muted);margin-bottom:.4rem}
+.nums{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));margin:1rem 0}
+.num{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.8rem .95rem}
+.num b{display:block;font-size:1.7rem;font-weight:800;color:var(--indigo);line-height:1.05;
+ font-variant-numeric:tabular-nums}
+.num span{display:block;font-size:.8rem;color:var(--muted);margin-top:.15rem}
+.num.red b{color:var(--red)} .num.green b{color:var(--green)}
+.scens{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));margin:1.1rem 0}
+.scen{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.9rem 1.05rem}
+.scen.rec{border-color:var(--green);background:var(--green-soft)}
+.sn{font-size:.78rem;font-weight:750;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.scen.rec .sn{color:var(--green)}
+.sv{font-size:2rem;font-weight:800;color:var(--indigo);line-height:1.1;font-variant-numeric:tabular-nums}
+.scen.rec .sv{color:var(--green)}
+.sl{font-size:.8rem;color:var(--muted);margin-bottom:.4rem}
+.scen p{font-size:.88rem;margin:0}
+.tools{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));margin:.9rem 0}
+.tool{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:.8rem .95rem}
+.th{display:flex;justify-content:space-between;gap:.5rem;align-items:baseline;margin-bottom:.25rem}
+.th b{font-weight:730;font-size:.97rem}
+.who{font-size:.72rem;color:var(--muted);white-space:nowrap}
+.tool p{font-size:.87rem;color:var(--muted);margin:.2rem 0 .4rem}
+.tool .when{font-size:.78rem;font-weight:700;color:var(--sky)}
+.week{background:var(--card);border:1px solid var(--line);border-radius:12px;
+ padding:.85rem 1.05rem;margin:.7rem 0}
+.wh{display:flex;justify-content:space-between;gap:.6rem;flex-wrap:wrap;align-items:baseline}
+.wh b{font-weight:760} .wh span{font-size:.8rem;color:var(--muted)}
+.week ul{margin:.5rem 0 0;padding-left:1.15rem} .week li{margin:.28rem 0;font-size:.92rem}
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:26rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.05em;text-transform:uppercase;
+ color:var(--muted);padding:.5rem .8rem;white-space:nowrap}
+td{padding:.5rem .8rem;border-top:1px solid var(--line)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.8rem 1.05rem;
+ border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:46rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.8rem 1.05rem;
+ border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:46rem}
+.foot{margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{body{background:#fff} .wrap{padding:0} section{break-inside:avoid}}
+</style></head>
+<body><div class="wrap">
+
+<div class="kicker">Набор 2026/27 · осталось 40 дней</div>
+<h1>Мега-план: полные группы к 30 сентября</h1>
+<p class="sub">Всё, что делаем до конца сентября, в одном месте. Цифры живые —
+пересчитываются из CRM при каждой сборке страницы.</p>
+
+<div class="nums">
+  <div class="num red"><b>7</b><span>оплатили<br>новый сезон</span></div>
+  <div class="num"><b>76</b><span>записей<br>из 398 мест</span></div>
+  <div class="num"><b>19%</b><span>заполнение<br>по местам</span></div>
+  <div class="num"><b>50</b><span>живых групп<br>из 78</span></div>
+</div>
+
+<div class="warn"><b>Главное, что нужно понимать про цифры.</b> «77 записей» и
+«7 оплат» — это не одно и то же. Статус «Учится» в CRM ставит администратор,
+когда зачисляет ребёнка в группу, и он не означает, что за новый сезон
+заплатили. Из 36 «учащихся» новый сезон оплатили шестеро, из 28 записанных
+на пробное — ни один. До старта занятий десять дней.</div>
+
+<section>
+<div class="seclabel">Честная математика</div>
+<h2>«Полные группы» — это три разные задачи</h2>
+<p>Разница между ними не в усилиях, а в том, сколько заявок нужно добывать
+каждый день. Вот что стоит за каждым вариантом:</p>
+
+<div class="scens"><div class="scen">
+  <div class="sn">Все места</div>
+  <div class="sv">19.3</div>
+  <div class="sl">заявок в день</div>
+  <p>каждое место занято. Нужно ещё 324 записей —
+     это 8.1 в день и 771 заявок за весь срок.</p>
+</div><div class="scen">
+  <div class="sn">Каждая группа живёт</div>
+  <div class="sv">14.2</div>
+  <div class="sl">заявок в день</div>
+  <p>в каждой из 78 групп минимум 4 ребёнка. Нужно ещё 239 записей —
+     это 6.0 в день и 569 заявок за весь срок.</p>
+</div><div class="scen rec">
+  <div class="sn">Только живые группы · рекомендую</div>
+  <div class="sv">7.6</div>
+  <div class="sl">заявок в день</div>
+  <p>расписание сокращено до 50 групп, где уже есть дети. Нужно ещё 127 записей —
+     это 3.2 в день и 302 заявок за весь срок.</p>
+</div></div>
+
+<div class="ok"><b>Что рекомендую.</b> Сократить расписание до групп, где уже
+есть дети, и добить их до четырёх человек. Пустая группа в расписании денег
+не приносит, зато занимает педагога и усложняет выбор: родителю, которому
+показали 78 вариантов, проще отложить решение, чем выбрать.
+Освободившиеся окна вернём, когда наберётся спрос — листы ожидания для этого
+и существуют.</div>
+</section>
+
+<section>
+<div class="seclabel">Что уже работает</div>
+<h2>Не трогаем, продолжаем</h2>
+<div class="tools"><div class="tool">
+  <div class="th"><b>Собрать оплату с тех, кто уже записан</b><span class="who">Лиза</span></div>
+  <p>54 человека выбрали группу и день, но не оплатили новый сезон. Им ничего не нужно продавать — нужно взять деньги. Самая короткая дорога, и она не тронута.</p>
+  <div class="when">деньги на этой неделе</div>
+</div><div class="tool">
+  <div class="th"><b>Возврат своих: 238 семей из прошлого ПШ</b><span class="who">Борис + админы</span></div>
+  <p>Семьи, которые уже занимались у нас и на новый сезон никуда не записаны. Лист собран, скрипт написан, ссылки на карточки внутри.</p>
+  <div class="when">app.kidsup.ru/base/obzvon_psh</div>
+</div><div class="tool">
+  <div class="th"><b>Три события 29–31 августа</b><span class="who">все</span></div>
+  <p>Праздник 29.08 в 11:00 — вход свободный, запись не нужна. День открытых дверей 30.08. Неделя открытых уроков 31.08–06.09 — первое занятие своей группы по обычному расписанию.</p>
+  <div class="when">подтверждать приходы 27–28.08</div>
+</div><div class="tool">
+  <div class="th"><b>Контент в соцсетях</b><span class="who">Борис</span></div>
+  <p>25 постов с готовыми текстами и сторис до конца сентября, цифры о местах подставляются из CRM.</p>
+  <div class="when">app.kidsup.ru/base/kontent_plan</div>
+</div><div class="tool">
+  <div class="th"><b>Обзвон холодной базы 15 в день</b><span class="who">админы на смене</span></div>
+  <p>Норма из марафона. У нас разложено по сменам с приоритетом: сначала деньги и тёплые, потом прошлогодние, потом холодные.</p>
+  <div class="when">ежедневно</div>
+</div><div class="tool">
+  <div class="th"><b>Рассылки по базе 10 в день</b><span class="who">Лиза</span></div>
+  <p>Норма из марафона. Идёт через Wazzup, но канал WhatsApp сейчас не авторизован — пока не пересканирован QR, часть сообщений не доходит.</p>
+  <div class="when">почини канал первым делом</div>
+</div><div class="tool">
+  <div class="th"><b>Листы ожидания на новые направления</b><span class="who">админы</span></div>
+  <p>Танцы, хореография, футбол, единоборства, акробатика, актёрское мастерство, техника речи. Первой группе — скидка 10%. Собирает спрос без затрат на педагога.</p>
+  <div class="when">предлагать вторым предметом</div>
+</div></div>
+</section>
+
+<section>
+<div class="seclabel">Что берём из марафона</div>
+<h2>Новое — по порядку внедрения</h2>
+<div class="tools"><div class="tool">
+  <div class="th"><b>Оффер месяца с дедлайном</b><span class="who">Борис</span></div>
+  <p>У нас есть «до 31 августа сентябрь по ценам прошлого года», но нет названия и единого макета. В марафоне это «Первоклассный чек-ап знаний»: диагностика плюс трекер прогресса в подарок. Название сильное — оно обещает родителю не скидку, а понимание про своего ребёнка.</p>
+  <div class="when">назвать и раздать админам</div>
+</div><div class="tool">
+  <div class="th"><b>Трекер диагностики</b><span class="who">педагоги</span></div>
+  <p>Бланк, который педагог заполняет на первом занятии: внимание, память, мышление, речь, моторика, социализация. Родитель уходит не с «всё хорошо», а с картой. Это же делает гарантию чтения измеримой — от чего считать три месяца.</p>
+  <div class="when">напечатать до 29.08</div>
+</div><div class="tool">
+  <div class="th"><b>Паспорт миссий ученика</b><span class="who">педагоги</span></div>
+  <p>Тетрадь, где ребёнок отмечает достижения за год. Работает на удержание: родитель видит прогресс, ребёнок хочет заполнить следующую страницу.</p>
+  <div class="when">напечатать до старта</div>
+</div><div class="tool">
+  <div class="th"><b>PDF-гайд после записи</b><span class="who">Клод</span></div>
+  <p>Автоматическая отправка гайда «Как подготовить ребёнка к учёбе» сразу после записи на пробное. Закрывает паузу между «записался» и «пришёл», в которой люди и отваливаются.</p>
+  <div class="when">собрать и включить</div>
+</div><div class="tool">
+  <div class="th"><b>Семейный кэшбек с партнёрами</b><span class="who">Борис</span></div>
+  <p>Партнёры по соседству — бассейн, студия, кофейня, фотостудия, детский клуб. Мы даём им родителей, они нам подарки для наших семей. Заодно закрывает пустое поле в наших правилах, где партнёрские программы до сих пор не названы.</p>
+  <div class="when">3–5 партнёров</div>
+</div><div class="tool">
+  <div class="th"><b>Реферальная программа</b><span class="who">Борис</span></div>
+  <p>Механика есть в марафоне, у нас решение не принято: висит вопрос про 1000 бонусных рублей. Пока не назван размер бонуса, публиковать нельзя — придётся отвечать на вопросы, ответов на которые нет.</p>
+  <div class="when">решить да/нет</div>
+</div><div class="tool">
+  <div class="th"><b>Расклейки и плакаты в ЖК</b><span class="who">Борис</span></div>
+  <p>Дешёвый локальный канал, которого у нас нет вовсе. Мы в спальном районе, наша аудитория живёт в соседних домах.</p>
+  <div class="when">макет + маршрут</div>
+</div><div class="tool">
+  <div class="th"><b>Реклама в пабликах и чатах</b><span class="who">Борис</span></div>
+  <p>Районные сообщества в Telegram, MAX и ВКонтакте. Точное попадание по географии, стоит недорого.</p>
+  <div class="when">найти 5–10 каналов</div>
+</div><div class="tool">
+  <div class="th"><b>Яндекс Карты</b><span class="who">Борис</span></div>
+  <p>Пост и фото с оффером в карточке организации. Люди ищут «детский центр рядом» именно там, а карточка обычно заброшена.</p>
+  <div class="when">30 минут работы</div>
+</div><div class="tool">
+  <div class="th"><b>Чат-бот для сбора контактов</b><span class="who">Клод</span></div>
+  <p>Бот в ВКонтакте, который отвечает на типовые вопросы и собирает телефоны в нерабочее время. Половина обращений приходит вечером, когда центр закрыт.</p>
+  <div class="when">после токенов ВК</div>
+</div><div class="tool">
+  <div class="th"><b>Конкурс с розыгрышем</b><span class="who">Борис</span></div>
+  <p>Механика на подписчиков: подарки всем участникам, сбор контактов через бота.</p>
+  <div class="when">после бота</div>
+</div><div class="tool">
+  <div class="th"><b>Блогеры: 3–5 местных</b><span class="who">Борис</span></div>
+  <p>Два формата из марафона: обзор центра с купоном или совместный конкурс в рилс с отметкой. Второй дешевле и даёт охват.</p>
+  <div class="when">проверить по регламенту</div>
+</div></div>
+<h3>Что чиним</h3>
+<div class="tools"><div class="tool">
+  <div class="th"><b>Промоутеры с микропризами</b><span class="who">Борис</span></div>
+  <p>Работают, но плохо: у Виталия почти все номера мёртвые, часть заблокирована оператором. В марафоне за лид дают микроприз — это меняет мотивацию промоутера с «набрать телефонов» на «привести живого».</p>
+  <div class="when">решить по Виталию</div>
+</div></div>
+<p class="sub">Трекеры, паспорта и гайд не обещаем родителям, пока они
+физически не напечатаны: обещание, которое нечем закрыть на первом же
+занятии, стоит дороже, чем отсутствие обещания.</p>
+</section>
+
+<section>
+<div class="seclabel">Календарь</div>
+<h2>Неделя за неделей</h2>
+<div class="week"><div class="wh"><b>22–24 августа</b>
+        <span>Деньги и подтверждения</span></div><ul><li>Лиза: обзвонить 54 записанных без оплаты — это ближайшие деньги.</li><li>Борис: лист ПШ, 103 семьи целевого возраста (суббота и воскресенье).</li><li>Починить канал WhatsApp — пересканировать QR.</li><li>Назвать оффер месяца и раздать админам единую формулировку.</li><li>Решить: имя педагога английского и размер реферального бонуса.</li></ul></div><div class="week"><div class="wh"><b>25–28 августа</b>
+        <span>Подготовка к событиям</span></div><ul><li>Напечатать трекеры диагностики и паспорта миссий — до праздника.</li><li>Провести инструктаж педагогов по трекеру: что заполнять и что говорить.</li><li>27 и 28 августа — обзвон подтверждений: без звонка накануне доходит половина.</li><li>Расклейка плакатов по ЖК, поиск 3–5 партнёров для кэшбека.</li><li>Разместить оффер на Яндекс Картах и во всех соцсетях.</li></ul></div><div class="week"><div class="wh"><b>29–31 августа</b>
+        <span>Три события</span></div><ul><li>29.08 в 11:00 — праздник открытия сезона: аниматоры, лотерея, вход свободный.</li><li>30.08 — День открытых дверей: знакомство с педагогами лично.</li><li>31.08 — старт учебного года и Неделя открытых уроков.</li><li>Каждому пришедшему — трекер и приглашение на пробное с конкретным днём.</li><li>Вечером каждого дня вносить всех пришедших в CRM — не откладывать.</li></ul></div><div class="week"><div class="wh"><b>1–7 сентября</b>
+        <span>Неделя открытых уроков</span></div><ul><li>Каждый пробный урок заканчивается разговором педагога с родителем по трекеру.</li><li>Оплата в день пробного — со скидкой 10%, называть сразу.</li><li>Реклама в районных пабликах и чатах.</li><li>Запуск реферальной программы, если механика утверждена.</li></ul></div><div class="week"><div class="wh"><b>8–21 сентября</b>
+        <span>Добор и сокращение</span></div><ul><li>Свести расписание: закрыть группы, куда за месяц никто не записался.</li><li>Перевести их детей и заявки в живые группы — родителю звонит человек, не бот.</li><li>Блогеры: 3–5 местных, формат конкурса в рилс.</li><li>Конкурс с ботом на сбор подписчиков.</li></ul></div><div class="week"><div class="wh"><b>22–30 сентября</b>
+        <span>Закрытие набора</span></div><ul><li>Добить группы, где не хватает одного-двух детей, — точечно и адресно.</li><li>Посчитать конверсию по каждому каналу: что дало заявки, а что нет.</li><li>Зафиксировать, какие направления просят в листах ожидания.</li></ul></div>
+</section>
+
+<section>
+<div class="seclabel">Где мы сейчас</div>
+<h2>Заполнение по предметам</h2>
+<div class="tbl"><table>
+<tr><th>предмет</th><th class="num">записей</th><th class="num">мест</th><th class="num">заполнено</th></tr>
+<tr><td>логопед</td><td class='num'>21</td><td class='num'>32</td><td class='num'>66%</td></tr><tr><td>подготовка к школе</td><td class='num'>16</td><td class='num'>120</td><td class='num'>13%</td></tr><tr><td>музыка и речь</td><td class='num'>12</td><td class='num'>42</td><td class='num'>29%</td></tr><tr><td>английский</td><td class='num'>7</td><td class='num'>64</td><td class='num'>11%</td></tr><tr><td>раннее развитие</td><td class='num'>6</td><td class='num'>46</td><td class='num'>13%</td></tr><tr><td>ИЗО</td><td class='num'>5</td><td class='num'>34</td><td class='num'>15%</td></tr><tr><td>ментальная арифметика</td><td class='num'>4</td><td class='num'>14</td><td class='num'>29%</td></tr><tr><td>мини-сад</td><td class='num'>1</td><td class='num'>15</td><td class='num'>7%</td></tr><tr><td>нулевой класс</td><td class='num'>1</td><td class='num'>15</td><td class='num'>7%</td></tr><tr><td>шахматы</td><td class='num'>1</td><td class='num'>16</td><td class='num'>6%</td></tr>
+</table></div>
+</section>
+
+<section>
+<div class="seclabel">Контроль</div>
+<h2>По каким числам поймём, что работает</h2>
+<div class="tbl"><table>
+<tr><th>показатель</th><th class="num">сейчас</th><th>как часто смотреть</th></tr>
+<tr><td>Оплаченных абонементов нового сезона</td><td class='num'>7</td><td>каждый день</td></tr><tr><td>Записей в группы 2026/27</td><td class='num'>77</td><td>каждый день</td></tr><tr><td>Заявок за день</td><td class='num'>цель 7</td><td>каждый вечер</td></tr><tr><td>Живых групп (есть хотя бы один ребёнок)</td><td class='num'>50 из 78</td><td>раз в неделю</td></tr><tr><td>Групп, дошедших до 4 детей</td><td class='num'>считать</td><td>раз в неделю</td></tr><tr><td>Конверсия заявка → пробное → оплата</td><td class='num'>считать</td><td>раз в неделю</td></tr>
+</table></div>
+<p class="sub">Главное число — оплаченные абонементы нового сезона, а не записи.
+Записи можно нарисовать статусом, оплату нельзя.</p>
+</section>
+
+<div class="foot">🤖 Клод, ИИ-сотрудник KidsUP · собрано 21.08.2026.
+Воронка марафона для сверки: 130 заявок → 80 ответов → 60 приходов → 55 покупок.</div>
+
+</div></body></html>
