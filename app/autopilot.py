@@ -2492,6 +2492,22 @@ def _loop() -> None:
                     _mark("morning", str(_today()))
                 finally:
                     mk.close()
+            # Сторож задач: утром до смены и вечером после неё. За 21.08 я
+            # дважды сам наводил в задачах беспорядок и дважды чинил руками —
+            # «сейчас чисто» держится ровно до следующей правки, если никто
+            # не смотрит. Теперь смотрит сторож.
+            for _h, _tag in ((8, "am"), (20, "pm")):
+                if now.hour == _h and now.minute < 5 \
+                        and _mark("taskguard", f"{_today()}:{_tag}"):
+                    try:
+                        from . import taskguard
+                        mk = _client()
+                        try:
+                            taskguard.check(mk)
+                        finally:
+                            mk.close()
+                    except Exception:
+                        log.exception("сторож задач упал — продолжаем")
             _retry_forwards()
             # звонки — раз в минуту (бесплатная замена платных уведомлений Mango)
             if 8 <= now.hour < 21:
