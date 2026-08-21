@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Подключение модели: пошагово</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+  --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+  --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819;}}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:50rem;margin:0 auto;padding:2rem 1.1rem 5rem}
+h1{font-size:1.9rem;font-weight:800;letter-spacing:-.025em;margin:.3rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.28rem;font-weight:760;margin:0 0 .35rem;text-wrap:balance}
+h3{font-size:1rem;font-weight:730;margin:1.3rem 0 .4rem}
+p{margin:.55rem 0;max-width:44rem} .sub{color:var(--muted);max-width:44rem}
+.kicker{font-size:.72rem;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:var(--indigo)}
+section{margin-top:2.2rem;padding-top:1.5rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.7rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:.4rem}
+.step{display:flex;gap:.85rem;align-items:flex-start;margin:1rem 0;max-width:44rem}
+.step i{flex:0 0 1.8rem;height:1.8rem;border-radius:99px;background:var(--indigo);
+  color:#fff;font-style:normal;font-weight:750;font-size:.85rem;
+  display:flex;align-items:center;justify-content:center;margin-top:.1rem}
+.step .b{flex:1}
+.step b{display:block;font-weight:730;margin-bottom:.2rem}
+.step p{margin:.25rem 0}
+pre{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:.75rem .9rem;overflow-x:auto;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+  margin:.6rem 0;max-width:44rem}
+code{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:var(--fill);padding:.08rem .3rem;border-radius:4px}
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.75rem 1rem;
+  border-radius:0 9px 9px 0;margin:1rem 0;max-width:44rem}
+.warn{border-left:3px solid var(--amber);background:var(--amber-soft);padding:.75rem 1rem;
+  border-radius:0 9px 9px 0;margin:1rem 0;max-width:44rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.75rem 1rem;
+  border-radius:0 9px 9px 0;margin:1rem 0;max-width:44rem}
+ul.plain{padding-left:1.2rem;max-width:44rem} ul.plain li{margin:.3rem 0}
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:24rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);padding:.5rem .8rem}
+td{padding:.5rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.k{font-weight:700;white-space:nowrap;font-family:ui-monospace,Menlo,monospace;font-size:.85rem}
+.foot{margin-top:2.6rem;padding-top:1.1rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+</style></head>
+<body><div class="wrap">
+
+<div class="kicker">Для Бориса · один раз, примерно 20 минут</div>
+<h1>Подключение модели: пошагово</h1>
+<p class="sub">Что это даёт: разбор задач и переписок начнёт понимать смысл,
+а не искать слова. Сегодня «заявка с сайта» уехала к вам из-за слова «сайт»,
+а «договорились» сработало как «договор» — такие ошибки исчезнут.</p>
+
+<div class="warn"><b>Почему нельзя просто вписать ключ.</b> Наш сервер стоит
+в России, и <code>api.anthropic.com</code> отвечает ему 403 по региону. Нужен
+посредник за пределами страны — маленькая программа на Cloudflare, которая
+принимает запрос от нас и передаёт дальше. Она бесплатна: 100 000 запросов
+в сутки, нам нужно около сотни.</div>
+
+<section>
+<div class="seclabel">Часть 1 · ключ</div>
+<h2>Получить ключ Anthropic</h2>
+
+<div class="step"><i>1</i><div class="b"><b>Откройте console.anthropic.com</b>
+<p>Войдите или зарегистрируйтесь. Это отдельный кабинет для API, не тот,
+где вы общаетесь со мной в чате.</p></div></div>
+
+<div class="step"><i>2</i><div class="b"><b>Пополните баланс</b>
+<p>Раздел <b>Billing</b> → добавить карту → пополнить. Для наших объёмов
+хватит 10–20 долларов на несколько месяцев: разбор одной задачи стоит
+доли цента.</p></div></div>
+
+<div class="step"><i>3</i><div class="b"><b>Создайте ключ</b>
+<p>Раздел <b>API Keys</b> → <b>Create Key</b> → назовите «kidsup-server».
+Ключ показывается один раз и начинается на <code>sk-ant-</code>.
+Скопируйте его — понадобится в части 3.</p></div></div>
+
+<div class="note"><b>Ключ — это доступ к вашим деньгам.</b> Не пересылайте
+его в мессенджерах и не показывайте на экране при демонстрациях. Если
+утёк — в том же разделе кнопка удалить, и создаёте новый.</div>
+</section>
+
+<section>
+<div class="seclabel">Часть 2 · прокси</div>
+<h2>Поднять воркер на Cloudflare</h2>
+
+<div class="step"><i>4</i><div class="b"><b>Зарегистрируйтесь на dash.cloudflare.com</b>
+<p>Бесплатный аккаунт, карта не нужна. Домен подключать не требуется.</p></div></div>
+
+<div class="step"><i>5</i><div class="b"><b>Создайте воркер</b>
+<p>В меню слева <b>Compute</b> → <b>Workers &amp; Pages</b> → <b>Create</b> →
+<b>Start with Hello World!</b> → назовите <code>kidsup-anthropic</code> →
+<b>Deploy</b>.</p></div></div>
+
+<div class="step"><i>6</i><div class="b"><b>Замените код</b>
+<p>Нажмите <b>Edit code</b>. Выделите всё в редакторе и вставьте содержимое
+файла <code>deploy/anthropic-proxy-worker.js</code> из нашего репозитория —
+он же приложен ниже. Нажмите <b>Deploy</b>.</p></div></div>
+
+<div class="step"><i>7</i><div class="b"><b>Задайте секрет</b>
+<p>Вернитесь в настройки воркера: <b>Settings</b> → <b>Variables and Secrets</b> →
+<b>Add</b> → тип <b>Secret</b>, имя <code>SHARED_SECRET</code>, значение —
+любая длинная случайная строка, например <code>kidsup-2026-jH7xQ2mP9vL4</code>.
+Сохраните и запомните её: без этого секрета воркер отвечает «forbidden»,
+и это правильно — иначе им пользовались бы посторонние.</p></div></div>
+
+<div class="step"><i>8</i><div class="b"><b>Запишите адрес</b>
+<p>На главной странице воркера будет ссылка вида
+<code>https://kidsup-anthropic.ваш-логин.workers.dev</code>. Это и есть
+адрес прокси.</p></div></div>
+
+<div class="ok"><b>Проверка, что воркер жив.</b> Откройте в браузере адрес
+воркера с добавленным <code>/__ping</code>. Должно ответить
+<code>{"error":"forbidden"}</code> — это нормально и означает, что воркер
+работает и требует секрет. Полная проверка будет на шаге 10.</div>
+</section>
+
+<section>
+<div class="seclabel">Часть 3 · включение</div>
+<h2>Прописать в системе</h2>
+
+<div class="step"><i>9</i><div class="b"><b>Передайте мне три значения</b>
+<p>Ключ, адрес воркера и секрет. Я впишу их в настройки сервера —
+они хранятся в базе, а не в коде, и в репозиторий не попадают.</p></div></div>
+
+<div class="tbl"><table>
+<tr><th>настройка</th><th>что туда идёт</th></tr>
+<tr><td class="k">anthropic_api_key</td><td>ключ вида sk-ant-…</td></tr>
+<tr><td class="k">anthropic_base_url</td><td>https://kidsup-anthropic.…workers.dev</td></tr>
+<tr><td class="k">anthropic_proxy_secret</td><td>та самая длинная строка из шага 7</td></tr>
+</table></div>
+
+<div class="step"><i>10</i><div class="b"><b>Проверяю связь</b>
+<p>У нас есть проверка <code>assistant.probe()</code>: она стучится через
+прокси и говорит, дошло ли. Ответ <code>401 authentication_error</code>
+означает «регион в порядке, дело только в ключе», ответ 200 — всё готово.</p></div></div>
+</section>
+
+<section>
+<div class="seclabel">Что изменится</div>
+<h2>Сторож начнёт понимать, а не искать слова</h2>
+<ul class="plain">
+  <li><b>Задачи попадут к тому, кто их делает.</b> Сейчас маршрут выбирается
+    по словам, и на границе он врёт. Модель читает задачу целиком и отвечает
+    на вопрос «что здесь надо сделать и кто это делает».</li>
+  <li><b>Спорные задачи перестанут ждать меня.</b> Сейчас сторож откладывает
+    их до моего прихода. С моделью он разберёт их сам, в 8 утра и в 20 вечера.</li>
+  <li><b>Разбор переписок станет точнее.</b> Намерение клиента —
+    запись, перенос, отказ, вопрос о цене — определяется смыслом,
+    а не набором слов.</li>
+  <li><b>Подсказки для звонка будут собираться под конкретного человека,</b>
+    а не по шаблону под сегмент.</li>
+</ul>
+
+<div class="note"><b>Что не изменится.</b> Модель не получит права
+на изменение данных сама по себе: она подсказывает решение, а применяют
+его те же проверенные функции с теми же предохранителями. Инварианты
+остаются — задача с деньгами не исчезает, свежий итог разговора
+не затирается старым планом обзвона.</div>
+</section>
+
+<section>
+<div class="seclabel">Приложение</div>
+<h2>Код воркера</h2>
+<p class="sub">Тот же файл лежит в репозитории:
+<code>deploy/anthropic-proxy-worker.js</code>. Ключ Anthropic в нём
+не хранится — он проходит транзитом внутри защищённого соединения,
+воркер его не читает и не пишет в логи.</p>
+<pre>const UPSTREAM = "https://api.anthropic.com";
+
+const PASS_THROUGH = [
+  "x-api-key", "authorization", "anthropic-version",
+  "anthropic-beta", "content-type", "accept",
+];
+
+export default {
+  async fetch(request, env) {
+    const expected = env.SHARED_SECRET;
+    if (!expected) {
+      return json({ error: "SHARED_SECRET не задан" }, 500);
+    }
+    if (request.headers.get("x-kidsup-auth") !== expected) {
+      return json({ error: "forbidden" }, 403);
+    }
+
+    const url = new URL(request.url);
+    if (url.pathname === "/__ping") {
+      return json({ ok: true, upstream: UPSTREAM });
+    }
+
+    const headers = new Headers();
+    for (const name of PASS_THROUGH) {
+      const value = request.headers.get(name);
+      if (value) headers.set(name, value);
+    }
+
+    let upstreamResponse;
+    try {
+      upstreamResponse = await fetch(UPSTREAM + url.pathname + url.search, {
+        method: request.method,
+        headers,
+        body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body,
+      });
+    } catch (err) {
+      return json({ error: "upstream_unreachable", detail: String(err) }, 502);
+    }
+
+    const out = new Headers(upstreamResponse.headers);
+    out.delete("content-encoding");
+    out.delete("content-length");
+    return new Response(upstreamResponse.body, {
+      status: upstreamResponse.status,
+      headers: out,
+    });
+  },
+};
+
+function json(body, status) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}</pre>
+</section>
+
+<div class="foot">🤖 Клод, ИИ-сотрудник KidsUP · 22 августа 2026.
+Застряли на любом шаге — напишите, на каком именно, и что видите на экране.</div>
+
+</div></body></html>

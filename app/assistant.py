@@ -77,6 +77,20 @@ def _system_prompt(groups: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _headers(key: str) -> dict:
+    """Заголовки запроса к API.
+
+    Если базовый адрес — наш прокси на Cloudflare, добавляем общий секрет:
+    без него воркер отвечает 403. Иначе воркер был бы открытым прокси,
+    которым быстро начнут пользоваться посторонние."""
+    h = {"x-api-key": key, "anthropic-version": "2023-06-01",
+         "content-type": "application/json"}
+    secret = db.get_setting("anthropic_proxy_secret")
+    if secret and "api.anthropic.com" not in _base_url():
+        h["x-kidsup-auth"] = secret
+    return h
+
+
 def ask(question_history: list[dict], groups: list[dict]) -> dict:
     """history: [{role, content}...] от браузера, последний — вопрос админа."""
     key = db.get_setting("anthropic_api_key")
@@ -89,11 +103,11 @@ def ask(question_history: list[dict], groups: list[dict]) -> dict:
     if not msgs or msgs[-1]["role"] != "user":
         return {"error": "bad_request", "message": "Пустой вопрос."}
     try:
-        r = httpx.post(_base_url() + "/v1/messages", timeout=60, headers={
-            "x-api-key": key, "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }, json={"model": model, "max_tokens": 1200,
-                 "system": _system_prompt(groups), "messages": msgs})
+        r = httpx.post(_base_url() + "/v1/messages", timeout=60,
+                       headers=_headers(key),
+                       json={"model": model, "max_tokens": 1200,
+                             "system": _system_prompt(groups),
+                             "messages": msgs})
     except Exception as e:  # noqa: BLE001
         return {"error": "network", "message": f"Не удалось достучаться до API: {e}"}
     if r.status_code != 200:
@@ -107,7 +121,11 @@ def ask(question_history: list[dict], groups: list[dict]) -> dict:
 def probe() -> dict:
     """Достижим ли api.anthropic.com с сервера (вопрос региона/блокировок)."""
     try:
-        r = httpx.get(_base_url() + "/v1/models", timeout=12)
+        key = db.get_setting("anthropic_api_key") or ""
+        r = httpx.get(_base_url() + "/v1/models", timeout=12,
+                      headers=_headers(key) if key else
+                      ({"x-kidsup-auth": db.get_setting("anthropic_proxy_secret")}
+                       if db.get_setting("anthropic_proxy_secret") else {}))
         return {"reachable": True, "status": r.status_code, "body": r.text[:300],
                 "note": "401 authentication_error = регион ок, нужен только ключ; "
                         "403 с текстом про region/country = блокировка региона"}
