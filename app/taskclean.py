@@ -152,7 +152,7 @@ def _urgent_rewrite(body: str, created: str) -> str:
     # на 24-е с текстом «был 8 дн. назад» — к своей дате они уже врали.
     try:
         was = date.fromisoformat(created[:10])
-        when = f"звонил {was.day:02d}.{was.month:02d}"
+        when = f"{was.day:02d}.{was.month:02d}"
     except Exception:
         when = "вчера" if n == 1 else f"{n} дн. назад"
     if re.search(r"НОВАЯ ЗАЯВКА", body, re.I):
@@ -162,7 +162,7 @@ def _urgent_rewrite(body: str, created: str) -> str:
                 f"открытых уроков.")[:250]
     ph = PHONE.search(body)
     num = (" с +7" + ph.group(1)) if ph else ""
-    return (f"📞 Пропущенный звонок{num} — {when}, перезвонить. "
+    return (f"📞 Пропущенный звонок{num} — звонил {when}, перезвонить. "
             f"Человек звонил сам, значит интерес был: спросить, что искали, "
             f"и позвать на 29.08, 30.08 или Неделю открытых уроков.")[:250]
 
