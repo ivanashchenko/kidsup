@@ -56,6 +56,13 @@ PROGRAMME = (
 )
 
 
+def _was(name: str) -> str:
+    """«был» или «была». Ошибка тут заметна с первого слова: «Вероника был
+    у нас» читается как машинная рассылка, и дальше текст уже не спасти."""
+    from .hint import is_female
+    return "была" if is_female(name) else "был"
+
+
 def _first_name(full: str) -> str:
     parts = [w for w in (full or "").split("(")[0].split() if w]
     if len(parts) >= 2 and parts[1][:1].isupper():
@@ -70,7 +77,8 @@ def text_past(name: str) -> str:
     это заметят первым же словом. Заход другой: мы помним, зовём вернуться,
     и повод — самая яркая смена сезона."""
     child = _first_name(name)
-    who = f"{child} был у нас в лагере" if child else "Ваш ребёнок был у нас в лагере"
+    who = f"{child} {_was(child)} у нас в лагере" if child \
+        else "Ваш ребёнок был у нас в лагере"
     return (
         f"Здравствуйте! {who} — и мы помним. Этим летом вас не было, "
         f"а последняя смена как раз такая, ради которой стоит вернуться.\n\n"
@@ -88,7 +96,7 @@ def text_past(name: str) -> str:
 def text_for(name: str) -> str:
     """Текст для семьи, которая была у нас этим летом."""
     child = _first_name(name)
-    hello = f"Здравствуйте! {child} был у нас этим летом" if child \
+    hello = f"Здравствуйте! {child} {_was(child)} у нас этим летом" if child \
         else "Здравствуйте! Ваш ребёнок был у нас этим летом"
     return (
         f"{hello} — и последнюю неделю августа мы придумали так, чтобы "
