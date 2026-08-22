@@ -71,6 +71,18 @@ def _subject(name: str) -> str | None:
     return None
 
 
+def _families(n: int) -> str:
+    """«161 семья», а не «161 семей» — иначе лист читается как машинный."""
+    last, tail = n % 10, n % 100
+    if 11 <= tail <= 14 or last == 0 or last >= 5:
+        word = "семей"
+    elif last == 1:
+        word = "семья"
+    else:
+        word = "семьи"
+    return f"{n} {word}"
+
+
 def _fake_phone(digits: str) -> bool:
     """Заглушки вместо телефона: 79999999999, 70000000000, 71234567890.
 
@@ -268,7 +280,7 @@ table.c th{{background:var(--fill);font-size:.78rem;font-weight:750}}
 <h1>Обзвон: подготовка к школе</h1>
 <p class="lead">Дети, которым к 1 сентября от 4 до 7 лет — возраст ПШ1
 (нечитающие) и ПШ2. В списке только те, кто занимался у нас в прошлом
-учебном году или был этим летом: {len(rows)} семей, из них {warm} уже
+учебном году или был этим летом: {_families(len(rows))}, из них {warm} уже
 разговаривали с нами недавно — они идут первыми в каждом разделе.
 Данные из CRM на {date.today().strftime('%d.%m.%Y')}.</p>
 
