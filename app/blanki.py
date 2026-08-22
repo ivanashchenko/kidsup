@@ -152,6 +152,22 @@ def enrolled_by_class() -> dict[int, list[str]]:
     return out
 
 
+def _group_no(name: str) -> int | None:
+    """Номер группы из названия: «…ПШ1 нечитающие (Гр12)» → 12."""
+    m = re.search(r"\(\s*гр\s*\.?\s*(\d+)", name or "", re.I)
+    return int(m.group(1)) if m else None
+
+
+def _group_order(g: dict) -> tuple:
+    """Порядок внутри предмета: сначала пронумерованные группы по номеру.
+
+    Номер — это то, как группу называют между собой и в разговоре
+    с родителем («записал в третью»), поэтому лист должен идти в том же
+    порядке. Группы без номера уходят вниз и сортируются по времени."""
+    n = _group_no(g.get("name") or "")
+    return (0, n, "") if n is not None else (1, 0, g.get("name") or "")
+
+
 def group_sheet(groups: list[dict], enrolled: dict[int, list[str]]) -> str:
     """Список групп предмета: у каждой — название, дни, часы и места.
 
@@ -159,7 +175,7 @@ def group_sheet(groups: list[dict], enrolled: dict[int, list[str]]) -> str:
     Это и есть рабочий лист: видно, куда можно записать прямо сейчас,
     и кто в группе уже есть."""
     out = []
-    for g in sorted(groups, key=lambda x: (x.get("when") or "")):
+    for g in sorted(groups, key=_group_order):
         ds, t = _slot(g.get("when") or "")
         cap = g.get("cap") or 8
         busy = g.get("busy") or 0
@@ -177,8 +193,10 @@ def group_sheet(groups: list[dict], enrolled: dict[int, list[str]]) -> str:
         if not when:
             when = _when_from_name(g.get("name") or "") or "по записи"
         free = max(0, cap - busy)
+        no = _group_no(g.get("name") or "")
+        tag = f'<span class="gn">Гр{no}</span>' if no else ""
         out.append(f"""<div class="grp">
-  <div class="gh"><b>{H.escape(g.get("name") or "")}</b>
+  <div class="gh">{tag}<b>{H.escape(g.get("name") or "")}</b>
     <span class="gw">{H.escape(when)}</span>
     <span class="gf{" full" if not free else ""}">свободно {free} из {cap}</span></div>
   <div class="rows">{"".join(rows)}</div>
@@ -358,6 +376,8 @@ table.grid td.off{{background:repeating-linear-gradient(45deg,#fff,#fff 5px,#FAF
 .gh{{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;
  border-bottom:1px solid var(--line);padding-bottom:.35rem;margin-bottom:.4rem}}
 .gh b{{font-size:.9rem;font-weight:750}}
+.gn{{background:var(--indigo);color:#fff;font-size:.72rem;font-weight:750;
+ padding:.1rem .4rem;border-radius:.25rem;flex:none}}
 .gw{{font-size:.82rem;color:var(--indigo);font-weight:700;
  font-variant-numeric:tabular-nums}}
 .gf{{margin-left:auto;font-size:.75rem;color:var(--green);font-weight:700}}
