@@ -655,6 +655,29 @@ def _broadcast_tick() -> None:
         break                           # одна отправка за тик — темп держит wa_per_hour
 
 
+def sync_admin_phones(mk: MoyklassClient) -> dict:
+    """Телефоны сотрудников из CRM в настройку admin_phones.
+
+    По ним уходит справка о клиенте в момент входящего звонка — админ
+    видит, кто звонит и что ему говорить, ДО того как снял трубку.
+    Настройка заполнялась руками, поэтому стояла пустой, и подсказки
+    молча никуда не уходили: механика была, а телефонов не было."""
+    try:
+        r = mk.get("/v1/company/managers", {"limit": 100})
+        ms = r.get("managers") if isinstance(r, dict) else r
+    except Exception:
+        return {}
+    out = {}
+    for m in ms or []:
+        ph = "".join(c for c in str(m.get("phone") or "") if c.isdigit())
+        if len(ph) >= 11 and m.get("id"):
+            out[str(m["id"])] = ph[-11:]
+    if out:
+        db.set_setting("admin_phones", json.dumps(out))
+        log.info("телефоны сотрудников обновлены: %d", len(out))
+    return out
+
+
 def _admins() -> list[dict]:
     try:
         return json.loads(db.get_setting("call_admins") or "[]")
@@ -2559,6 +2582,7 @@ def _loop() -> None:
             if 8 <= now.hour < 19 and not _has_mark("morning", str(_today())):
                 mk = _client()
                 try:
+                    sync_admin_phones(mk)
                     morning_tasks(mk)
                     _mark("morning", str(_today()))
                 finally:
