@@ -545,10 +545,11 @@ def _waba_template_watch() -> dict:
     if not ok:
         return {"ok": True, "одобренных_нет": True, "всего_шаблонов": len(items)}
     db.set_setting("waba_templates", json.dumps(ok, ensure_ascii=False))
-    # Запасной шаблон на случай, когда возраст ребёнка неизвестен: самый
-    # широкий сегмент 5–7 лет, а если его нет — любой одобренный.
+    # Запасной шаблон на случай, когда возраст ребёнка неизвестен:
+    # универсальный, а если его ещё не одобрили — любой доступный.
     if not db.get_setting("waba_template_id"):
-        pick = ok.get("nabor_5_7_let") or next(iter(ok.values()))
+        pick = ok.get("nabor_bez_vozrasta") or ok.get("nabor_5_7_let") \
+            or next(iter(ok.values()))
         db.set_setting("waba_template_id", pick)
     if (db.get_setting("broadcast_transports", "") or "").strip() == "off":
         db.set_setting("broadcast_transports", "whatsapp")
@@ -579,11 +580,15 @@ def _template_for(phone: str, campaign: str) -> str | None:
         camp = next((v for k, v in tpls.items() if k.startswith("lager")), None)
         return camp or db.get_setting("waba_template_id") or None
     age = _age_by_phone(phone)
-    name = "nabor_5_7_let"
+    # Возраст неизвестен у половины базы (3162 карточки из 6996). Раньше
+    # им уходил шаблон 5–7 лет, то есть разговор про подготовку к школе —
+    # мимо для всех, кроме дошкольников. Универсальный вместо угадывания
+    # просит назвать возраст: ответ заодно чинит карточку.
+    name = "nabor_bez_vozrasta"
     if age is not None:
         name = next(n for lim, n in AGE_TEMPLATES if age < lim)
-    return tpls.get(name) or tpls.get("nabor_5_7_let") \
-        or db.get_setting("waba_template_id") or None
+    return tpls.get(name) or tpls.get("nabor_bez_vozrasta") \
+        or tpls.get("nabor_5_7_let") or db.get_setting("waba_template_id") or None
 
 
 def _age_by_phone(phone: str) -> float | None:
