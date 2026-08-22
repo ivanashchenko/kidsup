@@ -2137,7 +2137,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.17"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.19"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2901,7 +2901,7 @@ def api_broadcast_log(day: str = "", limit: int = 100):
     d = day or autopilot._today().isoformat()
     with db.get_conn() as conn:
         rows = conn.execute(
-            "SELECT campaign, phone, child, status, sent, created FROM broadcast_queue "
+            "SELECT campaign, phone, child, status, sent, created, sender FROM broadcast_queue "
             "WHERE substr(COALESCE(sent, created), 1, 10) = ? "
             "ORDER BY COALESCE(sent, created) DESC LIMIT ?",
             (d, max(1, min(500, limit)))).fetchall()
@@ -2915,7 +2915,11 @@ def api_broadcast_log(day: str = "", limit: int = 100):
                 name = u["name"] if u else None
             out.append({"campaign": r["campaign"], "phone": ph, "crm_name": name,
                         "child": r["child"], "status": r["status"],
-                        "sent": r["sent"], "created": r["created"]})
+                        "sent": r["sent"], "created": r["created"],
+                        # с какого нашего номера ушло: без этого нельзя ответить
+                        # на вопрос «почему сообщение висит недоставленным» —
+                        # у каждого номера своё состояние и свой лимит
+                        "sender": r["sender"]})
     return {"day": d, "count": len(out), "rows": out}
 
 

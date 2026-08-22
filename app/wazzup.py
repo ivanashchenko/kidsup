@@ -32,8 +32,12 @@ API = "https://api.wazzup24.com/v3"
 CASCADE = ["whatsapp"]
 CHAT_TYPE = {"whatsapp": "whatsapp", "tgapi": "telegram", "max": "max", "vk": "vk"}
 # Порядок предпочтения WhatsApp-номеров (настройка wa_senders, через запятую).
-# Основной 0077 в ограничении → активным окажется первый живой резервный.
-WHATSAPP_PREFERRED = "79165610077,79199683507,79160170918"
+# 0077 стоит ПОСЛЕДНИМ намеренно: это канал переписки с историей банов, его
+# квота — считанные сообщения в день. 22.08 он был первым в этой константе,
+# и запуск рассылки в обход сервера (где wa_senders задан правильно) увёл
+# через него весь поток — номер отвалился в «не авторизован», а сообщения
+# перестали доставляться. Порядок здесь обязан совпадать с боевой настройкой.
+WHATSAPP_PREFERRED = "79160170918,79199683507,79165610077"
 
 TEMPLATES = {
     "nedozvon": (
@@ -101,6 +105,12 @@ def set_webhook(uri: str = OUR_HOOK) -> bool:
 
 def _pick(chans: list[dict], transport: str) -> dict | None:
     cand = [c for c in chans if c.get("transport") == transport]
+    # Заблокированный канал Wazzup принимает сообщение и отвечает 201, но не
+    # доставляет — молча теряется вся порция. Живые состояния отсекаем здесь,
+    # а не только в channels(): сюда попадают и списки из all_channels().
+    live = [c for c in cand
+            if str(c.get("state") or "").lower() in {"active", "opened", "ready"}]
+    cand = live or cand
     if transport == "whatsapp":
         pref = [p.strip() for p in
                 (db.get_setting("wa_senders", WHATSAPP_PREFERRED) or WHATSAPP_PREFERRED).split(",")]
