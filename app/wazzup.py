@@ -14,6 +14,8 @@ import argparse
 
 import logging
 
+import os
+import json
 import httpx
 
 from . import db
@@ -207,3 +209,67 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# --- кто стоит за идентификатором чата --------------------------------------
+
+_CONTACTS_CACHE = f"{os.environ.get('KIDSUP_SCRATCH') or '/tmp/kidsup-calls'}/wz_contacts.json"
+
+
+def contacts(refresh: bool = False) -> dict:
+    """chatId → {name, uid, type}. Ключ к тому, кто пишет из Telegram и MAX.
+
+    У таких клиентов номер не передаётся — приходит внутренний id аккаунта,
+    и задача выглядела как «+5113895858»: набрать нельзя, найти человека
+    тоже. А Wazzup знает связь: в его контактах у каждого лежит id карточки
+    МойКласс. Значит по id чата восстанавливается и имя, и карточка.
+
+    Кэш на сутки: список меняется медленно, а тянуть 5800 контактов
+    на каждую задачу незачем."""
+    if not refresh:
+        try:
+            d = json.load(open(_CONTACTS_CACHE))
+            if d.get("день") == date.today().isoformat():
+                return d.get("map") or {}
+        except Exception:
+            pass
+    out, off = {}, 0
+    try:
+        while off < 20000:
+            r = httpx.get(f"{API}/contacts", headers=_headers(), timeout=40,
+                          params={"limit": 100, "offset": off})
+            rows = (r.json().get("data") if r.status_code == 200 else None) or []
+            if not rows:
+                break
+            for c in rows:
+                uid = c.get("id")
+                name = c.get("name") or ""
+                for cd in (c.get("contactData") or []):
+                    cid = str(cd.get("chatId") or "")
+                    if cid:
+                        out[cid] = {"name": name, "uid": uid,
+                                    "type": cd.get("chatType") or ""}
+            off += 100
+    except Exception as e:  # noqa: BLE001
+        log.warning("wazzup.contacts: %s", type(e).__name__)
+        return out
+    try:
+        json.dump({"день": date.today().isoformat(), "map": out},
+                  open(_CONTACTS_CACHE, "w"), ensure_ascii=False)
+    except Exception:
+        pass
+    return out
+
+
+def who_is(chat_id: str) -> dict | None:
+    """Контакт по идентификатору чата. Хвост id тоже подойдёт: в задачах
+    он сохранён обрезанным."""
+    cid = str(chat_id or "").strip()
+    if not cid:
+        return None
+    m = contacts()
+    if cid in m:
+        return m[cid]
+    tail = cid[-6:]
+    hits = [v for k, v in m.items() if k.endswith(tail)]
+    return hits[0] if len(hits) == 1 else None
+
