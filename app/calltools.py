@@ -78,6 +78,20 @@ def _shift_names(day: str | None = None) -> list[str]:
     return [back[i] for i in ids if i in back]
 
 
+def _ext_override(day: str | None = None) -> dict:
+    """Кто за каким аппаратом сегодня, если пересели.
+
+    Администраторы меняются телефонами: 21.08 Ира работала одна и села
+    за аппарат 12, 22-23.08 с него звонит Аня. Жёсткая карта в такие дни
+    приписывает звонки не тому, и статистика вместе с замечаниями уходит
+    мимо. Переопределение задаётся по датам в настройке ext_by_day."""
+    try:
+        m = json.loads(db.get_setting("ext_by_day") or "{}")
+    except Exception:
+        return {}
+    return m.get(day or date.today().isoformat()) or {}
+
+
 def who_for_ext(ext: str, day: str | None = None) -> str:
     """Кому засчитать звонок с этого добавочного.
 
@@ -89,6 +103,10 @@ def who_for_ext(ext: str, day: str | None = None) -> str:
     # его» к ней не относится.
     if ext in PARTNER:
         return "Надежда"
+    # Явное указание на день важнее и графика, и привычной карты.
+    named = _ext_override(day).get(str(ext))
+    if named:
+        return named
     on = _shift_names(day)
     if len(on) == 1:
         return on[0]
