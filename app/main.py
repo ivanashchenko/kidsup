@@ -2142,7 +2142,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.33"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.35"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2841,6 +2841,29 @@ async def api_waba_pick(payload: dict = None):
     то же, что автопилот делает раз в пять минут."""
     from . import autopilot
     return autopilot._waba_template_watch()
+
+
+@app.post("/api/broadcast/hold", dependencies=AUTH)
+async def api_broadcast_hold(payload: dict = None):
+    """Снять человека со всех рассылок: у семьи сейчас не до нас.
+
+    Появилось 22.08: администратор дозвонилась до мамы, которая была
+    в роддоме. Такой семье нельзя ни звонить, ни слать — а очередь про
+    это не знает и через час отправит письмо про лагерь. Статус «не
+    писать» здесь не годится: он навсегда, а нужно на время.
+
+    Отменяет все строки в состоянии pending по этому телефону.
+    Кампании, поставленные позже, снимать надо заново — это осознанно:
+    «не беспокоить» имеет срок, и через месяц семье можно написать."""
+    phone = "".join(c for c in str((payload or {}).get("phone") or "") if c.isdigit())
+    if len(phone) < 10:
+        raise HTTPException(400, "нужен телефон")
+    with db.get_conn() as conn:
+        n = conn.execute(
+            "UPDATE broadcast_queue SET status='cancelled' WHERE status='pending' "
+            "AND substr(replace(replace(replace(phone,' ',''),'-',''),'+',''), -10)=?",
+            (phone[-10:],)).rowcount
+    return {"ok": True, "телефон": phone[-10:], "снято_с_рассылки": n}
 
 
 @app.post("/api/broadcast/requeue", dependencies=AUTH)

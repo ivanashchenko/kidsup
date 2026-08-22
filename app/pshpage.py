@@ -176,6 +176,10 @@ KidsUP на Рокоссовского. Звоню лично.<br>
 
 def build() -> str:
     data = ranked()
+    # Сколько семей ушло Надежде: их в этом листе нет, и владельцу полезно
+    # видеть, что список короче не потому, что база кончилась.
+    from .pshlist import _given_away
+    _given = len(_given_away())
     d1 = [c for c in data if c["seg"] == "ПШ сейчас (5,5-7)"][:60]
     rest = [c for c in data if c["seg"] == "ПШ сейчас (5,5-7)"][60:]
     d2 = rest + [c for c in data if c["seg"] == "младшая ПШ1 (4-5,5)"]
@@ -258,6 +262,7 @@ ul.plain{{padding-left:1.2rem}} ul.plain li{{margin:.35rem 0}}
   <div class="num"><b>{len(d2)}</b><span>воскресенье 23.08<br>остальные + 4–5,5</span></div>
   <div class="num"><b>0</b><span>записей сейчас<br>в 14 группах ПШ</span></div>
   <div class="num"><b>{len(data)}</b><span>всего семей<br>из прошлого ПШ</span></div>
+  <div class="num"><b>{_given}</b><span>отдано Надежде<br>здесь их нет</span></div>
 </div>
 
 {SCRIPT}

@@ -177,11 +177,30 @@ def ranked() -> list[dict]:
     Занятые задачей администратора уходят в конец: звонить туда владельцу
     значит продублировать чужой звонок в тот же день."""
     data = json.load(open(OUT))
+    given = _given_away()
+    if given:
+        before = len(data)
+        data = [c for c in data if c.get("uid") not in given]
+        log.info("отдано на обзвон Надежде и убрано из листа владельца: %d",
+                 before - len(data))
     for c in data:
         c["seg"] = segment(c)
     return sorted(data, key=lambda c: (ORDER.get(c["seg"], 9),
                                        bool(c.get("busy")),
                                        _newest_first(c.get("last") or "")))
+
+
+def _given_away() -> set[int]:
+    """Кого уже отдали Надежде — их в листе владельца быть не должно.
+
+    Оба садятся звонить завтра. Один и тот же родитель, которому за час
+    позвонили дважды из одного центра, решает, что у нас беспорядок, —
+    и это стоит дороже, чем недозвон."""
+    try:
+        rows = json.load(open(f"{SP}/nadezhda_list.json"))
+    except Exception:
+        return set()
+    return {r.get("uid") for r in rows if r.get("uid")}
 
 
 def _newest_first(d: str) -> str:
