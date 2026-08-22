@@ -132,8 +132,18 @@ def collect() -> list[dict]:
                 by_year[y].add(x["userId"])
         summer = {x["userId"] for x in camp
                   if set(x.get("classIds") or []) & this_ids}
-        took_last = {x["userId"] for x in camp
-                     if LAST_WEEK[0] <= (x.get("beginDate") or "")[:10] <= LAST_WEEK[1]}
+        # Оплатившим последнюю неделю приглашение слать нельзя. Считать надо
+        # по ПЕРЕСЕЧЕНИЮ периодов, а не по дате начала: у большинства
+        # абонемент куплен раньше и тянется до конца августа — 19.08–31.08,
+        # 01.06–31.08. Прежнее правило искало начало внутри 24–28 августа
+        # и нашло одного человека вместо 135; остальные 134 получили
+        # приглашение на неделю, за которую уже заплатили.
+        took_last = set()
+        for x in camp:
+            b = (x.get("beginDate") or "")[:10]
+            e = (x.get("endDate") or "")[:10] or b
+            if b and b <= LAST_WEEK[1] and e >= LAST_WEEK[0]:
+                took_last.add(x["userId"])
         past = (by_year.get("2025", set()) | by_year.get("2024", set())) - summer
         target = [(uid, "этим летом") for uid in sorted(summer - took_last)] + \
                  [(uid, "в прошлые годы") for uid in sorted(past)]
