@@ -800,6 +800,10 @@ DOC_GROUPS = [
          "Каждый контакт с листов: карточка, статус, кто и сколько звонил (срез 18.08)"),
     ]),
     ("Каждый день на смене", [
+        ("__url:/ochered", "☎️ Очередь на сегодня — звонить отсюда",
+         "Список задач дежурного с телефонами и кнопками итога: записан, "
+         "перезвонить, не актуально, не дозвонились. Отметка закрывает задачу "
+         "и пишет разговор в карточку — отдельный лист обзвона больше не нужен"),
         ("blanki_obzvona", "🖨 Бланки для обзвона: расписание, цены, контакты",
          "Печатать в альбомной ориентации. Сетка день × время по каждому "
          "предмету со свободными клетками под имена, лист цен из CRM "
@@ -943,10 +947,16 @@ def base_page(request: Request):
     for title, items in DOC_GROUPS:
         rows = []
         for slug, name, note in items:
+            # «__url:/путь» — не методичка, а живая страница портала:
+            # очередь дня собирается из задач и файла в docs не имеет
+            if slug.startswith("__url:"):
+                rows.append({"slug": slug, "href": slug[6:], "name": name,
+                             "note": note, "size": 0})
+                continue
             f = root / f"{slug}.html"
             if f.exists():
-                rows.append({"slug": slug, "name": name, "note": note,
-                             "size": f.stat().st_size // 1024})
+                rows.append({"slug": slug, "href": f"/base/{slug}", "name": name,
+                             "note": note, "size": f.stat().st_size // 1024})
         if rows:
             groups.append({"title": title, "items": rows})
     return render(request, "base_docs.html", active="base", groups=groups)
@@ -2146,7 +2156,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.40"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.42"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -3117,6 +3127,48 @@ async def api_wazzup_raw(limit: int = 40, kind: str = ""):
                 pass
         return {"count": len(events), "top_keys": cnt.most_common()}
     return {"count": len(events), "events": events}
+
+
+@app.get("/ochered", response_class=HTMLResponse, dependencies=AUTH)
+async def ochered_page(manager: int = 0):
+    """Очередь дня — та же, что в CRM. Строка страницы и есть задача.
+
+    Заменяет прежние листы обзвона, которые жили рядом с задачами и не были
+    с ними связаны: администратор звонил по листу, а задачи закрывал отдельно,
+    и в CRM оставалось «закрыто без касания»."""
+    from . import autopilot, callqueue
+    mid = manager
+    if not mid:
+        # Кто сегодня звонит — из графика смен; тот же источник, что у /api/duty,
+        # иначе очередь покажется человеку, который сегодня отдыхает.
+        try:
+            sched = json.loads(db.get_setting("admin_schedule") or "{}")
+            v = sched.get(autopilot._today().isoformat())
+            mid = (v[0] if isinstance(v, list) else v) or 0
+        except Exception:
+            mid = 0
+    mid = mid or 232805
+    try:
+        rows = callqueue.collect(mid)
+    except Exception as e:
+        raise HTTPException(502, f"МойКласс недоступен: {e}")
+    return HTMLResponse(callqueue.page(mid, rows))
+
+
+@app.post("/api/queue/result", dependencies=AUTH)
+async def api_queue_result(payload: dict = Body(...)):
+    """Итог звонка со страницы очереди: закрыть задачу или перенести."""
+    from . import callqueue
+    try:
+        return callqueue.apply_result(
+            int(payload.get("task_id") or 0),
+            str(payload.get("result") or ""),
+            str(payload.get("note") or "")[:400],
+            int(payload.get("manager_id") or 0))
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"не удалось записать итог: {e}")
 
 
 @app.get("/vstrechi", response_class=HTMLResponse)

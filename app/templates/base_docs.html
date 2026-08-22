@@ -11,7 +11,7 @@
     <tbody>
     {% for d in g['items'] %}
       <tr>
-        <td><a href="/base/{{ d.slug }}"><b>{{ d.name }}</b></a></td>
+        <td><a href="{{ d.href }}"><b>{{ d.name }}</b></a></td>
         <td class="small muted">{{ d.note }}</td>
         <td class="small muted">{{ d.size }} КБ</td>
       </tr>
