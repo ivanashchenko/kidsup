@@ -46,13 +46,15 @@ EVENTS = [
              "с педагогами. Можно прийти просто посмотреть центр изнутри "
              "и понять, нравится ли здесь ребёнку.",
      "note": "Вход свободный, запись не нужна"},
-    {"when": "30 августа, воскресенье", "tag": "День открытых дверей",
+    {"when": "30 августа, воскресенье, 11:00–15:00",
+     "tag": "День открытых дверей",
      "title": "Знакомство с программами",
      "text": "Показываем, как устроены занятия: подготовка к школе, "
              "английский по кембриджской программе, раннее развитие, "
              "мини-сад и нулевой класс. Отвечаем на вопросы про уровни, "
              "расписание и цены.",
-     "note": "Лучше предупредить о визите — подберём удобное время"},
+     "note": "Вход свободный, но лучше записаться — подберём удобное время",
+     "link": ("/day", "Программа дня и запись")},
     {"when": "31 августа — 6 сентября", "tag": "Неделя открытых уроков",
      "title": "Настоящее занятие, а не показательное",
      "text": "Учебный год начинается 31 августа, и всю первую неделю можно "
@@ -60,7 +62,8 @@ EVENTS = [
              "с группой, родитель смотрит, как идёт занятие и как работает "
              "педагог.",
      "note": "Первое занятие условно-бесплатное: не понравится — платить "
-             "не нужно, понравится — войдёт в первый абонемент"},
+             "не нужно, понравится — войдёт в первый абонемент",
+     "link": ("/week", "Как это устроено и выбор занятия")},
 ]
 
 
@@ -101,13 +104,23 @@ def week_grid() -> str:
 
 def build() -> str:
     grid = week_grid()
-    cards = "".join(f"""<article class="ev">
+    def _card(e: dict) -> str:
+        # У ДОД и Недели есть свои лендинги с программой и записью — с общей
+        # страницы человек должен попадать туда, а не искать их заново.
+        link = ""
+        if e.get("link"):
+            href, label = e["link"]
+            link = f'<a class="more" href="{href}">{H.escape(label)} →</a>'
+        return f"""<article class="ev">
   <div class="tag">{H.escape(e["tag"])}</div>
   <div class="when">{H.escape(e["when"])}</div>
   <h2>{H.escape(e["title"])}</h2>
   <p>{H.escape(e["text"])}</p>
   <div class="note">{H.escape(e["note"])}</div>
-</article>""" for e in EVENTS)
+  {link}
+</article>"""
+
+    cards = "".join(_card(e) for e in EVENTS)
 
     return f"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
@@ -137,6 +150,9 @@ h1{{font-size:1.9rem;line-height:1.2;font-weight:800;margin:.2rem 0 .4rem;
 .ev p{{margin:0 0 .6rem;color:#33364a}}
 .note{{background:var(--fill);border-left:3px solid var(--green);
  padding:.5rem .7rem;font-size:.92rem;color:#33364a;border-radius:0 .3rem .3rem 0}}
+.more{{display:inline-block;margin-top:.7rem;color:var(--indigo);font-weight:750;
+ text-decoration:none;border-bottom:2px solid var(--blue);padding-bottom:.1rem}}
+.more:hover{{border-bottom-color:var(--indigo)}}
 h2.sec{{font-size:1.3rem;font-weight:780;margin:2rem 0 .3rem;color:var(--indigo)}}
 .lead{{color:var(--muted);margin:0 0 1rem;font-size:.96rem}}
 .week{{display:grid;gap:.8rem}}
