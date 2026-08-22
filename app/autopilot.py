@@ -517,6 +517,34 @@ def broadcast_cancel(campaign: str | None = None) -> int:
         return cur.rowcount
 
 
+def _waba_template_watch() -> dict:
+    """Подхватить одобренный WABA-шаблон и вернуть рассылку в строй.
+
+    Шаблон заводится руками в кабинете Wazzup (API умеет только читать
+    список), а дальше ждать модерацию Meta человеку незачем: как только
+    статус стал «одобрен», id сам ложится в настройку, а транспорт
+    возвращается из «off». Без шаблона отправка через WABA намеренно
+    отказывает, поэтому включать транспорт заранее безопасно только
+    вместе с появлением id."""
+    if db.get_setting("waba_template_id"):
+        return {"ok": True, "уже_задан": True}
+    try:
+        t = wazzup.approved_template(prefer=db.get_setting("waba_template_prefer", ""))
+    except Exception as e:
+        log.warning("шаблоны WABA недоступны: %s", e)
+        return {"ok": False, "ошибка": str(e)[:120]}
+    if not t:
+        return {"ok": True, "одобренных_нет": True}
+    tid = t.get("id") or t.get("templateId")
+    if not tid:
+        return {"ok": False, "нет_id": True}
+    db.set_setting("waba_template_id", str(tid))
+    if (db.get_setting("broadcast_transports", "") or "").strip() == "off":
+        db.set_setting("broadcast_transports", "whatsapp")
+    log.info("WABA-шаблон одобрен: %s (%s) — рассылка включена", t.get("name"), tid)
+    return {"ok": True, "шаблон": t.get("name"), "id": tid, "рассылка": "включена"}
+
+
 def _broadcast_tick() -> None:
     """Раз в минуту: каскадная доставка очереди. Порядок каналов —
     настройка broadcast_transports (по умолчанию "tgapi,whatsapp,max").
@@ -673,7 +701,11 @@ def _broadcast_tick() -> None:
             continue  # ждёт ответа админа — не сбрасываем непрочитанное, вернёмся позже
         msg = _fill_name(text, child)
         try:
-            ok = wazzup.send_via(tr, phone, msg, dry_run=dry, sender=snd)
+            # у шаблона WABA текст утверждён Meta и не меняется — от нас
+            # идут только подстановки. Переменная одна: имя ребёнка
+            vals = [_child_name(child) or "ваш ребёнок"] if tr == "wapi" else None
+            ok = wazzup.send_via(tr, phone, msg, dry_run=dry, sender=snd,
+                                 template_values=vals)
         except Exception as e:
             log.warning("wazzup %s недоступен: %s", tr, e)
             ok = False
@@ -2687,6 +2719,13 @@ def _loop() -> None:
                     _sync.start_sync()
                 except Exception:
                     log.exception("полный автосинк не запустился")
+            # раз в 5 минут смотрим, не одобрила ли Meta шаблон: как только
+            # одобрит, рассылка возобновится сама, без участия человека
+            if now.minute % 5 == 0:
+                try:
+                    _waba_template_watch()
+                except Exception:
+                    log.exception("проверка WABA-шаблона не удалась")
             try:
                 _broadcast_tick()
             except Exception as e:

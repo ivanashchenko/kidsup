@@ -2137,7 +2137,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.25"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.26"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2811,6 +2811,31 @@ async def api_broadcast_prune(payload: dict = None):
     """Убрать из очереди семьи, которые занимаются у нас этим летом."""
     from . import autopilot
     return autopilot.broadcast_prune_active((payload or {}).get("campaign", "camp_aug26"))
+
+
+@app.get("/api/waba/templates", dependencies=AUTH)
+async def api_waba_templates():
+    """Шаблоны WABA и их статус модерации. Создать шаблон через API нельзя —
+    только прочитать список; заводятся они в кабинете Wazzup."""
+    from . import wazzup
+    try:
+        items = wazzup.templates()
+    except Exception as e:
+        raise HTTPException(502, f"Wazzup недоступен: {e}")
+    return {"всего": len(items),
+            "текущий_id": db.get_setting("waba_template_id") or None,
+            "шаблоны": [{"id": t.get("id") or t.get("templateId"),
+                         "имя": t.get("name"), "статус": t.get("status"),
+                         "текст": (t.get("text") or t.get("body") or "")[:200]}
+                        for t in items]}
+
+
+@app.post("/api/waba/pick-template", dependencies=AUTH)
+async def api_waba_pick(payload: dict = None):
+    """Подхватить одобренный шаблон и вернуть рассылку в строй вручную —
+    то же, что автопилот делает раз в пять минут."""
+    from . import autopilot
+    return autopilot._waba_template_watch()
 
 
 @app.post("/api/broadcast/requeue", dependencies=AUTH)

@@ -403,6 +403,31 @@ def best_channel(phone: str = "", uid: str | int | None = None,
     return "wapi" if mass else "whatsapp"
 
 
+def templates() -> list[dict]:
+    """Шаблоны WABA, заведённые в кабинете. API даёт только чтение —
+    создать и отправить на модерацию можно лишь руками в кабинете
+    Wazzup, POST на этот адрес возвращает 404."""
+    r = httpx.get(f"{API}/templates/whatsapp", headers=_headers(), timeout=30)
+    r.raise_for_status()
+    d = r.json()
+    return d if isinstance(d, list) else (d.get("data") or d.get("templates") or [])
+
+
+def approved_template(prefer: str = "") -> dict | None:
+    """Первый одобренный шаблон; prefer — часть имени для выбора нужного.
+
+    Модерация Meta идёт от нескольких минут до суток, и ждать её вручную
+    незачем: как только шаблон одобрен, его id можно подставить и
+    возобновить рассылку без участия человека."""
+    ok = [t for t in templates()
+          if str(t.get("status") or "").lower() in {"approved", "active", "одобрен"}]
+    if prefer:
+        named = [t for t in ok if prefer.lower() in str(t.get("name") or "").lower()]
+        if named:
+            return named[0]
+    return ok[0] if ok else None
+
+
 def _marked_in_crm(digits: str) -> list[str]:
     """Канал по пометке в имени карточки: «(MAX)», «писать в телеграмм».
 
