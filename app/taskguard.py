@@ -41,6 +41,9 @@ log = logging.getLogger("kidsup.taskguard")
 STAFF = {232763: "Ира", 232805: "Аня", 202856: "Лена",
          154181: "Лиза", 84116: "Борис", 229704: "Маша"}
 CAT_CALL, CAT_ORG = 104576, 104578
+# Звонящие администраторы: у них есть график смен, и задача
+# в их выходной бесполезна. У Лизы графика нет — она онлайн каждый день.
+CALLERS = (232763, 232805, 202856)
 
 # Владелец не должен получать работу администратора. Фильтр по смыслу стоял
 # только в autopilot._task(), а половина задач создаётся напрямую через API —
@@ -196,6 +199,32 @@ def _rewrite(mk: MoyklassClient, t: dict, *, day: str | None = None,
         return False
 
 
+def next_workday(manager_id: int, not_before: str | None = None) -> str:
+    """Ближайший рабочий день сотрудника, начиная с сегодня.
+
+    Правило «просрочка поднимается на сегодня» без этой проверки создаёт
+    круг: задача Иры уезжает на субботу, когда работает Аня, к утру
+    воскресенья снова становится просроченной и снова поднимается —
+    и так до её выхода. 22.08 так набежало 39 задач у человека,
+    который выходит 25-го.
+
+    Если график на сотрудника не заведён, возвращаем сегодня: лучше
+    показать задачу лишний раз, чем спрятать её от всех."""
+    today = not_before or date.today().isoformat()
+    try:
+        sched = json.loads(db.get_setting("admin_schedule") or "{}")
+    except Exception:
+        sched = {}
+    if not sched:
+        return today
+    days = []
+    for day, who in sched.items():
+        ids = who if isinstance(who, list) else [who]
+        if manager_id in ids and day >= today:
+            days.append(day)
+    return min(days) if days else today
+
+
 def _duty() -> int | None:
     """Кто сегодня на звонках. Берём из живого расписания смен, а не из
     памяти: администратор в отпуске не должен получать сегодняшний обзвон."""
@@ -259,7 +288,12 @@ def check(mk: MoyklassClient, fix: bool = True) -> dict:
             continue
 
         if cur and cur < today:
-            if fix and _rewrite(mk, t, day=today):
+            mid = (t.get("managerIds") or [None])[0]
+            # Поднимаем не на «сегодня», а на ближайшую смену исполнителя:
+            # задача, поставленная на выходной сотрудника, к утру снова
+            # станет просроченной, и так по кругу.
+            day = next_workday(mid, today) if mid in CALLERS else today
+            if fix and _rewrite(mk, t, day=day):
                 fixed["просрочка"] += 1
             continue
 
