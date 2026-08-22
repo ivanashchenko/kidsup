@@ -32,6 +32,26 @@ table.grid td.off{background:repeating-linear-gradient(45deg,#fff,#fff 5px,#FAFA
  font-size:.6rem;color:#B9B3A4}
 .ln.busy{background:var(--fill);border-bottom-color:#9C978A}
 .free{font-size:.62rem;color:var(--green);margin-top:.15rem}
+/* лист групп: у каждой группы свои строки под запись */
+.grp{break-inside:avoid;border:1px solid var(--line);border-radius:.4rem;
+ padding:.5rem .6rem .55rem;margin-bottom:.7rem}
+.gh{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;
+ border-bottom:1px solid var(--line);padding-bottom:.35rem;margin-bottom:.4rem}
+.gh b{font-size:.9rem;font-weight:750}
+.gw{font-size:.82rem;color:var(--indigo);font-weight:700;
+ font-variant-numeric:tabular-nums}
+.gf{margin-left:auto;font-size:.75rem;color:var(--green);font-weight:700}
+.gf.full{color:#B03A2E}
+.rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:.1rem .9rem}
+.row{display:flex;align-items:flex-end;gap:.4rem;height:1.35rem;
+ border-bottom:1px solid var(--line)}
+.row .n{font-size:.68rem;color:#B9B3A4;width:1.1rem;flex:none;
+ font-variant-numeric:tabular-nums}
+.row .who{font-size:.82rem;flex:1;overflow:hidden;white-space:nowrap;
+ text-overflow:ellipsis}
+.row.taken{background:var(--fill);border-bottom-color:#9C978A}
+@media print{.grp{page-break-inside:avoid}}
 .hint{font-size:.75rem;color:var(--muted);margin-top:.35rem}
 .q{break-inside:avoid;margin:.6rem 0}
 .q b{font-size:.92rem} .q p{margin:.1rem 0 0;font-size:.88rem;color:var(--muted)}
@@ -58,7 +78,7 @@ table.pr tr.sub td{background:var(--fill);font-weight:750;padding-top:.5rem}
 
 <h1>Бланки для обзвона</h1>
 <p class="lead">Печатать в альбомной ориентации. По листу на предмет плюс
-цены и контакты. Данные о занятости — из CRM на 21.08.2026,
+цены и контакты. Данные о занятости — из CRM на 22.08.2026,
 поэтому лист живёт примерно неделю: дальше лучше распечатать заново.</p>
 
 <div class="note"><b>Как пользоваться.</b> Родитель называет удобный день
@@ -69,72 +89,463 @@ table.pr tr.sub td{background:var(--fill);font-weight:750;padding-top:.5rem}
 
 <section class="sheet">
   <div class="sh"><h2>Подготовка к школе</h2>
-    <span>всего свободно 104 мест · 15 групп</span></div>
-  <table class="grid"><tr><th class="t"></th><th>пн</th><th>вт</th><th>ср</th><th>чт</th><th>пт</th><th>сб</th><th>вс</th></tr><tr><th class="t">16:00</th><td><div class="lvl">5-7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td><div class="lvl">4-5 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td class="off"></td><td><div class="lvl">5-7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td><div class="lvl">4-5 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">17:00</th><td><div class="lvl">4-5 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln busy">3.</div><div class="ln busy">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 4 из 8</div></td><td><div class="lvl">5-7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td class="off"></td><td><div class="lvl">4-5 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln busy">3.</div><div class="ln busy">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 4 из 8</div></td><td><div class="lvl">5-7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">18:00</th><td><div class="lvl">4-7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td><div class="lvl">5-7 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td><div class="lvl">4-5 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td><div class="lvl">4-7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td><div class="lvl">5-7 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">19:00</th><td class="off"></td><td><div class="lvl">4-7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td><div class="lvl">5-7 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td><div class="lvl">5-7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td><div class="lvl">4-7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">по записи</th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td></tr></table>
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+    <span>всего свободно 102 мест · 15 групп</span></div>
+  <div class="grp">
+  <div class="gh"><b>2627_ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)</b>
+    <span class="gw">пн 19:00 + сб 10:00</span>
+    <span class="gf">свободно 6 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Анисенкова Алена</span></div><div class="row taken"><span class="n">2</span><span class="who">Красильников Ярослав</span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_чт 19:00 + сб 11:00_5-7 лет_ПШ1 нечитающие (Гр13)</b>
+    <span class="gw">чт 19:00 + сб 11:00</span>
+    <span class="gf">свободно 8 из 8</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_вт-пт_16:00_4-5 лет_ПШ1 нечитающие (Гр8)</b>
+    <span class="gw">вт, пт · 16:00</span>
+    <span class="gf">свободно 8 из 8</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_вт-пт_17:00_5-7 лет_ПШ1 нечитающие (Гр9)</b>
+    <span class="gw">вт, пт · 17:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Скворцов Данила</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)</b>
+    <span class="gw">вт, пт · 18:00</span>
+    <span class="gf">свободно 8 из 8</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)</b>
+    <span class="gw">вт, пт · 19:00</span>
+    <span class="gf">свободно 6 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Кузина Агата</span></div><div class="row taken"><span class="n">2</span><span class="who">Шамраев Лев</span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)</b>
+    <span class="gw">вт, чт · 16:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Сидиков Мухамед Али</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)</b>
+    <span class="gw">вт, чт · 17:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">79966759001</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)</b>
+    <span class="gw">вт, чт · 18:00</span>
+    <span class="gf">свободно 5 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Архангельская Варвара</span></div><div class="row taken"><span class="n">2</span><span class="who">Шиш Савелий</span></div><div class="row taken"><span class="n">3</span><span class="who">Шиш Сергей</span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)</b>
+    <span class="gw">вт, чт · 19:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Малакеева Ева</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)</b>
+    <span class="gw">пн, чт · 16:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Смирнов Роман</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)</b>
+    <span class="gw">пн, чт · 17:00</span>
+    <span class="gf">свободно 4 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Бутовка Варвара</span></div><div class="row taken"><span class="n">2</span><span class="who">Кульков Максим</span></div><div class="row taken"><span class="n">3</span><span class="who">Муралев Андрей</span></div><div class="row taken"><span class="n">4</span><span class="who">Параскив Мария</span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)</b>
+    <span class="gw">пн, чт · 18:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Сутулов Макар</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_ср-пт_18:00_4-5 лет_ПШ1 нечитающие (Гр14)</b>
+    <span class="gw">ср, пт · 18:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Мукабенов Матвей</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)</b>
+    <span class="gw">ср, пт · 19:00</span>
+    <span class="gf">свободно 8 из 8</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div>
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section><section class="sheet">
   <div class="sh"><h2>Английский</h2>
-    <span>всего свободно 57 мест · 8 групп</span></div>
-  <table class="grid"><tr><th class="t"></th><th>пн</th><th>вт</th><th>ср</th><th>чт</th><th>пт</th><th>сб</th><th>вс</th></tr><tr><th class="t">16:00</th><td><div class="lvl">8-12 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td><div class="lvl">8-12 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td><div class="lvl">8-12 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td><div class="lvl">8-12 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td class="off"></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">17:00</th><td><div class="lvl">3-5 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td><div class="lvl">5-8 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td><div class="lvl">3-5 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td><div class="lvl">5-8 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td class="off"></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">18:00</th><td><div class="lvl">5-8 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln busy">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 5 из 8</div></td><td><div class="lvl">3-5 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td><div class="lvl">5-8 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln busy">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 5 из 8</div></td><td><div class="lvl">3-5 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td class="off"></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">19:00</th><td><div class="lvl">8-12 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td><div class="lvl">5-8 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td><div class="lvl">8-12 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td><div class="lvl">5-8 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td class="off"></td><td class="off"></td><td class="off"></td></tr></table>
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+    <span>всего свободно 52 мест · 8 групп</span></div>
+  <div class="grp">
+  <div class="gh"><b>2627_АЯ_вт-чт_16:00_8-12 лет_Pre-A1 Starters (Гр5)</b>
+    <span class="gw">вт, чт · 16:00</span>
+    <span class="gf">свободно 8 из 8</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)</b>
+    <span class="gw">вт, чт · 17:00</span>
+    <span class="gf">свободно 3 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Андрей</span></div><div class="row taken"><span class="n">2</span><span class="who">Панишева Екатерина</span></div><div class="row taken"><span class="n">3</span><span class="who">Сильченко Александра</span></div><div class="row taken"><span class="n">4</span><span class="who">Шиш Савелий</span></div><div class="row taken"><span class="n">5</span><span class="who">Шиш Сергей</span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)</b>
+    <span class="gw">вт, чт · 18:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Лоева Ирина</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_АЯ_вт-чт_19:00_5-8 лет_A1 Movers (Гр8)</b>
+    <span class="gw">вт, чт · 19:00</span>
+    <span class="gf">свободно 8 из 8</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)</b>
+    <span class="gw">пн, ср · 16:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Венера</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)</b>
+    <span class="gw">пн, ср · 17:00</span>
+    <span class="gf">свободно 8 из 8</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)</b>
+    <span class="gw">пн, ср · 18:00</span>
+    <span class="gf">свободно 5 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Алексей</span></div><div class="row taken"><span class="n">2</span><span class="who">Мирослав</span></div><div class="row taken"><span class="n">3</span><span class="who">Ульяна</span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</b>
+    <span class="gw">пн, ср · 19:00</span>
+    <span class="gf">свободно 6 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Есенкина Надежда</span></div><div class="row taken"><span class="n">2</span><span class="who">Пахомов Егор</span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div>
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section><section class="sheet">
   <div class="sh"><h2>Музыка и речь</h2>
-    <span>всего свободно 30 мест · 6 групп</span></div>
-  <table class="grid"><tr><th class="t"></th><th>пн</th><th>вт</th><th>ср</th><th>чт</th><th>пт</th><th>сб</th><th>вс</th></tr><tr><th class="t">09:45</th><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div></div><div class="free">свободно 7 из 7</div></td><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div></div><div class="free">свободно 7 из 7</div></td><td class="off"></td></tr><tr><th class="t">10:00</th><td><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln busy">3.</div><div class="ln busy">4.</div><div class="ln busy">5.</div><div class="ln busy">6.</div><div class="ln">7.</div></div><div class="free">свободно 1 из 7</div></td><td class="off"></td><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln busy">3.</div><div class="ln busy">4.</div><div class="ln busy">5.</div><div class="ln busy">6.</div><div class="ln">7.</div></div><div class="free">свободно 1 из 7</div></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">10:45</th><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div></div><div class="free">свободно 7 из 7</div></td><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div></div><div class="free">свободно 7 из 7</div></td><td class="off"></td></tr><tr><th class="t">11:00</th><td><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln busy">3.</div><div class="ln busy">4.</div><div class="ln busy">5.</div><div class="ln">6.</div><div class="ln">7.</div></div><div class="free">свободно 2 из 7</div></td><td class="off"></td><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln busy">3.</div><div class="ln busy">4.</div><div class="ln busy">5.</div><div class="ln">6.</div><div class="ln">7.</div></div><div class="free">свободно 2 из 7</div></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">11:45</th><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div></div><div class="free">свободно 6 из 7</div></td><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div></div><div class="free">свободно 6 из 7</div></td><td class="off"></td></tr><tr><th class="t">12:00</th><td><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div></div><div class="free">свободно 7 из 7</div></td><td class="off"></td><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div></div><div class="free">свободно 7 из 7</div></td><td class="off"></td><td class="off"></td></tr></table>
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+    <span>всего свободно 29 мест · 6 групп</span></div>
+  <div class="grp">
+  <div class="gh"><b>2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8</b>
+    <span class="gw">пн, пт · 10:00</span>
+    <span class="gf">свободно 1 из 7</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Дубинина Варвара</span></div><div class="row taken"><span class="n">2</span><span class="who">Кириллова Виктория</span></div><div class="row taken"><span class="n">3</span><span class="who">Малягина Екатерина</span></div><div class="row taken"><span class="n">4</span><span class="who">Николаев Виктор</span></div><div class="row taken"><span class="n">5</span><span class="who">Самчук Егор</span></div><div class="row taken"><span class="n">6</span><span class="who">Синько София</span></div><div class="row"><span class="n">7</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2</b>
+    <span class="gw">пн, пт · 11:00</span>
+    <span class="gf">свободно 2 из 7</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Аванян Вероника</span></div><div class="row taken"><span class="n">2</span><span class="who">Гололобова Нелли</span></div><div class="row taken"><span class="n">3</span><span class="who">Карандеева Мария</span></div><div class="row taken"><span class="n">4</span><span class="who">Колесникова Анна</span></div><div class="row taken"><span class="n">5</span><span class="who">Романенко София</span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3</b>
+    <span class="gw">пн, пт · 12:00</span>
+    <span class="gf">свободно 7 из 7</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8</b>
+    <span class="gw">ср, сб · 09:45</span>
+    <span class="gf">свободно 7 из 7</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2</b>
+    <span class="gw">ср, сб · 10:45</span>
+    <span class="gf">свободно 7 из 7</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3</b>
+    <span class="gw">ср, сб · 11:45</span>
+    <span class="gf">свободно 5 из 7</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Богданович Федор</span></div><div class="row taken"><span class="n">2</span><span class="who">Лесфорье Николь</span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div></div>
+</div>
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section><section class="sheet">
   <div class="sh"><h2>Раннее развитие</h2>
     <span>всего свободно 40 мест · 7 групп</span></div>
-  <table class="grid"><tr><th class="t"></th><th>пн</th><th>вт</th><th>ср</th><th>чт</th><th>пт</th><th>сб</th><th>вс</th></tr><tr><th class="t">10:00</th><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div></div><div class="free">свободно 5 из 6</div></td><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div></div><div class="free">свободно 5 из 6</div></td><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div></div><div class="free">свободно 6 из 6</div></td></tr><tr><th class="t">11:00</th><td class="off"></td><td><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div></div><div class="free">свободно 6 из 6</div></td><td class="off"></td><td><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div></div><div class="free">свободно 6 из 6</div></td><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div></div><div class="free">свободно 6 из 6</div></td></tr><tr><th class="t">12:00</th><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div></div><div class="free">свободно 5 из 6</div></td><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div></div><div class="free">свободно 5 из 6</div></td><td class="off"></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">16:00</th><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">17:00</th><td class="off"></td><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td class="off"></td><td><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td class="off"></td><td class="off"></td></tr></table>
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+  <div class="grp">
+  <div class="gh"><b>2627_РР.Первая школа_Группа 4_вс_10:00_1,5 - 2 года</b>
+    <span class="gw">вс · 10:00</span>
+    <span class="gf">свободно 6 из 6</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Первая школа_Группа 5_вс_11:00_2 - 3 года</b>
+    <span class="gw">вс · 11:00</span>
+    <span class="gf">свободно 6 из 6</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года</b>
+    <span class="gw">вт, чт · 10:00</span>
+    <span class="gf">свободно 5 из 6</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Киселев Павел</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года</b>
+    <span class="gw">вт, чт · 11:00</span>
+    <span class="gf">свободно 6 из 6</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года</b>
+    <span class="gw">вт, чт · 12:00</span>
+    <span class="gf">свободно 5 из 6</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Экимашев Савелий</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)</b>
+    <span class="gw">ср, пт · 16:00</span>
+    <span class="gf">свободно 6 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Ефремов Демьян</span></div><div class="row taken"><span class="n">2</span><span class="who">Петуховская Вероника</span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)</b>
+    <span class="gw">ср, пт · 17:00</span>
+    <span class="gf">свободно 6 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Иванов Данил</span></div><div class="row taken"><span class="n">2</span><span class="who">Юртаев Мирон</span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div>
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section><section class="sheet">
   <div class="sh"><h2>Ментальная арифметика</h2>
     <span>всего свободно 10 мест · 2 групп</span></div>
-  <table class="grid"><tr><th class="t"></th><th>пн</th><th>вт</th><th>ср</th><th>чт</th><th>пт</th><th>сб</th><th>вс</th></tr><tr><th class="t">12:30</th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td><div class="lvl">4-7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div></div><div class="free">свободно 4 из 6</div></td></tr><tr><th class="t">14:00</th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td><div class="lvl">7-12 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td></tr></table>
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+  <div class="grp">
+  <div class="gh"><b>2627_МА_вс_12:30_4-7 лет</b>
+    <span class="gw">вс · 12:30</span>
+    <span class="gf">свободно 4 из 6</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Кузина Агата</span></div><div class="row taken"><span class="n">2</span><span class="who">Сабирова Александра</span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_МА_вс_14:00_7-12 лет</b>
+    <span class="gw">вс · 14:00</span>
+    <span class="gf">свободно 6 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Аня</span></div><div class="row taken"><span class="n">2</span><span class="who">Загородный Денис</span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div>
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section><section class="sheet">
   <div class="sh"><h2>ИЗО</h2>
     <span>всего свободно 29 мест · 4 групп</span></div>
-  <table class="grid"><tr><th class="t"></th><th>пн</th><th>вт</th><th>ср</th><th>чт</th><th>пт</th><th>сб</th><th>вс</th></tr><tr><th class="t">16:00</th><td><div class="lvl">6 - 11 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td class="off"></td><td><div class="lvl">6 - 11 лет</div><div class="slots"><div class="ln">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 8 из 8</div></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">17:00</th><td><div class="lvl">4 - 11 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td class="off"></td><td><div class="lvl">4 - 11 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 7 из 8</div></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">18:00</th><td><div class="lvl">5 - 11 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div><div class="ln">9.</div><div class="ln">10.</div></div><div class="free">свободно 8 из 10</div></td><td class="off"></td><td><div class="lvl">5 - 11 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div><div class="ln">9.</div><div class="ln">10.</div></div><div class="free">свободно 8 из 10</div></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td></tr><tr><th class="t">19:00</th><td><div class="lvl">4 - 7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td class="off"></td><td><div class="lvl">4 - 7 лет</div><div class="slots"><div class="ln busy">1.</div><div class="ln busy">2.</div><div class="ln">3.</div><div class="ln">4.</div><div class="ln">5.</div><div class="ln">6.</div><div class="ln">7.</div><div class="ln">8.</div></div><div class="free">свободно 6 из 8</div></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td></tr></table>
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+  <div class="grp">
+  <div class="gh"><b>2627_ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины великих художников</b>
+    <span class="gw">пн, ср · 16:00</span>
+    <span class="gf">свободно 8 из 8</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка</b>
+    <span class="gw">пн, ср · 17:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Семенова Мария</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись</b>
+    <span class="gw">пн, ср · 18:00</span>
+    <span class="gf">свободно 8 из 10</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Ломаковская Дарья</span></div><div class="row taken"><span class="n">2</span><span class="who">Семенова Мария</span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div><div class="row"><span class="n">9</span><span class="who"></span></div><div class="row"><span class="n">10</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ИЗО_Группа 4_пн - ср_19:00_4 - 7 лет_Алфавитная живопись</b>
+    <span class="gw">пн, ср · 19:00</span>
+    <span class="gf">свободно 6 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Кирилл</span></div><div class="row taken"><span class="n">2</span><span class="who">Лоева Ирина</span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div>
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section><section class="sheet">
   <div class="sh"><h2>Шахматы</h2>
     <span>всего свободно 15 мест · 2 групп</span></div>
-  <table class="grid"><tr><th class="t"></th><th>пн</th><th>вт</th><th>ср</th><th>чт</th><th>пт</th><th>сб</th><th>вс</th></tr><tr><th class="t">по записи</th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td></tr></table>
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+  <div class="grp">
+  <div class="gh"><b>2627_ШАХ_Группа 2_пт 19:00 + вс 12:00_6-12 начинающие</b>
+    <span class="gw">пт 19:00 + вс 12:00</span>
+    <span class="gf">свободно 8 из 8</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие</b>
+    <span class="gw">пт 18:00 + вс 11:00</span>
+    <span class="gf">свободно 7 из 8</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Гасанова Айлин</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div></div>
+</div>
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section><section class="sheet">
   <div class="sh"><h2>Нулевой класс</h2>
     <span>всего свободно 14 мест · 1 групп</span></div>
-  <table class="grid"><tr><th class="t"></th><th>пн</th><th>вт</th><th>ср</th><th>чт</th><th>пт</th><th>сб</th><th>вс</th></tr><tr><th class="t">10:00</th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td></tr></table>
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+  <div class="grp">
+  <div class="gh"><b>2627_Нулевой класс_10:00-14:00</b>
+    <span class="gw">10:00</span>
+    <span class="gf">свободно 14 из 15</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Кутищев Григорий</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div><div class="row"><span class="n">9</span><span class="who"></span></div><div class="row"><span class="n">10</span><span class="who"></span></div><div class="row"><span class="n">11</span><span class="who"></span></div><div class="row"><span class="n">12</span><span class="who"></span></div><div class="row"><span class="n">13</span><span class="who"></span></div><div class="row"><span class="n">14</span><span class="who"></span></div><div class="row"><span class="n">15</span><span class="who"></span></div></div>
+</div>
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section><section class="sheet">
   <div class="sh"><h2>Мини-сад</h2>
     <span>всего свободно 14 мест · 1 групп</span></div>
-  <table class="grid"><tr><th class="t"></th><th>пн</th><th>вт</th><th>ср</th><th>чт</th><th>пт</th><th>сб</th><th>вс</th></tr><tr><th class="t">9:00</th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td></tr></table>
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+  <div class="grp">
+  <div class="gh"><b>2627_Мини-сад_9:00-13:00</b>
+    <span class="gw">9:00</span>
+    <span class="gf">свободно 14 из 15</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Рощепкин Владислав</span></div><div class="row"><span class="n">2</span><span class="who"></span></div><div class="row"><span class="n">3</span><span class="who"></span></div><div class="row"><span class="n">4</span><span class="who"></span></div><div class="row"><span class="n">5</span><span class="who"></span></div><div class="row"><span class="n">6</span><span class="who"></span></div><div class="row"><span class="n">7</span><span class="who"></span></div><div class="row"><span class="n">8</span><span class="who"></span></div><div class="row"><span class="n">9</span><span class="who"></span></div><div class="row"><span class="n">10</span><span class="who"></span></div><div class="row"><span class="n">11</span><span class="who"></span></div><div class="row"><span class="n">12</span><span class="who"></span></div><div class="row"><span class="n">13</span><span class="who"></span></div><div class="row"><span class="n">14</span><span class="who"></span></div><div class="row"><span class="n">15</span><span class="who"></span></div></div>
+</div>
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section><section class="sheet">
   <div class="sh"><h2>Логопед</h2>
     <span>всего свободно 11 мест · 32 групп</span></div>
-  <table class="grid"><tr><th class="t"></th><th>пн</th><th>вт</th><th>ср</th><th>чт</th><th>пт</th><th>сб</th><th>вс</th></tr><tr><th class="t">по записи</th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td></tr></table>
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+  <div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Вт_16:00</b>
+    <span class="gw">вт 16:00</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Васенкова Александра</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Вт_16:50</b>
+    <span class="gw">вт 16:50</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Васенкова Александра</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Вт_17:40</b>
+    <span class="gw">вт 17:40</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Красильников Ярослав</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Вт_18:30</b>
+    <span class="gw">вт 18:30</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Бакланов Семён</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Вт_19:20</b>
+    <span class="gw">вт 19:20</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Чт_16:00</b>
+    <span class="gw">чт 16:00</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Чт_16:50</b>
+    <span class="gw">чт 16:50</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Васенкова Афина</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Чт_17:40</b>
+    <span class="gw">чт 17:40</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Ситковский Александр</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Чт_18:30</b>
+    <span class="gw">чт 18:30</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Чт_19:20</b>
+    <span class="gw">чт 19:20</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Сб_10:00</b>
+    <span class="gw">сб 10:00</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Бирюкова Мирослава</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Сб_10:50</b>
+    <span class="gw">сб 10:50</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Иозефович София</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Сб_11:40</b>
+    <span class="gw">сб 11:40</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Бакланов Семён</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Сб_13:20</b>
+    <span class="gw">сб 13:20</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Ситковский Александр</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Сб_12:30</b>
+    <span class="gw">сб 12:30</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Городничев Антон</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Марина_Сб_14:00</b>
+    <span class="gw">сб 14:00</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Вт_9:30</b>
+    <span class="gw">вт 9:30</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Вт_10:30</b>
+    <span class="gw">вт 10:30</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Рощепкин Владислав</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Пн_18:00</b>
+    <span class="gw">пн 18:00</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Ср_19:00</b>
+    <span class="gw">ср 19:00</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Таланов Максим</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Пн_17:00</b>
+    <span class="gw">пн 17:00</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Апсатарова Дания</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Пн_19:00</b>
+    <span class="gw">пн 19:00</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Таланов Максим</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Ср_18:00</b>
+    <span class="gw">ср 18:00</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Кульков Максим</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Пт_18:00</b>
+    <span class="gw">пт 18:00</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Пт_19:00</b>
+    <span class="gw">пт 19:00</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Даня</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Ср_16:00</b>
+    <span class="gw">ср 16:00</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Зиньковская Дарья</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Чт_10:30</b>
+    <span class="gw">чт 10:30</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Рощепкин Владислав</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Чт_09:30</b>
+    <span class="gw">чт 09:30</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Пн_16:00</b>
+    <span class="gw">пн 16:00</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Зиньковская Дарья</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Пт_16:00</b>
+    <span class="gw">пт 16:00</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Ср_17:00</b>
+    <span class="gw">ср 17:00</span>
+    <span class="gf full">свободно 0 из 1</span></div>
+  <div class="rows"><div class="row taken"><span class="n">1</span><span class="who">Апсатарова Дания</span></div></div>
+</div><div class="grp">
+  <div class="gh"><b>2627_ЛГ Елена_Пт_17:00</b>
+    <span class="gw">пт 17:00</span>
+    <span class="gf">свободно 1 из 1</span></div>
+  <div class="rows"><div class="row"><span class="n">1</span><span class="who"></span></div></div>
+</div>
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section>
 
 <section class="sheet">
-<div class="sh"><h2>Цены</h2><span>из CRM · до 31 августа сентябрь по ценам прошлого года</span></div>
-<table class='c pr'><tr><th>абонемент</th><th class='p'>цена</th><th class='p'>за занятие</th></tr><tr class='sub'><td colspan='3'>подготовка к школе</td></tr><tr><td>пн-пт</td><td class='p'>950 ₽</td><td class='p m'>—</td></tr><tr><td>8 занятий</td><td class='p'>8 000 ₽</td><td class='p m'>1 000 ₽</td></tr><tr><td>4 занятия</td><td class='p'>5 100 ₽</td><td class='p m'>1 275 ₽</td></tr><tr><td>Подготовка к школе 8 занятий</td><td class='p'>6 950 ₽</td><td class='p m'>869 ₽</td></tr><tr class='sub'><td colspan='3'>английский</td></tr><tr><td>8 занятий</td><td class='p'>8 000 ₽</td><td class='p m'>1 000 ₽</td></tr><tr><td>4 занятия</td><td class='p'>5 100 ₽</td><td class='p m'>1 275 ₽</td></tr><tr><td>индивидуальное занятие</td><td class='p'>2 100 ₽</td><td class='p m'>2 100 ₽</td></tr><tr><td>НЕЙРО Английский язык 4 занятия</td><td class='p'>4 500 ₽</td><td class='p m'>1 125 ₽</td></tr><tr><td>мент.арифм+нейро-фитнес+скорочтен+каллиграф</td><td class='p'>8 000 ₽</td><td class='p m'>2 000 ₽</td></tr><tr class='sub'><td colspan='3'>раннее развитие</td></tr><tr><td>8 занятий</td><td class='p'>7 400 ₽</td><td class='p m'>925 ₽</td></tr><tr><td>4 занятия</td><td class='p'>4 100 ₽</td><td class='p m'>1 025 ₽</td></tr><tr><td>разовое занятие</td><td class='p'>1 500 ₽</td><td class='p m'>1 500 ₽</td></tr><tr class='sub'><td colspan='3'>ментальная арифметика</td></tr><tr><td>4 занятия 90 минут</td><td class='p'>8 000 ₽</td><td class='p m'>2 000 ₽</td></tr><tr><td>8 занятия 50 минут</td><td class='p'>8 000 ₽</td><td class='p m'>1 000 ₽</td></tr><tr><td>разовое занятие 90 минут</td><td class='p'>2 500 ₽</td><td class='p m'>2 500 ₽</td></tr><tr><td>разовое занятие 50 минут</td><td class='p'>1 500 ₽</td><td class='p m'>1 500 ₽</td></tr><tr class='sub'><td colspan='3'>ИЗО</td></tr><tr><td>8 занятий</td><td class='p'>6 900 ₽</td><td class='p m'>862 ₽</td></tr><tr><td>4 занятия</td><td class='p'>4 700 ₽</td><td class='p m'>1 175 ₽</td></tr><tr><td>разовое занятие</td><td class='p'>1 500 ₽</td><td class='p m'>1 500 ₽</td></tr><tr><td>пробное занятие</td><td class='p'>400 ₽</td><td class='p m'>400 ₽</td></tr><tr class='sub'><td colspan='3'>шахматы</td></tr><tr><td>8 занятий</td><td class='p'>7 600 ₽</td><td class='p m'>950 ₽</td></tr><tr><td>4 занятия</td><td class='p'>4 700 ₽</td><td class='p m'>1 175 ₽</td></tr><tr><td>разовое занятие</td><td class='p'>1 500 ₽</td><td class='p m'>1 500 ₽</td></tr><tr><td>пробное занятие</td><td class='p'>400 ₽</td><td class='p m'>400 ₽</td></tr><tr class='sub'><td colspan='3'>логопед</td></tr><tr><td>первичная консультация</td><td class='p'>2 100 ₽</td><td class='p m'>2 100 ₽</td></tr><tr><td>4 индивидуальных занятия</td><td class='p'>9 000 ₽</td><td class='p m'>2 250 ₽</td></tr><tr class='sub'><td colspan='3'>танцы</td></tr><tr><td>разовое занятие</td><td class='p'>750 ₽</td><td class='p m'>750 ₽</td></tr></table>
-<div class="note"><b>Если по одному предмету две цены</b> — значит в CRM
-остался тариф прошлого года. Называйте меньшую и уточните у Лизы, какая
-действует: ошибиться в цене хуже, чем взять паузу на минуту.</div>
+<div class="sh"><h2>Цены</h2><span>те же, что на экране набора · до 31 августа
+сентябрь идёт по ценам прошлого года</span></div>
+<table class='c pr'><tr><th>абонемент</th><th class='p'>до 31 августа</th><th class='p'>с 1 сентября</th></tr><tr class='sub'><td colspan='3'>Английский детский сад <i>Мини-сад ГКП 9:00–13:00 · Нулевой класс 10:00–14:00</i></td></tr><tr><td>Мини-сад, 20 посещений (5 дней)</td><td class='p'>34 500 ₽</td><td class='p m'>35 500 ₽</td></tr><tr><td>Мини-сад, 16 посещений (4 дня)</td><td class='p'>32 000 ₽</td><td class='p m'>33 000 ₽</td></tr><tr><td>Мини-сад, 12 посещений (3 дня)</td><td class='p'>25 800 ₽</td><td class='p m'>26 600 ₽</td></tr><tr><td>Мини-сад, 8 посещений (2 дня)</td><td class='p'>19 000 ₽</td><td class='p m'>19 600 ₽</td></tr><tr><td>Мини-сад, разовое посещение</td><td class='p'>2 700 ₽</td><td class='p m'>2 700 ₽</td></tr><tr><td>Нулевой класс, 20 посещений (5 дней)</td><td class='p'>34 500 ₽</td><td class='p m'>35 500 ₽</td></tr><tr><td>Нулевой класс, 12 посещений (3 дня)</td><td class='p'>25 800 ₽</td><td class='p m'>26 600 ₽</td></tr><tr class='sub'><td colspan='3'>Английский язык <i>Кембриджские уровни Starters/Movers/Flyers · занятие 50 мин</i></td></tr><tr><td>8 занятий (2 р/нед)</td><td class='p'>8 200 ₽</td><td class='p m'>8 400 ₽</td></tr><tr><td>4 занятия (1 р/нед)</td><td class='p'>4 800 ₽</td><td class='p m'>5 000 ₽</td></tr><tr class='sub'><td colspan='3'>Подготовка к школе <i>Ступени 1 и 2 · занятие 50 мин</i></td></tr><tr><td>8 занятий (2 р/нед)</td><td class='p'>8 200 ₽</td><td class='p m'>8 400 ₽</td></tr><tr><td>4 занятия (1 р/нед)</td><td class='p'>4 800 ₽</td><td class='p m'>5 000 ₽</td></tr><tr><td>Разовое занятие</td><td class='p'>1 600 ₽</td><td class='p m'>1 600 ₽</td></tr><tr class='sub'><td colspan='3'>Дошкольный университет <i>Занятие 50 мин</i></td></tr><tr><td>8 занятий (2 р/нед)</td><td class='p'>8 200 ₽</td><td class='p m'>8 400 ₽</td></tr><tr><td>4 занятия (1 р/нед)</td><td class='p'>4 800 ₽</td><td class='p m'>5 000 ₽</td></tr><tr><td>Разовое занятие</td><td class='p'>1 600 ₽</td><td class='p m'>1 600 ₽</td></tr><tr class='sub'><td colspan='3'>Раннее развитие <i>Три программы по возрасту: «Музыка и речь» (50 мин), «Первая школа» и «Лицей для малышей» (45 мин)</i></td></tr><tr><td>Музыка и речь · 8 занятий (2 р/нед)</td><td class='p'>8 200 ₽</td><td class='p m'>8 600 ₽</td></tr><tr><td>Музыка и речь · 4 занятия (1 р/нед)</td><td class='p'>5 000 ₽</td><td class='p m'>5 200 ₽</td></tr><tr><td>Первая школа · 8 занятий (2 р/нед)</td><td class='p'>7 600 ₽</td><td class='p m'>7 800 ₽</td></tr><tr><td>Первая школа · 4 занятия (1 р/нед)</td><td class='p'>4 800 ₽</td><td class='p m'>5 000 ₽</td></tr><tr><td>Лицей для малышей · 8 занятий (2 р/нед)</td><td class='p'>7 600 ₽</td><td class='p m'>7 800 ₽</td></tr><tr><td>Лицей для малышей · 4 занятия (1 р/нед)</td><td class='p'>4 800 ₽</td><td class='p m'>5 000 ₽</td></tr><tr><td>Разовое занятие (любая программа)</td><td class='p'>1 600 ₽</td><td class='p m'>1 600 ₽</td></tr><tr class='sub'><td colspan='3'>Ментальная арифметика <i>Занятие 90 мин</i></td></tr><tr><td>4 занятия</td><td class='p'>8 000 ₽</td><td class='p m'>8 600 ₽</td></tr><tr class='sub'><td colspan='3'>ИЗО-студия <i>Занятие 50 мин · первое занятие условно-бесплатное (входит в абонемент)</i></td></tr><tr><td>8 занятий (2 р/нед)</td><td class='p'>6 800 ₽</td><td class='p m'>7 000 ₽</td></tr><tr><td>4 занятия (1 р/нед)</td><td class='p'>4 700 ₽</td><td class='p m'>4 900 ₽</td></tr><tr><td>Разовое занятие</td><td class='p'>1 600 ₽</td><td class='p m'>1 600 ₽</td></tr><tr><td>Первое занятие, если не купили абонемент</td><td class='p'>850 ₽</td><td class='p m'>850 ₽</td></tr><tr class='sub'><td colspan='3'>Шахматы <i>Занятие 50 мин · первое занятие условно-бесплатное (входит в абонемент)</i></td></tr><tr><td>8 занятий (2 р/нед)</td><td class='p'>6 800 ₽</td><td class='p m'>7 000 ₽</td></tr><tr><td>4 занятия (1 р/нед)</td><td class='p'>4 700 ₽</td><td class='p m'>4 900 ₽</td></tr><tr><td>Разовое занятие</td><td class='p'>1 600 ₽</td><td class='p m'>1 600 ₽</td></tr><tr><td>Первое занятие, если не купили абонемент</td><td class='p'>850 ₽</td><td class='p m'>850 ₽</td></tr><tr class='sub'><td colspan='3'>Скорочтение (техника чтения) <i>Занятие 50 мин · с 7 лет</i></td></tr><tr><td>8 занятий</td><td class='p'>8 200 ₽</td><td class='p m'>8 400 ₽</td></tr><tr class='sub'><td colspan='3'>Каллиграфия + грамота <i>Занятие 50 мин · с 7 лет</i></td></tr><tr><td>8 занятий</td><td class='p'>8 200 ₽</td><td class='p m'>8 400 ₽</td></tr><tr class='sub'><td colspan='3'>Робототехника <i>Занятие 55 мин · партнёрский курс, цену ставит партнёр</i></td></tr><tr><td>4 занятия</td><td class='p'>6 400 ₽</td><td class='p m'>6 400 ₽</td></tr><tr><td>Разовое занятие</td><td class='p'>2 000 ₽</td><td class='p m'>2 000 ₽</td></tr><tr><td>Пробное занятие</td><td class='p'>1 100 ₽</td><td class='p m'>1 100 ₽</td></tr><tr class='sub'><td colspan='3'>Логопед <i>Индивидуально. На /price указаны только консультации</i></td></tr><tr><td>Консультация с Мариной, 40 мин</td><td class='p'>2 700 ₽</td><td class='p m'>2 700 ₽</td></tr><tr><td>Консультация с Еленой, 40 мин</td><td class='p'>2 200 ₽</td><td class='p m'>2 500 ₽</td></tr><tr class='sub'><td colspan='3'>Английский летний клуб <i>Лагерь до 28.08 (в скобках — цена без скидки)</i></td></tr><tr><td>1 неделя, полдня 8:00–15:00</td><td class='p'>20 400 ₽</td><td class='p m'>16 400 ₽</td></tr><tr><td>1 неделя, полный день 8:00–19:00</td><td class='p'>24 200 ₽</td><td class='p m'>20 700 ₽</td></tr><tr><td>2 недели, полдня</td><td class='p'>33 800 ₽</td><td class='p m'>29 300 ₽</td></tr><tr><td>2 недели, полный день</td><td class='p'>42 600 ₽</td><td class='p m'>36 700 ₽</td></tr><tr><td>4 недели, полдня</td><td class='p'>50 700 ₽</td><td class='p m'>44 100 ₽</td></tr><tr><td>4 недели, полный день</td><td class='p'>69 600 ₽</td><td class='p m'>63 100 ₽</td></tr></table>
+<div class="note"><b>Две колонки — это одна и та же цена в разное время.</b>
+До 31 августа включительно действует левая, с 1 сентября — правая. Если
+родитель оплачивает сегодня, он платит по левой, даже за сентябрь.</div>
 <div class="note"><b>Скидки — все по 10%, и только одна.</b> Первый абонемент
 при оплате в день пробного (только новым), второй предмет, второй ребёнок,
 многодетным и семьям участников СВО. Скидки НЕ суммируются: действует одна,
@@ -155,7 +566,7 @@ table.pr tr.sub td{background:var(--fill);font-weight:750;padding-top:.5rem}
 это не так.</div>
 </section>
 
-<div class="foot">🤖 Клод, ИИ-сотрудник KidsUP · 21.08.2026.
+<div class="foot">🤖 Клод, ИИ-сотрудник KidsUP · 22.08.2026.
 Занятость групп меняется каждый день — перед новым обзвоном соберите лист заново.</div>
 
 </div></body></html>

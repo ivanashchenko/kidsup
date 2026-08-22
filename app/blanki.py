@@ -96,6 +96,96 @@ def _slot(when: str) -> tuple[list[str], str]:
     return days, t
 
 
+def _when_from_name(name: str) -> str:
+    """Дни и часы из названия группы: «2627_ПШ_пн 19:00 + сб 10:00_5-7 лет…».
+
+    Форматов два: «вт-чт_17:00» — одно время на оба дня, и «пн 19:00 +
+    сб 10:00» — у каждого дня своё. Второй в поле when не попадает."""
+    # подчёркивание для регулярки — часть слова, поэтому «_пн» границы не
+    # даёт и день не находится; меняем разделители на пробелы
+    clean = re.sub(r"[_\-–]", " ", name.lower())
+    parts = []
+    for chunk in re.split(r"\s*\+\s*", clean):
+        days = [d for d in DAYS if re.search(rf"\b{d}\b", chunk)]
+        m = re.search(r"(\d{1,2}:\d{2})", chunk)
+        if days and m:
+            parts.append(f"{', '.join(days)} {m.group(1)}")
+    return " + ".join(parts)
+
+
+def enrolled_by_class() -> dict[int, list[str]]:
+    """Кто уже записан в каждую группу набора 2026/27.
+
+    Без имён лист бесполезен как рабочий: администратор не видит, кого
+    в группе уже ждут, и вписывает ребёнка в занятое место.
+
+    Берём из API, а не из локальной копии базы: копия отстаёт (в ней
+    ноль записей при 75 группах), и лист выходил бы с пустыми строками
+    там, где место занято."""
+    from . import sync, taskguard
+    from .moyklass_client import MoyklassClient
+    out = defaultdict(list)
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        rc = mk.get("/v1/company/classes", {"limit": 500})
+        cls = {c["id"]: (c.get("name") or "")
+               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+        ours = {cid for cid, nm in cls.items() if nm.startswith("2627")}
+        joins = taskguard.pull_all(mk, "/v1/company/joins", "joins")
+        need = {j.get("userId") for j in joins if j.get("classId") in ours}
+        names = {}
+        for u in taskguard.pull_all(mk, "/v1/company/users", "users",
+                                    cache_hours=6):
+            if u.get("id") in need:
+                names[u["id"]] = (u.get("name") or "").split("(")[0].strip()
+    finally:
+        mk.close()
+    for j in joins:
+        cid, uid = j.get("classId"), j.get("userId")
+        if cid not in ours:
+            continue
+        nm = names.get(uid) or ""
+        if nm and nm not in out[cid]:
+            out[cid].append(nm)
+    for cid in out:
+        out[cid].sort()
+    return out
+
+
+def group_sheet(groups: list[dict], enrolled: dict[int, list[str]]) -> str:
+    """Список групп предмета: у каждой — название, дни, часы и места.
+
+    Занятые места подписаны именами, свободные оставлены под запись.
+    Это и есть рабочий лист: видно, куда можно записать прямо сейчас,
+    и кто в группе уже есть."""
+    out = []
+    for g in sorted(groups, key=lambda x: (x.get("when") or "")):
+        ds, t = _slot(g.get("when") or "")
+        cap = g.get("cap") or 8
+        busy = g.get("busy") or 0
+        names = enrolled.get(g.get("id"), [])
+        rows = []
+        for i in range(cap):
+            who = H.escape(names[i]) if i < len(names) else ""
+            cls = "row taken" if who else "row"
+            rows.append(f'<div class="{cls}"><span class="n">{i + 1}</span>'
+                        f'<span class="who">{who}</span></div>')
+            # У части групп расписание разнесено по дням («пн 19:00 + сб 10:00»)
+        # и в поле when не попадает — тогда читаем прямо из названия,
+        # иначе на листе стоит «по записи» у группы с точным временем.
+        when = " · ".join(x for x in (", ".join(ds), t) if x)
+        if not when:
+            when = _when_from_name(g.get("name") or "") or "по записи"
+        free = max(0, cap - busy)
+        out.append(f"""<div class="grp">
+  <div class="gh"><b>{H.escape(g.get("name") or "")}</b>
+    <span class="gw">{H.escape(when)}</span>
+    <span class="gf{" full" if not free else ""}">свободно {free} из {cap}</span></div>
+  <div class="rows">{"".join(rows)}</div>
+</div>""")
+    return "".join(out)
+
+
 def grid(subject: str, groups: list[dict]) -> str:
     """Сетка день × время с клетками под имена."""
     cells = defaultdict(list)
@@ -136,46 +226,27 @@ def grid(subject: str, groups: list[dict]) -> str:
             + "".join(rows) + "</table>")
 
 
-def prices() -> list[tuple[str, list[tuple[str, str, str]]]]:
-    """Прайс из CRM, сгруппированный по предмету.
+def prices() -> list[tuple[str, str, list[tuple[str, str, str]]]]:
+    """Прайс — из того же источника, что и страница набора /enrollment.
 
-    Цены не выдумываем и не держим в коде: тарифы живут в МойКласс,
-    и лист должен показывать то же, что увидит администратор при оплате."""
-    from . import sync
-    from .moyklass_client import MoyklassClient
-    mk = MoyklassClient(sync.get_api_key())
-    try:
-        r = mk.get("/v1/company/subscriptions", {"limit": 200})
-        subs = (r.get("subscriptions") if isinstance(r, dict) else r) or []
-    except Exception:
-        return []
-    finally:
-        mk.close()
-    # Летний клуб закончился 28 августа: его недельные тарифы в листе
-    # для набора на учебный год только путают — родитель слышит «42 500»
-    # и кладёт трубку, хотя занятие в группе стоит тысячу.
-    SUMMER = re.compile(r"недел|полдня|полный день|лагер|ПРОБНАЯ", re.I)
-    groups = defaultdict(list)
-    seen = set()
-    for x in subs:
-        nm = x.get("name") or ""
-        price = x.get("price") or 0
-        if not price or x.get("isDeleted") or SUMMER.search(nm):
-            continue
-        n = x.get("visitCount") or 0
-        subj = sf._subject(nm) or _price_subject(nm)
-        if not subj:
-            continue
-        per = f"{round(price / n):,} ₽".replace(",", " ") if n else "—"
-        label = nm.split("_", 1)[-1].replace("_", " ").strip()
-        key = (subj, label)
-        if key in seen:           # один и тот же тариф двумя строками
-            continue
-        seen.add(key)
-        groups[subj].append((label, f"{price:,} ₽".replace(",", " "), per))
-    order = [s for s in SUBJ_ORDER if s in groups] + \
-            [s for s in groups if s not in SUBJ_ORDER]
-    return [(s, sorted(groups[s], key=lambda x: len(x[0]))) for s in order]
+    Раньше лист собирался из тарифов МойКласс, и цифры расходились с тем,
+    что видит администратор: в CRM лежат старые и служебные тарифы, летние
+    недельные пакеты и дубли одного абонемента разными строками. Родителю
+    называли то, чего нет. Единственный правильный прайс — константа
+    PRICES, по ней же работает /enrollment.
+
+    Возвращает: предмет, подпись предмета, строки (абонемент, до 31.08,
+    с 1 сентября)."""
+    from .main import PRICES
+    out = []
+    for course, block in PRICES.items():
+        lines = []
+        for label, old, new in block["lines"]:
+            lines.append((label,
+                          f"{old:,} ₽".replace(",", " "),
+                          f"{new:,} ₽".replace(",", " ")))
+        out.append((course, block.get("title", ""), lines))
+    return out
 
 
 def _price_subject(name: str) -> str | None:
@@ -211,30 +282,35 @@ def build() -> str:
     for g in f["группы"]:
         by[g["subject"]].append(g)
 
+    enrolled = enrolled_by_class()
     sheets = []
-    for s in SUBJ_ORDER:
+    order = [s for s in SUBJ_ORDER if s in by] + \
+            [s for s in by if s not in SUBJ_ORDER]
+    for s in order:
         gs = by.get(s)
         if not gs:
             continue
-        table = grid(s, gs)
-        if not table:
+        block = group_sheet(gs, enrolled)
+        if not block:
             continue
         total_free = sum(g["free"] for g in gs)
         sheets.append(f"""<section class="sheet">
   <div class="sh"><h2>{H.escape(s if s.isupper() or s == "ИЗО" else s.capitalize())}</h2>
     <span>всего свободно {total_free} мест · {len(gs)} групп</span></div>
-  {table}
-  <div class="hint">Закрашенная клетка — место занято. В пустые вписывайте
-  имя ребёнка и телефон, потом передайте в центр.</div>
+  {block}
+  <div class="hint">Подписанные строки — дети, которые уже записаны.
+  В пустые вписывайте имя и телефон, потом передайте в центр.</div>
 </section>""")
 
     ptab = []
-    for subj, items in prices():
+    for subj, title, items in prices():
         rows = "".join(f"<tr><td>{H.escape(a)}</td><td class='p'>{H.escape(b)}</td>"
                        f"<td class='p m'>{H.escape(c)}</td></tr>" for a, b, c in items)
-        ptab.append(f"<tr class='sub'><td colspan='3'>{H.escape(subj)}</td></tr>{rows}")
-    price_tbl = ("<table class='c pr'><tr><th>абонемент</th><th class='p'>цена</th>"
-                 "<th class='p'>за занятие</th></tr>" + "".join(ptab) + "</table>"
+        sub = H.escape(subj) + (f" <i>{H.escape(title)}</i>" if title else "")
+        ptab.append(f"<tr class='sub'><td colspan='3'>{sub}</td></tr>{rows}")
+    price_tbl = ("<table class='c pr'><tr><th>абонемент</th>"
+                 "<th class='p'>до 31 августа</th>"
+                 "<th class='p'>с 1 сентября</th></tr>" + "".join(ptab) + "</table>"
                  ) if ptab else "<p>Прайс не загрузился — уточните в центре.</p>"
 
     faq = "".join(f"<div class='q'><b>{H.escape(q)}</b><p>{H.escape(a)}</p></div>"
@@ -276,6 +352,26 @@ table.grid td.off{{background:repeating-linear-gradient(45deg,#fff,#fff 5px,#FAF
  font-size:.6rem;color:#B9B3A4}}
 .ln.busy{{background:var(--fill);border-bottom-color:#9C978A}}
 .free{{font-size:.62rem;color:var(--green);margin-top:.15rem}}
+/* лист групп: у каждой группы свои строки под запись */
+.grp{{break-inside:avoid;border:1px solid var(--line);border-radius:.4rem;
+ padding:.5rem .6rem .55rem;margin-bottom:.7rem}}
+.gh{{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;
+ border-bottom:1px solid var(--line);padding-bottom:.35rem;margin-bottom:.4rem}}
+.gh b{{font-size:.9rem;font-weight:750}}
+.gw{{font-size:.82rem;color:var(--indigo);font-weight:700;
+ font-variant-numeric:tabular-nums}}
+.gf{{margin-left:auto;font-size:.75rem;color:var(--green);font-weight:700}}
+.gf.full{{color:#B03A2E}}
+.rows{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:.1rem .9rem}}
+.row{{display:flex;align-items:flex-end;gap:.4rem;height:1.35rem;
+ border-bottom:1px solid var(--line)}}
+.row .n{{font-size:.68rem;color:#B9B3A4;width:1.1rem;flex:none;
+ font-variant-numeric:tabular-nums}}
+.row .who{{font-size:.82rem;flex:1;overflow:hidden;white-space:nowrap;
+ text-overflow:ellipsis}}
+.row.taken{{background:var(--fill);border-bottom-color:#9C978A}}
+@media print{{.grp{{page-break-inside:avoid}}}}
 .hint{{font-size:.75rem;color:var(--muted);margin-top:.35rem}}
 .q{{break-inside:avoid;margin:.6rem 0}}
 .q b{{font-size:.92rem}} .q p{{margin:.1rem 0 0;font-size:.88rem;color:var(--muted)}}
@@ -314,11 +410,12 @@ table.pr tr.sub td{{background:var(--fill);font-weight:750;padding-top:.5rem}}
 {"".join(sheets)}
 
 <section class="sheet">
-<div class="sh"><h2>Цены</h2><span>из CRM · до 31 августа сентябрь по ценам прошлого года</span></div>
+<div class="sh"><h2>Цены</h2><span>те же, что на экране набора · до 31 августа
+сентябрь идёт по ценам прошлого года</span></div>
 {price_tbl}
-<div class="note"><b>Если по одному предмету две цены</b> — значит в CRM
-остался тариф прошлого года. Называйте меньшую и уточните у Лизы, какая
-действует: ошибиться в цене хуже, чем взять паузу на минуту.</div>
+<div class="note"><b>Две колонки — это одна и та же цена в разное время.</b>
+До 31 августа включительно действует левая, с 1 сентября — правая. Если
+родитель оплачивает сегодня, он платит по левой, даже за сентябрь.</div>
 <div class="note"><b>Скидки — все по 10%, и только одна.</b> Первый абонемент
 при оплате в день пробного (только новым), второй предмет, второй ребёнок,
 многодетным и семьям участников СВО. Скидки НЕ суммируются: действует одна,
