@@ -165,15 +165,27 @@ def chat_id_for(transport: str, phone: str = "", uid: str | int | None = None) -
     digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
     if transport not in ("tgapi", "telegram"):
         return digits and ("7" + digits) or str(phone)
-    kind = "telegram"
-    for cid, info in (contacts() or {}).items():
-        if info.get("type") != kind:
-            continue
-        if uid is not None and str(info.get("uid")) == str(uid):
-            return cid
-    # По телефону телеграм-контакт не найти: у него телефона нет. Значит
-    # адресата ищем только по карточке МойКласс, и без uid слать нельзя.
-    return ""
+    if uid is None:
+        # По телефону телеграм-контакт не найти: у него телефона нет. Значит
+        # адресата ищем только по карточке МойКласс, и без uid слать нельзя.
+        return ""
+    return _tg_index().get(str(uid), "")
+
+
+_TG_INDEX: dict = {}
+
+
+def _tg_index() -> dict[str, str]:
+    """uid карточки → telegram chatId. Указатель, а не перебор.
+
+    Контактов 5618; линейный поиск по каждому адресату превращает рассылку
+    на полсотни человек в четверть миллиона сравнений и не укладывается
+    в таймаут."""
+    if not _TG_INDEX:
+        for cid, info in (contacts() or {}).items():
+            if info.get("type") == "telegram" and info.get("uid"):
+                _TG_INDEX[str(info["uid"])] = cid
+    return _TG_INDEX
 
 
 def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
