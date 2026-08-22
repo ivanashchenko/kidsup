@@ -294,6 +294,28 @@ PREFERRED = ["telegram", "max", "vk", "instagram", "whatsapp"]
 
 
 _LIVE_CACHE: dict = {}
+_INDEX_CACHE: dict = {}
+
+
+def _contact_index() -> tuple[dict, dict]:
+    """Указатели «кто где пишет»: по id карточки и по телефону.
+
+    Раньше выбор канала перебирал все 5800 контактов для КАЖДОГО получателя.
+    На рассылке в 540 человек это три миллиона сравнений — минуты ожидания
+    на ровном месте. Указатель строится один раз за прогон."""
+    if not _INDEX_CACHE.get("ready"):
+        by_uid: dict = {}
+        by_phone: dict = {}
+        for cid, info in contacts().items():
+            t = info.get("type") or ""
+            u = str(info.get("uid") or "")
+            if u:
+                by_uid.setdefault(u, []).append(t)
+            tail = "".join(c for c in cid if c.isdigit())[-10:]
+            if len(tail) == 10:
+                by_phone.setdefault(tail, []).append(t)
+        _INDEX_CACHE.update(ready=True, uid=by_uid, phone=by_phone)
+    return _INDEX_CACHE["uid"], _INDEX_CACHE["phone"]
 
 
 def _live_transports() -> set:
@@ -318,13 +340,10 @@ def best_channel(phone: str = "", uid: str | int | None = None) -> str | None:
     WABA: в Telegram и MAX первым написать нельзя, там диалог начинает
     пользователь."""
     digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
-    m = contacts()
-    found = []
-    for cid, info in m.items():
-        if uid is not None and str(info.get("uid")) == str(uid):
-            found.append(info.get("type") or "")
-        elif digits and cid[-10:] == digits:
-            found.append(info.get("type") or "")
+    by_uid, by_phone = _contact_index()
+    found = list(by_uid.get(str(uid), [])) if uid is not None else []
+    if not found and digits:
+        found = list(by_phone.get(digits, []))
     if not found:
         return None
     live = _live_transports()
