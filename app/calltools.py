@@ -22,7 +22,7 @@ import os
 import sys
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import httpx
