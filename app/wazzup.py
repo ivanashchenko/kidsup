@@ -153,9 +153,33 @@ def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
 
 
 
+def chat_id_for(transport: str, phone: str = "", uid: str | int | None = None) -> str:
+    """Идентификатор чата для этого транспорта.
+
+    У WhatsApp и MAX chatId — номер телефона, и слать по номеру можно.
+    У Telegram — внутренний числовой id аккаунта (953893756), телефона там
+    нет вовсе. 22.08 рассылка по лагерю ушла в Telegram с chatId=телефон
+    и все 47 сообщений вернулись с ошибкой BAD_CONTACT: Wazzup принял их
+    и не доставил. Это выглядело как «Telegram не даёт писать по базе»,
+    хотя дело было в неверном идентификаторе."""
+    digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
+    if transport not in ("tgapi", "telegram"):
+        return digits and ("7" + digits) or str(phone)
+    kind = "telegram"
+    for cid, info in (contacts() or {}).items():
+        if info.get("type") != kind:
+            continue
+        if uid is not None and str(info.get("uid")) == str(uid):
+            return cid
+    # По телефону телеграм-контакт не найти: у него телефона нет. Значит
+    # адресата ищем только по карточке МойКласс, и без uid слать нельзя.
+    return ""
+
+
 def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
              sender: str | None = None, template_id: str | None = None,
-             template_values: list | None = None) -> bool:
+             template_values: list | None = None,
+             uid: str | int | None = None) -> bool:
     """Отправка строго через один канал. sender — plainId конкретного номера
     (для ротации WhatsApp). True = принял к доставке.
 
@@ -193,10 +217,18 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
         if r.status_code not in (200, 201):
             log.warning("wazzup шаблон отклонён: %s %s", r.status_code, r.text[:200])
         return r.status_code in (200, 201)
+    chat_id = chat_id_for(transport, phone, uid) if transport in ("tgapi", "telegram") \
+        else phone
+    if not chat_id:
+        log.warning("%s: не нашёл chatId (uid=%s) — отправка отменена", transport, uid)
+        return False
     r = httpx.post(f"{API}/message", headers=_headers(), json={
         "channelId": ch["channelId"], "chatType": CHAT_TYPE.get(transport, transport),
-        "chatId": phone, "text": text,
+        "chatId": chat_id, "text": text,
     }, timeout=30)
+    if r.status_code not in (200, 201):
+        log.warning("wazzup %s → %s: HTTP %s %s", transport, chat_id,
+                    r.status_code, r.text[:160])
     return r.status_code in (200, 201)
 
 

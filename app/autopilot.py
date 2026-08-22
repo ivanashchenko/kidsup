@@ -619,6 +619,21 @@ def _age_by_phone(phone: str) -> float | None:
     return None
 
 
+def _uid_by_phone(phone: str) -> int | None:
+    """Карточка МойКласс по телефону — нужна Телеграму для chatId."""
+    digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
+    if not digits:
+        return None
+    try:
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT id FROM users WHERE substr(replace(replace(replace("
+                "phone,' ',''),'-',''),'+',''), -10)=? LIMIT 1", (digits,)).fetchone()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
 def _broadcast_tick() -> None:
     """Раз в минуту: каскадная доставка очереди. Порядок каналов —
     настройка broadcast_transports (по умолчанию "tgapi,whatsapp,max").
@@ -780,8 +795,11 @@ def _broadcast_tick() -> None:
             # идут только подстановки. Переменная одна: имя ребёнка
             vals = [_child_name(child) or "ваш ребёнок"] if tr == "wapi" else None
             tid = _template_for(phone, campaign or "") if tr == "wapi" else None
+            # Телеграму нужен id карточки: у telegram-чата нет телефона,
+            # и отправка «на номер» возвращает BAD_CONTACT
             ok = wazzup.send_via(tr, phone, msg, dry_run=dry, sender=snd,
-                                 template_values=vals, template_id=tid)
+                                 template_values=vals, template_id=tid,
+                                 uid=_uid_by_phone(phone) if tr == "tgapi" else None)
         except Exception as e:
             log.warning("wazzup %s недоступен: %s", tr, e)
             ok = False
