@@ -128,14 +128,23 @@ p { margin: 0 0 12px; }
 p:last-child { margin-bottom: 0; }
 
 /* ------------------------------------------------------------- шапка ---- */
+/* Шапка — явная сетка из трёх рядов, а не один flex с переносом.
+   В потоке лежали семь разнородных блоков, и при нехватке ширины
+   «Синхронизировать» выдавливало МЕЖДУ рядами меню, а подписи групп
+   слипались с пунктами. Сетка закрепляет за каждым блоком своё место. */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 30;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "brand search badge sync"
+    "main  main   main  main"
+    "sub   sub    sub   sub";
+  /* toggle на широком экране скрыт (display:none) и места не занимает */
   align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
+  gap: 8px 18px;
   padding: 10px max(18px, calc((100vw - var(--content)) / 2 - 6px));
   background: color-mix(in srgb, var(--card) 88%, transparent);
   backdrop-filter: saturate(1.4) blur(12px);
@@ -172,14 +181,18 @@ p:last-child { margin-bottom: 0; }
 /* Меню в две строки: сверху — ежедневная работа на смене,
    снизу — разделы контроля и разбора. */
 .topbar nav { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-.topbar nav.nav-main { flex: 1 1 auto; }
+.topbar nav.nav-main { grid-area: main; }
 .topbar nav.nav-sub {
-  flex: 1 0 100%;
-  gap: 2px;
-  margin-top: 4px;
+  grid-area: sub;
+  gap: 2px 4px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
+.brand { grid-area: brand; }
+.nav-toggle { grid-area: toggle; }
+.gsearch { grid-area: search; min-width: 0; }
+.wait-badge { grid-area: badge; }
+.sync-block { grid-area: sync; }
 .topbar nav a {
   position: relative;
   padding: 8px 14px;
@@ -203,24 +216,37 @@ p:last-child { margin-bottom: 0; }
 
 /* подписи групп во второй строке меню: Маркетинг · Контроль · Данные */
 .nav-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 10px;
   font-weight: 750;
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--muted);
   opacity: .75;
-  margin-left: 14px;
+  margin-left: 10px;
   align-self: center;
   user-select: none;
+  white-space: nowrap;
+}
+/* Вертикальная черта перед подписью: без неё «МАРКЕТИНГ» стоит в одном
+   ряду со ссылками и читается как ещё один пункт меню. */
+.nav-label::before {
+  content: "";
+  width: 1px;
+  height: 14px;
+  background: var(--border);
 }
 .nav-label:first-child { margin-left: 2px; }
+.nav-label:first-child::before { display: none; }
 
 /* витрина занятий: текст описаний */
 .prose p { margin: 0 0 10px; max-width: 74ch; }
 .prose ul { margin: 0 0 10px; padding-left: 20px; max-width: 74ch; }
 .prose li { margin: 4px 0; }
 
-.sync-block { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.sync-block { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
 
 main {
   max-width: var(--content);
@@ -594,10 +620,11 @@ textarea.apology {
 }
 @media (max-width: 700px) {
   body { font-size: 14.5px; }
-  .topbar { gap: 10px; padding: 9px 14px; }
+  .topbar { padding: 9px 14px; }
   .brand { font-size: 17px; }
   .brand img { height: 30px; width: 30px; }
-  .sync-block { margin-left: 0; }
+  .sync-block { justify-content: flex-start; }
+  .gsearch input { width: 100%; }
   /* меню одной прокручиваемой лентой — 15 разделов иначе занимают полэкрана */
   .topbar nav.nav-main, .topbar nav.nav-sub {
     flex-wrap: nowrap;
@@ -706,6 +733,20 @@ tr.warn-row td{background:#FDF1F1}
 /* --- мобильное меню: на узких экранах навигация сворачивается в бургер --- */
 .nav-toggle{display:none}
 @media (max-width: 920px){
+  /* С этой ширины появляется кнопка меню — сетка перестраивается здесь же,
+     а не на 700px: иначе кнопка видима, а места в сетке у неё нет,
+     и она уходит в неявную строку, ломая ряд. */
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand  toggle"
+      "search search"
+      "badge  badge"
+      "sync   sync"
+      "main   main"
+      "sub    sub";
+    gap: 8px 10px;
+  }
   .nav-toggle{display:inline-flex;align-items:center;gap:.35rem;margin-left:auto;
     padding:.45rem .85rem;border:1.5px solid #1DA7E0;border-radius:999px;
     background:#fff;color:#312783;font-weight:700;font-size:.9rem;cursor:pointer}
