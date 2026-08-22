@@ -406,11 +406,27 @@ def best_channel(phone: str = "", uid: str | int | None = None,
 def templates() -> list[dict]:
     """Шаблоны WABA, заведённые в кабинете. API даёт только чтение —
     создать и отправить на модерацию можно лишь руками в кабинете
-    Wazzup, POST на этот адрес возвращает 404."""
+    Wazzup, POST на этот адрес возвращает 404.
+
+    Поля приводим к общему виду: Wazzup зовёт идентификатор
+    templateGuid, а имя — title, и код, искавший id/name, молча получал
+    пустоту даже по одобренному шаблону."""
     r = httpx.get(f"{API}/templates/whatsapp", headers=_headers(), timeout=30)
     r.raise_for_status()
     d = r.json()
-    return d if isinstance(d, list) else (d.get("data") or d.get("templates") or [])
+    raw = d if isinstance(d, list) else (d.get("data") or d.get("templates") or [])
+    out = []
+    for t in raw:
+        text = ""
+        for c in (t.get("components") or []):
+            if c.get("text"):
+                text = c["text"]
+                break
+        out.append({**t,
+                    "id": t.get("templateGuid") or t.get("id") or t.get("templateId"),
+                    "name": t.get("title") or t.get("name") or "",
+                    "text": text})
+    return out
 
 
 def approved_template(prefer: str = "") -> dict | None:
