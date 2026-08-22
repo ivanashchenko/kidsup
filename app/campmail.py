@@ -37,7 +37,9 @@ from .moyklass_client import MoyklassClient
 log = logging.getLogger("kidsup.campmail")
 SP = os.environ.get("KIDSUP_SCRATCH") or "/tmp/kidsup-calls"
 
-CAMP_RE = re.compile(r"2526_ЛК|летний клуб", re.I)
+# Лагерь всех лет: 2526_ЛК — лето 2026, OLD_ЛК и 2024_ЛК — прошлые годы.
+CAMP_RE = re.compile(r"_ЛК|летний клуб|лагер", re.I)
+CAMP_THIS = re.compile(r"2526_ЛК", re.I)      # только этим летом
 LAST_WEEK = ("2026-08-24", "2026-08-28")
 
 # Программа — из афиши смены. Не пересказываем своими словами: у неё уже
@@ -59,6 +61,28 @@ def _first_name(full: str) -> str:
     if len(parts) >= 2 and parts[1][:1].isupper():
         return parts[1]
     return parts[0] if parts else ""
+
+
+def text_past(name: str) -> str:
+    """Для тех, кто был в лагере в прошлые годы, но этим летом не приходил.
+
+    Им нельзя писать «вы были у нас этим летом» — это неправда, и они
+    это заметят первым же словом. Заход другой: мы помним, зовём вернуться,
+    и повод — самая яркая смена сезона."""
+    child = _first_name(name)
+    who = f"{child} был у нас в лагере" if child else "Ваш ребёнок был у нас в лагере"
+    return (
+        f"Здравствуйте! {who} — и мы помним. Этим летом вас не было, "
+        f"а последняя смена как раз такая, ради которой стоит вернуться.\n\n"
+        f"{PROGRAMME}\n\n"
+        f"Пять дней перед школой: съёмки, сцена, своя команда. Хороший "
+        f"способ закончить лето громко, а не на «уже пора собирать портфель».\n\n"
+        f"Есть полный день и полдня.\n"
+        f"Первый день бесплатный — можно прийти и посмотреть, ни к чему "
+        f"не обязывает. Пробная неделя — 15 800 ₽.\n\n"
+        f"Подробности: kidsup.ru/summercamp\n"
+        f"Напишите, если интересно, — расскажу про места и время."
+    )
 
 
 def text_for(name: str) -> str:
@@ -92,25 +116,34 @@ def collect() -> list[dict]:
                                   "subscriptions")
         camp = [s for s in subs
                 if set(s.get("classIds") or []) & camp_ids and s.get("userId")]
-        summer = {s["userId"] for s in camp}
-        took_last = {s["userId"] for s in camp
-                     if LAST_WEEK[0] <= (s.get("beginDate") or "")[:10] <= LAST_WEEK[1]}
-        target = sorted(summer - took_last)
+        this_ids = {cid for cid, nm in cls.items() if CAMP_THIS.search(nm)}
+        by_year = defaultdict(set)
+        for x in camp:
+            y = (x.get("beginDate") or "")[:4]
+            if y:
+                by_year[y].add(x["userId"])
+        summer = {x["userId"] for x in camp
+                  if set(x.get("classIds") or []) & this_ids}
+        took_last = {x["userId"] for x in camp
+                     if LAST_WEEK[0] <= (x.get("beginDate") or "")[:10] <= LAST_WEEK[1]}
+        past = (by_year.get("2025", set()) | by_year.get("2024", set())) - summer
+        target = [(uid, "этим летом") for uid in sorted(summer - took_last)] + \
+                 [(uid, "в прошлые годы") for uid in sorted(past)]
 
         # Карточки берём одной выборкой, а не по одной: 174 отдельных запроса
         # к API — это несколько минут ожидания на ровном месте.
+        # Карточки берём из локальной копии базы: выгрузка 5800 клиентов
+        # через API занимает минуты, а нам нужны только имя, телефон
+        # и статус — они синхронизируются и лежат рядом.
         users = {}
-        off = 0
-        while off < 20000:
-            r = mk.get("/v1/company/users", {"limit": 100, "offset": off})
-            rows = (r.get("users") if isinstance(r, dict) else r) or []
-            if not rows:
-                break
-            for u in rows:
-                users[u["id"]] = u
-            off += 100
+        from . import db
+        with db.get_conn() as conn:
+            for uid, name, phone, state in conn.execute(
+                    "SELECT id, name, phone, client_state_id FROM users"):
+                users[uid] = {"id": uid, "name": name or "", "phone": phone or "",
+                              "clientStateId": state}
         out = []
-        for uid in target:
+        for uid, wave in target:
             u = users.get(uid)
             if not u:
                 continue
@@ -120,7 +153,7 @@ def collect() -> list[dict]:
             phone = "".join(c for c in str(u.get("phone") or "") if c.isdigit())
             if len(phone) < 11:
                 continue
-            out.append({"uid": uid, "name": u.get("name") or "",
+            out.append({"uid": uid, "wave": wave, "name": u.get("name") or "",
                         "phone": phone[-11:],
                         "channel": wazzup.best_channel(phone, uid) or "wapi"})
     finally:
@@ -135,7 +168,8 @@ def send(dry_run: bool = True, limit: int = 0) -> dict:
         rows = rows[:limit]
     stat: Counter = Counter()
     for r in rows:
-        txt = text_for(r["name"])
+        txt = text_past(r["name"]) if r.get("wave") == "в прошлые годы" \
+            else text_for(r["name"])
         try:
             wazzup.send(r["phone"], txt, mode="cascade", dry_run=dry_run,
                         transports=[r["channel"]])
@@ -157,9 +191,16 @@ def main():
         return
     rows = collect()
     print(f"кому уйдёт: {len(rows)} семей")
+    print("по волнам :", dict(Counter(r["wave"] for r in rows)))
     print("по каналам:", dict(Counter(r["channel"] for r in rows)))
-    print("\nпример текста:\n")
-    print(text_for(rows[0]["name"] if rows else "Иванов Матвей"))
+    this = next((r for r in rows if r["wave"] == "этим летом"), None)
+    past = next((r for r in rows if r["wave"] == "в прошлые годы"), None)
+    if this:
+        print("\n───── БЫЛИ ЭТИМ ЛЕТОМ ─────\n")
+        print(text_for(this["name"]))
+    if past:
+        print("\n───── БЫЛИ В ПРОШЛЫЕ ГОДЫ ─────\n")
+        print(text_past(past["name"]))
 
 
 if __name__ == "__main__":
