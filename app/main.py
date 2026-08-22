@@ -2137,7 +2137,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.23"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.25"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2185,7 +2185,10 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "calls_done",
             # сквозная аналитика: без этих двух ключей выгрузка оплат в Roistat
             # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
-            "roistat_project", "roistat_key"}
+            "roistat_project", "roistat_key",
+            # id утверждённого WABA-шаблона: без него массовая отправка через
+            # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
+            "waba_template_id"}
 
 
 # Значения, которые нельзя отдавать целиком даже по авторизованному запросу.
@@ -2819,13 +2822,29 @@ async def api_broadcast_requeue(payload: dict = None):
     не доставляя их. Метки попыток снимаем, иначе строка снова упрётся
     в проверку «этим каналом уже пробовали»."""
     campaign = ((payload or {}).get("campaign") or "").strip()
-    if not campaign:
-        raise HTTPException(400, "нужен campaign")
+    sender = ((payload or {}).get("sender") or "").strip()
+    day = ((payload or {}).get("day") or "").strip()
+    if not campaign and not sender:
+        raise HTTPException(400, "нужен campaign или sender")
+    # sender+day — разбор «фантомной» отправки: канал отчитался об успехе,
+    # а сообщения не ушли. Такие строки помечены sent, и без возврата
+    # адресат больше никогда не получит письмо.
+    where, args = [], []
+    if campaign:
+        where.append("campaign=?"); args.append(campaign)
+    if sender:
+        where.append("sender=?"); args.append(sender)
+        where.append("status='sent'")
+    else:
+        where.append("status='undeliverable'")
+    if day:
+        where.append("substr(sent,1,10)=?"); args.append(day)
     with db.get_conn() as conn:
         n = conn.execute(
-            "UPDATE broadcast_queue SET status='pending', tried='', sender=NULL "
-            "WHERE campaign=? AND status='undeliverable'", (campaign,)).rowcount
-    return {"ok": True, "campaign": campaign, "вернулось_в_очередь": n}
+            "UPDATE broadcast_queue SET status='pending', tried='', sender=NULL, "
+            "sent=NULL WHERE " + " AND ".join(where), args).rowcount
+    return {"ok": True, "campaign": campaign or "—", "sender": sender or "—",
+            "вернулось_в_очередь": n}
 
 
 @app.get("/api/broadcast/status", dependencies=AUTH)

@@ -648,7 +648,18 @@ def _broadcast_tick() -> None:
                 conn.execute("UPDATE broadcast_queue SET status='undeliverable' "
                              "WHERE id=?", (rid,))
             continue
-        if f"{transport_of.get(sender, 'whatsapp')}=" in tried:
+        # какой канал этой строке положен — решаем здесь, до проверки
+        # прошлых попыток: иначе повтор уходит тем же каналом, что уже
+        # не сработал
+        try:
+            pref = wazzup.best_channel(phone, mass=True)
+        except Exception:
+            pref = None
+        if pref in ("tgapi", "max"):
+            tr, snd = pref, None
+        else:
+            tr, snd = transport_of.get(sender, "whatsapp"), sender
+        if f"{tr}=" in tried:
             continue                    # этим каналом уже пробовали — ждём другого
         # свои номера в очередь попадают легко: у сотрудников и педагогов
         # бывают карточки детей. Продающая рассылка своему человеку —
@@ -662,32 +673,30 @@ def _broadcast_tick() -> None:
             continue  # ждёт ответа админа — не сбрасываем непрочитанное, вернёмся позже
         msg = _fill_name(text, child)
         try:
-            # у каждого номера свой транспорт: 3507 — WABA (wapi),
-            # остальные — обычный WhatsApp. Слать надо тем, чем номер живёт
-            tr = transport_of.get(sender, "whatsapp")
-            ok = wazzup.send_via(tr, phone, msg, dry_run=dry, sender=sender)
+            ok = wazzup.send_via(tr, phone, msg, dry_run=dry, sender=snd)
         except Exception as e:
-            log.warning("wazzup whatsapp недоступен: %s", e)
+            log.warning("wazzup %s недоступен: %s", tr, e)
             ok = False
-        mark = f"{transport_of.get(sender, 'whatsapp')}={'ok' if ok else 'fail'};"
+        # метка и отправитель — фактические, иначе в журнале не разобрать,
+        # каким каналом сообщение уходило и почему не дошло
+        mark = f"{tr}={'ok' if ok else 'fail'};"
         with db.get_conn() as conn:
             if ok:
                 conn.execute("UPDATE broadcast_queue SET status='sent', sent=?, sender=?, "
                              "tried=COALESCE(tried,'')||? WHERE id=?",
-                             (_now().isoformat(timespec="seconds"), sender, mark, rid))
+                             (_now().isoformat(timespec="seconds"), snd or tr, mark, rid))
             else:
                 conn.execute("UPDATE broadcast_queue SET tried=COALESCE(tried,'')||? "
                              "WHERE id=?", (mark, rid))
-        log.info("broadcast: #%s %s -> %s(%s) %s", rid, phone[-4:],
-                 transport_of.get(sender, "whatsapp"), sender[-4:],
-                 "ok" if ok else "fail")
+        log.info("broadcast: #%s %s -> %s(%s) %s", rid, phone[-4:], tr,
+                 (snd or "—")[-4:], "ok" if ok else "fail")
         # Обычный номер шлёт по одному сообщению за тик: ровный редкий темп —
         # его единственная защита от бана. У WABA такой угрозы нет, это
         # официальный канал с суточным лимитом в тысячи, и по одному в минуту
         # очередь в несколько сотен растянулась бы на дни — к дате смены
         # рассылка просто не успевала бы.
         sent_this_tick += 1
-        if transport_of.get(sender) != "wapi" or sent_this_tick >= wapi_burst:
+        if tr != "wapi" or sent_this_tick >= wapi_burst:
             break
 
 

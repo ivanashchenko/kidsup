@@ -154,9 +154,17 @@ def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
 
 
 def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
-             sender: str | None = None) -> bool:
+             sender: str | None = None, template_id: str | None = None,
+             template_values: list | None = None) -> bool:
     """Отправка строго через один канал. sender — plainId конкретного номера
-    (для ротации WhatsApp). True = принял к доставке."""
+    (для ротации WhatsApp). True = принял к доставке.
+
+    Для WABA вне 24-часового окна Meta пропускает ТОЛЬКО утверждённый
+    шаблон: произвольный текст Wazzup принимает и отвечает 201, но до
+    получателя он не доходит и в статистике Meta не появляется вовсе
+    (22.08: 24 «отправленных» сообщения — ноль в WhatsApp Manager).
+    Поэтому у wapi при заданном waba_template_id уходит templateId,
+    а текст идёт значениями подстановки."""
     phone = "".join(ch for ch in phone if ch.isdigit())
     if phone.startswith("8") and len(phone) == 11:
         phone = "7" + phone[1:]
@@ -168,6 +176,23 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
         return False
     if dry_run:
         return True
+    if transport == "wapi" and template_id is None:
+        template_id = db.get_setting("waba_template_id", "") or None
+    if transport == "wapi" and not template_id:
+        # Без шаблона WABA-отправка бессмысленна: Wazzup ответит 201, строка
+        # пометится доставленной, а адресат не получит ничего и второй раз
+        # ему уже не напишут. Лучше честный отказ — он вернёт строку в очередь.
+        log.warning("wapi: не задан waba_template_id — отправка отменена")
+        return False
+    if transport == "wapi" and template_id:
+        body = {"channelId": ch["channelId"], "chatType": "whatsapp",
+                "chatId": phone, "templateId": template_id}
+        if template_values is not None:
+            body["templateValues"] = template_values
+        r = httpx.post(f"{API}/message", headers=_headers(), json=body, timeout=30)
+        if r.status_code not in (200, 201):
+            log.warning("wazzup шаблон отклонён: %s %s", r.status_code, r.text[:200])
+        return r.status_code in (200, 201)
     r = httpx.post(f"{API}/message", headers=_headers(), json={
         "channelId": ch["channelId"], "chatType": CHAT_TYPE.get(transport, transport),
         "chatId": phone, "text": text,
@@ -345,38 +370,80 @@ def _live_transports() -> set:
     return _LIVE_CACHE["set"]
 
 
-def best_channel(phone: str = "", uid: str | int | None = None) -> str | None:
-    """В каком канале писать этому человеку.
+def best_channel(phone: str = "", uid: str | int | None = None,
+                 mass: bool = False) -> str | None:
+    """В каком канале писать этому человеку. Правило владельца от 22.08.
 
-    Смысл: если семья уже переписывается с нами в Telegram, писать ей
-    в WABA — платить за то, что можно сделать бесплатно, да ещё и в менее
-    удобном для неё месте. А если её нигде нет, кроме телефона, — только
-    WABA: в Telegram и MAX первым написать нельзя, там диалог начинает
-    пользователь."""
+    Первым делом — MAX или Telegram, если там уже есть переписка: это
+    бесплатно и там, где семье удобно. Если переписки нет, канал зависит
+    от того, что мы шлём:
+      · массовое (mass=True) — только WABA 3507. Это официальный канал
+        Meta, у него нет риска бана и есть суточный лимит в тысячи;
+      · разовое (mass=False) — обычный WhatsApp 0077, канал переписки.
+
+    Разделение принципиальное: 0077 живёт под угрозой бана и на массовом
+    потоке отваливается (22.08 так и вышло — номер ушёл в «не авторизован»),
+    а WABA вне 24-часового окна пропускает только утверждённые шаблоны и
+    для живого разового ответа не годится."""
     digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
     by_uid, by_phone = _contact_index()
     found = list(by_uid.get(str(uid), [])) if uid is not None else []
     if not found and digits:
         found = list(by_phone.get(digits, []))
-    if not found:
-        return None
+    found += _marked_in_crm(digits)
     live = _live_transports()
-    for kind in PREFERRED:
+    # ступень 1: переписка в MAX или Telegram
+    for kind in ("telegram", "max"):
         if kind not in found:
             continue
         for transport in BY_CONTACT_TYPE.get(kind, [kind]):
             if transport in live:
                 return transport
-    return None
+    # ступень 2: WhatsApp — какой именно, решает тип отправки
+    return "wapi" if mass else "whatsapp"
+
+
+def _marked_in_crm(digits: str) -> list[str]:
+    """Канал по пометке в имени карточки: «(MAX)», «писать в телеграмм».
+
+    Указатель контактов Wazzup знает только тех, кто писал нам через него:
+    из 5618 контактов там 114 MAX и 220 Telegram, тогда как в CRM таких
+    пометок 83 и 112 — и совпадают они не полностью. Администраторы ставят
+    пометку руками именно там, где человек просил писать ему в этот
+    мессенджер, так что это второй равноправный источник, а не догадка."""
+    if not digits:
+        return []
+    try:
+        from . import db as _db
+        with _db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT name FROM users WHERE substr("
+                "replace(replace(replace(phone,' ',''),'-',''),'+',''), -10)=? LIMIT 1",
+                (digits,)).fetchone()
+    except Exception:
+        return []
+    name = (row[0] if row else "") or ""
+    out = []
+    low = name.lower()
+    if "max" in low or "(мах)" in low:
+        out.append("max")
+    if "телеграм" in low or "telegram" in low:
+        out.append("telegram")
+    return out
+
+
+# Номера WhatsApp под каждую задачу. Массовое — только WABA, разовое —
+# только канал переписки: смешивать нельзя, у них разные лимиты и разная
+# цена ошибки.
+WABA_SENDER = "79199683507"
+CHAT_SENDER = "79165610077"
 
 
 def send_smart(phone: str, text: str, uid: str | int | None = None,
-               dry_run: bool = True) -> list[str]:
-    """Отправить туда, где человеку удобно, а если негде — в WABA."""
-    t = best_channel(phone, uid)
-    if t:
-        return send(phone, text, mode="cascade", dry_run=dry_run, transports=[t])
-    # Нигде не пишет — остаётся официальный канал WhatsApp.
-    return send(phone, text, mode="cascade", dry_run=dry_run,
-                transports=["wapi", "whatsapp"])
+               dry_run: bool = True, mass: bool = False) -> list[str]:
+    """Отправить туда, где человеку удобно, по правилу best_channel."""
+    t = best_channel(phone, uid, mass=mass) or ("wapi" if mass else "whatsapp")
+    sender = WABA_SENDER if t == "wapi" else (CHAT_SENDER if t == "whatsapp" else None)
+    ok = send_via(t, phone, text, dry_run=dry_run, sender=sender)
+    return [f"{t}({sender or '—'}) → {phone}: {'ok' if ok else 'fail'}"]
 
