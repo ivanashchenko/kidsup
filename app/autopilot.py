@@ -525,24 +525,93 @@ def _waba_template_watch() -> dict:
     статус стал «одобрен», id сам ложится в настройку, а транспорт
     возвращается из «off». Без шаблона отправка через WABA намеренно
     отказывает, поэтому включать транспорт заранее безопасно только
-    вместе с появлением id."""
-    if db.get_setting("waba_template_id"):
-        return {"ok": True, "уже_задан": True}
+    вместе с появлением id.
+
+    Шаблонов несколько: под лагерь один, под набор — четыре по возрастам.
+    Все одобренные складываем в карту «имя → id», а какой применить к
+    конкретному адресату, решает возраст ребёнка в момент отправки."""
     try:
-        t = wazzup.approved_template(prefer=db.get_setting("waba_template_prefer", ""))
+        items = wazzup.templates()
     except Exception as e:
         log.warning("шаблоны WABA недоступны: %s", e)
         return {"ok": False, "ошибка": str(e)[:120]}
-    if not t:
-        return {"ok": True, "одобренных_нет": True}
-    tid = t.get("id") or t.get("templateId")
-    if not tid:
-        return {"ok": False, "нет_id": True}
-    db.set_setting("waba_template_id", str(tid))
+    ok = {}
+    for t in items:
+        if str(t.get("status") or "").lower() not in {"approved", "active", "одобрен"}:
+            continue
+        name, tid = (t.get("name") or "").strip(), (t.get("id") or t.get("templateId"))
+        if name and tid:
+            ok[name] = str(tid)
+    if not ok:
+        return {"ok": True, "одобренных_нет": True, "всего_шаблонов": len(items)}
+    db.set_setting("waba_templates", json.dumps(ok, ensure_ascii=False))
+    # Запасной шаблон на случай, когда возраст ребёнка неизвестен: самый
+    # широкий сегмент 5–7 лет, а если его нет — любой одобренный.
+    if not db.get_setting("waba_template_id"):
+        pick = ok.get("nabor_5_7_let") or next(iter(ok.values()))
+        db.set_setting("waba_template_id", pick)
     if (db.get_setting("broadcast_transports", "") or "").strip() == "off":
         db.set_setting("broadcast_transports", "whatsapp")
-    log.info("WABA-шаблон одобрен: %s (%s) — рассылка включена", t.get("name"), tid)
-    return {"ok": True, "шаблон": t.get("name"), "id": tid, "рассылка": "включена"}
+    log.info("одобренных WABA-шаблонов: %d (%s) — рассылка включена",
+             len(ok), ", ".join(sorted(ok)))
+    return {"ok": True, "шаблоны": ok, "рассылка": "включена"}
+
+
+# Возрастные шаблоны набора: до какого возраста действует каждый.
+AGE_TEMPLATES = [(3.0, "nabor_1_3_goda"), (5.0, "nabor_3_5_let"),
+                 (7.0, "nabor_5_7_let"), (99.0, "nabor_7_12_let")]
+
+
+def _template_for(phone: str, campaign: str) -> str | None:
+    """Какой шаблон слать этому адресату.
+
+    У кампании лагеря шаблон один на всех. У набора — четыре по возрасту
+    ребёнка: пятилетке незачем читать про мини-сад, а двухлетке про
+    кембриджские уровни. Возраст неизвестен — берём 5–7 лет, это самый
+    широкий сегмент и самый ходовой продукт."""
+    try:
+        tpls = json.loads(db.get_setting("waba_templates", "") or "{}")
+    except ValueError:
+        tpls = {}
+    if not tpls:
+        return db.get_setting("waba_template_id") or None
+    if not campaign.startswith("nabor"):
+        camp = next((v for k, v in tpls.items() if k.startswith("lager")), None)
+        return camp or db.get_setting("waba_template_id") or None
+    age = _age_by_phone(phone)
+    name = "nabor_5_7_let"
+    if age is not None:
+        name = next(n for lim, n in AGE_TEMPLATES if age < lim)
+    return tpls.get(name) or tpls.get("nabor_5_7_let") \
+        or db.get_setting("waba_template_id") or None
+
+
+def _age_by_phone(phone: str) -> float | None:
+    """Возраст ребёнка на 1 сентября по телефону из карточки."""
+    digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
+    if not digits:
+        return None
+    try:
+        with db.get_conn() as conn:
+            row = conn.execute(
+                "SELECT raw FROM users WHERE substr(replace(replace(replace("
+                "phone,' ',''),'-',''),'+',''), -10)=? LIMIT 1", (digits,)).fetchone()
+    except Exception:
+        return None
+    if not row or not row[0]:
+        return None
+    try:
+        j = json.loads(row[0])
+    except ValueError:
+        return None
+    for a in (j.get("attributes") or []):
+        if a.get("attributeAlias") == "birthday" and a.get("value"):
+            try:
+                bd = date.fromisoformat(str(a["value"])[:10])
+            except ValueError:
+                return None
+            return round((date(2026, 9, 1) - bd).days / 365.25, 1)
+    return None
 
 
 def _broadcast_tick() -> None:
@@ -638,7 +707,8 @@ def _broadcast_tick() -> None:
             return                      # все номера выбрали дневной лимит
         sender = max(candidates, key=lambda p: limit(p) - used(p))
         rows = conn.execute(
-            "SELECT id, phone, child, text, COALESCE(tried,'') FROM broadcast_queue "
+            "SELECT id, phone, child, text, COALESCE(tried,''), campaign "
+            "FROM broadcast_queue "
             "WHERE status='pending' "
             # Всё, у чего дедлайн — события 29.08–06.09, идёт вперёд лагерной
             # рассылки: после события такое сообщение теряет смысл целиком.
@@ -665,7 +735,7 @@ def _broadcast_tick() -> None:
     # сколько сообщений WABA отправляет за один тик (настройка wapi_burst)
     wapi_burst = max(1, min(25, int(db.get_setting("wapi_burst", "8") or 8)))
     sent_this_tick = 0
-    for rid, phone, child, text, tried in rows:
+    for rid, phone, child, text, tried, campaign in rows:
         # Недоставляемым считаем только после попытки ОБОИМИ каналами: у
         # обычного номера и у WABA разные причины отказа, и неудача с одного
         # ничего не говорит о втором. Прежняя проверка по одной метке
@@ -704,8 +774,9 @@ def _broadcast_tick() -> None:
             # у шаблона WABA текст утверждён Meta и не меняется — от нас
             # идут только подстановки. Переменная одна: имя ребёнка
             vals = [_child_name(child) or "ваш ребёнок"] if tr == "wapi" else None
+            tid = _template_for(phone, campaign or "") if tr == "wapi" else None
             ok = wazzup.send_via(tr, phone, msg, dry_run=dry, sender=snd,
-                                 template_values=vals)
+                                 template_values=vals, template_id=tid)
         except Exception as e:
             log.warning("wazzup %s недоступен: %s", tr, e)
             ok = False

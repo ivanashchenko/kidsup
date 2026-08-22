@@ -2142,7 +2142,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.31"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.32"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2193,7 +2193,7 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "roistat_project", "roistat_key",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
-            "waba_template_id"}
+            "waba_template_id", "waba_templates"}
 
 
 # Значения, которые нельзя отдавать целиком даже по авторизованному запросу.
