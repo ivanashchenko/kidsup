@@ -30,6 +30,7 @@ import re
 import time
 from collections import defaultdict
 from datetime import date
+from pathlib import Path
 
 from . import sync, taskguard
 from .moyklass_client import MoyklassClient
@@ -180,7 +181,10 @@ def ranked() -> list[dict]:
     given = _given_away()
     if given:
         before = len(data)
-        data = [c for c in data if c.get("uid") not in given]
+        # сверяем по телефону: он есть в обоих списках, а uid — только в CRM
+        data = [c for c in data
+                if "".join(x for x in str(c.get("phone") or "") if x.isdigit())[-10:]
+                not in given]
         log.info("отдано на обзвон Надежде и убрано из листа владельца: %d",
                  before - len(data))
     for c in data:
@@ -190,17 +194,30 @@ def ranked() -> list[dict]:
                                        _newest_first(c.get("last") or "")))
 
 
-def _given_away() -> set[int]:
-    """Кого уже отдали Надежде — их в листе владельца быть не должно.
+def _given_away() -> set[str]:
+    """Телефоны, отданные Надежде, — их в листе владельца быть не должно.
 
-    Оба садятся звонить завтра. Один и тот же родитель, которому за час
-    позвонили дважды из одного центра, решает, что у нас беспорядок, —
-    и это стоит дороже, чем недозвон."""
+    Один и тот же родитель, которому за час позвонили дважды из одного
+    центра, решает, что у нас беспорядок, — это дороже, чем недозвон.
+
+    Читаем из готовой страницы в docs, а не из файла в /tmp: временную
+    папку стирает при перезапуске контейнера, и вычитание тихо переставало
+    работать — 22.08 в двух листах оказалось шесть общих номеров. Страница
+    лежит в репозитории и живёт столько же, сколько сам список."""
+    out: set[str] = set()
+    page = Path(__file__).resolve().parent.parent / "docs" / "obzvon_nadezhda.html"
     try:
-        rows = json.load(open(f"{SP}/nadezhda_list.json"))
+        out |= set(re.findall(r"\+7(\d{10})", page.read_text(encoding="utf-8")))
     except Exception:
-        return set()
-    return {r.get("uid") for r in rows if r.get("uid")}
+        pass
+    try:
+        for r in json.load(open(f"{SP}/nadezhda_list.json")):
+            ph = "".join(c for c in str(r.get("phone") or "") if c.isdigit())[-10:]
+            if len(ph) == 10:
+                out.add(ph)
+    except Exception:
+        pass
+    return out
 
 
 def _newest_first(d: str) -> str:
