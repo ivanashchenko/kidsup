@@ -293,6 +293,22 @@ BY_CONTACT_TYPE = {
 PREFERRED = ["telegram", "max", "vk", "instagram", "whatsapp"]
 
 
+_LIVE_CACHE: dict = {}
+
+
+def _live_transports() -> set:
+    """Какие каналы сейчас живые. Кэш на процесс: без него выбор канала
+    для каждого получателя заново дёргает список каналов, и рассылка
+    на четыреста человек превращается в четыреста лишних запросов."""
+    if not _LIVE_CACHE.get("set"):
+        try:
+            _LIVE_CACHE["set"] = {c.get("transport") for c in all_channels()
+                                  if c.get("state") == "active"}
+        except Exception:
+            return set()
+    return _LIVE_CACHE["set"]
+
+
 def best_channel(phone: str = "", uid: str | int | None = None) -> str | None:
     """В каком канале писать этому человеку.
 
@@ -311,7 +327,7 @@ def best_channel(phone: str = "", uid: str | int | None = None) -> str | None:
             found.append(info.get("type") or "")
     if not found:
         return None
-    live = {c.get("transport") for c in all_channels() if c.get("state") == "active"}
+    live = _live_transports()
     for kind in PREFERRED:
         if kind not in found:
             continue

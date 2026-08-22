@@ -27,8 +27,10 @@
 from __future__ import annotations
 
 import json
+import os
 import logging
 import re
+import time
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 
@@ -37,6 +39,7 @@ from . import db
 from .moyklass_client import MoyklassClient
 
 log = logging.getLogger("kidsup.taskguard")
+SP = os.environ.get("KIDSUP_SCRATCH") or "/tmp/kidsup-calls"
 
 STAFF = {232763: "Ира", 232805: "Аня", 202856: "Лена",
          154181: "Лиза", 84116: "Борис", 229704: "Маша"}
@@ -101,7 +104,7 @@ PAGE_CAP = 2000
 
 
 def pull_all(mk: MoyklassClient, path: str, key: str, params: dict | None = None,
-             cap: int = 40000) -> list[dict]:
+             cap: int = 40000, cache_hours: float = 0) -> list[dict]:
     """Выкачать эндпоинт целиком, а не первые N страниц.
 
     21.08 выборка joins была ограничена тремя тысячами при 8082 записях
@@ -109,6 +112,21 @@ def pull_all(mk: MoyklassClient, path: str, key: str, params: dict | None = None
     ноль записей», хотя их был двадцать один. Молчаливое обрезание опаснее
     ошибки: цифра выглядит правдоподобно и её никто не перепроверяет.
     Поэтому предел здесь заведомо избыточный, а его достижение — громкое."""
+    # Тяжёлые справочники (абонементы, записи) меняются медленно, а тянутся
+    # по сто строк за запрос: десять тысяч абонементов — это сто запросов
+    # и несколько минут. Для них разрешён кэш на диске.
+    cf = None
+    if cache_hours:
+        import hashlib
+        tag = hashlib.sha256(f"{path}|{key}|{params}".encode()).hexdigest()[:16]
+        cf = f"{SP}/pull_{tag}.json"
+        try:
+            st = os.path.getmtime(cf)
+            if (time.time() - st) < cache_hours * 3600:
+                return json.load(open(cf))
+        except Exception:
+            pass
+
     out, off = [], 0
     while off < cap:
         q = dict(params or {})
@@ -116,11 +134,17 @@ def pull_all(mk: MoyklassClient, path: str, key: str, params: dict | None = None
         r = mk.get(path, q)
         rows = (r.get(key) if isinstance(r, dict) else r) or []
         if not rows:
-            return out
+            break
         out += rows
         off += 100
-    log.error("pull_all: %s отдал больше %d строк — выборка обрезана, "
-              "цифрам по ней доверять нельзя", path, cap)
+    else:
+        log.error("pull_all: %s отдал больше %d строк — выборка обрезана, "
+                  "цифрам по ней доверять нельзя", path, cap)
+    if cf:
+        try:
+            json.dump(out, open(cf, "w"), ensure_ascii=False)
+        except Exception:
+            pass
     return out
 
 

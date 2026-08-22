@@ -113,7 +113,7 @@ def collect() -> list[dict]:
                for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
         camp_ids = {cid for cid, nm in cls.items() if CAMP_RE.search(nm)}
         subs = taskguard.pull_all(mk, "/v1/company/userSubscriptions",
-                                  "subscriptions")
+                                  "subscriptions", cache_hours=6)
         camp = [s for s in subs
                 if set(s.get("classIds") or []) & camp_ids and s.get("userId")]
         this_ids = {cid for cid, nm in cls.items() if CAMP_THIS.search(nm)}
