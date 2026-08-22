@@ -2142,7 +2142,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.35"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.36"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -3113,6 +3113,21 @@ async def api_wazzup_raw(limit: int = 40, kind: str = ""):
                 pass
         return {"count": len(events), "top_keys": cnt.most_common()}
     return {"count": len(events), "events": events}
+
+
+@app.get("/vstrechi", response_class=HTMLResponse)
+async def vstrechi_page():
+    """Три события открытия сезона — публично, без пароля.
+
+    Ссылка идёт в WABA-шаблоны и в переписку с родителями, поэтому
+    страница не может быть за админской авторизацией. Собирается
+    из тех же данных, что и /enrollment, — расписание открытых уроков
+    на ней всегда совпадает с настоящим."""
+    f = BASE.parent / "docs" / "vstrechi.html"
+    if not f.exists():
+        raise HTTPException(404, "страница ещё не собрана (python3 -m app.events)")
+    return HTMLResponse(f.read_text(encoding="utf-8"),
+                        headers={"Cache-Control": "public, max-age=600"})
 
 
 @app.get("/site", response_class=HTMLResponse)
