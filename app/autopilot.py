@@ -560,8 +560,17 @@ def _broadcast_tick() -> None:
     # только реально живые номера: у заблокированного канала Wazzup принимает
     # сообщение, но не доставляет — при высоком темпе это потеря всей порции
     ok_states = {"active", "opened", "ready"}
+    # WABA (transport «wapi») — такой же отправитель, как обычный WhatsApp,
+    # и для массовых рассылок он основной: это официальный канал Meta с
+    # суточным лимитом в тысячи сообщений, тогда как обычные номера живут
+    # под угрозой бана и идут по квотам в десятки. До 22.08 очередь искала
+    # только transport == "whatsapp" и WABA не видела вовсе.
+    wa_kinds = {"whatsapp", "wapi"}
+    transport_of = {c.get("plainId"): c.get("transport") for c in chans
+                    if c.get("transport") in wa_kinds
+                    and str(c.get("state") or "").lower() in ok_states}
     active = [c.get("plainId") for c in chans
-              if c.get("transport") == "whatsapp"
+              if c.get("transport") in wa_kinds
               and str(c.get("state") or "").lower() in ok_states]
     pref = [p.strip() for p in (db.get_setting(
         "wa_senders", wazzup.WHATSAPP_PREFERRED) or "").split(",") if p.strip()]
@@ -619,12 +628,22 @@ def _broadcast_tick() -> None:
             "LIMIT 30").fetchall()
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
     team = _team_phones()
+    # сколько сообщений WABA отправляет за один тик (настройка wapi_burst)
+    wapi_burst = max(1, min(25, int(db.get_setting("wapi_burst", "8") or 8)))
+    sent_this_tick = 0
     for rid, phone, child, text, tried in rows:
-        if "whatsapp=" in tried:
+        # Недоставляемым считаем только после попытки ОБОИМИ каналами: у
+        # обычного номера и у WABA разные причины отказа, и неудача с одного
+        # ничего не говорит о втором. Прежняя проверка по одной метке
+        # хоронила строку после первой же осечки обычного номера — в том
+        # числе когда осечка была вызвана нашим же заблокированным каналом.
+        if "whatsapp=" in tried and "wapi=" in tried:
             with db.get_conn() as conn:
                 conn.execute("UPDATE broadcast_queue SET status='undeliverable' "
                              "WHERE id=?", (rid,))
             continue
+        if f"{transport_of.get(sender, 'whatsapp')}=" in tried:
+            continue                    # этим каналом уже пробовали — ждём другого
         # свои номера в очередь попадают легко: у сотрудников и педагогов
         # бывают карточки детей. Продающая рассылка своему человеку —
         # позор, поэтому проверяем перед каждой отправкой, а не при постановке
@@ -637,11 +656,14 @@ def _broadcast_tick() -> None:
             continue  # ждёт ответа админа — не сбрасываем непрочитанное, вернёмся позже
         msg = _fill_name(text, child)
         try:
-            ok = wazzup.send_via("whatsapp", phone, msg, dry_run=dry, sender=sender)
+            # у каждого номера свой транспорт: 3507 — WABA (wapi),
+            # остальные — обычный WhatsApp. Слать надо тем, чем номер живёт
+            tr = transport_of.get(sender, "whatsapp")
+            ok = wazzup.send_via(tr, phone, msg, dry_run=dry, sender=sender)
         except Exception as e:
             log.warning("wazzup whatsapp недоступен: %s", e)
             ok = False
-        mark = f"whatsapp={'ok' if ok else 'fail'};"
+        mark = f"{transport_of.get(sender, 'whatsapp')}={'ok' if ok else 'fail'};"
         with db.get_conn() as conn:
             if ok:
                 conn.execute("UPDATE broadcast_queue SET status='sent', sent=?, sender=?, "
@@ -650,9 +672,17 @@ def _broadcast_tick() -> None:
             else:
                 conn.execute("UPDATE broadcast_queue SET tried=COALESCE(tried,'')||? "
                              "WHERE id=?", (mark, rid))
-        log.info("broadcast: #%s %s -> whatsapp(%s) %s", rid, phone[-4:],
-                 sender[-4:], "ok" if ok else "fail")
-        break                           # одна отправка за тик — темп держит wa_per_hour
+        log.info("broadcast: #%s %s -> %s(%s) %s", rid, phone[-4:],
+                 transport_of.get(sender, "whatsapp"), sender[-4:],
+                 "ok" if ok else "fail")
+        # Обычный номер шлёт по одному сообщению за тик: ровный редкий темп —
+        # его единственная защита от бана. У WABA такой угрозы нет, это
+        # официальный канал с суточным лимитом в тысячи, и по одному в минуту
+        # очередь в несколько сотен растянулась бы на дни — к дате смены
+        # рассылка просто не успевала бы.
+        sent_this_tick += 1
+        if transport_of.get(sender) != "wapi" or sent_this_tick >= wapi_burst:
+            break
 
 
 def sync_admin_phones(mk: MoyklassClient) -> dict:

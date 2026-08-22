@@ -30,7 +30,11 @@ API = "https://api.wazzup24.com/v3"
 # блокировкой. MAX-канал уже заблокирован. tgapi/max оставлены только для
 # явной отправки через send_via (например, ответ в уже открытый диалог).
 CASCADE = ["whatsapp"]
-CHAT_TYPE = {"whatsapp": "whatsapp", "tgapi": "telegram", "max": "max", "vk": "vk"}
+# chatType — это тип ДИАЛОГА, а не название транспорта. У WABA транспорт
+# зовётся «wapi», но диалог всё равно whatsapp: без этой строки уходило
+# chatType="wapi", которого у Wazzup нет.
+CHAT_TYPE = {"whatsapp": "whatsapp", "wapi": "whatsapp",
+             "tgapi": "telegram", "max": "max", "vk": "vk"}
 # Порядок предпочтения WhatsApp-номеров (настройка wa_senders, через запятую).
 # 0077 стоит ПОСЛЕДНИМ намеренно: это канал переписки с историей банов, его
 # квота — считанные сообщения в день. 22.08 он был первым в этой константе,

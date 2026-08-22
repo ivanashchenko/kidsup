@@ -2137,7 +2137,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-22.19"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-22.22"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2808,6 +2808,24 @@ async def api_broadcast_prune(payload: dict = None):
     """Убрать из очереди семьи, которые занимаются у нас этим летом."""
     from . import autopilot
     return autopilot.broadcast_prune_active((payload or {}).get("campaign", "camp_aug26"))
+
+
+@app.post("/api/broadcast/requeue", dependencies=AUTH)
+async def api_broadcast_requeue(payload: dict = None):
+    """Вернуть в очередь то, что помечено недоставляемым: {"campaign": "..."}.
+
+    Нужно, когда отказ был не по вине адресата, а по нашей — например
+    отправка шла через заблокированный номер, и Wazzup принимал сообщения,
+    не доставляя их. Метки попыток снимаем, иначе строка снова упрётся
+    в проверку «этим каналом уже пробовали»."""
+    campaign = ((payload or {}).get("campaign") or "").strip()
+    if not campaign:
+        raise HTTPException(400, "нужен campaign")
+    with db.get_conn() as conn:
+        n = conn.execute(
+            "UPDATE broadcast_queue SET status='pending', tried='', sender=NULL "
+            "WHERE campaign=? AND status='undeliverable'", (campaign,)).rowcount
+    return {"ok": True, "campaign": campaign, "вернулось_в_очередь": n}
 
 
 @app.get("/api/broadcast/status", dependencies=AUTH)
