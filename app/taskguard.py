@@ -255,6 +255,61 @@ def _reassign(mk: MoyklassClient, t: dict, to: int) -> bool:
         return False
 
 
+def _closed_without_touch(mk: MoyklassClient, day: str) -> dict:
+    """Задачи, закрытые сегодня по клиенту, которого не набирали и которому
+    не писали. Закрытая задача выглядит как сделанная работа — и именно
+    поэтому её надо проверять: иначе список пустеет, а клиенты остаются
+    нетронутыми."""
+    out = {"сколько": 0, "кто": {}, "примеры": []}
+    try:
+        from . import mango
+        from datetime import datetime, timedelta, timezone
+        msk = timezone(timedelta(hours=3))
+        now = datetime.now(msk)
+        rows = mango.calls(now - timedelta(days=2), now)
+    except Exception:
+        return out
+    touched = set()
+    for r in rows:
+        for f in ("from_num", "to_num"):
+            d = "".join(c for c in str(r.get(f) or "") if c.isdigit())[-10:]
+            if len(d) == 10:
+                touched.add(d)
+    try:
+        with db.get_conn() as conn:
+            for tbl in ("wazzup_outbox", "wazzup_inbox"):
+                try:
+                    for (ph,) in conn.execute(
+                            f"SELECT DISTINCT phone FROM {tbl} WHERE ts >= ?",
+                            (day,)):
+                        touched.add(str(ph or "")[-10:])
+                except Exception:
+                    pass
+            phones = {uid: "".join(c for c in str(p or "") if c.isdigit())[-10:]
+                      for uid, p in conn.execute("SELECT id, phone FROM users")}
+    except Exception:
+        phones = {}
+    by_who: Counter = Counter()
+    for mid, name in STAFF.items():
+        for t in all_tasks(mk, mid):
+            if not (t.get("isComplete") or t.get("isCompleted")):
+                continue
+            if (t.get("beginDate") or "")[:10] != day:
+                continue
+            body = t.get("body") or ""
+            # Своё же закрытие работой администратора не считаем.
+            if MY_CLOSURE.search(body) or not t.get("userId"):
+                continue
+            ph = phones.get(t["userId"])
+            if ph and ph not in touched:
+                out["сколько"] += 1
+                by_who[name] += 1
+                if len(out["примеры"]) < 5:
+                    out["примеры"].append(f"{name}: {body[:90]}")
+    out["кто"] = dict(by_who)
+    return out
+
+
 def check(mk: MoyklassClient, fix: bool = True) -> dict:
     from .autopilot import _real_number
 
@@ -330,6 +385,12 @@ def check(mk: MoyklassClient, fix: bool = True) -> dict:
                                 else CAT_ORG):
                 fixed["без категории"] += 1
 
+    # Закрыто без единого касания клиента. 22.08 выяснилось, что 57 задач
+    # «позвонить прошлогоднему клиенту» закрыли, ни разу не набрав и ничего
+    # не написав. Это не видно ни в одной сводке: закрытая задача выглядит
+    # как сделанная работа. Считаем и показываем — решение за владельцем.
+    ghost_closed = _closed_without_touch(mk, today)
+
     # Считаем то, что чинить автоматически нельзя.
     live = _open_tasks(mk) if fix and fixed else tasks
     dups = sum(v - 1 for v in
@@ -346,7 +407,9 @@ def check(mk: MoyklassClient, fix: bool = True) -> dict:
         "открытых": len(live),
         "починено": dict(fixed),
         "требует_меня": {"дублей": dups, "шаблонных": templates,
-                         "спорных": len(unclear)},
+                         "спорных": len(unclear),
+                         "закрыто_без_касания": ghost_closed["сколько"]},
+        "закрыто_без_касания": ghost_closed,
         "спорные": unclear[:20],
         "нагрузка": {who: dict(sorted(c.items())) for who, c in load.items()},
     }

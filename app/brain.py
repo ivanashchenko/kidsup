@@ -81,7 +81,8 @@ def _cache_save(d: dict) -> None:
 
 
 def ask(system: str, user: str, schema: dict, name: str = "answer",
-        model: str | None = None, cache: bool = True) -> dict | None:
+        model: str | None = None, cache: bool = True,
+        max_tokens: int = 900) -> dict | None:
     """Спросить модель и получить строго структурированный ответ.
 
     Возвращает None, если связи нет или ответ не разобрался, — вызывающий
@@ -100,7 +101,10 @@ def ask(system: str, user: str, schema: dict, name: str = "answer",
     # это выглядит как «модель не работает».
     body = {
         "model": model or db.get_setting("assistant_model") or DEFAULT_MODEL,
-        "max_tokens": 900,
+        # Ответ, не влезший в лимит, обрывается на полуслове, и tool_use
+        # приходит неполным — снаружи это выглядит как «модель молчит».
+        # Разбору пачки задач нужно заметно больше, чем одиночному вопросу.
+        "max_tokens": max_tokens,
         "system": system,
         "messages": [{"role": "user", "content": user}],
         "tools": [{"name": name, "description": "Верни разбор в этой структуре.",
