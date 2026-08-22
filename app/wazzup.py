@@ -273,3 +273,61 @@ def who_is(chat_id: str) -> dict | None:
     hits = [v for k, v in m.items() if k.endswith(tail)]
     return hits[0] if len(hits) == 1 else None
 
+# --- выбор канала: где человеку уже удобно ----------------------------------
+
+# Порядок предпочтения. Первыми — бесплатные каналы, где человек уже пишет
+# сам; WABA последним: там каждое сообщение платное, и это единственный
+# канал, где можно написать первым по номеру телефона.
+# Тип контакта и название транспорта — разные слова для одного канала:
+# в контактах лежит «telegram», а канал в списке называется «tgapi».
+# Без сопоставления выбор канала молча не находил ничего.
+BY_CONTACT_TYPE = {
+    "telegram": ["tgapi"],
+    "max": ["max"],
+    "vk": ["vk"],
+    "instagram": ["instagram"],
+    "whatsapp": ["whatsapp", "wapi"],
+}
+# Порядок предпочтения по типу контакта: сначала бесплатные каналы,
+# где человек пишет сам; WABA последним — там каждое сообщение платное.
+PREFERRED = ["telegram", "max", "vk", "instagram", "whatsapp"]
+
+
+def best_channel(phone: str = "", uid: str | int | None = None) -> str | None:
+    """В каком канале писать этому человеку.
+
+    Смысл: если семья уже переписывается с нами в Telegram, писать ей
+    в WABA — платить за то, что можно сделать бесплатно, да ещё и в менее
+    удобном для неё месте. А если её нигде нет, кроме телефона, — только
+    WABA: в Telegram и MAX первым написать нельзя, там диалог начинает
+    пользователь."""
+    digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
+    m = contacts()
+    found = []
+    for cid, info in m.items():
+        if uid is not None and str(info.get("uid")) == str(uid):
+            found.append(info.get("type") or "")
+        elif digits and cid[-10:] == digits:
+            found.append(info.get("type") or "")
+    if not found:
+        return None
+    live = {c.get("transport") for c in all_channels() if c.get("state") == "active"}
+    for kind in PREFERRED:
+        if kind not in found:
+            continue
+        for transport in BY_CONTACT_TYPE.get(kind, [kind]):
+            if transport in live:
+                return transport
+    return None
+
+
+def send_smart(phone: str, text: str, uid: str | int | None = None,
+               dry_run: bool = True) -> list[str]:
+    """Отправить туда, где человеку удобно, а если негде — в WABA."""
+    t = best_channel(phone, uid)
+    if t:
+        return send(phone, text, mode="cascade", dry_run=dry_run, transports=[t])
+    # Нигде не пишет — остаётся официальный канал WhatsApp.
+    return send(phone, text, mode="cascade", dry_run=dry_run,
+                transports=["wapi", "whatsapp"])
+
