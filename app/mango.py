@@ -12,6 +12,7 @@
 import argparse
 import hashlib
 import json
+import re
 import time
 from datetime import datetime, timedelta
 
@@ -25,6 +26,20 @@ API = "https://app.mango-office.ru/vpbx/"
 # 20 — их рабочее место, 21 — мобильный их сотрудника. Их звонки не анализируем,
 # не показываем в отчётах и не создаём по ним задачи.
 FOREIGN_EXTS = {"21"}
+
+# Аппарат в CDR надёжнее опознаётся по SIP-логину, чем по from_extension.
+# 23.08 звонки трубки 10 (мама, обзвон по листу) поехали в отчёт с добавочным
+# 12: в статистике вышло, что один администратор ведёт два разговора
+# одновременно, а трубка 10 за день не набрала никого. Логин при этом
+# оставался свой — user1, — и по нему потоки разделяются точно.
+# Соответствие снято с 16-20.08, когда добавочный ещё проставлялся верно.
+SIP_EXT = {"user1": "10", "user5": "12", "user3": "15", "user2": "20"}
+_SIP_RE = re.compile(r"sip:(user\d+)@")
+
+
+def _sip_login(num: str) -> str:
+    m = _SIP_RE.search(num or "")
+    return m.group(1) if m else ""
 # 20 — Надежда Иванащенко, звонит по нашей базе из Клуба Буракова.
 PARTNER_EXTS = {"20"}
 
@@ -78,10 +93,11 @@ def calls(date_from: datetime, date_to: datetime) -> list[dict]:
         # Надежда Иванащенко (Клуб Буракова, Люберцы) по НАШЕЙ базе, и такие
         # звонки — наши: их надо разбирать и заводить записи. Чей звонок,
         # решает не добавочный, а собеседник: есть ли он в нашей CRM.
+        sip = _sip_login(p[5] if p[4] else p[7])
         rows.append({
             "start": int(p[1] or 0), "finish": int(p[2] or 0), "answer": int(p[3] or 0),
             "from_ext": p[4], "from_num": p[5], "to_ext": p[6], "to_num": p[7],
-            "reason": p[8],
+            "reason": p[8], "sip": sip, "ext": SIP_EXT.get(sip) or p[4],
         })
     return rows
 
@@ -103,9 +119,9 @@ def report(day: str | None = None, rows: list[dict] | None = None) -> list[dict]
     names = users()
     stats: dict[str, dict] = {}
     for r in rows:
-        ext = r["from_ext"]
-        if not ext:  # входящие без добавочного пропускаем в разрезе исходящих
+        if not r["from_ext"]:  # входящие в разрезе исходящих не считаем
             continue
+        ext = r.get("ext") or r["from_ext"]
         s = stats.setdefault(ext, {
             "admin": names.get(ext, f"доб. {ext}"), "attempts": 0, "answered": 0,
             "talk_sec": 0, "numbers": set()})
