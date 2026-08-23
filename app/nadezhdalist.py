@@ -100,6 +100,28 @@ def _teacher(group: str) -> str | None:
     return "Катя"
 
 
+# Пометка в имени карточки бывает двух родов, и путать их нельзя.
+# «Никогда не звонить» — прямой запрет: такой семье звонок испортит
+# отношения, и в лист обзвона она попадать не должна. «Писать в телеграм» —
+# всего лишь предпочтение канала, звонить можно, но лучше начать с письма.
+NO_CALL_MARK = re.compile(r"не\s*звонить|не\s*звоните|не\s*беспоко", re.I)
+PREFER_TEXT = re.compile(r"писать\s+в|только\s+пис", re.I)
+
+
+def _clean_name(name: str) -> str:
+    """Имя для печатного листа.
+
+    В карточках попадаются служебные заголовки («Звонок от 79262797354»)
+    и имена из одних эмодзи. В списке, по которому звонит человек, это
+    выглядит как сбой и мешает: лучше честное «имя не указано» и телефон
+    рядом, чем флажок вместо ребёнка."""
+    n = (name or "").strip()
+    bare = re.sub(r"[^\w\s\-().]", "", n, flags=re.UNICODE).strip()
+    if not bare or re.fullmatch(r"(Звонок от\s*)?[\d\s+()-]*", n):
+        return "имя не указано"
+    return n
+
+
 def _families(n: int) -> str:
     """«161 семья», а не «161 семей» — иначе лист читается как машинный."""
     last, tail = n % 10, n % 100
@@ -214,8 +236,11 @@ def collect() -> list[dict]:
         # есть тёплые, которые центр уже знают.
         if u["id"] not in recent:
             continue
+        # «Никогда не звонить» — прямой запрет, такой семье звонок только навредит
+        if NO_CALL_MARK.search(u.get("name") or ""):
+            continue
         out.append({
-            "uid": u["id"], "name": (u.get("name") or "").strip(),
+            "uid": u["id"], "name": _clean_name(u.get("name") or ""),
             "phone": "+" + phone[-11:], "age": age,
             "state": STATE_NAME.get(u.get("clientStateId"), "архив"),
             "state_id": u.get("clientStateId"),
@@ -258,6 +283,8 @@ def build(rows: list[dict] | None = None) -> str:
             was = ", ".join(c["was"]) or "—"
             last = c["last"][:7] if c["last"] else "—"
             mark = ' <span class="busy">админ звонит</span>' if c["busy"] else ""
+            if PREFER_TEXT.search(c["name"]):
+                mark += ' <span class="wr">лучше написать</span>' 
             trs.append(
                 f"<tr><td class='nm'>{H.escape(c['name'])}{mark}</td>"
                 f"<td class='ag'>{c['age']:g}</td>"
@@ -269,9 +296,9 @@ def build(rows: list[dict] | None = None) -> str:
                 f"<td class='res'></td></tr>")
         blocks.append(f"""<section class="sheet">
   <div class="sh"><h2>{a} лет к 1 сентября</h2><span>{len(items)} детей</span></div>
-  <table class="c"><tr><th>ребёнок</th><th>возр.</th><th>телефон</th>
+  <table class="c"><thead><tr><th>ребёнок</th><th>возр.</th><th>телефон</th>
     <th>что было у нас</th><th>педагог ПШ</th><th>когда</th><th>статус</th>
-    <th class="res">итог разговора</th></tr>{"".join(trs)}</table>
+    <th class="res">итог разговора</th></tr></thead><tbody>{"".join(trs)}</tbody></table>
 </section>""")
 
     warm = sum(1 for c in rows if c["state"] in ("думает", "недозвон", "новый лид"))
@@ -305,12 +332,27 @@ table.c th{{background:var(--fill);font-size:.78rem;font-weight:750}}
 .st{{width:6rem;color:var(--muted);font-size:.8rem}}
 .res{{width:13rem}}
 .busy{{font-size:.68rem;color:#B03A2E;font-weight:700;white-space:nowrap}}
+.wr{{font-size:.68rem;color:#1DA7E0;font-weight:700;white-space:nowrap}}
 .note{{background:var(--fill);border-left:3px solid var(--indigo);
  padding:.5rem .7rem;margin:.7rem 0;font-size:.86rem;break-inside:avoid}}
 @media print{{
+ /* 8pt читались только с лупой, а звонить по такому листу час подряд.
+    11pt с частым межстрочным — вдвое больше страниц, но лист рабочий. */
  .wrap{{max-width:none;padding:0}}
- table.c{{font-size:8pt}} .nm{{width:auto}}
- @page{{size:A4 landscape;margin:10mm}}
+ table.c{{font-size:11pt}}
+ table.c th,table.c td{{padding:.34rem .45rem}}
+ .nm{{width:auto;font-size:11.5pt}}
+ .ph{{font-size:12pt;font-weight:700}}
+ .st,.tch,.dt{{font-size:10pt}}
+ .busy{{font-size:9pt}}
+ .lead,.note{{font-size:10pt}}
+ h1{{font-size:16pt}} h2{{font-size:13pt}}
+ .note{{page-break-inside:avoid}}
+ .sheet{{page-break-before:always}}
+ .sheet:first-of-type{{page-break-before:auto}}
+ tr{{page-break-inside:avoid}}
+ thead{{display:table-header-group}}
+ @page{{size:A4 landscape;margin:8mm}}
 }}
 </style></head><body><div class="wrap">
 <h1>Обзвон: подготовка к школе</h1>
