@@ -87,9 +87,13 @@ def calls(date_from: datetime, date_to: datetime) -> list[dict]:
 
 
 def _day_calls(day: str | None) -> list[dict]:
-    d = datetime.strptime(day, "%Y-%m-%d") if day else datetime.now().replace(
+    now = datetime.now()
+    d = datetime.strptime(day, "%Y-%m-%d") if day else now.replace(
         hour=0, minute=0, second=0, microsecond=0)
-    return calls(d, d + timedelta(days=1))
+    # Манго отвергает date_to в будущем («must be not more than the current
+    # date»), поэтому для текущего дня границей служит сейчас, а не полночь
+    # следующего. Раньше сводка за сегодня просто падала с 400.
+    return calls(d, min(d + timedelta(days=1), now))
 
 
 def report(day: str | None = None, rows: list[dict] | None = None) -> list[dict]:
