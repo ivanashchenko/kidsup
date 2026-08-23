@@ -2160,7 +2160,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-23.11"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-23.13"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -3062,15 +3062,16 @@ def api_broadcast_free_list(limit: int = 200):
             "WHERE status='pending' LIMIT 4000").fetchall()
     for r in rows:
         phone = r["phone"] or ""
+        uid = autopilot._uid_by_phone(phone)
         try:
-            tr = wazzup.best_channel(phone, mass=True)
+            tr = wazzup.best_channel(phone, uid, mass=True)
         except Exception:
             continue
         if tr not in ("tgapi", "max"):
             continue
         out.append({"id": r["id"], "campaign": r["campaign"], "transport": tr,
                     "phone": phone, "child": r["child"],
-                    "uid": autopilot._uid_by_phone(phone), "text": r["text"]})
+                    "uid": uid, "text": r["text"]})
         if len(out) >= limit:
             break
     return {"всего": len(out), "письма": out}
@@ -3111,11 +3112,14 @@ def api_broadcast_channels(campaign: str = ""):
     out: dict = {}
     for r in rows:
         phone = r["phone"] or ""
+        # uid обязателен: телеграм-контакт по телефону не найти, у него
+        # телефона нет вовсе — без карточки всё уезжало бы в WABA
+        uid = autopilot._uid_by_phone(phone)
         try:
-            tr = wazzup.best_channel(phone, mass=True) or "wapi"
+            tr = wazzup.best_channel(phone, uid, mass=True) or "wapi"
         except Exception:
             tr = "wapi"
-        if tr == "wapi" and not autopilot._uid_by_phone(phone):
+        if tr == "wapi" and not uid:
             tr = "wapi (без карточки)"
         c = out.setdefault(r["campaign"], {})
         c[tr] = c.get(tr, 0) + 1

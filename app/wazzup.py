@@ -458,10 +458,15 @@ def channels_for(phone: str = "", uid: str | int | None = None,
     """
     digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
     by_uid, by_phone = _contact_index()
+    # Считается только НАСТОЯЩАЯ переписка. Указатель контактов Wazzup
+    # содержит того, с кем диалог уже был: без диалога chatId не существует.
+    # Пометку в имени карточки («(MAX)», «писать в телеграмм») сюда НЕ
+    # берём — это пожелание администратора, а не факт переписки: у семьи
+    # может стоять пометка, а диалога с нами в этом мессенджере нет,
+    # и сообщение уйдёт в пустоту.
     found = list(by_uid.get(str(uid), [])) if uid is not None else []
     if not found and digits:
         found = list(by_phone.get(digits, []))
-    found += _marked_in_crm(digits)
     live = _live_transports()
 
     out: list[str] = []
