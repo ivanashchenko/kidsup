@@ -2160,7 +2160,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-23.10"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-23.11"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2214,7 +2214,10 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "waba_template_id", "waba_templates",
             # номера, закрытые для любой отправки — включая Telegram и MAX,
             # которые могут висеть на том же аккаунте
-            "blocked_senders"}
+            "blocked_senders",
+            # номер WhatsApp для разовых сообщений: 0077 как канал переписки,
+            # а пока он выведен из работы — резервный
+            "chat_whatsapp"}
 
 
 # Значения, которые нельзя отдавать целиком даже по авторизованному запросу.

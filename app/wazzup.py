@@ -215,9 +215,14 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
     # только к WhatsApp, а на том же номере висят Telegram и MAX. В итоге
     # 42 сообщения ушли ровно через тот аккаунт, который выводили. Настройка
     # blocked_senders режет любой транспорт, привязанный к номеру.
+    # Формат записи: «номер» закрывает все каналы аккаунта, «номер:транспорт» —
+    # только один. Второе нужно потому, что на 0077 висят сразу три канала:
+    # WhatsApp там отвалился и выведен из работы, а Telegram и MAX живы
+    # и по правилу владельца остаются рабочими.
     banned = {x.strip() for x in
               (db.get_setting("blocked_senders", "") or "").split(",") if x.strip()}
-    if str(ch.get("plainId") or "") in banned:
+    num = str(ch.get("plainId") or "")
+    if num in banned or f"{num}:{transport}" in banned:
         logging.getLogger("kidsup.wazzup").warning(
             "канал %s (%s) закрыт настройкой blocked_senders — отправка отменена",
             ch.get("plainId"), transport)
@@ -429,21 +434,28 @@ def _live_transports() -> set:
     return _LIVE_CACHE["set"]
 
 
-def best_channel(phone: str = "", uid: str | int | None = None,
-                 mass: bool = False) -> str | None:
-    """В каком канале писать этому человеку. Правило владельца от 22.08.
+def channels_for(phone: str = "", uid: str | int | None = None,
+                 mass: bool = False) -> list[str]:
+    """Все каналы, куда идёт это сообщение. Правило владельца от 23.08.
 
-    Первым делом — MAX или Telegram, если там уже есть переписка: это
-    бесплатно и там, где семье удобно. Если переписки нет, канал зависит
-    от того, что мы шлём:
-      · массовое (mass=True) — только WABA 3507. Это официальный канал
-        Meta, у него нет риска бана и есть суточный лимит в тысячи;
-      · разовое (mass=False) — обычный WhatsApp 0077, канал переписки.
+    Общее для обоих случаев: смотрим, где с семьёй УЖЕ есть переписка.
+    Есть и в MAX, и в Telegram — пишем в оба, а не выбираем один: человек
+    читает тот мессенджер, который открыл, и угадывать за него незачем.
 
-    Разделение принципиальное: 0077 живёт под угрозой бана и на массовом
-    потоке отваливается (22.08 так и вышло — номер ушёл в «не авторизован»),
-    а WABA вне 24-часового окна пропускает только утверждённые шаблоны и
-    для живого разового ответа не годится."""
+    Дальше пути расходятся, и это принципиально:
+
+    · РАЗОВОЕ сообщение (mass=False) — ответ конкретному человеку. К мессенджерам
+      ВСЕГДА добавляется WhatsApp, даже если переписка уже нашлась: разовых
+      немного, и лучше продублировать, чем не достучаться. Номер берётся
+      из настройки chat_whatsapp — 0077 как канал переписки, а пока он выведен
+      из работы, туда прописан 0918.
+
+    · РАССЫЛКА (mass=True) — WhatsApp только через WABA 3507 и только
+      утверждённым шаблоном. Обычный номер на массовом потоке отваливается:
+      22.08 через 0077 ушла рассылка по лагерю, и он ушёл в «не авторизован».
+      И если переписка в MAX или Telegram есть, WABA не добавляем — платить
+      за то, что уже доставлено бесплатно, незачем.
+    """
     digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
     by_uid, by_phone = _contact_index()
     found = list(by_uid.get(str(uid), [])) if uid is not None else []
@@ -451,15 +463,27 @@ def best_channel(phone: str = "", uid: str | int | None = None,
         found = list(by_phone.get(digits, []))
     found += _marked_in_crm(digits)
     live = _live_transports()
-    # ступень 1: переписка в MAX или Telegram
-    for kind in ("telegram", "max"):
+
+    out: list[str] = []
+    for kind in ("max", "telegram"):
         if kind not in found:
             continue
         for transport in BY_CONTACT_TYPE.get(kind, [kind]):
-            if transport in live:
-                return transport
-    # ступень 2: WhatsApp — какой именно, решает тип отправки
-    return "wapi" if mass else "whatsapp"
+            if transport in live and transport not in out:
+                out.append(transport)
+    if mass:
+        # рассылка: мессенджеры покрыли — хватит, иначе платный WABA
+        return out or ["wapi"]
+    # разовое: WhatsApp идёт всегда, вдобавок к найденным мессенджерам
+    out.append("whatsapp")
+    return out
+
+
+def best_channel(phone: str = "", uid: str | int | None = None,
+                 mass: bool = False) -> str | None:
+    """Первый канал из channels_for — для мест, где нужен ровно один."""
+    got = channels_for(phone, uid, mass=mass)
+    return got[0] if got else None
 
 
 def templates() -> list[dict]:
@@ -540,10 +564,24 @@ CHAT_SENDER = "79165610077"
 
 
 def send_smart(phone: str, text: str, uid: str | int | None = None,
-               dry_run: bool = True, mass: bool = False) -> list[str]:
-    """Отправить туда, где человеку удобно, по правилу best_channel."""
-    t = best_channel(phone, uid, mass=mass) or ("wapi" if mass else "whatsapp")
-    sender = WABA_SENDER if t == "wapi" else (CHAT_SENDER if t == "whatsapp" else None)
-    ok = send_via(t, phone, text, dry_run=dry_run, sender=sender)
-    return [f"{t}({sender or '—'}) → {phone}: {'ok' if ok else 'fail'}"]
+               dry_run: bool = True, mass: bool = False,
+               template_values: list | None = None) -> list[str]:
+    """Отправить по всем каналам, которые положены этому адресату.
+
+    Разовому сообщению каналов может быть несколько — MAX, Telegram
+    и обязательный WhatsApp; рассылке обычно один. Возвращает по строке
+    на канал, чтобы в журнале было видно каждую попытку отдельно."""
+    log = []
+    for t in channels_for(phone, uid, mass=mass):
+        sender = None
+        if t == "wapi":
+            sender = WABA_SENDER
+        elif t == "whatsapp":
+            # Канал переписки задаётся настройкой: пока 0077 выведен
+            # из работы, разовые уходят с резервного номера.
+            sender = db.get_setting("chat_whatsapp", CHAT_SENDER) or CHAT_SENDER
+        ok = send_via(t, phone, text, dry_run=dry_run, sender=sender, uid=uid,
+                      template_values=template_values)
+        log.append(f"{t}({sender or '—'}) → {phone}: {'ok' if ok else 'fail'}")
+    return log or [f"— → {phone}: каналов нет"]
 
