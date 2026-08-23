@@ -168,29 +168,71 @@ def page(title: str, sub: str, rows: list[dict], cols: list[tuple]) -> str:
     return "\n".join(out)
 
 
+def _busy_phones(mk) -> set[str]:
+    """Телефоны, по которым у администратора уже висит открытая задача.
+
+    Такой клиент завтра получит звонок от того, на ком задача. Если он
+    же стоит в печатном листе, ему позвонят дважды из одного центра —
+    ровно то, из-за чего 23.08 семья Радюхиных выслушала нас два раза
+    за день. Печатный лист и очередь задач должны не пересекаться."""
+    users = taskguard.pull_all(mk, "/v1/company/users", "users", cache_hours=3)
+    ph = {u["id"]: "".join(c for c in str(u.get("phone") or "") if c.isdigit())[-10:]
+          for u in users}
+    out = set()
+    for mid in (232805, 232763, 202856, 154181):
+        for t in taskguard.all_tasks(mk, mid):
+            if (t.get("isComplete") or t.get("isCompleted")) or not t.get("userId"):
+                continue
+            p = ph.get(t["userId"])
+            if p and len(p) == 10:
+                out.add(p)
+    return out
+
+
 def build() -> dict:
     from pathlib import Path
     docs = Path(__file__).resolve().parent.parent / "docs"
     mother = _mother_list()
     talked = _talked_today()
-    log.info("список Надежды: %d, сегодня поговорили: %d", len(mother), len(talked))
+    mk0 = MoyklassClient(sync.get_api_key())
+    try:
+        busy = _busy_phones(mk0)
+    finally:
+        mk0.close()
+    log.info("список Надежды: %d, вчера поговорили: %d, занято задачами: %d",
+             len(mother), len(talked), len(busy))
 
     def fit(r):
-        return r["phone"] not in talked and r["state"] != "думает"
+        return (r["phone"] not in talked and r["phone"] not in busy
+                and r["state"] != "думает")
 
     lena = [r for r in mother if r["teacher"] in ("Катя", "Инга", "Инга, Катя") and fit(r)]
-    burak = [r for r in mother if r["teacher"] not in ("Катя", "Инга", "Инга, Катя") and fit(r)]
+    # У семьи бывает двое детей: один занимался у Кати, другой нет — и
+    # один номер попадает в оба листа. Звонок в семью один, поэтому
+    # приоритет у Лены: с ней родителю есть о чём говорить предметно.
+    lena_phones = {r["phone"] for r in lena}
+    burak = [r for r in mother
+             if r["teacher"] not in ("Катя", "Инга", "Инга, Катя")
+             and r["phone"] not in lena_phones and fit(r)]
 
     # добор из общего возрастного листа: у звонящего работа не должна
     # кончиться через полтора часа
     extra = [r for r in prozvon.collect()
-             if r["phone"] not in talked
+             if r["phone"] not in talked and r["phone"] not in busy
              and r["phone"] not in {x["phone"] for x in mother}]
+    # Добор делится пополам между листами: одна и та же половина не
+    # должна попасть в оба — иначе двое звонят одному человеку.
     half = len(extra) // 2
     for lst, pool in ((lena, extra[:half]), (burak, extra[half:])):
+        # в seen кладём номера ОБОИХ листов: добор второго не должен
+        # попасть на семью, уже стоящую в первом
+        seen = {x["phone"] for x in lena} | {x["phone"] for x in burak}
         for r in pool:
             if len(lst) >= TARGET:
                 break
+            if r["phone"] in seen:
+                continue
+            seen.add(r["phone"])
             lst.append({"name": r["name"], "age": ("%g" % r["age"]).replace(".", ",")
                         if r["age"] else "—", "phone": r["phone"],
                         "was": ", ".join(r["was"]) or "занимался у нас",
@@ -201,7 +243,14 @@ def build() -> dict:
         irina = _english_7_12(mk)
     finally:
         mk.close()
-    irina = [r for r in irina if r["phone"] not in talked][:IRINA_TARGET]
+    # Лист Ирины собирается по своему признаку (английский 7-12), поэтому
+    # без явного вычитания в него попадают те же семьи, что уже стоят у
+    # Лены и Буракова: в первой сборке пересечение было 82 человека из 86.
+    # Один номер — один лист, иначе смысл разделения теряется.
+    taken = {r["phone"] for r in lena} | {r["phone"] for r in burak}
+    irina = [r for r in irina
+             if r["phone"] not in talked and r["phone"] not in busy
+             and r["phone"] not in taken][:IRINA_TARGET]
     for r in irina:
         r["band"] = ("занимались в прошлом сезоне" if r["tier"] == "свежие"
                      else "занимались раньше")
