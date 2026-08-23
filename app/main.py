@@ -800,6 +800,11 @@ DOC_GROUPS = [
          "Каждый контакт с листов: карточка, статус, кто и сколько звонил (срез 18.08)"),
     ]),
     ("Каждый день на смене", [
+        ("__url:/perepiska", "💬 Переписка: что спросили и что мы ответили",
+         "Все диалоги без ответа за день. Зелёным — то, на что отвечаю сам "
+         "(расписание, цены, адрес) с точными цифрами из прайса и CRM; серым — "
+         "то, что уходит администратору: оплаты, переносы, жалобы. "
+         "Страница ничего не отправляет, пока не нажать кнопку"),
         ("__url:/ochered", "☎️ Очередь на сегодня — звонить отсюда",
          "Список задач дежурного с телефонами и кнопками итога: записан, "
          "перезвонить, не актуально, не дозвонились. Отметка закрывает задачу "
@@ -985,12 +990,59 @@ def base_page(request: Request):
 
 @app.get("/api/perepiska", dependencies=AUTH)
 def perepiska_report(day: str | None = None, send: int = 0):
-    """Отчёт по переписке: что спросили, что ответили, что ушло человеку.
-
-    По умолчанию ничего не отправляет — только показывает. send=1
-    отправляет ответы и пишет их в карточки."""
+    """Отчёт по переписке машинным форматом. Человеку — /perepiska."""
     from . import perepiska as P
     return P.run(day=day, dry=not send)
+
+
+@app.get("/perepiska", response_class=HTMLResponse, dependencies=AUTH)
+def perepiska_page(request: Request, day: str | None = None, send: int = 0):
+    """Что спросили в переписке и что мы ответили — читаемой страницей.
+
+    Открывается без параметров и НИЧЕГО не отправляет: сначала владелец
+    смотрит тексты, и только ссылка «отправить» пускает их клиентам."""
+    from . import perepiska as P
+    import html as _h
+    r = P.run(day=day, dry=not send)
+    rows = []
+    for x in r["строки"]:
+        mine = x["action"] != "человеку"
+        rows.append(
+            f"<tr class='{'mine' if mine else 'human'}'>"
+            f"<td><b>{_h.escape(x['name'][:28] or '—')}</b><br>"
+            f"<span class=ph>+7{x['phone']}</span></td>"
+            f"<td>{_h.escape(x['topic'] or '—')}"
+            f"{'<br><i>' + _h.escape(x['subject']) + '</i>' if x.get('subject') else ''}</td>"
+            f"<td class=q>{_h.escape(x['text'][:400])}</td>"
+            f"<td class=a>{_h.escape(x.get('answer') or '') or '<i>пишет администратор</i>'}"
+            f"{'<div class=bk>запись: ' + _h.escape(x['booked']) + '</div>' if x.get('booked') else ''}</td>"
+            f"<td>{_h.escape(x['action'])}</td></tr>")
+    night = ("<div class=warn>Сейчас вне рабочих часов центра (9:00–20:00 МСК) — "
+             "отправка отложена до утра.</div>" if r["ночь"] else "")
+    body = f"""<style>
+    body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:16px;color:#222}}
+    h1{{font-size:20px;margin:0 0 4px}} .sub{{color:#666;font-size:13px;margin-bottom:10px}}
+    table{{border-collapse:collapse;width:100%}}
+    th{{background:#312783;color:#fff;font-size:12px;padding:6px;text-align:left}}
+    td{{border-bottom:1px solid #e3e3e3;padding:8px 6px;font-size:13px;vertical-align:top}}
+    .q{{max-width:340px;color:#444}} .a{{max-width:430px;white-space:pre-wrap}}
+    .ph{{color:#666;font-size:12px}} .bk{{color:#5C8C1E;font-weight:600;margin-top:4px}}
+    tr.mine td{{background:#F4F9EF}} tr.human td{{background:#fff;color:#777}}
+    .warn{{background:#FFF4E0;border-left:4px solid #F59C00;padding:8px 10px;
+          margin-bottom:10px;font-size:13px}}
+    .go{{display:inline-block;background:#7DB928;color:#fff;padding:8px 14px;
+        border-radius:6px;text-decoration:none;font-weight:600;margin-bottom:12px}}
+    </style>
+    <h1>Переписка: что спросили и что мы ответили</h1>
+    <div class=sub>Диалогов без ответа {r['всего']} · отвечаю сам {r['ответили']} ·
+    пишет администратор {r['человеку']}. Зелёные строки — мои ответы,
+    серые уходят человеку.</div>
+    {night}
+    {'<a class=go href="/perepiska?send=1">Отправить мои ответы клиентам</a>'
+     if not send else '<div class=warn>Отправлено.</div>'}
+    <table><tr><th>Клиент</th><th>Тема</th><th>Спросили</th>
+    <th>Наш ответ</th><th>Что сделано</th></tr>{''.join(rows)}</table>"""
+    return HTMLResponse(body)
 
 
 @app.get("/base/{slug}", response_class=HTMLResponse, dependencies=AUTH)
@@ -2187,7 +2239,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-23.33"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-23.34"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
