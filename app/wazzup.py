@@ -163,29 +163,42 @@ def chat_id_for(transport: str, phone: str = "", uid: str | int | None = None) -
     и не доставил. Это выглядело как «Telegram не даёт писать по базе»,
     хотя дело было в неверном идентификаторе."""
     digits = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
-    if transport not in ("tgapi", "telegram"):
+    kind = {"tgapi": "telegram", "telegram": "telegram",
+            "max": "max"}.get(transport)
+    if not kind:
         return digits and ("7" + digits) or str(phone)
-    if uid is None:
-        # По телефону телеграм-контакт не найти: у него телефона нет. Значит
-        # адресата ищем только по карточке МойКласс, и без uid слать нельзя.
-        return ""
-    return _tg_index().get(str(uid), "")
+    # У Telegram телефона нет вовсе, у MAX он тоже не всегда совпадает
+    # с chatId: у части контактов там внутренний номер аккаунта (13009918).
+    # Поэтому идентификатор берём из указателя по карточке МойКласс.
+    if uid is not None:
+        got = _msgr_index(kind).get(str(uid))
+        if got:
+            return got
+    # Телеграму телефон не подходит принципиально, MAX его иногда принимает
+    return "" if kind == "telegram" else (digits and ("7" + digits) or "")
 
 
-_TG_INDEX: dict = {}
+_MSGR_INDEX: dict = {}
 
 
-def _tg_index() -> dict[str, str]:
-    """uid карточки → telegram chatId. Указатель, а не перебор.
+def _msgr_index(kind: str) -> dict[str, str]:
+    """uid карточки → chatId в этом мессенджере. Указатель, а не перебор.
 
     Контактов 5618; линейный поиск по каждому адресату превращает рассылку
     на полсотни человек в четверть миллиона сравнений и не укладывается
     в таймаут."""
-    if not _TG_INDEX:
+    if kind not in _MSGR_INDEX:
+        idx: dict[str, str] = {}
         for cid, info in (contacts() or {}).items():
-            if info.get("type") == "telegram" and info.get("uid"):
-                _TG_INDEX[str(info["uid"])] = cid
-    return _TG_INDEX
+            if info.get("type") == kind and info.get("uid"):
+                idx[str(info["uid"])] = cid
+        _MSGR_INDEX[kind] = idx
+    return _MSGR_INDEX[kind]
+
+
+def _tg_index() -> dict[str, str]:
+    """Оставлено для вызовов, которые ищут именно телеграм-чаты."""
+    return _msgr_index("telegram")
 
 
 def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
