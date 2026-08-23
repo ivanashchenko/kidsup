@@ -261,8 +261,10 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
             logging.getLogger("kidsup.wazzup").warning(
                 "wazzup шаблон отклонён: %s %s", r.status_code, r.text[:200])
         return r.status_code in (200, 201)
-    chat_id = chat_id_for(transport, phone, uid) if transport in ("tgapi", "telegram") \
-        else phone
+    # MAX сюда добавлен 23.08: у части контактов там внутренний номер
+    # аккаунта, и отправка по телефону возвращает CHANNEL_MAX_PHONE_NOT_OCCUPIED
+    chat_id = chat_id_for(transport, phone, uid) \
+        if transport in ("tgapi", "telegram", "max") else phone
     if not chat_id:
         logging.getLogger("kidsup.wazzup").warning(
             "%s: не нашёл chatId (uid=%s) — отправка отменена", transport, uid)
