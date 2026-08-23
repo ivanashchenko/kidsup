@@ -210,6 +210,18 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
     ch = _pick(chans, transport)
     if not ch:
         return False
+    # Запрет по НОМЕРУ, а не по транспорту. 23.08 владелец вывел из работы
+    # номер 0077, я убрал его из wa_senders — но эта настройка относится
+    # только к WhatsApp, а на том же номере висят Telegram и MAX. В итоге
+    # 42 сообщения ушли ровно через тот аккаунт, который выводили. Настройка
+    # blocked_senders режет любой транспорт, привязанный к номеру.
+    banned = {x.strip() for x in
+              (db.get_setting("blocked_senders", "") or "").split(",") if x.strip()}
+    if str(ch.get("plainId") or "") in banned:
+        logging.getLogger("kidsup.wazzup").warning(
+            "канал %s (%s) закрыт настройкой blocked_senders — отправка отменена",
+            ch.get("plainId"), transport)
+        return False
     if dry_run:
         return True
     if transport == "wapi" and template_id is None:
@@ -218,7 +230,8 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
         # Без шаблона WABA-отправка бессмысленна: Wazzup ответит 201, строка
         # пометится доставленной, а адресат не получит ничего и второй раз
         # ему уже не напишут. Лучше честный отказ — он вернёт строку в очередь.
-        log.warning("wapi: не задан waba_template_id — отправка отменена")
+        logging.getLogger("kidsup.wazzup").warning(
+            "wapi: не задан waba_template_id — отправка отменена")
         return False
     if transport == "wapi" and template_id:
         body = {"channelId": ch["channelId"], "chatType": "whatsapp",
@@ -227,20 +240,22 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
             body["templateValues"] = template_values
         r = httpx.post(f"{API}/message", headers=_headers(), json=body, timeout=30)
         if r.status_code not in (200, 201):
-            log.warning("wazzup шаблон отклонён: %s %s", r.status_code, r.text[:200])
+            logging.getLogger("kidsup.wazzup").warning(
+                "wazzup шаблон отклонён: %s %s", r.status_code, r.text[:200])
         return r.status_code in (200, 201)
     chat_id = chat_id_for(transport, phone, uid) if transport in ("tgapi", "telegram") \
         else phone
     if not chat_id:
-        log.warning("%s: не нашёл chatId (uid=%s) — отправка отменена", transport, uid)
+        logging.getLogger("kidsup.wazzup").warning(
+            "%s: не нашёл chatId (uid=%s) — отправка отменена", transport, uid)
         return False
     r = httpx.post(f"{API}/message", headers=_headers(), json={
         "channelId": ch["channelId"], "chatType": CHAT_TYPE.get(transport, transport),
         "chatId": chat_id, "text": text,
     }, timeout=30)
     if r.status_code not in (200, 201):
-        log.warning("wazzup %s → %s: HTTP %s %s", transport, chat_id,
-                    r.status_code, r.text[:160])
+        logging.getLogger("kidsup.wazzup").warning(
+            "wazzup %s → %s: HTTP %s %s", transport, chat_id, r.status_code, r.text[:160])
     return r.status_code in (200, 201)
 
 

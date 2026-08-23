@@ -2160,7 +2160,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-23.08"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-23.10"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2211,7 +2211,10 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "roistat_project", "roistat_key",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
-            "waba_template_id", "waba_templates"}
+            "waba_template_id", "waba_templates",
+            # номера, закрытые для любой отправки — включая Telegram и MAX,
+            # которые могут висеть на том же аккаунте
+            "blocked_senders"}
 
 
 # Значения, которые нельзя отдавать целиком даже по авторизованному запросу.
