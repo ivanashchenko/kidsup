@@ -65,6 +65,11 @@ section{padding:56px 0}
 .hero{background:linear-gradient(160deg,#F2F8FD 0%,#EAF4FB 55%,#E9F5DE 100%);overflow:hidden;position:relative}
 .hero .wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:32px;align-items:center;padding-top:56px;padding-bottom:56px}
 @media(max-width:860px){.hero .wrap{grid-template-columns:1fr}}
+/* На телефоне 56px сверху плюс шапка съедали 112px первого экрана — это
+   треть высоты, на которой должен быть заголовок, а не воздух. */
+@media(max-width:640px){.hero .wrap{padding-top:22px;padding-bottom:32px}
+  .hero .sub{margin:.7rem 0 1.1rem;font-size:1.02rem}
+  .badge-row{margin-bottom:.8rem}}
 .hero h1{font-size:clamp(1.9rem,4.6vw,3.1rem);font-weight:900}
 .hero .sub{margin:.9rem 0 1.4rem;font-size:1.1rem;color:var(--muted);max-width:34rem}
 .badge-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.1rem}
@@ -243,6 +248,14 @@ footer .legal a{color:#9BD7F5}
 .rev-note h3{font-size:1.05rem;margin-bottom:.5rem}
 .rev-note p{font-size:.92rem;color:var(--muted);margin:.5rem 0}
 .rev-stars{font-size:1.5rem;letter-spacing:.1em}
+/* оценки по темам с Яндекс.Карт: цифра крупно, ссылка на первоисточник */
+.rev-cats{list-style:none;margin:.6rem 0 .8rem;padding:0;display:grid;gap:8px}
+.rev-cats a{display:flex;align-items:baseline;gap:10px;text-decoration:none;color:var(--ink);
+  border:1px solid var(--line);border-radius:12px;padding:9px 12px;transition:border-color .2s,background .2s}
+.rev-cats a:hover{border-color:var(--green);background:#F7FBF2}
+.rev-cats b{font-family:Rubik;font-size:1.3rem;color:var(--green);flex:0 0 auto;line-height:1}
+.rev-cats span{font-size:.9rem;flex:1}
+.rev-cats i{font-style:normal;font-size:.76rem;color:var(--muted);white-space:nowrap}
 .rev-note .btn{margin-top:.8rem;padding:.6rem 1.2rem;font-size:.9rem}
 /* мессенджеры и соцсети */
 .mess{background:#fff}
@@ -1030,8 +1043,21 @@ body.js .reveal.in{opacity:1;transform:none}
       </div>
       <div class="rev-note reveal">
         <div class="rev-stars">⭐️⭐️⭐️⭐️⭐️</div>
-        <h3>5,0 на Яндекс.Картах · 253 отзыва</h3>
-        <p style="font-size:.78rem;color:var(--muted);margin:.1rem 0 .4rem">данные на 19 августа 2026</p>
+        <h3><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank"
+        rel="noopener" style="color:inherit;text-decoration:none;border-bottom:2px solid var(--amber)">5,0
+        на Яндекс.Картах · 253 отзыва</a></h3>
+        <p style="font-size:.78rem;color:var(--muted);margin:.1rem 0 .6rem">данные на 23 августа 2026 ·
+        каждая цифра ниже кликается и ведёт на первоисточник</p>
+        <!-- Оценки по темам: у Яндекса это отдельные срезы, и они сильнее общей
+             пятёрки — родитель видит, что именно хвалят, а не «нам поставили 5». -->
+        <ul class="rev-cats">
+          <li><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">
+            <b>97%</b><span>хвалят отношение к детям</span><i>181 отзыв</i></a></li>
+          <li><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">
+            <b>96%</b><span>довольны педагогами</span><i>168 отзывов</i></a></li>
+          <li><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">
+            <b>99%</b><span>довольны качеством обучения</span><i>141 отзыв</i></a></li>
+        </ul>
         <p style="color:var(--ink);font-size:.95rem;margin-top:.2rem"><b>«Хорошее место 2026»</b> — награда Яндекса
         центрам, которые родители выбирают и рекомендуют чаще других.</p>
         <p>12 лет в районе: многие приводят уже второго и третьего ребёнка, а выпускники
@@ -1054,7 +1080,15 @@ body.js .reveal.in{opacity:1;transform:none}
       <div class="box reveal">
         <p><b>📍 Адрес:</b> б-р Маршала Рокоссовского, 6 к1В — напротив ТЦ «Янтарь»,
         БЦ «Богородский», 7-й подъезд, 2-й этаж.</p>
-        <p><b>🚇 Метро:</b> Бульвар Рокоссовского — 2 минуты пешком.</p>
+        <p><b>🚇 Метро:</b> Бульвар Рокоссовского — 2 минуты пешком: из метро
+        направо вдоль бульвара, мимо ТЦ «Янтарь», вход со стороны двора.</p>
+        <!-- Названия районов нужны не для красоты: по «детский центр
+             Метрогородок» нас не находили, потому что этих слов на сайте
+             не было ни разу. -->
+        <p><b>🗺 Откуда к нам ездят:</b> Метрогородок, Богородское,
+        Преображенское, Открытое шоссе, Гольяново, ЖК «Богородский» и весь
+        Восточный округ. От Преображенской площади — две остановки на метро,
+        парковка у ТЦ «Янтарь» бесплатная.</p>
         <p><b>🕘 Часы работы:</b> ежедневно; в августе 8:00–19:00, с сентября 9:00–20:00.</p>
         <p><b>☎️ Телефон:</b> <a href="tel:+74951209024">+7 495 120-90-24</a></p>
         <p><b>💬 WhatsApp:</b> <a href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">написать нам</a></p>

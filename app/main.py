@@ -2156,7 +2156,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-23.01"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-23.03"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2974,6 +2974,41 @@ def api_broadcast_restore(payload: dict = Body(...)):
             back += 1
         conn.commit()
     return {"restored": back, "skipped_already_sent_or_excluded": len(rows) - back}
+
+
+@app.get("/api/broadcast/channels", dependencies=AUTH)
+def api_broadcast_channels(campaign: str = ""):
+    """Куда уйдёт очередь: сколько писем в MAX, Telegram и WABA.
+
+    Правило владельца: есть переписка в MAX или Telegram — пишем туда
+    бесплатно и без шаблона; нет — только WABA с утверждённым шаблоном.
+    Пока шаблоны на модерации, первая часть очереди уже может уходить,
+    и эта сводка показывает, насколько она велика."""
+    from . import autopilot, wazzup
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT campaign, phone FROM broadcast_queue WHERE status='pending'"
+            + (" AND campaign=?" if campaign else ""),
+            ((campaign,) if campaign else ())).fetchall()
+    out: dict = {}
+    for r in rows:
+        phone = r["phone"] or ""
+        try:
+            tr = wazzup.best_channel(phone, mass=True) or "wapi"
+        except Exception:
+            tr = "wapi"
+        if tr == "wapi" and not autopilot._uid_by_phone(phone):
+            tr = "wapi (без карточки)"
+        c = out.setdefault(r["campaign"], {})
+        c[tr] = c.get(tr, 0) + 1
+    itog: dict = {}
+    for c in out.values():
+        for k, v in c.items():
+            itog[k] = itog.get(k, 0) + v
+    free = sum(v for k, v in itog.items() if k in ("tgapi", "max"))
+    return {"по_кампаниям": out, "итого": itog,
+            "можно_слать_сейчас": free,
+            "ждут_шаблона_WABA": sum(itog.values()) - free}
 
 
 @app.get("/api/broadcast/peek", dependencies=AUTH)
