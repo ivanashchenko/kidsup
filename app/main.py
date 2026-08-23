@@ -816,6 +816,10 @@ DOC_GROUPS = [
          "Что публиковать каждый день до конца сентября — с готовыми текстами "
          "постов и сторис. Цифры о свободных местах подставляются из CRM, "
          "продающий пост не чаще одного из пяти"),
+        ("domeny_sayta", "🌐 Как подключить новый сайт к доменам",
+         "Что сейчас на kidsup.ru, kidsupday.ru и kidsupweek.ru, три способа "
+         "переключения и какой для какого домена подходит. С предупреждением "
+         "про ссылки в шаблонах рассылки"),
         ("tri_ocheredi", "🔍 Три очереди: почему задачи закрываются без касания",
          "Разбор по данным 22.08: работа идёт по трём спискам сразу — задачи "
          "в CRM, страницы обзвона и лист промоутера, — а отчитываться надо "
@@ -2156,7 +2160,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-23.04"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-23.08"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2974,6 +2978,114 @@ def api_broadcast_restore(payload: dict = Body(...)):
             back += 1
         conn.commit()
     return {"restored": back, "skipped_already_sent_or_excluded": len(rows) - back}
+
+
+@app.post("/api/broadcast/retext-age", dependencies=AUTH)
+def api_broadcast_retext_age(payload: dict = None):
+    """Переписать ожидающие письма под возрастные тексты набора.
+
+    От соседнего /api/broadcast/retext отличается тем, что текст не один
+    на кампанию, а свой для каждого адресата — по возрасту ребёнка.
+
+    В очереди лежат формулировки, заведённые до того, как появились
+    возрастные шаблоны: место праздника, состав направлений и события
+    там описаны иначе. Клиент не должен получать разное в зависимости
+    от того, каким каналом до него дошли, поэтому тексты приводим
+    к одному источнику — app.wabatexts, с подстановкой имени вместо
+    переменной шаблона.
+
+    По умолчанию только те строки, что уйдут в MAX и Telegram: WABA
+    шлёт утверждённый шаблон, и её текст в очереди всё равно не
+    используется."""
+    from . import autopilot, wabatexts, wazzup
+    p = payload or {}
+    campaigns = p.get("campaigns") or ["invite_a", "invite_b", "invite_v"]
+    only_free = p.get("only_free", True)
+    dry = p.get("dry_run", True)
+
+    def pick(age):
+        if age is None:
+            return wabatexts.TEMPLATES["nabor_bez_vozrasta"]
+        for lim, name in autopilot.AGE_TEMPLATES:
+            if age < lim:
+                return wabatexts.TEMPLATES[name]
+        return wabatexts.TEMPLATES["nabor_bez_vozrasta"]
+
+    done, skip, sample = 0, 0, None
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, phone, child FROM broadcast_queue WHERE status='pending' "
+            "AND campaign IN (%s)" % ",".join("?" * len(campaigns)),
+            campaigns).fetchall()
+        for r in rows:
+            phone = r["phone"] or ""
+            if only_free:
+                try:
+                    if wazzup.best_channel(phone, mass=True) not in ("tgapi", "max"):
+                        skip += 1
+                        continue
+                except Exception:
+                    skip += 1
+                    continue
+            age = autopilot._age_by_phone(phone)
+            # {{1}} — синтаксис Meta; в живом канале подставляем имя сами
+            text = pick(age).replace("({{1}})", "({имя})").replace("{{1}}", "{имя}")
+            if sample is None:
+                sample = text[:400]
+            if not dry:
+                conn.execute("UPDATE broadcast_queue SET text=? WHERE id=?",
+                             (text, r["id"]))
+            done += 1
+    return {"переписано": done, "пропущено_не_свой_канал": skip,
+            "пробный_прогон": dry, "образец": sample}
+
+
+@app.get("/api/broadcast/free-list", dependencies=AUTH)
+def api_broadcast_free_list(limit: int = 200):
+    """Письма, которые можно отправить бесплатно — в MAX и Telegram.
+
+    Очередь на это не рассчитана: её тик умеет только WhatsApp и шлёт
+    подряд. Для живых мессенджеров нужен другой темп — паузы и вариации,
+    иначе аккаунт читается как спам-бот. Поэтому список отдаётся наружу,
+    а отправку ведёт app.tgdrip."""
+    from . import autopilot, wazzup
+    out = []
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, campaign, phone, child, text FROM broadcast_queue "
+            "WHERE status='pending' LIMIT 4000").fetchall()
+    for r in rows:
+        phone = r["phone"] or ""
+        try:
+            tr = wazzup.best_channel(phone, mass=True)
+        except Exception:
+            continue
+        if tr not in ("tgapi", "max"):
+            continue
+        out.append({"id": r["id"], "campaign": r["campaign"], "transport": tr,
+                    "phone": phone, "child": r["child"],
+                    "uid": autopilot._uid_by_phone(phone), "text": r["text"]})
+        if len(out) >= limit:
+            break
+    return {"всего": len(out), "письма": out}
+
+
+@app.post("/api/broadcast/mark-sent", dependencies=AUTH)
+def api_broadcast_mark_sent(payload: dict = None):
+    """Отметить письма отправленными: id и каким каналом ушло."""
+    p = payload or {}
+    ids = [int(x) for x in (p.get("ids") or [])]
+    sender = str(p.get("sender") or "")[:40]
+    if not ids:
+        raise HTTPException(400, "нужен ids")
+    from . import autopilot
+    with db.get_conn() as conn:
+        n = conn.execute(
+            "UPDATE broadcast_queue SET status='sent', sent=?, sender=?, "
+            "tried=COALESCE(tried,'')||? WHERE id IN (%s)" % ",".join("?" * len(ids)),
+            [autopilot._now().isoformat(timespec="seconds"), sender,
+             f"{sender}=ok;"] + ids).rowcount
+    return {"ok": True, "отмечено": n}
 
 
 @app.get("/api/broadcast/channels", dependencies=AUTH)

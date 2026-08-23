@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Как подключить новый сайт к доменам</title>
+<style>
+:root{--indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;
+ --red:#E30613;--ink:#1B1D2B;--muted:#5F6478;--line:#E3E1DA;--fill:#F6F5F1}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);
+ font:16px/1.62 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:52rem;margin:0 auto;padding:1.8rem 1.1rem 4rem}
+h1{font-size:1.8rem;line-height:1.2;font-weight:800;margin:.2rem 0 .5rem;color:var(--indigo)}
+.lead{color:var(--muted);margin:0 0 1.5rem;max-width:44rem}
+h2{font-size:1.25rem;font-weight:780;margin:2rem 0 .5rem;color:var(--indigo)}
+h3{font-size:1.02rem;font-weight:750;margin:1.2rem 0 .3rem}
+p{margin:0 0 .75rem}
+table{border-collapse:collapse;width:100%;margin:.6rem 0 1rem;font-size:.93rem}
+th,td{border:1px solid var(--line);padding:.42rem .6rem;text-align:left;vertical-align:top}
+th{background:var(--fill);font-weight:750;font-size:.85rem}
+code{background:var(--fill);padding:.12rem .35rem;border-radius:.25rem;
+ font:.9em ui-monospace,Menlo,Consolas,monospace}
+pre{background:var(--fill);border:1px solid var(--line);border-radius:.5rem;
+ padding:.7rem .9rem;overflow-x:auto;font:.86rem ui-monospace,Menlo,Consolas,monospace}
+.q{border:1px solid var(--line);border-left:4px solid var(--blue);
+ border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:1rem 0;background:var(--fill)}
+.q.warn{border-left-color:var(--red)}
+.q.good{border-left-color:var(--green)}
+ol,ul{margin:.3rem 0 1rem;padding-left:1.25rem}
+li{margin:.32rem 0}
+.foot{margin-top:2.4rem;border-top:1px solid var(--line);padding-top:1rem;
+ color:var(--muted);font-size:.9rem}
+@media (prefers-color-scheme:dark){
+ :root:not([data-theme="light"]){--ink:#EDEEF3;--muted:#A5A9BC;--line:#33364A;
+  --fill:#222432;--indigo:#8E86E8;--blue:#57C4F2;--red:#FF6B6B}
+ :root:not([data-theme="light"]) body{background:#161826}
+}
+</style></head><body><div class="wrap">
+
+<h1>Как подключить новый сайт к доменам</h1>
+<p class="lead">Что где сейчас живёт, три способа переключения и почему
+для каждого домена подходит свой. Готовить заранее ничего не нужно —
+новый сайт уже работает и открыт без пароля.</p>
+
+<h2>Что сейчас</h2>
+<table>
+<tr><th>Домен</th><th>Куда ведёт</th><th>Что там</th></tr>
+<tr><td><b>kidsup.ru</b></td><td>185.215.4.44 (DDoS-Guard)</td>
+    <td>действующий сайт</td></tr>
+<tr><td><b>kidsupday.ru</b></td><td>185.215.4.44 (DDoS-Guard)</td>
+    <td>старый лендинг Дня открытых дверей</td></tr>
+<tr><td><b>kidsupweek.ru</b></td><td>176.57.64.243 (DDoS-Guard)</td>
+    <td>старый лендинг Недели открытых уроков</td></tr>
+<tr><td><b>app.kidsup.ru</b></td><td>161.104.16.236 (наш сервер)</td>
+    <td>новый сайт и оба новых лендинга</td></tr>
+</table>
+
+<p>Новые страницы уже открыты всем, без пароля:</p>
+<ul>
+<li><code>app.kidsup.ru/site</code> — новый сайт</li>
+<li><code>app.kidsup.ru/day</code> — День открытых дверей</li>
+<li><code>app.kidsup.ru/week</code> — Неделя открытых уроков</li>
+</ul>
+
+<h2>Способ 1. Переадресация — за пять минут, без риска</h2>
+<p>В панели регистратора у каждого домена есть «Перенаправление» или
+«Веб-форвардинг». Указываете адрес — и домен просто отправляет посетителя
+на нашу страницу.</p>
+<table>
+<tr><th>Домен</th><th>Куда перенаправить</th></tr>
+<tr><td>kidsupday.ru</td><td><code>https://app.kidsup.ru/day</code></td></tr>
+<tr><td>kidsupweek.ru</td><td><code>https://app.kidsup.ru/week</code></td></tr>
+</table>
+<p>Тип перенаправления — <b>301 (постоянное)</b>, галочку «сохранять
+маску адреса» или «фрейм» <b>не ставить</b>: под маской у посетителя
+в адресной строке остаётся старый домен, а сайт внутри рамки, и это
+ломает и аналитику, и поиск.</p>
+
+<div class="q good"><b>Чем хорош.</b> Делается в панели домена за пять минут,
+ничего не ломает, откатывается так же быстро. Для лендингов событий этого
+достаточно: они живут три недели, ссылки на них уже ушли в рассылки.</div>
+
+<div class="q warn"><b>Чем плох.</b> В адресной строке у посетителя будет
+<code>app.kidsup.ru/day</code>, а не <code>kidsupday.ru</code>. Для события
+это неважно, для основного сайта — нежелательно.</div>
+
+<h2>Способ 2. Свой домен на наш сервер — правильный для kidsup.ru</h2>
+<p>Домен начинает указывать прямо на наш сервер, адрес в строке остаётся
+свой. Порядок такой:</p>
+<ol>
+<li><b>Сначала я готовлю сервер.</b> Нужно, чтобы он отвечал на новое имя
+и отдавал сайт с корня — сейчас корень под паролем, это админка.
+Работы примерно на час.</li>
+<li><b>Выпускаем сертификат</b> для нового имени: без него браузер покажет
+предупреждение. Бесплатный Let's Encrypt, выпуск автоматический.</li>
+<li><b>Вы меняете A-запись</b> домена на <code>161.104.16.236</code>
+в панели DDoS-Guard или у регистратора.</li>
+<li><b>Ждём обновления DNS</b> — от пятнадцати минут до нескольких часов.
+В это время часть посетителей видит старый сайт, часть новый: оба
+работают, ничего не падает.</li>
+</ol>
+
+<div class="q warn"><b>Что проверить до переключения kidsup.ru.</b>
+На домене живёт не только сайт: почта, подтверждения для рекламных
+кабинетов, коды аналитики. Менять нужно <b>только запись A для самого
+домена и www</b>, не трогая MX (почта) и TXT (проверки). Если у вас
+подключены Яндекс.Метрика и Директ — их коды на новом сайте уже стоят,
+но цели придётся перепроверить: адреса страниц изменились.</div>
+
+<h2>Способ 3. Держать старый сайт, а новый — на поддомене</h2>
+<p>Промежуточный вариант: <code>new.kidsup.ru</code> ведёт на новый сайт,
+основной домен пока не трогаем. Полезно, если хочется показать сайт
+команде и собрать замечания до переключения. Делается так же, как способ 2,
+но без риска для основного адреса.</p>
+
+<h2>Что я советую</h2>
+<ol>
+<li><b>Сегодня:</b> переадресация для kidsupday.ru и kidsupweek.ru —
+пять минут, и ссылки из рассылок ведут на настоящие лендинги, а не
+на прошлогодние страницы.</li>
+<li><b>После 6 сентября,</b> когда закончится Неделя открытых уроков
+и спадёт нагрузка: переключаем kidsup.ru по способу 2. К этому времени
+я допишу сервер и проверю сайт на реальном трафике.</li>
+</ol>
+
+<div class="q"><b>Важно про шаблоны рассылок.</b> В текстах, которые ждут
+модерации, стоят адреса <code>kidsupday.ru</code> и
+<code>kidsupweek.ru</code>. Одобренный шаблон Meta не редактируется —
+ссылка в нём останется навсегда. Значит переадресацию надо включить
+<b>до</b> того, как шаблоны одобрят, иначе люди попадут на старые
+страницы.</div>
+
+<div class="foot">Данные о доменах получены запросом DNS 23 августа 2026.
+Адрес нашего сервера может смениться при переезде — перед правкой
+A-записи уточните актуальный.</div>
+
+</div></body></html>
