@@ -141,19 +141,31 @@ def report(day: str | None = None, rows: list[dict] | None = None) -> list[dict]
     return sorted(out, key=lambda x: -x["attempts"])
 
 
+# Сколько секунд разговора считать состоявшимся контактом. Ниже этого
+# человек успевает сказать «алло» и сбросить — поговорить мы не поговорили.
+TALK_MIN = 20
+
+
 def missed(day: str | None = None, rows: list[dict] | None = None) -> list[dict]:
-    """Недозвоны за день: исходящие без ответа (для WhatsApp-догона)."""
+    """Недозвоны за день: с кем так и не поговорили (для WhatsApp-догона).
+
+    Раньше достаточно было факта ответа: answer != 0 — значит дозвонились,
+    догон не нужен. 23.08 по листу обзвона так выпали 22 семьи из 32: они
+    сняли трубку на шесть-семь секунд и сбросили, и в отчёте это выглядело
+    как разговор. Ни звонка, ни сообщения им в тот день не досталось.
+    Теперь короткий сброс — тоже недозвон."""
     rows = rows if rows is not None else _day_calls(day)
-    seen, answered = {}, set()
+    seen: dict[str, int] = {}
+    talked = set()
     for r in rows:
         if not r["from_ext"]:
             continue
         num = r["to_num"]
-        if r["answer"]:
-            answered.add(num)
+        if r["answer"] and (r["finish"] - r["answer"]) >= TALK_MIN:
+            talked.add(num)
         else:
             seen[num] = seen.get(num, 0) + 1
-    return [{"phone": n, "attempts": c} for n, c in seen.items() if n not in answered]
+    return [{"phone": n, "attempts": c} for n, c in seen.items() if n not in talked]
 
 
 def main():
