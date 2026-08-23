@@ -985,8 +985,22 @@ def _wa_unanswered(phone: str) -> bool:
     return not last_out or last_in > last_out
 
 
+# Центр работает с 9:00 до 20:00 по Москве, и автоматика пишет клиентам
+# только в эти часы. Сообщение в девять вечера читается как беспокойство,
+# а ответить на него всё равно некому: администратор уже ушёл. Проверка
+# стоит в одной точке — через _wa проходят все автосообщения, и добавить
+# новый сценарий в обход рабочего дня теперь нельзя.
+WA_HOUR_FROM, WA_HOUR_TO = 9, 20
+
+
 def _wa(phone: str, text: str, mode: str = "broadcast") -> None:
     """broadcast — во все мессенджеры (WhatsApp+Telegram+MAX): у кого какой есть."""
+    hour = _now().hour
+    if not (WA_HOUR_FROM <= hour < WA_HOUR_TO) \
+            and phone != (db.get_setting("digest_phone") or ""):
+        log.info("wazzup: %s — сейчас %d:00 МСК, вне рабочих часов, не пишем",
+                 phone[-4:], hour)
+        return
     if phone != (db.get_setting("digest_phone") or "") and _wa_unanswered(phone):
         log.info("wazzup: %s ждёт ответа админа — автосообщение отложено", phone[-4:])
         return
