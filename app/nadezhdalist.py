@@ -217,7 +217,15 @@ def collect() -> list[dict]:
     recent = {uid for uid, d in seen_until.items() if d >= RECENT_FROM}
     for j in joins:
         uid, nm = j.get("userId"), cls.get(j.get("classId"), "")
-        if uid and nm and (LAST_YEAR.match(nm) or SUMMER_26.search(nm)):
+        if not (uid and nm):
+            continue
+        # «Заявки» — буфер, куда кладут до распределения в группу. Человек
+        # там не занимался: оставил заявку и не дошёл. Считать это за «был
+        # у нас в прошлом году» нельзя — разговор начнётся с «вы у нас
+        # занимались», а семья этого не помнит, потому что не занималась.
+        if re.search(r"аявк", nm, re.I):
+            continue
+        if LAST_YEAR.match(nm) or SUMMER_26.search(nm):
             recent.add(uid)
 
     out = []
