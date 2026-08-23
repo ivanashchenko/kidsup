@@ -983,6 +983,16 @@ def base_page(request: Request):
     return render(request, "base_docs.html", active="base", groups=groups)
 
 
+@app.get("/api/perepiska", dependencies=AUTH)
+def perepiska_report(day: str | None = None, send: int = 0):
+    """Отчёт по переписке: что спросили, что ответили, что ушло человеку.
+
+    По умолчанию ничего не отправляет — только показывает. send=1
+    отправляет ответы и пишет их в карточки."""
+    from . import perepiska as P
+    return P.run(day=day, dry=not send)
+
+
 @app.get("/base/{slug}", response_class=HTMLResponse, dependencies=AUTH)
 def base_doc(slug: str):
     """Отдаёт методичку. Имя файла проверяем по белому списку."""
@@ -2177,7 +2187,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-23.31"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-23.32"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
