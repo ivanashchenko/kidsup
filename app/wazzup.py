@@ -476,11 +476,12 @@ def channels_for(phone: str = "", uid: str | int | None = None,
         for transport in BY_CONTACT_TYPE.get(kind, [kind]):
             if transport in live and transport not in out:
                 out.append(transport)
-    if mass:
-        # рассылка: мессенджеры покрыли — хватит, иначе платный WABA
-        return out or ["wapi"]
-    # разовое: WhatsApp идёт всегда, вдобавок к найденным мессенджерам
-    out.append("whatsapp")
+    # WhatsApp идёт ВСЕГДА и не требует переписки — в отличие от мессенджеров,
+    # куда без диалога писать нельзя. Разовому это обычный номер, рассылке —
+    # WABA с утверждённым шаблоном. Даже если сообщение уже ушло в MAX или
+    # Telegram, WhatsApp добавляется: решение владельца от 23.08, человек
+    # читает то, что открыл, и дубль здесь дешевле молчания.
+    out.append("wapi" if mass else "whatsapp")
     return out
 
 
