@@ -16,7 +16,9 @@ description: >-
 
 Правила:
 - Обновление клиента → ТОЛЬКО `MoyKlassClient.safe_update_user()` (GET → merge → POST).
-- Статус → `POST /users/{id}/status` {statusId, (statusChangeReasonId 313608 для набора)}.
+- Статус → `POST /users/{id}/status` {statusId, statusChangeReasonId}.
+  Отказ (125957) и набор (125951) БЕЗ причины → 400. Рабочая причина: 313608.
+  Недозвон (345768) и «думает» (146950) проходят без причины.
 - Теги → `POST /users/{id}/tags`. Ответственные — тоже суб-эндпоинтом, не полным POST.
 - `createSourceId` в теле апдейта → 400 (readOnly).
 - ЛЮБАЯ массовая операция (>20 карточек): СНАЧАЛА свежая копия
