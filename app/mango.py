@@ -98,6 +98,9 @@ def calls(date_from: datetime, date_to: datetime) -> list[dict]:
             "start": int(p[1] or 0), "finish": int(p[2] or 0), "answer": int(p[3] or 0),
             "from_ext": p[4], "from_num": p[5], "to_ext": p[6], "to_num": p[7],
             "reason": p[8], "sip": sip, "ext": SIP_EXT.get(sip) or p[4],
+            # идентификатор записи разговора: без него ежечасный разбор не
+            # может скачать mp3 и сверяться с реестром уже обработанных
+            "rec": p[0],
         })
     return rows
 
