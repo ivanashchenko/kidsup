@@ -2319,7 +2319,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-24.29"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-24.30"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2362,7 +2362,7 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
             "anthropic_proxy_secret", "work_hours", "ext_by_day",
             "vk_token", "vk_group_id", "tg_bot_token", "tg_channel", "mango_ext_admins",
-            "calls_parsed", "sms_on", "sms_sender_name",
+            "calls_parsed", "sms_on", "sms_sender_name", "lead_hook_key",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
             "calls_done",
@@ -2781,6 +2781,68 @@ def _lead_to_crm(lead: dict) -> None:
         roistat_mod.push_lead(lead)
     except Exception as e:
         log.info("лид в Roistat не ушёл: %s", e)
+
+
+@app.post("/hook/lead")
+async def hook_lead(request: Request, key: str = ""):
+    """Приём заявок с форм старого сайта (Tilda/Roistat) — тем же путём,
+    что и формы нового сайта.
+
+    24.08 выяснилось: формы Тильды доходят до сервиса заявок, но в CRM не
+    попадают — из четырёх заявок дня одна пропала совсем, остальные завелись
+    только потому, что клиенты потом позвонили сами. Вебхук закрывает дыру:
+    любая форма, настроенная сюда, попадает в CRM, получает мгновенный
+    перезвон дежурному и задачу.
+
+    Настройка в Tilda: Сайт → Формы → Webhook, URL
+    https://app.kidsup.ru/hook/lead?key=<секрет из настройки lead_hook_key>."""
+    secret = db.get_setting("lead_hook_key", "")
+    if secret and key != secret:
+        return {"ok": False}
+    try:
+        payload = await request.json()
+    except Exception:
+        form = await request.form()
+        payload = dict(form)
+    low = {str(k).lower(): v for k, v in (payload or {}).items()}
+
+    def pick(*names):
+        for n in names:
+            for k, v in low.items():
+                if n in k and str(v).strip():
+                    return str(v).strip()
+        return ""
+    phone = "".join(ch for ch in pick("phone", "тел") if ch.isdigit())
+    if len(phone) == 11 and phone[0] == "8":
+        phone = "7" + phone[1:]
+    if len(phone) == 10:
+        phone = "7" + phone
+    if len(phone) != 11:
+        log = logging.getLogger("kidsup.lead")
+        log.warning("вебхук заявки без телефона: %s", str(payload)[:200])
+        return {"ok": False, "error": "no phone"}
+    lead = {"phone": phone, "child": pick("name", "имя", "ребен"),
+            "age": pick("age", "возраст"),
+            "course": pick("formname", "form_name", "форм", "курс", "направл"),
+            "note": "заявка с формы старого сайта",
+            "roistat": pick("roistat", "rv"), "lead_id": None}
+    from starlette.concurrency import run_in_threadpool
+
+    def _store():
+        with db.get_conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO site_leads (ts, phone, child, age, course, note,"
+                " roistat, ip, crm_status) VALUES"
+                " (datetime('now'), ?, ?, ?, ?, ?, ?, ?, 'pending')",
+                (lead["phone"], lead["child"], lead["age"], lead["course"],
+                 lead["note"], lead["roistat"], "webhook"))
+            conn.commit()
+            return cur.lastrowid
+
+    lead["lead_id"] = await run_in_threadpool(_store)
+    import threading
+    threading.Thread(target=lambda: _safe_lead(lead), daemon=True).start()
+    return {"ok": True}
 
 
 @app.post("/api/public/lead")
