@@ -1795,6 +1795,36 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
     return sent
 
 
+_MGR_NAMES = {202856: "Лена", 232805: "Аня", 232763: "Ира", 154181: "Лиза",
+              84116: "Борис", 229704: "Маша", None: "Админ Бураковых"}
+
+
+def joins_by_admin(mk: MoyklassClient) -> tuple[dict, dict]:
+    """Записи в группы 2627 по авторам: за сегодня и нарастающим итогом.
+
+    У записи в МойКлассе есть managerId; пустой автор — создание через
+    API, то есть оформленные автоматикой записи Админа Бураковых (его
+    людей в нашем МойКлассе нет, их договорённости оформляет разбор
+    звонков). Буферы заявок не считаются — запись в «Заявки» не запись."""
+    joins = mk.fetch_all("/v1/company/joins", ["joins"]) or []
+    rc = mk.get("/v1/company/classes", {"limit": 500})
+    cls = {c["id"]: (c.get("name") or "")
+           for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+    today = _today().isoformat()
+    day, total = {}, {}
+    for j in joins:
+        nm = cls.get(j.get("classId"), "")
+        if not nm.startswith("2627") or "аявк" in nm.lower():
+            continue
+        if j.get("statusId") not in {2, 50509, 58131, 58132, 83760}:
+            continue
+        who = _MGR_NAMES.get(j.get("managerId"), f"мгр{j.get('managerId')}")
+        total[who] = total.get(who, 0) + 1
+        if str(j.get("createdAt") or "")[:10] == today:
+            day[who] = day.get(who, 0) + 1
+    return day, total
+
+
 def evening_digest(mk: MoyklassClient) -> None:
     """Вечерняя сводка владельцу — решение 24.08.
 
@@ -1813,18 +1843,11 @@ def evening_digest(mk: MoyklassClient) -> None:
     except Exception as e:
         lines.append(f"звонки: Манго недоступен ({str(e)[:40]})")
     try:
-        joins = mk.fetch_all("/v1/company/joins", ["joins"],
-                             params={"createdAt": today}) or []
-        rc = mk.get("/v1/company/classes", {"limit": 500})
-        cls = {c["id"]: (c.get("name") or "")
-               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
-        new = [cls.get(j.get("classId"), "") for j in joins
-               if str(j.get("createdAt") or "")[:10] == today
-               and cls.get(j.get("classId"), "").startswith("2627")
-               and "аявк" not in cls.get(j.get("classId"), "").lower()]
-        lines.append(f"\nЗАПИСЕЙ В ГРУППЫ: {len(new)}")
-        for nm in new[:10]:
-            lines.append(f"• {_join_title(nm)[:60]}")
+        day, total = joins_by_admin(mk)
+        lines.append(f"\nЗАПИСЕЙ В ГРУППЫ: {sum(day.values())} за день, "
+                     f"{sum(total.values())} всего на 2026/27")
+        for who in sorted(total, key=lambda w: -total[w]):
+            lines.append(f"• {who}: +{day.get(who, 0)} сегодня, {total[who]} всего")
     except Exception:
         lines.append("записи: не посчитались")
     # обещания клиентам, не выполненные к вечеру: срочные и переписка
