@@ -215,6 +215,29 @@ def balance() -> float | None:
         return None
 
 
+def callback(ext: str, phone: str) -> bool:
+    """Мгновенный обратный звонок: АТС набирает добавочный админа, тот
+    снимает трубку — и Манго уже соединяет его с клиентом.
+
+    Замена платному «Автодозвону из форм» (2 000 ₽/мес): команда callback
+    входит в обычный API АТС. Клиент, оставивший номер на сайте, слышит
+    звонок через полминуты — тот самый «вау-эффект», ноль абонплаты."""
+    num = "".join(ch for ch in phone if ch.isdigit())
+    if len(num) == 10:
+        num = "7" + num
+    r = _call("commands/callback", {
+        "command_id": f"cb_{num[-4:]}",
+        "from": {"extension": str(ext)},
+        "to_number": num,
+    })
+    ok = r.status_code == 200 and '"result":1000' in r.text
+    if not ok:
+        import logging
+        logging.getLogger("kidsup.mango").warning(
+            "callback %s: %s %s", num[-4:], r.status_code, r.text[:120])
+    return ok
+
+
 def send_sms(phone: str, text: str, from_ext: str = "12") -> bool:
     """СМС через АТС — крайний канал для тех, у кого нет мессенджеров.
 

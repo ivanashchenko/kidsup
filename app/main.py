@@ -2297,7 +2297,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-24.20"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-24.21"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2679,6 +2679,22 @@ def _lead_to_crm(lead: dict) -> None:
 
     admins = autopilot._admins_today() or autopilot._admins()
     duty = admins[autopilot._today().toordinal() % len(admins)] if admins else None
+    # 0) мгновенный обратный звонок — решение владельца 24.08 вместо
+    # платного «Автодозвона из форм». В рабочие часы АТС тут же набирает
+    # дежурного и соединяет с клиентом; одна попытка на номер в день,
+    # ночная заявка получает обычный порядок (уведомление + задача) и
+    # звонок утром.
+    MGR_EXT = {232763: "10", 202856: "12", 232805: "15"}
+    try:
+        from . import mango as _mango
+        hour = autopilot._now().hour
+        ext = MGR_EXT.get(duty["managerId"]) if duty else None
+        if ext and 9 <= hour < 20 and len(phone) >= 10 \
+                and autopilot._mark("lead_callback", f"{autopilot._today()}:{phone[-10:]}"):
+            if _mango.callback(ext, phone):
+                log.info("мгновенный перезвон: доб. %s → %s", ext, phone[-4:])
+    except Exception as e:
+        log.warning("мгновенный перезвон не запустился: %s", e)
     # 1) человек узнаёт о заявке в любом случае
     try:
         phones = json.loads(db.get_setting("admin_phones") or "{}")
