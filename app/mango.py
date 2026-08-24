@@ -120,6 +120,16 @@ def report(day: str | None = None, rows: list[dict] | None = None) -> list[dict]
     # поэтому историю за день выгружаем один раз и переиспользуем
     rows = rows if rows is not None else _day_calls(day)
     names = users()
+    # Имена из настройки перекрывают карточки АТС: в Манго доб. 20 значится
+    # «Детский клуб Буракова», а в статистике по решению владельца 24.08
+    # он «Админ Бураковых» — полноправный админ со своим зачётом.
+    try:
+        import json as _json
+        from . import db as _db
+        names.update({str(k): str(v) for k, v in _json.loads(
+            _db.get_setting("mango_ext_admins", "") or "{}").items()})
+    except Exception:
+        pass
     stats: dict[str, dict] = {}
     for r in rows:
         if not r["from_ext"]:  # входящие в разрезе исходящих не считаем
@@ -192,6 +202,17 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def balance() -> float | None:
+    """Баланс АТС. Ноль на счету останавливает и звонки, и СМС —
+    в вечерней сводке владелец видит его раньше, чем это случится."""
+    try:
+        r = _call("account/balance", {})
+        import json as _json
+        return float(_json.loads(r.text).get("balance"))
+    except Exception:
+        return None
 
 
 def send_sms(phone: str, text: str, from_ext: str = "12") -> bool:

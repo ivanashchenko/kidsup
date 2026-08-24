@@ -1850,6 +1850,10 @@ def evening_digest(mk: MoyklassClient) -> None:
                 lines.append(f"• {_join_title(f['name'])[:52]} — {f['got']}/{f['target']}")
     except Exception:
         pass
+    bal = mango.balance()
+    if bal is not None:
+        mark = " ⚠ ПОПОЛНИТЬ — встанут звонки и СМС" if bal < 500 else ""
+        lines.append(f"\nБаланс Манго: {bal:.0f} ₽{mark}")
     text = "\n".join(lines)[:1800]
     phone = db.get_setting("digest_phone") or ""
     if phone:
@@ -1884,7 +1888,19 @@ def missed_calls() -> None:
                                for t in wazzup.channels_for(phone))
             except Exception:
                 has_msgr = False
-            need_sms = (delivered is True and not has_msgr) or delivered is False
+            # СМС только бывшим и действующим клиентам — тем, у кого в CRM
+            # есть хоть одна оплата. Рекламная СМС человеку, который у нас
+            # никогда не покупал, — риск штрафа по закону о рекламе
+            # (решение владельца 24.08). Мессенджеры остаются для всех.
+            paid_before = False
+            with db.get_conn() as conn:
+                row = conn.execute(
+                    "SELECT 1 FROM users u JOIN payments p ON p.user_id = u.id "
+                    "WHERE substr(u.phone,-10)=? AND p.summa > 0 LIMIT 1",
+                    (phone[-10:],)).fetchone()
+                paid_before = bool(row)
+            need_sms = paid_before and (
+                (delivered is True and not has_msgr) or delivered is False)
             if need_sms and _mark("missed_sms", f"{today}:{phone}"):
                 if mango.send_sms(phone,
                         "KidsUP: звонили по поводу занятий 2026/27 - идёт "
