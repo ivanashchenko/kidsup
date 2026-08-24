@@ -2297,7 +2297,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-24.10"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-24.11"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -3320,6 +3320,21 @@ def api_broadcast_log(day: str = "", limit: int = 100):
                         # у каждого номера своё состояние и свой лимит
                         "sender": r["sender"]})
     return {"day": d, "count": len(out), "rows": out}
+
+
+@app.post("/api/autopilot/confirm-now", dependencies=AUTH)
+def autopilot_confirm_now():
+    """Подтверждения записей немедленно + текст ошибки, если падает."""
+    from . import autopilot
+    import traceback
+    mk = autopilot._client()
+    try:
+        autopilot.confirm_joins(mk)
+        return {"ok": True}
+    except Exception:
+        return {"ok": False, "error": traceback.format_exc()[-800:]}
+    finally:
+        mk.close()
 
 
 @app.post("/api/autopilot/missed-now", dependencies=AUTH)
