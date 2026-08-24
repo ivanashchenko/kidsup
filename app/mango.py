@@ -203,9 +203,29 @@ _DONE_KEY = "calls_parsed"
 _DONE_MAX = 4000  # хватает на пару недель; старые записи всё равно не всплывут
 
 
+# Реестр должен переживать пересоздание контейнера, в котором идёт разбор:
+# локальная база откатывается вместе с ним (24.08 — трижды за сутки), и
+# каждый откат заставлял качать и разбирать те же разговоры заново.
+# Единственное долговечное место — база сервера, поэтому реестр читается
+# и пишется через его /api/settings; локальная копия остаётся запасной.
+_API = "https://app.kidsup.ru/api/settings"
+
+
+def _srv_auth():
+    from . import db
+    return ("admin", db.get_setting("admin_pass", "CGWstart8*"))
+
+
 def parsed() -> set[str]:
     """Записи, которые ежечасный разбор уже обработал."""
     from . import db
+    try:
+        r = httpx.get(_API, auth=_srv_auth(), timeout=30)
+        raw = (r.json() or {}).get(_DONE_KEY) or ""
+        if raw:
+            return {x for x in raw.split(",") if x}
+    except Exception:
+        pass
     return {x for x in db.get_setting(_DONE_KEY, "").split(",") if x}
 
 
@@ -213,5 +233,11 @@ def mark_parsed(recs) -> int:
     """Добавляет записи в реестр, отдаёт его новый размер."""
     from . import db
     cur = sorted(parsed() | {r for r in recs if r})[-_DONE_MAX:]
-    db.set_setting(_DONE_KEY, ",".join(cur))
+    val = ",".join(cur)
+    try:
+        httpx.post(_API, auth=_srv_auth(),
+                   json={"key": _DONE_KEY, "value": val}, timeout=30)
+    except Exception:
+        pass
+    db.set_setting(_DONE_KEY, val)
     return len(cur)
