@@ -993,23 +993,27 @@ def _wa_unanswered(phone: str) -> bool:
 WA_HOUR_FROM, WA_HOUR_TO = 9, 20
 
 
-def _wa(phone: str, text: str, mode: str = "broadcast") -> None:
+def _wa(phone: str, text: str, mode: str = "broadcast") -> bool | None:
     """broadcast — во все мессенджеры (WhatsApp+Telegram+MAX): у кого какой есть."""
     hour = _now().hour
     if not (WA_HOUR_FROM <= hour < WA_HOUR_TO) \
             and phone != (db.get_setting("digest_phone") or ""):
         log.info("wazzup: %s — сейчас %d:00 МСК, вне рабочих часов, не пишем",
                  phone[-4:], hour)
-        return
+        return None
     if phone != (db.get_setting("digest_phone") or "") and _wa_unanswered(phone):
         log.info("wazzup: %s ждёт ответа админа — автосообщение отложено", phone[-4:])
-        return
+        return None
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
     try:
-        for line in wazzup.send(phone, text, mode=mode, dry_run=dry):
+        lines = wazzup.send(phone, text, mode=mode, dry_run=dry)
+        for line in lines:
             log.info("wazzup: %s", line)
+        # HTTP 20x хотя бы в одном канале — сообщение принято к доставке
+        return any("HTTP 20" in ln or ln.startswith("[dry-run]") for ln in lines)
     except Exception as e:  # ключа может не быть — сценарии не должны падать
         log.warning("wazzup недоступен: %s", e)
+        return False
 
 
 def _age_years(user: dict) -> float | None:
@@ -1688,7 +1692,18 @@ def missed_calls() -> None:
                 text = MISSED_OUR.format(child=f" по занятиям {_genitive(child)}" if child else "")
             else:
                 text = MISSED_COLD
-            _wa(phone, text)
+            delivered = _wa(phone, text)
+            # Ни один мессенджер не принял — у человека их нет. СМС:
+            # решение владельца 24.08, одна на номер в день. Часы уже
+            # проверены внутри _wa; False возвращается только на реальном
+            # отказе всех каналов, ночная задержка даёт None.
+            if delivered is False and _mark("missed_sms", f"{today}:{phone}"):
+                if mango.send_sms(phone,
+                        "KidsUP: звонили по поводу занятий 2026/27 - идёт "
+                        "набор групп. Ответьте в WhatsApp 79160170918 или "
+                        "перезвоните 74951209024 - подберём группу. Первое "
+                        "занятие условно-бесплатное."):
+                    log.info("sms-догон: %s", phone[-4:])
             log.info("missed_calls: +7%s — %s", phone, kind)
     finally:
         mk.close()
