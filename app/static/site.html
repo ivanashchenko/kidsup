@@ -1056,6 +1056,18 @@ body.js .reveal.in{opacity:1;transform:none}
         «за скидку» — всё, что вы читаете слева, родители написали сами.</p>
         <p><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener"
         style="color:var(--indigo);font-weight:600">Открыть все отзывы на Яндекс.Картах →</a></p>
+        <!-- Виджет MyReviews со старого сайта: сводит отзывы с разных
+             площадок, uuid тот же — история отзывов сохраняется. -->
+        <div class="myReviews__block-widget" style="margin:14px 0"></div>
+        <script src="https://myreviews.dev/widget/dist/index.js" defer></script>
+        <script>
+        window.addEventListener("load", function () {
+          if (window.myReviews) new window.myReviews.BlockWidget({
+            uuid: "19ccaa9d-c508-4a38-b59e-33d01d38f2f7",
+            name: "customWidget-1", additionalFrame: "none", lang: "ru"
+          }).init();
+        });
+        </script>
         <p>Хотите увидеть центр вживую — приходите 29 августа на праздник: аниматоры,
         конкурсы и беспроигрышная лотерея, вход свободный.</p>
         <a class="btn btn-green" href="#signup">Записаться на занятие</a>
@@ -1086,8 +1098,16 @@ body.js .reveal.in{opacity:1;transform:none}
         <p><b>📄 Работаем по образовательной лицензии:</b> оплата материнским капиталом
         и налоговый вычет 13%.</p>
       </div>
+      <div>
+      <!-- Видео с прохода от метро — перенесено со старого сайта: для
+           родителя с коляской «как дойти» важнее схемы. -->
+      <iframe class="map" style="margin-bottom:10px" loading="lazy"
+        title="Видео: как к нам пройти от метро"
+        src="https://vk.com/video_ext.php?oid=-220359229&id=456239329&hd=2"
+        allow="encrypted-media; fullscreen; picture-in-picture" frameborder="0"></iframe>
       <iframe class="map" loading="lazy" title="KidsUP на карте"
         src="https://yandex.ru/map-widget/v1/?text=%D0%B1%D1%83%D0%BB%D1%8C%D0%B2%D0%B0%D1%80%20%D0%9C%D0%B0%D1%80%D1%88%D0%B0%D0%BB%D0%B0%20%D0%A0%D0%BE%D0%BA%D0%BE%D1%81%D1%81%D0%BE%D0%B2%D1%81%D0%BA%D0%BE%D0%B3%D0%BE%206%D0%BA1%D0%92&z=16"></iframe>
+      </div>
     </div>
   </div>
 </section>
@@ -1526,5 +1546,39 @@ ym(69569509,"init",{clickmap:true,trackLinks:true,accurateTrackBounce:true,webvi
 t.src="https://vk.com/js/api/openapi.js?169",t.onload=function(){VK.Retargeting.Init("VK-RTRG-401784-8crag"),VK.Retargeting.Hit()},
 document.head.appendChild(t)}();</script>
 <noscript><img src="https://vk.com/rtrg?p=VK-RTRG-401784-8crag" style="position:fixed;left:-999px" alt="" loading="lazy" decoding="async"></noscript>
+
+<!-- Плавающая кнопка мессенджеров — как на старом сайте, но WhatsApp
+     ведёт на живой 0918: прежний 0077 забанен, и кнопка старого сайта
+     отправляет людей писать в канал, который никто не читает. -->
+<style>
+.fab{position:fixed;right:18px;bottom:18px;z-index:90;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.fab input{display:none}
+.fab-main{width:58px;height:58px;border-radius:50%;background:var(--indigo,#312783);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);transition:transform .2s}
+.fab-main:hover{transform:scale(1.06)}
+.fab-main svg{width:28px;height:28px;fill:none;stroke:#fff;stroke-width:2}
+.fab-item{display:flex;align-items:center;gap:8px;text-decoration:none;opacity:0;pointer-events:none;transform:translateY(8px);transition:all .25s}
+.fab input:checked ~ .fab-item{opacity:1;pointer-events:auto;transform:none}
+.fab-item span{background:#fff;color:#222;font-size:13px;font-weight:600;padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.fab-ic{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.22)}
+.fab-ic img{width:26px;height:26px}
+</style>
+<div class="fab">
+  <input type="checkbox" id="fab-t">
+  <a class="fab-item" href="https://wa.me/79160170918" target="_blank" rel="noopener">
+    <span>WhatsApp</span>
+    <div class="fab-ic" style="background:#25D366"><svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.1c-.2.7-1.3 1.3-1.8 1.3-.5.1-1 .2-3.2-.7-2.7-1.1-4.4-3.9-4.6-4.1-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5s.8 1.9.8 2c.1.1.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.3.1.5.1.6-.1.2-.2.7-.8.9-1.1.2-.3.4-.2.6-.1l1.9.9c.2.1.4.2.4.3.1.1.1.6-.1 1.2z"/></svg></div></a>
+  <a class="fab-item" href="https://t.me/KidsUPchat" target="_blank" rel="noopener">
+    <span>Telegram</span>
+    <div class="fab-ic" style="background:#2AABEE"><svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><path d="M21.9 4.6 19 19.1c-.2 1-.8 1.2-1.6.8l-4.5-3.3-2.2 2.1c-.2.2-.4.4-.9.4l.3-4.6 8.4-7.6c.4-.3-.1-.5-.6-.2L7.6 13.2 3.1 11.8c-1-.3-1-1 .2-1.4l17.3-6.7c.8-.3 1.5.2 1.3.9z"/></svg></div></a>
+  <a class="fab-item" href="https://max.ru/u/f9LHodD0cOL7ouxX67LQufADpyAmbvMGRUdMqaGj2Ya-F1EuIVQMGWeU9gc" target="_blank" rel="noopener">
+    <span>MAX</span>
+    <div class="fab-ic" style="background:#7B3FF2;color:#fff;font-weight:800;font-size:15px">MAX</div></a>
+  <label class="fab-main" for="fab-t" title="Написать нам">
+    <svg viewBox="0 0 35 32"><path d="M11.3 12.7h12.1M11.3 16.5h12.1M4.8 23.6A13.3 13.3 0 0 1 1 14.8C1 7.2 8.4 1 17.5 1S34 7.2 34 14.8 26.6 28.5 17.5 28.5c-1.9 0-3.7-.3-5.3-.7l-.2-.1L5 31v-7.2l-.2-.2z" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </label>
+</div>
+<!-- Пиксель ВК со старого сайта — ретаргетинг тех, кто был на сайте -->
+<script>!function(){var t=document.createElement("script");t.type="text/javascript",t.async=!0,t.src="https://vk.com/js/api/openapi.js?169",t.onload=function(){VK.Retargeting.Init("VK-RTRG-401784-8crag"),VK.Retargeting.Hit()},document.head.appendChild(t)}();</script>
+<noscript><img src="https://vk.com/rtrg?p=VK-RTRG-401784-8crag" style="position:fixed;left:-999px" alt=""/></noscript>
 </body>
 </html>
