@@ -1922,7 +1922,15 @@ def missed_calls() -> None:
                     "WHERE substr(u.phone,-10)=? AND p.summa > 0 LIMIT 1",
                     (phone[-10:],)).fetchone()
                 paid_before = bool(row)
-            need_sms = paid_before and (
+            # Выключатель: 24.08 Манго принимал СМС (result 1000), но
+            # длинный кириллический текст до абонента НЕ ДОХОДИЛ — оператор
+            # режет многосегментные сообщения от незарегистрированного имени
+            # «MDeveloper». Платить ~9 ₽ за три сегмента, которые молча
+            # умирают у оператора, и считать семью «догнанной» — хуже, чем
+            # не слать. Включается настройкой sms_on=1 после регистрации
+            # имени отправителя в ЛК Манго.
+            sms_on = db.get_setting("sms_on", "0") == "1"
+            need_sms = sms_on and paid_before and (
                 (delivered is True and not has_msgr) or delivered is False)
             if need_sms and _mark("missed_sms", f"{today}:{phone}"):
                 if mango.send_sms(phone,

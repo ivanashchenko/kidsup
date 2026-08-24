@@ -2297,7 +2297,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-24.16"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-24.17"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -2340,7 +2340,7 @@ SETTABLE = {"admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "br
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
             "anthropic_proxy_secret", "work_hours", "ext_by_day",
             "vk_token", "vk_group_id", "tg_bot_token", "tg_channel", "mango_ext_admins",
-            "calls_parsed",
+            "calls_parsed", "sms_on",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
             "calls_done",
