@@ -30,8 +30,24 @@ from .moyklass_client import MoyklassClient
 log = logging.getLogger("kidsup.callmark")
 
 # Кто звонит с какого аппарата — в карточке должно быть видно имя, а не
-# номер добавочного: администратор читает карточку, а не схему АТС.
-WHO = {"10": "Надежда", "12": "Аня", "15": "админ (ноутбук)", "20": "Клуб Буракова"}
+# номер добавочного. Раскладка меняется по сменам (23.08 на доб. 10 была
+# Надежда, 24.08 — Ира), поэтому живёт в настройке ext_names, а здесь
+# только запасной вариант на случай пустой настройки.
+_WHO_DEFAULT = {"10": "Ира", "12": "Лена", "15": "Аня", "20": "Клуб Буракова"}
+
+
+def _who() -> dict:
+    import json as _json
+    try:
+        raw = db.get_setting("mango_ext_admins", "")
+        if raw:
+            return {str(k): str(v) for k, v in _json.loads(raw).items()}
+    except Exception:
+        pass
+    return _WHO_DEFAULT
+
+
+WHO = _who()
 
 ST_NEDOZVON = 345768
 # Смена статуса на «отказ» и «новый лид» без причины даёт 400 —
