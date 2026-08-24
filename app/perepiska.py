@@ -106,6 +106,31 @@ def _dialogs(day: str | None = None) -> list[dict]:
     return d if isinstance(d, list) else (d.get("dialogs") or [])
 
 
+def _yesterday_subjects() -> dict[str, str]:
+    """Предмет из вчерашней переписки по номеру.
+
+    Разговор живёт дольше суток: 23.08 Артамонов написал «планируем на
+    ментальную арифметику», 24.08 — «какая цена будет?». Без вчерашнего
+    контекста ответ переспрашивал бы то, что клиент уже сказал, и выглядел
+    бы как разговор с автоматом, который ничего не помнит."""
+    from datetime import timedelta
+    out: dict[str, str] = {}
+    try:
+        prev = (date.today() - timedelta(days=1)).isoformat()
+        for d in _dialogs(prev):
+            phone = "".join(c for c in str(d.get("phone") or "") if c.isdigit())[-10:]
+            if len(phone) != 10:
+                continue
+            text = " ".join(m["text"] for m in (d.get("messages") or [])
+                            if m.get("dir") == "in")
+            subj = next((n for n, rx in SUBJ_HINT if rx.search(text)), None)
+            if subj:
+                out[phone] = subj
+    except Exception as e:
+        log.warning("вчерашние диалоги недоступны: %s", e)
+    return out
+
+
 def _price_block(subject: str) -> str:
     """Строки прайса по предмету. Две цены: до 30.08 и после."""
     from .main import PRICES
@@ -220,6 +245,7 @@ def find_class(mk, subject: str, day: str | None, time: str | None):
 def scan(day: str | None = None) -> list[dict]:
     """Диалоги, где клиент задал вопрос и ответа от нас ещё не было."""
     out = []
+    yesterday = _yesterday_subjects()
     for d in _dialogs(day):
         msgs = d.get("messages") or []
         ins = [m for m in msgs if m["dir"] == "in"]
@@ -233,6 +259,8 @@ def scan(day: str | None = None) -> list[dict]:
             continue                      # служебные номера Wazzup
         text = " ".join(m["text"] for m in ins[-3:])
         topic, subj = classify(text)
+        if not subj:
+            subj = yesterday.get(phone)
         out.append({"phone": phone, "name": d.get("name") or "", "text": text,
                     "last_ts": last["ts"], "topic": topic, "subject": subj})
     return out
