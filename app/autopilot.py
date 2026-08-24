@@ -2548,15 +2548,35 @@ def wazzup_watchdog() -> dict:
 
     try:
         senders = [s.strip() for s in (db.get_setting("wa_senders") or "").split(",") if s.strip()]
-        alive = {c.get("plainId") for c in wz.all_channels()
-                 if c.get("transport") == "whatsapp" and c.get("state") == "active"}
+        # У номера бывает несколько каналов: старые заблокированные и один
+        # живой. Живым считаем номер, если ХОТЯ БЫ ОДИН его канал активен, —
+        # и смотрим оба транспорта: whatsapp (обычный, чинится QR-кодом) и
+        # wapi (WABA, где QR не существует вовсе). 25.08 сторож искал WABA
+        # 3507 среди обычных WhatsApp, не находил и просил сканировать QR,
+        # которого у WABA нет.
+        chans = wz.all_channels()
+        alive, kind = set(), {}
+        for c in chans:
+            pid, tr = c.get("plainId"), c.get("transport")
+            if tr in ("whatsapp", "wapi"):
+                kind.setdefault(pid, tr)
+                if c.get("state") == "active":
+                    alive.add(pid)
+                    kind[pid] = tr
         dead = [s for s in senders if s not in alive]
         res["dead_senders"] = dead
         if dead and _mark("wz_dead_sender", f"{_today()}:{','.join(dead)}"):
+            how = []
+            for d in dead:
+                if kind.get(d) == "wapi":
+                    how.append(f"{d} — это WABA: QR не нужен, смотреть статус "
+                               f"номера в WhatsApp Manager и подписку Wazzup")
+                else:
+                    how.append(f"{d} — обычный WhatsApp: переподключить канал "
+                               f"в Wazzup, сканировать QR заново")
             _wa(db.get_setting("digest_phone") or "79104526673",
-                "🤖 Клод: отвалились номера WhatsApp — " + ", ".join(dead) +
-                ". Рассылка с них не уходит. Нужно переподключить канал в Wazzup "
-                "(сканировать QR заново).")
+                "🤖 Клод: не вижу активного канала для номеров — "
+                + ", ".join(dead) + ". Рассылка с них не уйдёт. " + "; ".join(how))
             log.warning("watchdog: мёртвые отправители %s", dead)
     except Exception as e:
         log.warning("watchdog: каналы не проверились: %s", e)
