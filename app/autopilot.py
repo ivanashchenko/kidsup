@@ -1795,8 +1795,8 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
     return sent
 
 
-def daily_digest(mk: MoyklassClient) -> None:
-    """Вечерняя сводка владельцу в 20:05 — решение 24.08.
+def evening_digest(mk: MoyklassClient) -> None:
+    """Вечерняя сводка владельцу — решение 24.08.
 
     Всё, что владелец спрашивает вечером руками, приходит само: звонки
     по людям, записи, автоматика, невыполненные обещания клиентам,
@@ -1874,11 +1874,18 @@ def missed_calls() -> None:
             else:
                 text = MISSED_COLD
             delivered = _wa(phone, text)
-            # Ни один мессенджер не принял — у человека их нет. СМС:
-            # решение владельца 24.08, одна на номер в день. Часы уже
-            # проверены внутри _wa; False возвращается только на реальном
-            # отказе всех каналов, ночная задержка даёт None.
-            if delivered is False and _mark("missed_sms", f"{today}:{phone}"):
+            # Правило владельца 24.08 (вечер): если с семьёй НЕТ переписки
+            # в Telegram и MAX, СМС уходит ВМЕСТЕ с WhatsApp — не как
+            # запасной канал, а параллельно. Плюс страховка: все каналы
+            # отказали → тоже СМС. Одна на номер в день; None от _wa —
+            # ночь или клиент ждёт ответа, туда СМС не суём.
+            try:
+                has_msgr = any(t in ("telegram", "max")
+                               for t in wazzup.channels_for(phone))
+            except Exception:
+                has_msgr = False
+            need_sms = (delivered is True and not has_msgr) or delivered is False
+            if need_sms and _mark("missed_sms", f"{today}:{phone}"):
                 if mango.send_sms(phone,
                         "KidsUP: звонили по поводу занятий 2026/27 - идёт "
                         "набор групп. Ответьте в WhatsApp 79160170918 или "
@@ -2681,32 +2688,14 @@ def money_check() -> dict:
 
 
 def daily_digest() -> None:
-    day = _today().isoformat()
+    """Точка входа штатного расписания (20:00). Сама сводка собирается в
+    evening_digest: прежняя считала записи по локальной копии базы и не
+    видела ни горящих групп, ни невыполненных обещаний клиентам."""
+    mk = _client()
     try:
-        rows = mango.calls(_now().replace(hour=0, minute=0, second=0),
-                           _now())
-        rep = mango.report(rows=rows)
-        missed_n = len(mango.missed(rows=rows))
-    except Exception as e:
-        rep, missed_n = [], -1
-        log.warning("digest: mango недоступен: %s", e)
-    with db.get_conn() as conn:
-        joined = conn.execute(
-            "SELECT COUNT(*) FROM joins WHERE created_at >= ?", (day,)).fetchone()[0]
-    lines = [f"📊 KidsUP — сводка за {day}"]
-    for s in rep:
-        lines.append(f"• {s['admin']}: {s['attempts']} звонков, "
-                     f"{s['answered']} дозвонов, {s['talk_min']} мин")
-    if not rep:
-        lines.append("• звонков через АТС сегодня не было")
-    lines.append(f"Новых записей в группы: {joined}")
-    if missed_n >= 0:
-        lines.append(f"Недозвонов в догоне: {missed_n}")
-    text = "\n".join(lines)
-    log.info("digest:\n%s", text)
-    phone = db.get_setting("digest_phone")
-    if phone:
-        _wa(phone, text)
+        evening_digest(mk)
+    finally:
+        mk.close()
 
 
 def _retry_forwards() -> None:
@@ -3081,15 +3070,6 @@ def _loop() -> None:
                         reactivate_thinkers(mk)
                     except Exception:
                         log.exception("реактивация упала — продолжаем")
-                    finally:
-                        mk.close()
-                if now.hour == 20 and now.minute < 10 \
-                        and _mark("digest_day", str(_today())):
-                    mk = _client()
-                    try:
-                        daily_digest(mk)
-                    except Exception:
-                        log.exception("вечерняя сводка упала — продолжаем")
                     finally:
                         mk.close()
                 if now.hour == 16 and now.minute >= 50 \

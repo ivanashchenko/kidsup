@@ -2297,7 +2297,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-24.13"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-24.14"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -3341,7 +3341,7 @@ def autopilot_digest_now():
     import traceback
     mk = autopilot._client()
     try:
-        autopilot.daily_digest(mk)
+        autopilot.evening_digest(mk)
         return {"ok": True}
     except Exception:
         return {"ok": False, "error": traceback.format_exc()[-700:]}
