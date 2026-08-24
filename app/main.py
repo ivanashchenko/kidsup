@@ -2243,7 +2243,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-24.04"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-24.05"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -3265,6 +3265,20 @@ def api_broadcast_log(day: str = "", limit: int = 100):
                         # у каждого номера своё состояние и свой лимит
                         "sender": r["sender"]})
     return {"day": d, "count": len(out), "rows": out}
+
+
+@app.post("/api/autopilot/missed-now", dependencies=AUTH)
+def autopilot_missed_now():
+    """Догон недозвонов немедленно, в процессе сервера.
+
+    Нужен, когда часовой тик пропустил своё окно (рестарт при деплое,
+    сбой Манго): отметки об отправке живут в серверной базе, и запускать
+    догон надо именно здесь, иначе после запуска с другой машины сервер
+    не узнает об отправленном и продублирует."""
+    from . import autopilot
+    before = len(autopilot.db.get_setting("_", "") or "")
+    autopilot.missed_calls()
+    return {"ok": True}
 
 
 @app.get("/api/autopilot/log", dependencies=AUTH)
