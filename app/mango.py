@@ -248,9 +248,16 @@ def send_sms(phone: str, text: str, from_ext: str = "12") -> bool:
     num = "".join(ch for ch in phone if ch.isdigit())
     if len(num) == 10:
         num = "7" + num
+    # Имя отправителя, выбранное в ЛК (USLUGI_MT), на API-отправки само
+    # не действует — 24.08 тест пришёл по-прежнему от «MDeveloper».
+    # Передаём имя явно; настройка sms_sender_name позволяет сменить его
+    # без правки кода, когда согласуют индивидуальное.
+    from . import db as _db
+    sender = _db.get_setting("sms_sender_name", "USLUGI_MT") or "USLUGI_MT"
     r = _call("commands/sms", {"command_id": f"sms_{num[-4:]}",
                                "from_extension": from_ext,
-                               "to_number": num, "text": text[:480]})
+                               "to_number": num, "text": text[:480],
+                               "sms_sender": sender})
     ok = r.status_code == 200 and '"result":1000' in r.text
     if not ok:
         import logging
