@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import Body, Depends, FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, PlainTextResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -70,7 +70,32 @@ def render(request: Request, template: str, **ctx) -> HTMLResponse:
 
 # --- страницы -------------------------------------------------------------
 
-@app.get("/", response_class=HTMLResponse, dependencies=AUTH)
+PUBLIC_HOSTS = {
+    # Домен → какой публичной странице отвечает его корень. Когда DNS
+    # kidsup.ru переедет на этот сервер, посетитель получит сайт, а не
+    # окно авторизации; служебный app.kidsup.ru остаётся под паролем.
+    "kidsup.ru": "site", "www.kidsup.ru": "site",
+    "kidsupday.ru": "day", "www.kidsupday.ru": "day",
+    "kidsupweek.ru": "week", "www.kidsupweek.ru": "week",
+}
+
+
+@app.get("/", response_class=HTMLResponse)
+def root(request: Request,
+         credentials: HTTPBasicCredentials | None = Depends(_security)):
+    host = (request.headers.get("x-forwarded-host")
+            or request.headers.get("host") or "").split(":")[0].lower()
+    page = PUBLIC_HOSTS.get(host)
+    if page == "site":
+        return await_page("site")
+    if page == "day":
+        return await_page("day")
+    if page == "week":
+        return await_page("week")
+    check_auth(credentials)          # служебный хост — как раньше, под паролем
+    return dashboard(request)
+
+
 def dashboard(request: Request):
     return render(
         request, "dashboard.html",
@@ -83,6 +108,35 @@ def dashboard(request: Request):
         debtors=analytics.top_debtors(),
         groups=analytics.group_stats()[:15],
     )
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots(request: Request):
+    host = (request.headers.get("x-forwarded-host")
+            or request.headers.get("host") or "kidsup.ru").split(":")[0]
+    if host.startswith("app."):
+        return PlainTextResponse("User-agent: *\nDisallow: /\n")
+    return PlainTextResponse(
+        f"User-agent: *\nAllow: /\nSitemap: https://{host}/sitemap.xml\n")
+
+
+@app.get("/sitemap.xml")
+def sitemap(request: Request):
+    from fastapi.responses import Response
+    host = (request.headers.get("x-forwarded-host")
+            or request.headers.get("host") or "kidsup.ru").split(":")[0]
+    urls = "".join(f"<url><loc>https://{host}/{u}</loc></url>"
+                   for u in ("",))
+    return Response(content=('<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        + urls + "</urlset>"), media_type="application/xml")
+
+
+@app.get("/favicon.ico")
+def favicon():
+    from fastapi.responses import FileResponse
+    return FileResponse(BASE / "static" / "logo_color.png",
+                        media_type="image/png")
 
 
 @app.get("/students", response_class=HTMLResponse, dependencies=AUTH)
@@ -2265,7 +2319,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-24.26"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-24.28"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -3549,6 +3603,14 @@ async def vstrechi_page():
         raise HTTPException(404, "страница ещё не собрана (python3 -m app.events)")
     return HTMLResponse(f.read_text(encoding="utf-8"),
                         headers={"Cache-Control": "public, max-age=600"})
+
+
+def await_page(which: str) -> HTMLResponse:
+    """Отдать публичную страницу по имени — общий код для превью-роутов
+    и корня публичных доменов."""
+    name = {"site": "site.html", "day": "day.html", "week": "week.html"}[which]
+    f = BASE / "static" / name
+    return HTMLResponse(f.read_text(encoding="utf-8"))
 
 
 @app.get("/site", response_class=HTMLResponse)
