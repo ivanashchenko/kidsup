@@ -1933,11 +1933,13 @@ def missed_calls() -> None:
             need_sms = sms_on and paid_before and (
                 (delivered is True and not has_msgr) or delivered is False)
             if need_sms and _mark("missed_sms", f"{today}:{phone}"):
+                # Кириллический сегмент — 70 символов; прежний текст был
+                # три сегмента и полз до абонента десять минут. Два сегмента
+                # доставляются быстрее и стоят на треть дешевле.
                 if mango.send_sms(phone,
-                        "KidsUP: звонили по поводу занятий 2026/27 - идёт "
-                        "набор групп. Ответьте в WhatsApp 79160170918 или "
-                        "перезвоните 74951209024 - подберём группу. Первое "
-                        "занятие условно-бесплатное."):
+                        "KidsUP: звонили по поводу занятий - идёт набор групп "
+                        "2026/27. Ответьте в WhatsApp 79160170918 или "
+                        "перезвоните 74951209024 - подберём группу."):
                     log.info("sms-догон: %s", phone[-4:])
             log.info("missed_calls: +7%s — %s", phone, kind)
     finally:
