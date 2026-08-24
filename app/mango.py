@@ -194,6 +194,27 @@ if __name__ == "__main__":
     main()
 
 
+def send_sms(phone: str, text: str, from_ext: str = "12") -> bool:
+    """СМС через АТС — крайний канал для тех, у кого нет мессенджеров.
+
+    Проверено 24.08 на номере владельца: доходит через МТС, отправителем
+    значится «MDeveloper» (заводское имя Манго для API), ответить на СМС
+    нельзя. Поэтому текст ОБЯЗАН начинаться с «KidsUP» и содержать номер,
+    куда отвечать, — иначе это анонимка в спам."""
+    num = "".join(ch for ch in phone if ch.isdigit())
+    if len(num) == 10:
+        num = "7" + num
+    r = _call("commands/sms", {"command_id": f"sms_{num[-4:]}",
+                               "from_extension": from_ext,
+                               "to_number": num, "text": text[:480]})
+    ok = r.status_code == 200 and '"result":1000' in r.text
+    if not ok:
+        import logging
+        logging.getLogger("kidsup.mango").warning(
+            "sms %s: %s %s", num[-4:], r.status_code, r.text[:120])
+    return ok
+
+
 # --- реестр разобранных записей ------------------------------------------
 # Лежал в /tmp и исчезал при каждом перезапуске контейнера: 23.08 это
 # случилось трижды, и после каждого раза ежечасный разбор был готов заново
