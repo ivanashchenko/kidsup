@@ -265,6 +265,16 @@ def scan(day: str | None = None) -> list[dict]:
         topic, subj = classify(text)
         if not subj:
             subj = yesterday.get(phone)
+        # Ответ на наш уточняющий вопрос: клиент пишет «ментальная
+        # арифметика» или «5 лет» без слов «цена/расписание» — тема не
+        # распознаётся, и запрос повисает (24.08 Юрченко ждала весь день).
+        # Если последнее наше сообщение было уточнением, ответ и есть
+        # предмет, а тема — та, ради которой уточняли.
+        outs = [m for m in msgs if m["dir"] == "out" and m["ts"] < last["ts"]]
+        if not topic and outs and "что интересует" in outs[-1]["text"]:
+            topic = "цена"
+            if not subj:
+                subj = next((n for n, rx in SUBJ_HINT if rx.search(last["text"])), None)
         out.append({"phone": phone, "name": d.get("name") or "", "text": text,
                     "last_ts": last["ts"], "topic": topic, "subject": subj})
     return out
