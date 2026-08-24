@@ -1560,6 +1560,118 @@ def _missed_kind(mk: MoyklassClient, phone: str) -> tuple[str, str]:
     return "cold", child
 
 
+# Читаемое имя группы для сообщения клиенту: из «2627_ПШ_пн-чт_18:00_4-7
+# лет_ПШ2 читающие (Гр7)» получается «Подготовка к школе · пн-чт · 18:00 ·
+# ПШ2 читающие». Родителю в подтверждении нужен предмет, дни и время,
+# а не внутренний код сезона.
+_SUBJ_FULL = {
+    "ПШ": "Подготовка к школе", "АЯ": "Английский язык", "МА": "Ментальная арифметика",
+    "НК": "Мини-сад", "ШАХ": "Шахматы", "ИЗО": "ИЗО-студия",
+}
+
+
+def _join_title(name: str) -> str:
+    parts = [p for p in name.split("_") if p and not p.startswith("2627")]
+    if parts and parts[0] in _SUBJ_FULL:
+        parts[0] = _SUBJ_FULL[parts[0]]
+    return " · ".join(parts)[:120]
+
+
+def _duty_manager() -> int:
+    """Первый администратор из сегодняшней смены — на него ложатся наряды."""
+    import json as _json
+    try:
+        sched = _json.loads(db.get_setting("admin_schedule", "") or "{}")
+        v = sched.get(str(_today()))
+        if isinstance(v, list) and v:
+            return int(v[0])
+        if v:
+            return int(v)
+    except Exception:
+        pass
+    return 232805
+
+
+def confirm_joins(mk: MoyklassClient) -> None:
+    """Подтверждение каждой новой записи — решение владельца 24.08.
+
+    До этого подтверждение получали только записи, оформленные Клодом:
+    родитель, которого администратор записал по телефону, клал трубку
+    и не получал ничего — ни группы, ни адреса. Информация жила только
+    в его памяти, а память после трёх звонков за день ненадёжна.
+
+    Раз в цикл: свежие записи в группы нового сезона (кроме буферов
+    заявок) → сообщение клиенту по правилу каналов + след в карточке.
+    Отметка по id записи, чтобы подтверждение было ровно одно."""
+    today = _today().isoformat()
+    joins = mk.fetch_all("/v1/company/joins", ["joins"],
+                         params={"createdAt": today}) or []
+    rc = mk.get("/v1/company/classes", {"limit": 500})
+    cls = {c["id"]: (c.get("name") or "")
+           for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+    for j in joins:
+        nm = cls.get(j.get("classId"), "")
+        if not nm.startswith("2627") or "аявк" in nm.lower():
+            continue
+        if str(j.get("createdAt") or "")[:10] != today:
+            continue
+        if j.get("statusId") not in {2, 50509, 58131, 58132, 83760}:
+            continue
+        if not _mark("join_confirm", str(j["id"])):
+            continue
+        try:
+            u = mk.get(f"/v1/company/users/{j['userId']}")
+        except Exception:
+            continue
+        phone = "".join(ch for ch in (u.get("phone") or "") if ch.isdigit())[-10:]
+        if len(phone) != 10:
+            continue
+        title = _join_title(nm)
+        _wa(phone, f"Здравствуйте! Подтверждаем запись: {title}. "
+                   f"Занятия начинаются 31 августа. Адрес: б-р Маршала "
+                   f"Рокоссовского, 6к1В (напротив ТЦ «Янтарь»), 2 минуты "
+                   f"от метро Бульвар Рокоссовского. Первое занятие "
+                   f"условно-бесплатное, и на нём же бесплатная диагностика — "
+                   f"педагог посмотрит уровень и подберёт ступень. Если "
+                   f"что-то поменяется, просто ответьте здесь.")
+        try:
+            mk.post("/v1/company/userComments",
+                    {"userId": j["userId"], "showToUser": False,
+                     "comment": f"Авто: отправлено подтверждение записи «{title}» "
+                                f"(WhatsApp + мессенджеры по правилу каналов)."})
+        except Exception:
+            log.warning("подтверждение: комментарий не записан uid=%s", j.get("userId"))
+        log.info("подтверждение записи: %s → %s", title[:40], phone[-4:])
+
+
+def evening_recall(mk: MoyklassClient) -> None:
+    """Вечерний наряд: перезвонить утренним недозвонам — решение 24.08.
+
+    Утром две трети наборов уходят в никуда: родители на работе. Вечером
+    (17:00-19:00) доля ответов заметно выше, поэтому в 16:55 дежурный
+    получает задачу со ссылкой на живой список /nedozvony — там те, кому
+    сегодня не дозвонились И кто не ответил на сообщение-догон."""
+    from . import mango
+    try:
+        missed = mango.missed()
+    except Exception as e:
+        log.warning("вечерний наряд: Манго недоступен: %s", e)
+        return
+    n = len(missed)
+    if not n:
+        return
+    duty = _duty_manager() if "_duty_manager" in globals() else 232805
+    mk.post("/v1/company/tasks", {
+        "managerIds": [duty], "categoryId": 44337,
+        "beginDate": f"{_today()}T13:55:00+00:00",
+        "endDate": f"{_today()}T17:00:00+00:00",
+        "body": (f"ВЕЧЕРНИЙ ПРОЗВОН: {n} утренних недозвонов ждут второй "
+                 f"попытки — вечером берут трубку чаще. Живой список: "
+                 f"app.kidsup.ru/nedozvony (кто уже ответил на сообщение, "
+                 f"из списка убран).")[:250]})
+    log.info("вечерний наряд: %d недозвонов → задача дежурному", n)
+
+
 def missed_calls() -> None:
     today = _today().isoformat()
     mk = _client()
@@ -2758,6 +2870,23 @@ def _loop() -> None:
                         missed_inbound(mk)
                 finally:
                     mk.close()
+                if now.minute % 20 < 3 and 9 <= now.hour < 20:
+                    mk = _client()
+                    try:
+                        confirm_joins(mk)
+                    except Exception:
+                        log.exception("подтверждение записей упало — продолжаем")
+                    finally:
+                        mk.close()
+                if now.hour == 16 and now.minute >= 50 \
+                        and _mark("evening_recall", str(_today())):
+                    mk = _client()
+                    try:
+                        evening_recall(mk)
+                    except Exception:
+                        log.exception("вечерний наряд упал — продолжаем")
+                    finally:
+                        mk.close()
                 # ответы в переписке на вопросы с однозначным ответом
                 # (цена/расписание/адрес из прайса и живых групп) — решение
                 # владельца 24.08 после проверки первой отправки. Каждые

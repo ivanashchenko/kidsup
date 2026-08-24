@@ -992,6 +992,60 @@ def base_page(request: Request):
     return render(request, "base_docs.html", active="base", groups=groups)
 
 
+@app.get("/nedozvony", response_class=HTMLResponse, dependencies=AUTH)
+def nedozvony_page():
+    """Живой список сегодняшних недозвонов для вечернего прозвона.
+
+    Бумажный лист устаревает за день (24.08 семья получила третий звонок,
+    потому что люберецкий лист печатался накануне). Эта страница строится
+    в момент открытия: те, кому не дозвонились сегодня, МИНУС те, кто уже
+    ответил на сообщение-догон, минус отказы и «не писать»."""
+    import html as _h
+    from . import mango
+    try:
+        missed = mango.missed()
+    except Exception as e:
+        return HTMLResponse(f"<p>Манго недоступен: {_h.escape(str(e)[:120])}</p>")
+    replied = set()
+    with db.get_conn() as conn:
+        try:
+            for (ph,) in conn.execute(
+                    "SELECT DISTINCT substr(phone,-10) FROM wazzup_inbox "
+                    "WHERE date(ts)=date('now') AND chat_type!='manual'"):
+                replied.add(ph)
+        except Exception:
+            pass
+        names, states = {}, {}
+        for uid, nm, phone, st in conn.execute(
+                "SELECT id, name, phone, client_state_id FROM users WHERE phone IS NOT NULL"):
+            p10 = "".join(ch for ch in str(phone) if ch.isdigit())[-10:]
+            if len(p10) == 10 and p10 not in names:
+                names[p10], states[p10] = (nm or ""), st
+    rows = []
+    for m in sorted(missed, key=lambda x: -x["attempts"]):
+        p = m["phone"][-10:]
+        if p in replied or states.get(p) in (125957, 146328, 125954):
+            continue
+        rows.append(f"<tr><td>{_h.escape((names.get(p) or '—')[:34])}</td>"
+                    f"<td class=ph>+7{p}</td><td class=at>{m['attempts']}</td>"
+                    f"<td class=res></td></tr>")
+    body = f"""<style>
+    body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:14px;color:#222}}
+    h1{{font-size:19px;margin:0 0 4px}} .sub{{color:#666;font-size:13px;margin-bottom:10px}}
+    table{{border-collapse:collapse;width:100%}}
+    th{{background:#312783;color:#fff;font-size:12px;padding:6px;text-align:left}}
+    td{{border-bottom:1px solid #ddd;padding:7px 6px;font-size:14px}}
+    .ph{{font-weight:600;white-space:nowrap}} .at{{text-align:center}}
+    .res{{width:200px;border-bottom:1px solid #999}}</style>
+    <h1>Вечерний прозвон: сегодняшние недозвоны</h1>
+    <div class=sub>{len(rows)} номеров. Кто уже ответил на сообщение-догон,
+    отказники и «не писать» — убраны. Страница живая: обновите перед звонками.
+    Больше всего попыток — сверху.</div>
+    <table><tr><th>Кто</th><th>Телефон</th><th>Попыток</th><th>Итог</th></tr>
+    {''.join(rows)}</table>"""
+    return HTMLResponse(body)
+
+
 @app.get("/api/perepiska", dependencies=AUTH)
 def perepiska_report(day: str | None = None, send: int = 0):
     """Отчёт по переписке машинным форматом. Человеку — /perepiska."""
@@ -2243,7 +2297,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-24.07"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-24.08"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
