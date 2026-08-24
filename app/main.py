@@ -2297,7 +2297,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-24.11"  # видно в /api/health — чтобы проверять, что обновление применилось
+APP_VERSION = "2026-08-24.13"  # видно в /api/health — чтобы проверять, что обновление применилось
 
 
 @app.get("/api/net")
@@ -3320,6 +3320,63 @@ def api_broadcast_log(day: str = "", limit: int = 100):
                         # у каждого номера своё состояние и свой лимит
                         "sender": r["sender"]})
     return {"day": d, "count": len(out), "rows": out}
+
+
+@app.post("/api/autopilot/reactivate-now", dependencies=AUTH)
+def autopilot_reactivate_now(cap: int = 15):
+    from . import autopilot
+    import traceback
+    mk = autopilot._client()
+    try:
+        return {"ok": True, "sent": autopilot.reactivate_thinkers(mk, cap=cap)}
+    except Exception:
+        return {"ok": False, "error": traceback.format_exc()[-700:]}
+    finally:
+        mk.close()
+
+
+@app.post("/api/autopilot/digest-now", dependencies=AUTH)
+def autopilot_digest_now():
+    from . import autopilot
+    import traceback
+    mk = autopilot._client()
+    try:
+        autopilot.daily_digest(mk)
+        return {"ok": True}
+    except Exception:
+        return {"ok": False, "error": traceback.format_exc()[-700:]}
+    finally:
+        mk.close()
+
+
+@app.get("/zapolnyaemost", response_class=HTMLResponse, dependencies=AUTH)
+def zapolnyaemost_page():
+    """Заполняемость групп нового сезона — самые пустые сверху."""
+    import html as _h
+    from . import autopilot
+    mk = autopilot._client()
+    try:
+        fills = autopilot.group_fill(mk)
+    finally:
+        mk.close()
+    rows = []
+    for f in fills:
+        bar = "█" * f["got"] + "░" * f["free"]
+        hot = ' style="background:#FFF4E0"' if f["got"] * 2 < f["target"] else ""
+        rows.append(f"<tr{hot}><td>{_h.escape(autopilot._join_title(f['name'])[:64])}</td>"
+                    f"<td class=n>{f['got']}/{f['target']}</td>"
+                    f"<td class=b>{bar}</td></tr>")
+    return HTMLResponse(f"""<style>
+    body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:14px;color:#222}}
+    h1{{font-size:19px;margin:0 0 4px}} .sub{{color:#666;font-size:13px;margin-bottom:10px}}
+    table{{border-collapse:collapse;width:100%}}
+    th{{background:#312783;color:#fff;font-size:12px;padding:6px;text-align:left}}
+    td{{border-bottom:1px solid #ddd;padding:6px;font-size:14px}}
+    .n{{white-space:nowrap;font-weight:600}} .b{{font-family:monospace;letter-spacing:1px}}</style>
+    <h1>Заполняемость групп 2026/27</h1>
+    <div class=sub>Самые пустые сверху. Жёлтым — занято меньше половины плана:
+    эти группы в приоритете обзвона. Живая страница.</div>
+    <table><tr><th>Группа</th><th>Занято</th><th></th></tr>{''.join(rows)}</table>""")
 
 
 @app.post("/api/autopilot/confirm-now", dependencies=AUTH)

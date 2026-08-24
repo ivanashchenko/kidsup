@@ -1676,6 +1676,187 @@ def evening_recall(mk: MoyklassClient) -> None:
     log.info("вечерний наряд: %d недозвонов → задача дежурному", n)
 
 
+# --- заполняемость групп нового сезона --------------------------------
+# Целевой размер: у сада и нулевого класса мест больше, чем у кружковых
+# групп. Точных планов по каждой группе в CRM нет, поэтому берём типовые.
+_TARGET = (("ини-сад", 8), ("улевой", 8), ("_ПШ_", 6), ("_АЯ_", 6),
+           ("ИЗО", 6), ("ШАХ", 6), ("_МА_", 6), ("Лицей", 6),
+           ("Музыка и речь", 6), ("Первая школа", 6))
+
+
+def _group_target(name: str) -> int:
+    for pat, n in _TARGET:
+        if pat in name:
+            return n
+    return 6
+
+
+def group_fill(mk: MoyklassClient) -> list[dict]:
+    """Заполняемость групп 2627: сколько записано против типового плана.
+
+    «Горящая» группа — та, где занято меньше половины плана: звонок
+    «во вторник в 17:00 осталось три места» честен и работает лучше
+    любого скрипта, но только если места посчитаны, а не выдуманы."""
+    joins = mk.fetch_all("/v1/company/joins", ["joins"]) or []
+    rc = mk.get("/v1/company/classes", {"limit": 500})
+    cls = {c["id"]: (c.get("name") or "")
+           for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+    cnt: dict[int, int] = {}
+    for j in joins:
+        nm = cls.get(j.get("classId"), "")
+        if nm.startswith("2627") and "аявк" not in nm.lower()                 and j.get("statusId") in {2, 50509, 58131, 58132, 83760}:
+            cnt[j["classId"]] = cnt.get(j["classId"], 0) + 1
+    out = []
+    for cid, nm in cls.items():
+        if not nm.startswith("2627") or "аявк" in nm.lower():
+            continue
+        # логопед — индивидуальные слоты, а не группы с планом набора:
+        # 34 пустых получаса Елены и Марины хоронят под собой реально
+        # горящие группы
+        if "_ЛГ" in nm:
+            continue
+        got = cnt.get(cid, 0)
+        tgt = _group_target(nm)
+        out.append({"name": nm, "got": got, "target": tgt,
+                    "free": max(0, tgt - got)})
+    return sorted(out, key=lambda x: (x["got"] / max(1, x["target"]), x["name"]))
+
+
+def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
+    """Одно точное сообщение «думающим», до которых давно не касались.
+
+    Статус «думает» означает состоявшийся разговор без отказа — самая
+    тёплая часть базы, и она тихо остывает: на 24.08 таких 35+ без
+    единого касания за трое суток. Сообщение персональное (имя ребёнка,
+    предмет из его истории), не чаще раза в неделю на семью, не больше
+    cap за день — это разовые письма по правилу каналов, не рассылка."""
+    week = _today().isocalendar()[1]
+    users = mk.fetch_all("/v1/company/users", ["users"],
+                         params={"clientStateIds": 146950}) or []
+    thinkers = [u for u in users if u.get("clientStateId") == 146950]
+    joins = mk.fetch_all("/v1/company/joins", ["joins"]) or []
+    rc = mk.get("/v1/company/classes", {"limit": 500})
+    cls = {c["id"]: (c.get("name") or "")
+           for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+    SUBJ = (("_ПШ_|одготовк|нулев", "подготовке к школе"),
+            ("_АЯ_|_ЛК_|нглийск", "английскому языку"),
+            ("ини-сад|_НК_", "мини-саду"), ("ИЗО", "ИЗО-студии"),
+            ("ШАХ", "шахматам"), ("_МА_|ентальн", "ментальной арифметике"),
+            ("Лицей|Первая школа|МсМ|Музыка", "занятиям для малышей"))
+    import re as _re
+    interest: dict[int, str] = {}
+    for j in joins:
+        nm = cls.get(j.get("classId"), "")
+        for pat, label in SUBJ:
+            if _re.search(pat, nm):
+                interest.setdefault(j.get("userId"), label)
+                break
+    # свежие касания: комментарии за трое суток
+    since = (_today() - timedelta(days=3)).isoformat()
+    touched = set()
+    try:
+        cm = mk.get("/v1/company/userComments",
+                    {"createdAt": [since, _today().isoformat()], "limit": 500})
+        touched = {x.get("userId") for x in
+                   ((cm.get("userComments") if isinstance(cm, dict) else cm) or [])}
+    except Exception:
+        log.warning("reactivate: комментарии недоступны, шлём без фильтра касаний")
+    sent = 0
+    for u in thinkers:
+        if sent >= cap:
+            break
+        uid = u["id"]
+        if uid in touched or not _mark("reactivate", f"{uid}:w{week}"):
+            continue
+        phone = "".join(ch for ch in (u.get("phone") or "") if ch.isdigit())[-10:]
+        if len(phone) != 10:
+            continue
+        child = _child_name(u.get("name") or "")
+        subj = interest.get(uid)
+        about = f" по {subj}" if subj else ""
+        who = f" {child}" if child else ""
+        ok = _wa(phone,
+                 f"Здравствуйте! Это KidsUP на бульваре Рокоссовского. "
+                 f"Вы думали про занятия{about} для{who or ' ребёнка'} — группы "
+                 f"на новый год собрались почти полностью, занятия с 31 августа. "
+                 f"Чтобы место точно осталось за вами, можно прийти на первое "
+                 f"занятие: оно условно-бесплатное, и на нём же бесплатная "
+                 f"диагностика. Написать, какие дни и время ещё свободны?")
+        if ok:
+            try:
+                mk.post("/v1/company/userComments",
+                        {"userId": uid, "showToUser": False,
+                         "comment": f"Авто-реактивация «думает»: отправлено личное "
+                                    f"сообщение{about or ' (предмет не определён)'}."})
+            except Exception:
+                pass
+            sent += 1
+    log.info("reactivate: отправлено %d", sent)
+    return sent
+
+
+def daily_digest(mk: MoyklassClient) -> None:
+    """Вечерняя сводка владельцу в 20:05 — решение 24.08.
+
+    Всё, что владелец спрашивает вечером руками, приходит само: звонки
+    по людям, записи, автоматика, невыполненные обещания клиентам,
+    горящие группы на завтра."""
+    from . import mango
+    today = _today().isoformat()
+    lines = [f"KidsUP · сводка за {_today().strftime('%d.%m')}"]
+    try:
+        rep = mango.report()
+        lines.append("\nЗВОНКИ:")
+        for r in rep:
+            lines.append(f"• {r['admin']}: набрано {r['attempts']}, дозвон "
+                         f"{r['answered']}, {r['talk_min']} мин")
+    except Exception as e:
+        lines.append(f"звонки: Манго недоступен ({str(e)[:40]})")
+    try:
+        joins = mk.fetch_all("/v1/company/joins", ["joins"],
+                             params={"createdAt": today}) or []
+        rc = mk.get("/v1/company/classes", {"limit": 500})
+        cls = {c["id"]: (c.get("name") or "")
+               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+        new = [cls.get(j.get("classId"), "") for j in joins
+               if str(j.get("createdAt") or "")[:10] == today
+               and cls.get(j.get("classId"), "").startswith("2627")
+               and "аявк" not in cls.get(j.get("classId"), "").lower()]
+        lines.append(f"\nЗАПИСЕЙ В ГРУППЫ: {len(new)}")
+        for nm in new[:10]:
+            lines.append(f"• {_join_title(nm)[:60]}")
+    except Exception:
+        lines.append("записи: не посчитались")
+    # обещания клиентам, не выполненные к вечеру: срочные и переписка
+    try:
+        broken = []
+        from . import taskguard as _tg
+        for mid in (154181, 232805, 202856, 232763):
+            for t in _tg.all_tasks(mk, mid):
+                if t.get("isComplete") or t.get("isCompleted"):
+                    continue
+                if str(t.get("endDate") or "")[:10] <= today                         and t.get("categoryId") in (44337, 104575):
+                    broken.append(t)
+        if broken:
+            lines.append(f"\n⚠ НЕ ЗАКРЫТО К ВЕЧЕРУ: {len(broken)} срочных/переписка")
+    except Exception:
+        pass
+    try:
+        fills = group_fill(mk)
+        hot = [f for f in fills if f["got"] * 2 < f["target"]][:5]
+        if hot:
+            lines.append("\nГОРЯЩИЕ ГРУППЫ (меньше половины плана):")
+            for f in hot:
+                lines.append(f"• {_join_title(f['name'])[:52]} — {f['got']}/{f['target']}")
+    except Exception:
+        pass
+    text = "\n".join(lines)[:1800]
+    phone = db.get_setting("digest_phone") or ""
+    if phone:
+        _wa(phone, text)
+        log.info("вечерняя сводка отправлена владельцу")
+
+
 def missed_calls() -> None:
     today = _today().isoformat()
     mk = _client()
@@ -2891,6 +3072,24 @@ def _loop() -> None:
                         confirm_joins(mk)
                     except Exception:
                         log.exception("подтверждение записей упало — продолжаем")
+                    finally:
+                        mk.close()
+                if now.hour == 12 and now.minute < 10 \
+                        and _mark("reactivate_day", str(_today())):
+                    mk = _client()
+                    try:
+                        reactivate_thinkers(mk)
+                    except Exception:
+                        log.exception("реактивация упала — продолжаем")
+                    finally:
+                        mk.close()
+                if now.hour == 20 and now.minute < 10 \
+                        and _mark("digest_day", str(_today())):
+                    mk = _client()
+                    try:
+                        daily_digest(mk)
+                    except Exception:
+                        log.exception("вечерняя сводка упала — продолжаем")
                     finally:
                         mk.close()
                 if now.hour == 16 and now.minute >= 50 \
