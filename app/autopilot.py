@@ -3114,6 +3114,19 @@ def _loop() -> None:
                         log.exception("подтверждение записей упало — продолжаем")
                     finally:
                         mk.close()
+                # Сторож имён: раз в день проверяет, не дописали ли в имена
+                # карточек служебные пометки заново. 24.08 таких было 404 —
+                # без сторожа они накопятся снова за пару месяцев.
+                if now.hour == 19 and now.minute < 10 \
+                        and _mark("imena_watch", str(_today())):
+                    mk = _client()
+                    try:
+                        from . import imena
+                        imena.watch(mk)
+                    except Exception:
+                        log.exception("сторож имён упал — продолжаем")
+                    finally:
+                        mk.close()
                 if now.hour == 12 and now.minute < 10 \
                         and _mark("reactivate_day", str(_today())):
                     mk = _client()
