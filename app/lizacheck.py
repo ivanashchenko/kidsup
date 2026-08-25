@@ -68,21 +68,71 @@ def _calls(days: int = 16) -> dict:
 
 
 def _messages() -> tuple:
+    """Последнее входящее и последнее исходящее по каждому телефону —
+    вместе с текстом. Текст нужен для второй фазы разбора: одно дело,
+    когда клиент последним написал «а сколько стоит», и совсем другое —
+    когда «спасибо, поняла»."""
     inbox, outbox = {}, {}
     try:
         with db.get_conn() as conn:
             for tbl, dst in (("wazzup_inbox", inbox), ("wazzup_outbox", outbox)):
                 try:
-                    for ts, phone in conn.execute(
-                            f"SELECT ts, phone FROM {tbl} ORDER BY ts"):
+                    for ts, phone, text in conn.execute(
+                            f"SELECT ts, phone, text FROM {tbl} ORDER BY ts"):
                         p = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
                         if len(p) == 10:
-                            dst[p] = ts
+                            dst[p] = (ts, str(text or ""))
                 except Exception:
                     continue
     except Exception:
         pass
     return inbox, outbox
+
+
+# Реплики, которыми разговор заканчивают, а не продолжают. Если последнее
+# слово клиента такое — вопрос закрыт, задача больше ни к чему.
+_CLOSING = re.compile(
+    r"^\s*(спасибо|благодар|хорошо|ок|окей|ok|поняла|понял|принял|принято|"
+    r"договорились|ждём|ждем|будем ждать|да, конечно|отлично|супер|"
+    r"подтверждаю|👍|🙏|❤|😊)", re.I)
+# Слова, по которым видно, что клиент задал вопрос и ждёт ответа.
+_ASKING = re.compile(r"[?]|сколько|когда|какой|какие|можно ли|подскажите|"
+                     r"уточнит|а если|расскажите", re.I)
+
+
+def _second_pass(row: dict, inbox: dict, outbox: dict,
+                 comments_text: dict) -> dict:
+    """Вторая фаза для «проверить»: смотрим НЕ факт переписки, а её итог.
+
+    Три исхода. Клиент написал последним и задал вопрос — это самая
+    дорогая строка в списке, человек ждёт нас прямо сейчас. Клиент
+    попрощался — закрываем. Мы написали последними и человек молчит —
+    задача жива, но не горит: тут нужен дожим, а не ответ."""
+    p = row["phone"]
+    inn = inbox.get(p)
+    out = outbox.get(p)
+    if inn and (not out or inn[0] > out[0]):
+        text = inn[1].strip()
+        if _CLOSING.match(text):
+            row["verdict"] = "закрыть"
+            row["why"] = f"клиент попрощался: «{text[:40]}»"
+        elif _ASKING.search(text):
+            row["verdict"] = "актуальна"
+            row["why"] = f"КЛИЕНТ ЖДЁТ ОТВЕТА: «{text[:60]}»"
+        else:
+            row["verdict"] = "актуальна"
+            row["why"] = f"последнее слово за клиентом: «{text[:50]}»"
+        return row
+    if out and (not inn or out[0] > inn[0]):
+        row["verdict"] = "актуальна"
+        row["why"] = (f"мы написали {out[0][5:16]}, ответа нет — "
+                      f"нужен дожим, а не ответ")
+        return row
+    ct = comments_text.get(row["uid"], "")
+    if ct:
+        row["verdict"] = "актуальна"
+        row["why"] = f"по карточке шла работа: «{ct[:50]}»"
+    return row
 
 
 def check() -> list:
@@ -97,12 +147,15 @@ def check() -> list:
         cls = {c["id"]: (c.get("name") or "")
                for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
         comments: dict = {}
+        comments_text: dict = {}
         try:
             cm = mk.get("/v1/company/userComments", {"limit": 500})
             for x in ((cm.get("userComments") if isinstance(cm, dict) else cm) or []):
                 uid, when = x.get("userId"), str(x.get("createdAt") or "")
                 if uid and when > comments.get(uid, ""):
                     comments[uid] = when
+                    comments_text[uid] = re.sub(r"\s+", " ",
+                                                str(x.get("comment") or ""))
         except Exception:
             pass
     finally:
@@ -137,20 +190,23 @@ def check() -> list:
                 verdict = "закрыть"
                 why = (f"разговор {w[8:10]}.{w[5:7]} в {w[11:16]}, "
                        f"{d // 60} мин {d % 60} с")
-            elif inbox.get(phone, "") > born:
+            elif (inbox.get(phone) or ("", ""))[0] > born:
                 verdict, why = "проверить", "клиент ответил после постановки"
-            elif outbox.get(phone, "") > born:
+            elif (outbox.get(phone) or ("", ""))[0] > born:
                 verdict, why = "проверить", "мы уже написали ему после постановки"
             elif uid and comments.get(uid, "") > born:
                 verdict, why = "проверить", "в карточке новый комментарий"
             elif after:
                 why = f"набирали {len(after)} раз, разговора не было"
-        out.append({"id": t["id"], "uid": uid,
+        row = {"id": t["id"], "uid": uid,
                     "cat": CAT.get(t.get("categoryId"), "—"),
                     "body": re.sub(r"\s+", " ", str(t.get("body") or ""))[:200],
                     "end": str(t.get("endDate") or "")[:10],
                     "name": (u.get("name") or "")[:26], "phone": phone,
-                    "verdict": verdict, "why": why})
+               "verdict": verdict, "why": why}
+        if verdict == "проверить":
+            row = _second_pass(row, inbox, outbox, comments_text)
+        out.append(row)
     return out
 
 
@@ -173,13 +229,13 @@ GROUPS = [
      "После постановки задачи состоялся разговор, человек записался или "
      "карточка закрыта отказом. Проверьте основание справа и отметьте "
      "выполненными — список станет честным."),
-    ("проверить", "Проверить глазами — что-то происходило",
-     "Клиент отвечал, мы ему писали или появился комментарий в карточке. "
-     "Возможно, задача уже не нужна, но автоматически такое закрывать "
-     "нельзя: переписка могла оборваться на полуслове."),
+    ("проверить", "Проверить глазами — итог переписки неясен",
+     "Что-то происходило, но чем кончилось — по журналу не видно. "
+     "Открыть диалог и решить руками."),
     ("актуальна", "Живые задачи — делать",
-     "Ни разговора, ни переписки после постановки. Это и есть настоящая "
-     "работа на сегодня."),
+     "Либо после постановки не было ничего, либо разговор оборвался "
+     "на нас. Строки, где написано «КЛИЕНТ ЖДЁТ ОТВЕТА», разбирать "
+     "первыми: человек задал вопрос и сидит без ответа."),
 ]
 
 
@@ -195,12 +251,15 @@ def page(rows: list) -> str:
            f"<div class=tot><b>{len(by['закрыть'])} задач можно закрыть "
            f"прямо сейчас</b> — работа по ним сделана. Ещё "
            f"{len(by['проверить'])} стоит проглядеть глазами. Реальной "
-           f"работы остаётся {len(by['актуальна'])}.</div>"]
+           f"работы остаётся {len(by['актуальна'])}, и из них "
+           f"{len([r for r in rows if 'ЖДЁТ ОТВЕТА' in r['why']])} — люди, "
+           f"которые задали вопрос и до сих пор без ответа.</div>"]
     for key, title, why in GROUPS:
         rws = by.get(key) or []
         if not rws:
             continue
-        rws.sort(key=lambda r: (r["end"] or "9999", r["name"]))
+        rws.sort(key=lambda r: (0 if "ЖДЁТ ОТВЕТА" in r["why"] else 1,
+                                r["end"] or "9999", r["name"]))
         out.append(f"<h2>{title} <span class=n>— {len(rws)}</span></h2>")
         out.append(f"<div class=why>{why}</div>")
         out.append("<table><tr><th>Срок</th><th>Клиент</th><th>Телефон</th>"
