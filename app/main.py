@@ -2327,7 +2327,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.14"
+APP_VERSION = "2026-08-25.15"
 
 
 @app.get("/api/net")
@@ -3509,6 +3509,14 @@ def nabormail_build():
     собранная с другой машины, о них не знает и продублирует."""
     from . import nabormail
     return {"ok": True, "в очереди": nabormail.build()}
+
+
+@app.post("/api/nabormail/confirms", dependencies=AUTH)
+def nabormail_confirms():
+    """Поставить в начало очереди подтверждения записи, не дошедшие 25.08
+    из-за десятизначного chatId."""
+    from . import nabormail
+    return {"ok": True, "поставлено": nabormail.confirms_to_queue()}
 
 
 @app.post("/api/nabormail/send-now", dependencies=AUTH)
