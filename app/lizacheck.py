@@ -218,6 +218,40 @@ def page(rows: list) -> str:
     return "\n".join(out)
 
 
+def close_done(dry: bool = True) -> dict:
+    """Отметить выполненными задачи с вердиктом «закрыть».
+
+    Владелец разрешил это 25.08, увидев основания. В тело задачи дописываем,
+    почему она закрыта: через месяц никто не вспомнит, и «закрыто роботом»
+    без объяснения выглядит как потеря работы."""
+    import time
+    rows = [r for r in check() if r["verdict"] == "закрыть"]
+    stat = {"к закрытию": len(rows), "закрыто": 0, "ошибок": 0}
+    if dry:
+        return stat
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        for r in rows:
+            try:
+                t = mk.get(f"/v1/company/tasks/{r['id']}")
+                payload = {k: t.get(k) for k in
+                           ("body", "beginDate", "endDate", "isAllDay",
+                            "managerIds", "userId", "classIds", "filialIds",
+                            "categoryId")}
+                payload["isComplete"] = True
+                payload["body"] = (f"✅ Закрыто автоматически: {r['why']}. "
+                                   + str(payload.get("body") or ""))[:250]
+                mk.post(f"/v1/company/tasks/{r['id']}", payload)
+                stat["закрыто"] += 1
+            except Exception as e:
+                stat["ошибок"] += 1
+                log.warning("задача %s: %s", r["id"], str(e)[:80])
+            time.sleep(0.3)
+    finally:
+        mk.close()
+    return stat
+
+
 def main():
     import sys
     from collections import Counter

@@ -2356,7 +2356,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.42"
+APP_VERSION = "2026-08-25.43"
 
 
 @app.get("/api/net")
@@ -3546,6 +3546,13 @@ def nabormail_confirms(rebuild: bool = False):
     из-за десятизначного chatId."""
     from . import nabormail
     return {"ok": True, "поставлено": nabormail.confirms_to_queue(rebuild=rebuild)}
+
+
+@app.post("/api/lizacheck/close", dependencies=AUTH)
+def lizacheck_close(dry: bool = True):
+    """Закрыть задачи Лизы, по которым работа уже сделана."""
+    from . import lizacheck
+    return lizacheck.close_done(dry=dry)
 
 
 @app.get("/zadachi-lizy", response_class=HTMLResponse, dependencies=AUTH)
