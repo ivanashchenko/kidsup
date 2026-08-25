@@ -196,8 +196,10 @@ def collect() -> list[dict]:
 
 def build() -> int:
     rows = collect()
-    done = set(json.loads(db.get_setting(DONE_KEY, "[]") or "[]"))
-    rows = [r for r in rows if f"confirm:{r['uid']}" not in done]
+    done = {str(x) for x in json.loads(db.get_setting(DONE_KEY, "[]") or "[]")}
+    # в реестре встречаются оба формата: голый id (до 25.08) и «вид:id»
+    rows = [r for r in rows
+            if f"nabor:{r['uid']}" not in done and str(r["uid"]) not in done]
     db.set_setting(QUEUE_KEY, json.dumps(rows, ensure_ascii=False))
     log.info("очередь рассылки: %d семей", len(rows))
     return len(rows)
@@ -375,6 +377,10 @@ def confirms_to_queue(days=("2026-08-24", "2026-08-25"),
                 "text": f"Здравствуйте! {what}\n\n{tail}"})
     finally:
         mk.close()
+    # Кому подтверждение уже ушло — второй раз не отправляем. 25.08 из-за
+    # пропущенной проверки один клиент дважды оказывался первым в очереди.
+    done = {str(x) for x in json.loads(db.get_setting(DONE_KEY, "[]") or "[]")}
+    rows = [r for r in rows if f"confirm:{r['uid']}" not in done]
     queue = json.loads(db.get_setting(QUEUE_KEY, "[]") or "[]")
     if rebuild:
         # Текст письма лежит прямо в строке очереди, поэтому правка
