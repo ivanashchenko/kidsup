@@ -11,6 +11,7 @@
 
 import argparse
 import hashlib
+import logging
 import json
 import re
 import time
@@ -21,6 +22,7 @@ import httpx
 from . import db
 
 API = "https://app.mango-office.ru/vpbx/"
+log = logging.getLogger("kidsup.mango")
 
 # Добавочные ДРУГОГО центра (Люберцы, «Детский клуб Буракова») на общей АТС:
 # 20 — их рабочее место, 21 — мобильный их сотрудника. Их звонки не анализируем,
@@ -79,9 +81,16 @@ def calls(date_from: datetime, date_to: datetime) -> list[dict]:
         res = _call("stats/result", {"key": key})
         if res.status_code == 200 and res.text.strip():
             break
-        time.sleep(2)  # 204 — отчёт ещё готовится
+        time.sleep(2)  # 204 — отчёт ещё готовится ИЛИ звонков не было
     else:
-        raise RuntimeError("stats/result: отчёт не готов")
+        # Манго отвечает пустым телом и на «ещё готовится», и на «за окно
+        # ничего не найдено» — различить нельзя. Раньше это было
+        # исключением, и утренний разбор падал просто потому, что с 6:40
+        # до 8:15 никто не звонил, унося с собой весь час автоматики.
+        # Пустой отчёт — это ноль звонков, а не авария.
+        log.info("stats/result пуст за %s — %s: считаем, что звонков не было",
+                 date_from, date_to)
+        return []
     rows = []
     for line in res.text.strip().splitlines():
         p = [x.strip("[]") for x in line.split(";")]
