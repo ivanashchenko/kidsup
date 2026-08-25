@@ -198,7 +198,7 @@ def build() -> int:
     rows = collect()
     done = set(json.loads(db.get_setting(DONE_KEY, "[]") or "[]"))
     rows = [r for r in rows if f"nabor:{r['uid']}" not in done
-            and r["uid"] not in done]
+            and str(r["uid"]) not in done]
     db.set_setting(QUEUE_KEY, json.dumps(rows, ensure_ascii=False))
     log.info("очередь рассылки: %d семей", len(rows))
     return len(rows)
@@ -233,14 +233,21 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
     queue = json.loads(db.get_setting(QUEUE_KEY, "[]") or "[]")
     if not queue:
         return {}
-    done = set(json.loads(db.get_setting(DONE_KEY, "[]") or "[]"))
+    # Реестр отправленных начинался как список голых id карточек, а стал
+    # списком ключей «вид:id». Старые записи приводим к строкам при чтении:
+    # без этого sorted() на смеси чисел и строк роняет всю отправку —
+    # 25.08 рассылка встала на час именно так.
+    done = {str(x) for x in json.loads(db.get_setting(DONE_KEY, "[]") or "[]")}
     stat: Counter = Counter()
     sent_uids = []
     # Ключ «кому уже ушло» учитывает вид письма: одна и та же семья может
     # получить и рассылку по набору, и подтверждение записи — это разные
     # сообщения, и второе не должно пропасть только потому, что первое ушло.
     def _key(row):
-        return f"{row.get('kind') or 'nabor'}:{row['uid']}"
+        kind = row.get("kind") or "nabor"
+        # старые записи лежат как голый id — считаем их отправленной рассылкой
+        return str(row["uid"]) if kind == "nabor" and str(row["uid"]) in done \
+            else f"{kind}:{row['uid']}"
 
     for r in queue[:max(1, batch)]:
         if _key(r) in done:
