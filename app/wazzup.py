@@ -123,6 +123,102 @@ def _pick(chans: list[dict], transport: str) -> dict | None:
     return cand[0] if cand else None
 
 
+# --- единый предохранитель отправки ---------------------------------------
+# Все проверки живут здесь, а не в вызывающем коде. 25.08 выяснилось,
+# почему это принципиально: окно «9:00-20:00» и защита «клиент ждёт ответа»
+# стояли в обёртке autopilot._wa, а половина сценариев — рассылка, автоответ,
+# догоны, лагерная почта — звали send_via напрямую и проходили мимо. Один
+# клиент получил за час десяток одинаковых писем сразу в трёх каналах
+# и позвонил жаловаться. Ниже — тот самый заслон, который нельзя обойти.
+
+# Виды, которым лимит на сутки не писан: ответ живому человеку в диалоге
+# и служебные сообщения владельцу. Всё остальное — автоматика, и её
+# количество на одного человека ограничено.
+FREE_KINDS = {"reply", "digest", "owner", "apology"}
+DAY_LIMIT = 2            # автосообщений одному человеку в сутки
+HOUR_FROM, HOUR_TO = 9, 20
+
+
+def _msk() -> "datetime.datetime":
+    import datetime as _dt
+    return _dt.datetime.utcnow() + _dt.timedelta(hours=3)
+
+
+def _guard_tables(conn) -> None:
+    conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_guard (
+        phone TEXT, day TEXT, kind TEXT, digest TEXT, ts TEXT,
+        transport TEXT DEFAULT '')""")
+    try:
+        conn.execute("ALTER TABLE wazzup_guard ADD COLUMN transport TEXT DEFAULT ''")
+    except Exception:
+        pass
+    conn.execute("CREATE INDEX IF NOT EXISTS wg_phone_day "
+                 "ON wazzup_guard (phone, day)")
+
+
+def guard(phone: str, text: str, kind: str = "",
+          transport: str = "") -> str | None:
+    """None — можно слать. Строка — причина, по которой отправка отменена.
+
+    Проверки по порядку дешевизны: стоп-кран, часы, суточный лимит,
+    повтор того же текста."""
+    if db.get_setting("messages_off", "0") == "1":
+        return "стоп-кран messages_off включён"
+    owner = "".join(c for c in str(db.get_setting("digest_phone", "") or "")
+                    if c.isdigit())[-10:]
+    p = _msisdn(phone)[-10:]
+    if p and p == owner:
+        return None                      # владельцу пишем всегда
+    now = _msk()
+    if not (HOUR_FROM <= now.hour < HOUR_TO):
+        return f"сейчас {now.hour}:00 — вне окна {HOUR_FROM}-{HOUR_TO}"
+    import hashlib
+    dig = hashlib.sha1(text.strip().lower().encode()).hexdigest()[:16]
+    day = now.date().isoformat()
+    with db.get_conn() as conn:
+        _guard_tables(conn)
+        # тот же текст тому же человеку за последнюю неделю — это дубль,
+        # чем бы он ни был вызван: повтором сценария, сбоем сохранения
+        # реестра или двумя разными сценариями с одинаковым текстом
+        week = (now - __import__("datetime").timedelta(days=7)).isoformat()
+        # Дубль считается ПО КАНАЛУ: одно и то же сообщение штатно уходит
+        # и в WhatsApp, и в мессенджеры — это правило владельца, а не сбой.
+        # Сбой — это когда один и тот же текст летит в один канал дважды.
+        same = conn.execute("SELECT ts FROM wazzup_guard WHERE phone=? AND "
+                            "digest=? AND COALESCE(transport,'')=? AND ts>=? "
+                            "LIMIT 1", (p, dig, transport, week)).fetchone()
+        if same:
+            return f"тот же текст уже уходил в {transport} {str(same[0])[5:16]}"
+        if kind not in FREE_KINDS:
+            # считаем РАЗНЫЕ сообщения за сутки, а не отправки: письмо
+            # в три канала — это одно сообщение, а не три
+            n = conn.execute("SELECT COUNT(DISTINCT digest) FROM wazzup_guard "
+                             "WHERE phone=? AND day=? AND kind NOT IN "
+                             "('reply','digest','owner','apology')",
+                             (p, day)).fetchone()[0]
+            if n >= DAY_LIMIT:
+                return f"за сегодня уже {n} автосообщения — лимит {DAY_LIMIT}"
+    return None
+
+
+def guard_note(phone: str, text: str, kind: str = "",
+               transport: str = "") -> None:
+    """Записать факт отправки — по нему считаются лимит и дубли."""
+    import hashlib
+    now = _msk()
+    p = _msisdn(phone)[-10:]
+    dig = hashlib.sha1(text.strip().lower().encode()).hexdigest()[:16]
+    try:
+        with db.get_conn() as conn:
+            _guard_tables(conn)
+            conn.execute("INSERT INTO wazzup_guard (phone, day, kind, digest, "
+                         "ts, transport) VALUES (?,?,?,?,?,?)",
+                         (p, now.date().isoformat(), kind or "auto", dig,
+                          now.isoformat(timespec="seconds"), transport))
+    except Exception:
+        logging.getLogger("kidsup.wazzup").warning("предохранитель не записал %s", p)
+
+
 def _remember(resp, transport: str, phone: str, uid=None, kind: str = "") -> None:
     """Запомнить, какому человеку принадлежит отправленное сообщение.
 
@@ -170,6 +266,10 @@ def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
             log.append(f"[dry-run] {transport} ({ch['channelId'][:8]}…) → {phone}: {text[:60]}…")
             ok = True
         else:
+            stop = guard(phone, text, kind, transport)
+            if stop:
+                log.append(f"{transport} → {phone}: отменено ({stop})")
+                continue
             r = httpx.post(f"{API}/message", headers=_headers(), json={
                 "channelId": ch["channelId"], "chatType": CHAT_TYPE.get(transport, transport),
                 "chatId": phone, "text": text,
@@ -177,6 +277,7 @@ def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
             ok = r.status_code in (200, 201)
             if ok:
                 _remember(r, transport, phone, None, kind)
+                guard_note(phone, text, kind, transport)
             log.append(f"{transport} → {phone}: HTTP {r.status_code} {r.text[:120]}")
         if ok and mode == "cascade":
             break
@@ -272,6 +373,11 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
         return False
     if dry_run:
         return True
+    stop = guard(phone, text, kind, transport)
+    if stop:
+        logging.getLogger("kidsup.wazzup").info(
+            "предохранитель: %s → %s (%s)", phone[-4:], stop, kind or "auto")
+        return False
     if transport == "wapi" and template_id is None:
         template_id = db.get_setting("waba_template_id", "") or None
     if transport == "wapi" and not template_id:
@@ -292,6 +398,7 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
                 "wazzup шаблон отклонён: %s %s", r.status_code, r.text[:200])
         else:
             _remember(r, transport, phone, uid, kind)
+            guard_note(phone, text, kind, transport)
         return r.status_code in (200, 201)
     # MAX сюда добавлен 23.08: у части контактов там внутренний номер
     # аккаунта, и отправка по телефону возвращает CHANNEL_MAX_PHONE_NOT_OCCUPIED
@@ -310,6 +417,7 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
             "wazzup %s → %s: HTTP %s %s", transport, chat_id, r.status_code, r.text[:160])
     else:
         _remember(r, transport, phone, uid, kind)
+        guard_note(phone, text, kind, transport)
     return r.status_code in (200, 201)
 
 
@@ -644,7 +752,7 @@ CHAT_SENDER = "79160170918"
 
 def send_smart(phone: str, text: str, uid: str | int | None = None,
                dry_run: bool = True, mass: bool = False,
-               template_values: list | None = None) -> list[str]:
+               template_values: list | None = None, kind: str = "") -> list[str]:
     """Отправить по всем каналам, которые положены этому адресату.
 
     Разовому сообщению каналов может быть несколько — MAX, Telegram
@@ -660,7 +768,7 @@ def send_smart(phone: str, text: str, uid: str | int | None = None,
             # из работы, разовые уходят с резервного номера.
             sender = db.get_setting("chat_whatsapp", CHAT_SENDER) or CHAT_SENDER
         ok = send_via(t, phone, text, dry_run=dry_run, sender=sender, uid=uid,
-                      template_values=template_values)
+                      template_values=template_values, kind=kind)
         log.append(f"{t}({sender or '—'}) → {phone}: {'ok' if ok else 'fail'}")
     return log or [f"— → {phone}: каналов нет"]
 

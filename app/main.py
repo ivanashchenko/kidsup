@@ -2356,7 +2356,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.36"
+APP_VERSION = "2026-08-25.37"
 
 
 @app.get("/api/net")
@@ -3556,6 +3556,38 @@ def zadachi_lizy_live():
     собрать её где-то ещё нельзя, а данные меняются каждый час."""
     from . import lizacheck
     return HTMLResponse(lizacheck.page(lizacheck.check()))
+
+
+@app.get("/api/guard", dependencies=AUTH)
+def api_guard(hours: int = 24):
+    """Что предохранитель пропустил и что остановил за последние часы."""
+    from collections import Counter as _C
+    from datetime import datetime as _dt, timedelta as _td
+    edge = (_dt.utcnow() + _td(hours=3) - _td(hours=hours)).isoformat(timespec="seconds")
+    rows = []
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT phone, kind, transport, ts FROM wazzup_guard "
+                "WHERE ts >= ? ORDER BY ts DESC", (edge,)).fetchall()
+    except Exception:
+        pass
+    per_phone = _C(r[0] for r in rows)
+    return {"стоп-кран": db.get_setting("messages_off", "0") == "1",
+            "лимит в сутки на человека": 2,
+            "отправок за период": len(rows),
+            "по видам": dict(_C(r[1] for r in rows)),
+            "по каналам": dict(_C(r[2] or "—" for r in rows)),
+            "больше всех получили":
+                [{"телефон": "+7" + p, "сообщений": n}
+                 for p, n in per_phone.most_common(5)]}
+
+
+@app.post("/api/guard/stop", dependencies=AUTH)
+def api_guard_stop(off: bool = True):
+    """Мгновенный стоп-кран для ВСЕХ автосообщений."""
+    db.set_setting("messages_off", "1" if off else "0")
+    return {"ok": True, "автосообщения": "остановлены" if off else "включены"}
 
 
 @app.get("/api/dostavka", dependencies=AUTH)

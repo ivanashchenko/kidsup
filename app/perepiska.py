@@ -335,7 +335,8 @@ def run(day: str | None = None, dry: bool = True) -> dict:
                 report["строки"].append({**it, "action": "готово, ждёт отправки"})
                 report["ответили"] += 1
                 continue
-            wazzup.send_smart(it["phone"], text, uid=it["uid"], dry_run=False)
+            wazzup.send_smart(it["phone"], text, uid=it["uid"], dry_run=False,
+                              kind="reply")
             if it["uid"]:
                 mk.post("/v1/company/userComments", {
                     "userId": it["uid"], "showToUser": False,

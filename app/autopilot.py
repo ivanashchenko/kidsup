@@ -1371,7 +1371,7 @@ def booking_summary(mk: MoyklassClient) -> None:
                    f"заполнить документы.\n"
                    f"Первое занятие условно-бесплатное: не понравится — платить не нужно, "
                    f"понравится — войдёт в первый абонемент.\n"
-                   f"Сохраните сообщение, накануне напомним 😊")
+                   f"Сохраните сообщение, накануне напомним 😊", kind="booking")
         log.info("booking_summary: %s → %s", str(phone)[-4:], when)
 
 
@@ -2629,7 +2629,8 @@ def discipline_check() -> dict:
             why = next((w for k, _, w in DISCIPLINE_RULES if k == rule), "")
             lines.append(f"• {title}: было {was}, стало {n} — {why}.")
         lines += ["", "Замечание озвучено, поведение не изменилось. Нужен разбор на смене."]
-        _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines))
+        _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines),
+                kind="digest")
         log.warning("discipline_check: не исправлено — %s", worse)
     mk.close()
     return {"today": stat, "yesterday": prev, "worse": [w[0] for w in worse]}
@@ -2745,7 +2746,8 @@ def audit_yesterday() -> dict:
             lines = ["🤖 Клод: возвраты за вчера — проверь основания.", ""]
             lines += [f"• {r['name']}: {r['summa']:,.0f} ₽".replace(",", " ")
                       for r in refunds[:8]]
-            _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines))
+            _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines),
+                kind="digest")
     finally:
         mk.close()
     return res
@@ -2824,7 +2826,8 @@ def rules_check() -> dict:
             lines += [f"• {f['title']} — {(f['detail'] or '')[:90]}" for f in high[:6]]
             lines.append("")
             lines.append("Разбор: https://app.kidsup.ru/pravila-kontrol")
-            _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines))
+            _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines),
+                kind="digest")
     finally:
         mk.close()
     log.info("правила: %d флагов, задачи %d администраторам",
@@ -2868,7 +2871,8 @@ def money_check() -> dict:
             lines = [f"🤖 Клод: {len(high)} денежных расхождений в CRM:", ""]
             lines += [f"• {f['title']} — {(f['detail'] or '')[:80]}" for f in high[:6]]
             lines += ["", "Разбор: https://app.kidsup.ru/dolgi"]
-            _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines))
+            _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines),
+                kind="digest")
     finally:
         mk.close()
     log.info("деньги: %d флагов, задачи %d администраторам", len(flags), len(by_mgr))
@@ -3156,7 +3160,8 @@ def team_chat_tick() -> None:
             res = assistant.ask(hist, groups)
             ans = (res.get("answer") or "").strip()
             if ans:
-                wazzup.send_via(tmap.get(ctype, "whatsapp"), phone, ans, dry_run=False)
+                wazzup.send_via(tmap.get(ctype, "whatsapp"), phone, ans, dry_run=False,
+                                kind="reply")
                 log.info("team_chat: ответ %s (%s)", team[p10], ctype)
             elif res.get("error"):
                 log.warning("team_chat: %s — %s", team[p10], res.get("message", ""))
