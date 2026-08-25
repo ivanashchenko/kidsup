@@ -2356,7 +2356,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.40"
+APP_VERSION = "2026-08-25.41"
 
 
 @app.get("/api/net")
@@ -3612,7 +3612,8 @@ def api_dostavka(hours: int = 1):
             "из них важного (пойдёт СМС)":
                 len([r for r in nd if r["kind"] in dostavka.CHASE_KINDS]),
             "примеры": [{"время": r["ts"][11:16], "канал": r["transport"],
-                         "вид": r["kind"] or "—", "статус": r["status"]}
+                         "вид": r["kind"] or "—", "статус": r["status"],
+                         "телефон": "+7" + (r["phone"] or "")[-10:]}
                         for r in nd[:8]]}
 
 
