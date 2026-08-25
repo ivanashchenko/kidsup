@@ -126,9 +126,7 @@ def _pick(chans: list[dict], transport: str) -> dict | None:
 def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
          transports: list[str] | None = None) -> list[str]:
     """Отправка сообщения. transports ограничивает каналы (например ["tgapi"])."""
-    phone = "".join(ch for ch in phone if ch.isdigit())
-    if phone.startswith("8") and len(phone) == 11:
-        phone = "7" + phone[1:]
+    phone = _msisdn(phone)
     log, chans = [], channels()
     order = transports or CASCADE  # broadcast шлёт во все перечисленные
     for transport in order:
@@ -214,9 +212,7 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
     (22.08: 24 «отправленных» сообщения — ноль в WhatsApp Manager).
     Поэтому у wapi при заданном waba_template_id уходит templateId,
     а текст идёт значениями подстановки."""
-    phone = "".join(ch for ch in phone if ch.isdigit())
-    if phone.startswith("8") and len(phone) == 11:
-        phone = "7" + phone[1:]
+    phone = _msisdn(phone)
     chans = channels()
     if sender:
         chans = [c for c in chans if c.get("plainId") == sender] or chans
@@ -447,6 +443,25 @@ def _live_transports() -> set:
         except Exception:
             return set()
     return _LIVE_CACHE["set"]
+
+
+def _msisdn(raw: str) -> str:
+    """Номер в том виде, в каком его понимает WhatsApp: 11 цифр с семёркой.
+
+    25.08: все 77 сообщений за сутки повисли с ошибкой доставки, и это
+    выглядело как бан номера — на деле chatId уходил десятизначным
+    («9013412303»), потому что вызывающий код повсюду режет телефон до
+    последних десяти цифр. Такого абонента WhatsApp не находит и молча
+    роняет сообщение. Нормализуем в одном месте, а не в каждом вызове.
+
+    Telegram сюда не попадает: там chatId — внутренний id аккаунта,
+    его берёт chat_id_for."""
+    d = "".join(ch for ch in str(raw or "") if ch.isdigit())
+    if len(d) == 11 and d[0] == "8":
+        d = "7" + d[1:]
+    elif len(d) == 10 and d[0] == "9":
+        d = "7" + d
+    return d
 
 
 def channels_for(phone: str = "", uid: str | int | None = None,
