@@ -272,6 +272,8 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
         stat["доставлено" if ok else "отказ"] += 1
         if ok:
             sent_uids.append(_key(r))
+            if r.get("task_id") and not dry_run:
+                close_task(r["task_id"])
     if not dry_run:
         n = len(done) + len(sent_uids)
         pause = random.uniform(300, 720) if n and n % 15 == 0 \
@@ -287,6 +289,82 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
             db.set_setting(QUEUE_KEY, json.dumps(left, ensure_ascii=False))
             stat["осталось"] = len(left)
     return dict(stat)
+
+
+def liza_to_queue() -> int:
+    """Задачи Лизы «звонки не помогают — написать» берём на себя.
+
+    25.08 у неё висело 288 открытых задач, из них 227 со сроком «сегодня».
+    Восемнадцать из них — написать клиенту предложение по новому году:
+    это ровно то, что делает рассылка, только адресно. Ставим их в общую
+    очередь, чтобы они шли тем же спокойным темпом и не устроили
+    администратору вал ответов, а задачу закрываем по факту отправки.
+
+    Тех, кому сообщение уже ушло сегодня, пропускаем: получить два письма
+    в один день от одного центра — это ровно то, на что клиенты жаловались."""
+    from .moyklass_client import MoyklassClient
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        tasks = mk.fetch_all("/v1/company/tasks", ["tasks"], params={"limit": 500}) or []
+        users = {u["id"]: u for u in
+                 taskguard.pull_all(mk, "/v1/company/users", "users", cache_hours=2)}
+    finally:
+        mk.close()
+    mine = [t for t in tasks
+            if not t.get("isComplete") and 154181 in (t.get("managerIds") or [])
+            and t.get("categoryId") == 104575 and t.get("userId")
+            and "НАПИСАТЬ" in str(t.get("body") or "")]
+    done = {str(x) for x in json.loads(db.get_setting(DONE_KEY, "[]") or "[]")}
+    queue = json.loads(db.get_setting(QUEUE_KEY, "[]") or "[]")
+    have = {f"{r.get('kind') or 'nabor'}:{r['uid']}" for r in queue}
+    rows = []
+    for t in mine:
+        uid = t["userId"]
+        key = f"liza:{uid}"
+        if key in done or key in have:
+            continue
+        if f"nabor:{uid}" in done or str(uid) in done:
+            continue                       # сегодня уже писали
+        u = users.get(uid)
+        if not u:
+            continue
+        phone = "".join(c for c in str(u.get("phone") or "") if c.isdigit())[-10:]
+        if len(phone) != 10:
+            continue
+        bd = next((a.get("value") for a in (u.get("attributes") or [])
+                   if a.get("attributeAlias") == "birthday"), None)
+        age = None
+        if bd:
+            try:
+                age = round((SEASON - date.fromisoformat(bd[:10])).days / 365.25, 1)
+            except ValueError:
+                pass
+        rows.append({"uid": uid, "phone": phone, "name": (u.get("name") or "").strip(),
+                     "seg": _seg(age), "paid": True, "kind": "liza",
+                     "task_id": t["id"],
+                     "msgr": wazzup.channels_for(phone, uid=uid, mass=True)})
+    db.set_setting(QUEUE_KEY, json.dumps(queue + rows, ensure_ascii=False))
+    log.info("задач Лизы в очередь: %d", len(rows))
+    return len(rows)
+
+
+def close_task(task_id: int) -> None:
+    """Закрыть задачу Лизы после того, как сообщение ушло."""
+    from .moyklass_client import MoyklassClient
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        t = mk.get(f"/v1/company/tasks/{task_id}")
+        payload = {k: t.get(k) for k in ("body", "beginDate", "endDate", "isAllDay",
+                                         "managerIds", "userId", "classIds",
+                                         "filialIds", "categoryId")}
+        payload["isComplete"] = True
+        payload["body"] = ("🤖 Клод написал клиенту предложение по новому году. "
+                           + str(payload.get("body") or ""))[:250]
+        mk.post(f"/v1/company/tasks/{task_id}", payload)
+    except Exception as e:
+        log.warning("задача %s не закрылась: %s", task_id, str(e)[:80])
+    finally:
+        mk.close()
 
 
 def main():

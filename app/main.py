@@ -2348,7 +2348,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.30"
+APP_VERSION = "2026-08-25.31"
 
 
 @app.get("/api/net")
@@ -3552,6 +3552,13 @@ def api_dostavka(hours: int = 1):
             "примеры": [{"время": r["ts"][11:16], "канал": r["transport"],
                          "вид": r["kind"] or "—", "статус": r["status"]}
                         for r in nd[:8]]}
+
+
+@app.post("/api/nabormail/liza", dependencies=AUTH)
+def nabormail_liza():
+    """Взять на себя задачи Лизы «написать клиенту»."""
+    from . import nabormail
+    return {"ok": True, "поставлено": nabormail.liza_to_queue()}
 
 
 @app.post("/api/nabormail/skip", dependencies=AUTH)
