@@ -2337,7 +2337,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.27"
+APP_VERSION = "2026-08-25.28"
 
 
 @app.get("/api/net")
@@ -3527,6 +3527,20 @@ def nabormail_confirms(rebuild: bool = False):
     из-за десятизначного chatId."""
     from . import nabormail
     return {"ok": True, "поставлено": nabormail.confirms_to_queue(rebuild=rebuild)}
+
+
+@app.get("/api/dostavka", dependencies=AUTH)
+def api_dostavka(hours: int = 1):
+    """Что уходит и что доходит. Первый экран при подозрении, что канал лёг."""
+    from . import dostavka
+    nd = dostavka.undelivered()
+    return {"здоровье каналов за час": dostavka.channel_health(hours),
+            "не дошло за 2 часа": len(nd),
+            "из них важного (пойдёт СМС)":
+                len([r for r in nd if r["kind"] in dostavka.CHASE_KINDS]),
+            "примеры": [{"время": r["ts"][11:16], "канал": r["transport"],
+                         "вид": r["kind"] or "—", "статус": r["status"]}
+                        for r in nd[:8]]}
 
 
 @app.post("/api/nabormail/skip", dependencies=AUTH)
