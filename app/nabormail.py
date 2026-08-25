@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections import Counter
 from datetime import date
@@ -130,6 +131,36 @@ def text_for(name: str, seg: str, paid: bool) -> str:
             f"группы.\n\n{OFFER.get(seg, OFFER['?'])}\n\n{DATES}\n\n{TRIAL}\n\n"
             f"Напишите, если удобно подобрать время, — подскажу, "
             f"где ещё есть места.")
+
+
+def push_text(name: str, seg: str) -> str:
+    """Второе касание: человеку уже писали, и он не ответил.
+
+    Повторять то же самое нельзя — это выглядит как «вы не ответили».
+    Поэтому вместо напоминания о себе даём то, чего в первом письме
+    не было: конкретную группу с днями и временем, куда его ребёнку
+    можно прийти прямо сейчас."""
+    child = _first_name(name)
+    who = f"для {child}" if child else "для вашего ребёнка"
+    place = {
+        "1-3": "в утренние группы раннего развития — вторник и четверг "
+               "в 10:00, 11:00 и 12:00, есть воскресные",
+        "3-5": "в «Лицей для малышей» — среда и пятница, 16:00 или 17:00",
+        "5-7": "в подготовку к школе — будни с 16:00 до 19:00, "
+               "есть субботние группы",
+        "7-12": "в английский по уровням Cambridge — понедельник-среда "
+                "или вторник-четверг, вечернее время",
+        "?": "в группы по возрасту — от раннего развития до английского "
+             "и подготовки к школе",
+    }.get(seg, "в группы по возрасту")
+    return (f"Здравствуйте! Это KidsUP на бульваре Рокоссовского.\n\n"
+            f"Писали вам на днях про новый учебный год — не хочу быть "
+            f"навязчивым, поэтому просто оставлю конкретику: место {who} "
+            f"есть {place}.\n\n"
+            f"Занятия начинаются 31 августа. Первое — условно-бесплатное: "
+            f"не понравится, платить не нужно.\n\n"
+            f"Если сейчас не актуально, просто не отвечайте — больше "
+            f"с этим не побеспокою.")
 
 
 def _seg(age: float | None) -> str:
@@ -258,7 +289,9 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
         # попадает переотправка подтверждений записи: у неё тот же
         # предохранитель по темпу, что и у рассылки, а гнать её отдельным
         # циклом значило бы иметь два независимых крана в один канал.
-        txt = r.get("text") or text_for(r["name"], r["seg"], r["paid"])
+        txt = (r.get("text")
+               or (push_text(r["name"], r["seg"]) if r.get("push")
+                   else text_for(r["name"], r["seg"], r["paid"])))
         ok = False
         for t in r["msgr"]:
             try:
@@ -385,6 +418,100 @@ def close_task(task_id: int) -> None:
         log.warning("задача %s не закрылась: %s", task_id, str(e)[:80])
     finally:
         mk.close()
+
+
+# Задачи, где нужно НАПИСАТЬ клиенту. Формулировок много — они копились
+# в разных сценариях, поэтому ищем по смыслу, а не по точной фразе:
+# 25.08 узкий фильтр «ЗВОНКИ НЕ ПОМОГАЮТ» поймал 18 задач из 85, которые
+# я на деле мог взять на себя.
+WRITE_HINTS = re.compile(
+    r"НАПИСАТЬ|Написать|Прислать|в MAX|в TELEGRAM|в Telegram|в телеграм|"
+    r"в WhatsApp|Летний клиент|не записан|закончил сезон|Предложить", re.I)
+# Слова, при которых письмо не годится: нужен человек и его решение.
+HUMAN_ONLY = re.compile(
+    r"справк|вычет|возврат|маткапитал|материнск|счёт|счет на оплату|"
+    r"перерасч|оплат|деньги|договор|жалоб|претенз|перезвонить|"
+    r"дизайн|афиш|распечат|комплект", re.I)
+
+
+def tasks_to_queue(limit: int = 0) -> dict:
+    """Взять на себя все задачи Лизы, где нужно написать клиенту.
+
+    Что берём: письмо по набору, «клиент только в переписке», «летний
+    клиент не записан», второе касание после молчания. Что не берём:
+    всё про деньги и документы, звонки и физическую работу — там нужен
+    человек, а не сообщение."""
+    from .moyklass_client import MoyklassClient
+    from . import lizacheck
+    rows_check = {r["id"]: r for r in lizacheck.check()}
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        tasks = mk.fetch_all("/v1/company/tasks", ["tasks"], params={"limit": 500}) or []
+        users = {u["id"]: u for u in
+                 taskguard.pull_all(mk, "/v1/company/users", "users", cache_hours=2)}
+        joins = taskguard.pull_all(mk, "/v1/company/joins", "joins")
+        rc = mk.get("/v1/company/classes", {"limit": 500})
+        cls = {c["id"]: (c.get("name") or "")
+               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+    finally:
+        mk.close()
+    booked = {j["userId"] for j in joins
+              if cls.get(j.get("classId"), "").startswith("2627")
+              and j.get("statusId") in ACTIVE_JOIN
+              and "аявк" not in cls.get(j.get("classId"), "").lower()}
+    done = {str(x) for x in json.loads(db.get_setting(DONE_KEY, "[]") or "[]")}
+    queue = json.loads(db.get_setting(QUEUE_KEY, "[]") or "[]")
+    have = {f"{r.get('kind') or 'nabor'}:{r['uid']}" for r in queue}
+    stat = {"просмотрено": 0, "взято": 0, "человеку — деньги и звонки": 0,
+            "уже писали": 0, "записан или закрыт": 0}
+    rows = []
+    for t in tasks:
+        if t.get("isComplete") or 154181 not in (t.get("managerIds") or []):
+            continue
+        uid = t.get("userId")
+        body = str(t.get("body") or "")
+        stat["просмотрено"] += 1
+        if not uid:
+            continue
+        chk = rows_check.get(t["id"]) or {}
+        push = str(chk.get("why", "")).startswith("мы написали")
+        if not (WRITE_HINTS.search(body) or push):
+            continue
+        if HUMAN_ONLY.search(body):
+            stat["человеку — деньги и звонки"] += 1
+            continue
+        u = users.get(uid)
+        if not u or uid in booked or u.get("clientStateId") in SKIP_STATE:
+            stat["записан или закрыт"] += 1
+            continue
+        key = f"liza:{uid}"
+        if key in done or key in have or f"nabor:{uid}" in done or str(uid) in done:
+            stat["уже писали"] += 1
+            continue
+        phone = "".join(c for c in str(u.get("phone") or "") if c.isdigit())[-10:]
+        if len(phone) != 10:
+            continue
+        bd = next((a.get("value") for a in (u.get("attributes") or [])
+                   if a.get("attributeAlias") == "birthday"), None)
+        age = None
+        if bd:
+            try:
+                age = round((SEASON - date.fromisoformat(bd[:10])).days / 365.25, 1)
+            except ValueError:
+                pass
+        rows.append({"uid": uid, "phone": phone, "name": (u.get("name") or "").strip(),
+                     "seg": _seg(age), "paid": True, "kind": "liza",
+                     "task_id": t["id"], "push": bool(push),
+                     "msgr": wazzup.channels_for(phone, uid=uid)})
+        have.add(key)
+        stat["взято"] += 1
+        if limit and len(rows) >= limit:
+            break
+    head = [r for r in queue if (r.get("kind") or "nabor") in ("confirm", "liza")]
+    rest = [r for r in queue if (r.get("kind") or "nabor") not in ("confirm", "liza")]
+    db.set_setting(QUEUE_KEY, json.dumps(head + rows + rest, ensure_ascii=False))
+    log.info("задач Лизы взято: %d", len(rows))
+    return stat
 
 
 def main():
