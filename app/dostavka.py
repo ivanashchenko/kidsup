@@ -143,18 +143,24 @@ def _mark_chased(mid: str) -> None:
         conn.execute("UPDATE wazzup_sent SET chased = 1 WHERE message_id = ?", (mid,))
 
 
-def channel_health(hours: int = 1) -> list[dict]:
-    """Доля недоставленного по каналам за последние часы."""
+def channel_health(hours: int = 1, ripe_min: int = 30) -> list[dict]:
+    """Доля доставленного по каналам за последние часы.
+
+    Учитываем только сообщения старше `ripe_min` минут: статус доставки
+    приходит от мессенджера не мгновенно, и свежая отправка почти всегда
+    выглядит недоставленной. 25.08 без этой поправки сторож собрался
+    поднять тревогу на здоровом канале через минуту после отправки."""
     _table()
     edge = (_now() - timedelta(hours=hours)).isoformat(timespec="seconds")
+    ripe = (_now() - timedelta(minutes=ripe_min)).isoformat(timespec="seconds")
     q = """SELECT s.transport, COUNT(*),
                   SUM(CASE WHEN COALESCE(st.rank, 0) >= 2 THEN 1 ELSE 0 END)
              FROM wazzup_sent s
         LEFT JOIN wazzup_status st ON st.message_id = s.message_id
-            WHERE s.ts >= ?
+            WHERE s.ts >= ? AND s.ts <= ?
          GROUP BY s.transport"""
     with db.get_conn() as conn:
-        rows = conn.execute(q, (edge,)).fetchall()
+        rows = conn.execute(q, (edge, ripe)).fetchall()
     return [{"transport": r[0], "всего": r[1], "дошло": r[2] or 0,
              "доля": round(100 * (r[2] or 0) / r[1]) if r[1] else 0}
             for r in rows]
