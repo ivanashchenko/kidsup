@@ -816,6 +816,10 @@ DOC_GROUPS = [
          "Записи, дошедшие до пробного и оплаты по каждому админу с 17.08 "
          "с начислением по ставкам владельца. Пробные начинаются 31.08 — "
          "до этой даты бонус идёт только за оплаты"),
+        ("__url:/zadachi-lizy", "🗂 Задачи Лизы: проверка на актуальность",
+         "Каждая открытая задача проверена по звонкам, переписке, "
+         "комментариям и записям: что уже сделано и можно закрыть, "
+         "что проглядеть глазами, что делать. Считается при открытии"),
         ("zadachi_lizy", "🗂 Задачи Лизы: что срочно, что подождёт",
          "288 открытых задач, разложенных не по дате, а по тому, что мы "
          "теряем, если не сделать. Наверху 50 человек, которые написали "
@@ -2352,7 +2356,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.35"
+APP_VERSION = "2026-08-25.36"
 
 
 @app.get("/api/net")
@@ -3542,6 +3546,16 @@ def nabormail_confirms(rebuild: bool = False):
     из-за десятизначного chatId."""
     from . import nabormail
     return {"ok": True, "поставлено": nabormail.confirms_to_queue(rebuild=rebuild)}
+
+
+@app.get("/zadachi-lizy", response_class=HTMLResponse, dependencies=AUTH)
+def zadachi_lizy_live():
+    """Задачи Лизы с проверкой актуальности — считается в момент открытия.
+
+    Живая страница, а не файл: журнал переписки лежит в базе сервера,
+    собрать её где-то ещё нельзя, а данные меняются каждый час."""
+    from . import lizacheck
+    return HTMLResponse(lizacheck.page(lizacheck.check()))
 
 
 @app.get("/api/dostavka", dependencies=AUTH)
