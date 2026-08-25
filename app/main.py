@@ -2327,7 +2327,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.07"
+APP_VERSION = "2026-08-25.08"
 
 
 @app.get("/api/net")
@@ -3500,6 +3500,32 @@ def autopilot_confirm_now():
         return {"ok": False, "error": traceback.format_exc()[-800:]}
     finally:
         mk.close()
+
+
+@app.post("/api/nabormail/build", dependencies=AUTH)
+def nabormail_build():
+    """Собрать очередь рассылки по набору. Считать её надо именно на
+    сервере: отметки «кому уже ушло» лежат в его базе, и очередь,
+    собранная с другой машины, о них не знает и продублирует."""
+    from . import nabormail
+    return {"ok": True, "в очереди": nabormail.build()}
+
+
+@app.post("/api/nabormail/send-now", dependencies=AUTH)
+def nabormail_send_now(batch: int = 40, dry: bool = True):
+    from . import nabormail
+    return nabormail.tick(dry_run=dry, batch=batch)
+
+
+@app.get("/api/nabormail/state", dependencies=AUTH)
+def nabormail_state():
+    import json as _j
+    from . import db as _db
+    q = _j.loads(_db.get_setting("nabormail_queue", "[]") or "[]")
+    d = _j.loads(_db.get_setting("nabormail_done", "[]") or "[]")
+    from collections import Counter as _C
+    return {"в очереди": len(q), "отправлено": len(d),
+            "по возрастам": dict(_C(r["seg"] for r in q))}
 
 
 @app.post("/api/autopilot/missed-now", dependencies=AUTH)

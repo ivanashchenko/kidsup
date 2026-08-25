@@ -3183,6 +3183,20 @@ def _loop() -> None:
                                      r["ответили"], r["человеку"])
                     except Exception:
                         log.exception("автоответ в переписке упал — продолжаем")
+                # Рассылка по набору в Telegram и MAX. Порциями по 40 раз
+                # в десять минут: 265 сообщений одним залпом дают вал
+                # ответов, который два администратора не разберут. Идёт
+                # только пока WABA на модерации — потом второй заход
+                # шаблоном по тем, кто промолчал.
+                if now.minute % 10 < 3 and 9 <= now.hour < 20 \
+                        and _mark("nabormail", now.strftime("%Y-%m-%d %H:%M")[:15]):
+                    try:
+                        from . import nabormail
+                        r = nabormail.tick()
+                        if r:
+                            log.info("рассылка набора: %s", r)
+                    except Exception:
+                        log.exception("рассылка набора упала — продолжаем")
                 if now.minute < 3 and 10 <= now.hour <= 20:
                     # Манго жёстко ограничивает stats/request; один 429 в
                     # этом вызове 24.08 убивал весь тик — и вместе с ним все
