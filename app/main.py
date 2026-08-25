@@ -2335,7 +2335,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.21"
+APP_VERSION = "2026-08-25.22"
 
 
 @app.get("/api/net")
@@ -3525,6 +3525,24 @@ def nabormail_confirms(rebuild: bool = False):
     из-за десятизначного chatId."""
     from . import nabormail
     return {"ok": True, "поставлено": nabormail.confirms_to_queue(rebuild=rebuild)}
+
+
+@app.post("/api/nabormail/skip", dependencies=AUTH)
+def nabormail_skip(uid: int, kind: str = "confirm"):
+    """Пометить письмо отправленным, не отправляя. Нужно там, где сообщение
+    до клиента дошло, а отметка не сохранилась: 25.08 из-за сбоя сохранения
+    один клиент получил письмо десяток раз и остался без отметки — при
+    пересборке очереди он снова оказался первым."""
+    import json as _j
+    from . import db as _db
+    done = {str(x) for x in _j.loads(_db.get_setting("nabormail_done", "[]") or "[]")}
+    done.add(f"{kind}:{uid}")
+    _db.set_setting("nabormail_done", _j.dumps(sorted(done)))
+    q = _j.loads(_db.get_setting("nabormail_queue", "[]") or "[]")
+    left = [r for r in q if not (r["uid"] == uid
+                                 and (r.get("kind") or "nabor") == kind)]
+    _db.set_setting("nabormail_queue", _j.dumps(left, ensure_ascii=False))
+    return {"ok": True, "исключён": f"{kind}:{uid}", "в очереди": len(left)}
 
 
 @app.post("/api/nabormail/send-now", dependencies=AUTH)
