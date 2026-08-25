@@ -197,7 +197,8 @@ def collect() -> list[dict]:
 def build() -> int:
     rows = collect()
     done = set(json.loads(db.get_setting(DONE_KEY, "[]") or "[]"))
-    rows = [r for r in rows if r["uid"] not in done]
+    rows = [r for r in rows if f"nabor:{r['uid']}" not in done
+            and r["uid"] not in done]
     db.set_setting(QUEUE_KEY, json.dumps(rows, ensure_ascii=False))
     log.info("очередь рассылки: %d семей", len(rows))
     return len(rows)
@@ -235,11 +236,21 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
     done = set(json.loads(db.get_setting(DONE_KEY, "[]") or "[]"))
     stat: Counter = Counter()
     sent_uids = []
+    # Ключ «кому уже ушло» учитывает вид письма: одна и та же семья может
+    # получить и рассылку по набору, и подтверждение записи — это разные
+    # сообщения, и второе не должно пропасть только потому, что первое ушло.
+    def _key(row):
+        return f"{row.get('kind') or 'nabor'}:{row['uid']}"
+
     for r in queue[:max(1, batch)]:
-        if r["uid"] in done:
-            sent_uids.append(r["uid"])
+        if _key(r) in done:
+            sent_uids.append(_key(r))
             continue
-        txt = text_for(r["name"], r["seg"], r["paid"])
+        # Строка очереди может нести собственный текст — так сюда
+        # попадает переотправка подтверждений записи: у неё тот же
+        # предохранитель по темпу, что и у рассылки, а гнать её отдельным
+        # циклом значило бы иметь два независимых крана в один канал.
+        txt = r.get("text") or text_for(r["name"], r["seg"], r["paid"])
         ok = False
         for t in r["msgr"]:
             try:
@@ -251,7 +262,7 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
                 log.warning("uid=%s %s: %s", r["uid"], t, str(e)[:90])
         stat["доставлено" if ok else "отказ"] += 1
         if ok:
-            sent_uids.append(r["uid"])
+            sent_uids.append(_key(r))
     if not dry_run:
         n = len(done) + len(sent_uids)
         pause = random.uniform(300, 720) if n and n % 15 == 0 \
@@ -263,7 +274,7 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
         if sent_uids:
             done |= set(sent_uids)
             db.set_setting(DONE_KEY, json.dumps(sorted(done)))
-            left = [r for r in queue if r["uid"] not in done]
+            left = [r for r in queue if _key(r) not in done]
             db.set_setting(QUEUE_KEY, json.dumps(left, ensure_ascii=False))
             stat["осталось"] = len(left)
     return dict(stat)
@@ -292,6 +303,65 @@ def main():
             print("\n" + "=" * 60 + f"\n{seg}, {'платил' if r['paid'] else 'не платил'}"
                   f", {r['name']}\n" + "=" * 60)
             print(text_for(r["name"], r["seg"], r["paid"]))
+
+
+
+def confirms_to_queue(days=("2026-08-24", "2026-08-25")) -> int:
+    """Поставить в начало очереди подтверждения записи, не дошедшие из-за
+    десятизначного chatId (25.08). Одно письмо на семью, все её записи
+    списком — как и в confirm_joins после правки того же дня."""
+    from . import autopilot
+    from .moyklass_client import MoyklassClient
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        rc = mk.get("/v1/company/classes", {"limit": 500})
+        cls = {c["id"]: (c.get("name") or "")
+               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+        by_user: dict = {}
+        for d in days:
+            for j in (mk.fetch_all("/v1/company/joins", ["joins"],
+                                   params={"createdAt": d}) or []):
+                nm = cls.get(j.get("classId"), "")
+                if not nm.startswith("2627") or "аявк" in nm.lower():
+                    continue
+                if str(j.get("createdAt") or "")[:10] != d:
+                    continue
+                if j.get("statusId") not in ACTIVE_JOIN:
+                    continue
+                by_user.setdefault(j["userId"], []).append(autopilot._join_title(nm))
+        rows = []
+        for uid, titles in by_user.items():
+            try:
+                u = mk.get(f"/v1/company/users/{uid}")
+            except Exception:
+                continue
+            phone = "".join(c for c in str(u.get("phone") or "") if c.isdigit())[-10:]
+            if len(phone) != 10:
+                continue
+            titles = list(dict.fromkeys(titles))
+            what = (f"Подтверждаем запись: {titles[0]}." if len(titles) == 1
+                    else "Подтверждаем записи:\n" + "\n".join(f"• {t}" for t in titles))
+            rows.append({
+                "uid": uid, "phone": phone, "name": (u.get("name") or "").strip(),
+                "seg": "?", "paid": True, "kind": "confirm",
+                "msgr": wazzup.channels_for(phone, uid=uid),
+                "text": (f"Здравствуйте! {what}\n\n"
+                         f"Занятия начинаются 31 августа. Адрес: б-р Маршала "
+                         f"Рокоссовского, 6к1В (напротив ТЦ «Янтарь»), 2 минуты "
+                         f"от метро Бульвар Рокоссовского. Первое занятие "
+                         f"условно-бесплатное, и на нём же бесплатная "
+                         f"диагностика — педагог посмотрит уровень и подберёт "
+                         f"ступень. Если что-то поменяется, просто ответьте "
+                         f"здесь.")})
+    finally:
+        mk.close()
+    queue = json.loads(db.get_setting(QUEUE_KEY, "[]") or "[]")
+    have = {r["uid"] for r in queue if r.get("text")}
+    rows = [r for r in rows if r["uid"] not in have]
+    # в начало: подтверждение записи ждать не должно
+    db.set_setting(QUEUE_KEY, json.dumps(rows + queue, ensure_ascii=False))
+    log.info("подтверждений в очередь: %d", len(rows))
+    return len(rows)
 
 
 if __name__ == "__main__":
