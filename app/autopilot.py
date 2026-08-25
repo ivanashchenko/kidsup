@@ -1584,6 +1584,42 @@ _SUBJ_FULL = {
 }
 
 
+# Предмет по названию группы — по нему решаем, продолжает ли ребёнок то же
+# самое или приходит на новое. Код сезона и номер группы тут не важны:
+# «2526_ПШ_пн-чт_17:00_Гр3» и «2627_ПШ_вт-пт_18:00_Гр7» — один предмет.
+_SUBJ_KEYS = (("_ПШ_", "ПШ"), ("_АЯ_", "АЯ"), ("_МА_", "МА"), ("_НК_", "НК"),
+              ("ШАХ", "ШАХ"), ("ИЗО", "ИЗО"), ("ини-сад", "НК"),
+              ("нулев", "НК"), ("Лицей", "ЛИЦЕЙ"), ("Первая школа", "РР"),
+              ("Музыка и речь", "МУЗ"), ("ЛГ", "ЛГ"), ("огопед", "ЛГ"))
+
+
+def _subject_key(name: str) -> str | None:
+    low = (name or "").lower()
+    for needle, key in _SUBJ_KEYS:
+        if needle.lower() in low:
+            return key
+    return None
+
+
+def _continuing(user_joins: list, cls: dict, new_class_id) -> bool:
+    """Ходил ли ребёнок на ЭТОТ ЖЕ предмет в прошлом учебном году.
+
+    Продолжающему нельзя писать про условно-бесплатное первое занятие
+    и бесплатную диагностику — решение владельца 25.08. Он ходит второй
+    год, диагностику давно прошёл, а фраза про бесплатное занятие читается
+    либо как насмешка, либо как обещание не платить за сентябрь."""
+    key = _subject_key(cls.get(new_class_id, ""))
+    if not key:
+        return False
+    for j in user_joins:
+        nm = cls.get(j.get("classId"), "")
+        if not nm.startswith("2526"):
+            continue
+        if _subject_key(nm) == key:
+            return True
+    return False
+
+
 def _join_title(name: str) -> str:
     parts = [p for p in name.split("_") if p and not p.startswith("2627")]
     if parts and parts[0] in _SUBJ_FULL:
@@ -1632,6 +1668,7 @@ def confirm_joins(mk: MoyklassClient) -> None:
     cls = {c["id"]: (c.get("name") or "")
            for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
     by_user: dict = {}
+    fresh_ids: dict = {}
     for j in joins:
         nm = cls.get(j.get("classId"), "")
         if not nm.startswith("2627") or "аявк" in nm.lower():
@@ -1643,6 +1680,19 @@ def confirm_joins(mk: MoyklassClient) -> None:
         if not _mark("join_confirm", str(j["id"])):
             continue
         by_user.setdefault(j["userId"], []).append(_join_title(nm))
+        fresh_ids.setdefault(j["userId"], []).append(j.get("classId"))
+    # Прошлогодние записи — чтобы отличить продолжающего от новичка.
+    # Берём из общего кэша: отдельный запрос на каждого клиента стоил бы
+    # десятков вызовов в каждом цикле.
+    past: dict = {}
+    if by_user:
+        from . import taskguard as _tg
+        try:
+            for j in _tg.pull_all(mk, "/v1/company/joins", "joins"):
+                if j.get("userId") in by_user:
+                    past.setdefault(j["userId"], []).append(j)
+        except Exception:
+            log.warning("подтверждение: история записей недоступна")
     for uid, titles in by_user.items():
         try:
             u = mk.get(f"/v1/company/users/{uid}")
@@ -1657,13 +1707,21 @@ def confirm_joins(mk: MoyklassClient) -> None:
         else:
             what = ("Подтверждаем записи:\n"
                     + "\n".join(f"• {t}" for t in titles))
-        ok = _wa(phone, f"Здравствуйте! {what}\n\n"
-                        f"Занятия начинаются 31 августа. Адрес: б-р Маршала "
-                        f"Рокоссовского, 6к1В (напротив ТЦ «Янтарь»), 2 минуты "
-                        f"от метро Бульвар Рокоссовского. Первое занятие "
-                        f"условно-бесплатное, и на нём же бесплатная диагностика — "
-                        f"педагог посмотрит уровень и подберёт ступень. Если "
-                        f"что-то поменяется, просто ответьте здесь.")
+        # Продолжающему — ни слова про условно-бесплатное занятие
+        # и диагностику: он ходит второй год и то, и другое давно прошёл.
+        mine = past.get(uid, [])
+        cont = all(_continuing(mine, cls, cid) for cid in fresh_ids.get(uid, []))
+        ok = _wa(phone, f"Здравствуйте! {what}\n\n" + (
+            f"Занятия начинаются 31 августа, всё как обычно — б-р Маршала "
+            f"Рокоссовского, 6к1В. Рады, что продолжаете с нами. Если "
+            f"что-то поменяется, просто ответьте здесь."
+            if cont else
+            f"Занятия начинаются 31 августа. Адрес: б-р Маршала "
+            f"Рокоссовского, 6к1В (напротив ТЦ «Янтарь»), 2 минуты "
+            f"от метро Бульвар Рокоссовского. Первое занятие "
+            f"условно-бесплатное, и на нём же бесплатная диагностика — "
+            f"педагог посмотрит уровень и подберёт ступень. Если "
+            f"что-то поменяется, просто ответьте здесь."))
         short = ", ".join(t[:34] for t in titles)
         status_note = ("отправлено" if ok else
                        "каналы не приняли, поставлена задача подтвердить голосом")

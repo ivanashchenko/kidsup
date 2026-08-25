@@ -325,6 +325,7 @@ def confirms_to_queue(days=("2026-08-24", "2026-08-25")) -> int:
         cls = {c["id"]: (c.get("name") or "")
                for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
         by_user: dict = {}
+        new_cls: dict = {}
         for d in days:
             for j in (mk.fetch_all("/v1/company/joins", ["joins"],
                                    params={"createdAt": d}) or []):
@@ -336,6 +337,11 @@ def confirms_to_queue(days=("2026-08-24", "2026-08-25")) -> int:
                 if j.get("statusId") not in ACTIVE_JOIN:
                     continue
                 by_user.setdefault(j["userId"], []).append(autopilot._join_title(nm))
+                new_cls.setdefault(j["userId"], []).append(j.get("classId"))
+        past: dict = {}
+        for j in taskguard.pull_all(mk, "/v1/company/joins", "joins"):
+            if j.get("userId") in by_user:
+                past.setdefault(j["userId"], []).append(j)
         rows = []
         for uid, titles in by_user.items():
             try:
@@ -348,18 +354,25 @@ def confirms_to_queue(days=("2026-08-24", "2026-08-25")) -> int:
             titles = list(dict.fromkeys(titles))
             what = (f"Подтверждаем запись: {titles[0]}." if len(titles) == 1
                     else "Подтверждаем записи:\n" + "\n".join(f"• {t}" for t in titles))
+            # Продолжающему — без «условно-бесплатного» и диагностики:
+            # он ходит второй год на то же самое (решение владельца 25.08).
+            cont = all(autopilot._continuing(past.get(uid, []), cls, cid)
+                       for cid in new_cls.get(uid, []))
+            tail = ("Занятия начинаются 31 августа, всё как обычно — б-р "
+                    "Маршала Рокоссовского, 6к1В. Рады, что продолжаете "
+                    "с нами. Если что-то поменяется, просто ответьте здесь."
+                    if cont else
+                    "Занятия начинаются 31 августа. Адрес: б-р Маршала "
+                    "Рокоссовского, 6к1В (напротив ТЦ «Янтарь»), 2 минуты "
+                    "от метро Бульвар Рокоссовского. Первое занятие "
+                    "условно-бесплатное, и на нём же бесплатная диагностика — "
+                    "педагог посмотрит уровень и подберёт ступень. Если "
+                    "что-то поменяется, просто ответьте здесь.")
             rows.append({
                 "uid": uid, "phone": phone, "name": (u.get("name") or "").strip(),
                 "seg": "?", "paid": True, "kind": "confirm",
                 "msgr": wazzup.channels_for(phone, uid=uid),
-                "text": (f"Здравствуйте! {what}\n\n"
-                         f"Занятия начинаются 31 августа. Адрес: б-р Маршала "
-                         f"Рокоссовского, 6к1В (напротив ТЦ «Янтарь»), 2 минуты "
-                         f"от метро Бульвар Рокоссовского. Первое занятие "
-                         f"условно-бесплатное, и на нём же бесплатная "
-                         f"диагностика — педагог посмотрит уровень и подберёт "
-                         f"ступень. Если что-то поменяется, просто ответьте "
-                         f"здесь.")})
+                "text": f"Здравствуйте! {what}\n\n{tail}"})
     finally:
         mk.close()
     queue = json.loads(db.get_setting(QUEUE_KEY, "[]") or "[]")
