@@ -2356,7 +2356,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.44"
+APP_VERSION = "2026-08-25.45"
 
 
 @app.get("/api/net")
@@ -3645,6 +3645,30 @@ def nabormail_liza(reorder: bool = False):
         _db.set_setting("nabormail_queue", _j.dumps(head + rest, ensure_ascii=False))
         return {"ok": True, "поднято в начало": len(head)}
     return {"ok": True, "поставлено": nabormail.liza_to_queue()}
+
+
+@app.post("/api/nabormail/pause", dependencies=AUTH)
+def nabormail_pause(off: bool = True):
+    """Приостановить рассылку, сохранив очередь.
+
+    25.08 Wazzup предупредил: на тарифе осталось 100 новых диалогов до конца
+    месяца, дальше канал отключается. В очереди рассылки лежал ровно 101
+    адресат — она бы съела весь остаток, и в неделю перед стартом занятий
+    мы не смогли бы ответить ни одному новому обращению. Очередь уходит
+    в резерв целиком и возвращается одной командой."""
+    import json as _j
+    from . import db as _db
+    if off:
+        q = _db.get_setting("nabormail_queue", "[]") or "[]"
+        _db.set_setting("nabormail_parked", q)
+        _db.set_setting("nabormail_queue", "[]")
+        return {"ok": True, "в резерве": len(_j.loads(q)), "рассылка": "на паузе"}
+    parked = _db.get_setting("nabormail_parked", "[]") or "[]"
+    cur = _j.loads(_db.get_setting("nabormail_queue", "[]") or "[]")
+    _db.set_setting("nabormail_queue", _j.dumps(cur + _j.loads(parked),
+                                                ensure_ascii=False))
+    _db.set_setting("nabormail_parked", "[]")
+    return {"ok": True, "вернули в очередь": len(_j.loads(parked))}
 
 
 @app.post("/api/nabormail/skip", dependencies=AUTH)
