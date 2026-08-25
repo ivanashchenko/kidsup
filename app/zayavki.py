@@ -261,11 +261,114 @@ def build_list(since: str = "2026-06-01") -> int:
     return len(rows)
 
 
+def build_fresh(since: str = "2026-08-01") -> int:
+    """Свежие заявки с сайта, по которым мы так и не поговорили.
+
+    25.08 владелец попросил проверить, как отрабатываются заявки, и картина
+    оказалась плохой: из шестнадцати августовских одиннадцать никто не
+    набрал, а у пяти человек даже карточки в CRM нет. Причина системная —
+    заявки с сайта в CRM не попадали вовсе (в интеграцию Roistat приходят
+    только звонки), и увидеть их можно было лишь в выгрузке Тильды руками.
+
+    «Отработана» = есть запись на новый сезон ИЛИ состоялся разговор
+    дольше двадцати секунд. Недозвон отработкой не считается: человек
+    оставил заявку и остался без ответа.
+
+    Лагерь исключаем — сезон кончился, звать туда уже некуда."""
+    import html as _html
+    from datetime import date as _date, datetime as _dt, timedelta as _td
+    from pathlib import Path
+    from . import mango
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        leads = {p: v for p, v in load().items() if v["last"] >= since}
+        users = taskguard.pull_all(mk, "/v1/company/users", "users", cache_hours=2)
+        joins = taskguard.pull_all(mk, "/v1/company/joins", "joins")
+        rc = mk.get("/v1/company/classes", {"limit": 500})
+        cls = {c["id"]: (c.get("name") or "")
+               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+    finally:
+        mk.close()
+    booked = {j["userId"] for j in joins
+              if cls.get(j.get("classId"), "").startswith("2627")
+              and j.get("statusId") in {2, 50509, 58131, 58132, 83760}
+              and "аявк" not in cls.get(j.get("classId"), "").lower()}
+    idx = {}
+    for u in users:
+        p = phone10(u.get("phone"))
+        if p:
+            idx.setdefault(p, u)
+    talked = set()
+    for dd in range(0, 25):
+        day = _date.today() - _td(days=dd)
+        try:
+            rows = mango.calls(_dt.combine(day, _dt.min.time()),
+                               _dt.combine(day, _dt.max.time()))
+        except Exception:
+            continue
+        for r in rows:
+            n = (r.get("to_num") if r.get("from_ext") else r.get("from_num")) or ""
+            d = "".join(c for c in str(n) if c.isdigit())[-10:]
+            dur = (r["finish"] - r["answer"]) if r.get("answer") else 0
+            if len(d) == 10 and dur >= 20:
+                talked.add(d)
+    rows_out = []
+    for p, lead in sorted(leads.items(), key=lambda x: x[1]["last"], reverse=True):
+        forms = ", ".join(dict.fromkeys(lead["forms"]))
+        if "агер" in forms.lower():
+            continue                       # лагерь кончился
+        if any(t in forms.lower() for t in ("тест", "nест", "текст")):
+            continue                       # проверочные отправки формы
+        u = idx.get(p)
+        if u and (u["id"] in booked or u.get("clientStateId") in (146328, 125954, 125957)):
+            continue
+        if p in talked:
+            continue
+        kid = lead["child"] or ""
+        who = (kid or lead["parent"] or (u.get("name") if u else "") or "")[:26]
+        bd = lead["birthday"] or ""
+        age = ""
+        if bd:
+            try:
+                age = "%g" % round((_date(2026, 9, 1)
+                                    - _date.fromisoformat(bd)).days / 365.25, 1)
+                age = age.replace(".", ",")
+            except ValueError:
+                pass
+        rows_out.append(
+            f"<tr><td>{_html.escape(who) or '—'}"
+            f"{'' if u else ' <span class=new>нет карточки</span>'}</td>"
+            f"<td class=ag>{age or '—'}</td>"
+            f"<td class=ph>+7{p}</td>"
+            f"<td>{_html.escape(forms[:46])}</td>"
+            f"<td>{lead['last'][8:10]}.{lead['last'][5:7]}</td>"
+            f"<td>{_html.escape((lead['interest'] or lead['note'] or '')[:44])}</td>"
+            f"<td class=res></td></tr>")
+    body = (f"<style>{CSS}</style>"
+            f"<h1>Заявки с сайта, по которым мы не поговорили</h1>"
+            f"<div class=sub>{len(rows_out)} человек оставили заявку с "
+            f"{since[8:10]}.{since[5:7]} и до сих пор не записаны, а разговора "
+            f"с ними не было — только недозвоны или вообще ничего. Лагерь "
+            f"и тестовые отправки формы исключены. Свежие сверху: заявке "
+            f"вчерашнего дня цена выше, чем трёхнедельной. У кого «нет "
+            f"карточки» — завести при разговоре. Печатать в альбомной.</div>"
+            "<table><thead><tr><th>Кто</th><th>Возраст<br>на 1.09</th>"
+            "<th>Телефон</th><th>Форма на сайте</th><th>Дата</th>"
+            "<th>Что просили</th><th>Итог разговора</th></tr></thead><tbody>"
+            + "".join(rows_out) + "</tbody></table>")
+    p_out = Path(__file__).resolve().parent.parent / "docs" / "zayavki_svezhie.html"
+    p_out.write_text(body, encoding="utf-8")
+    log.info("%s: %d строк", p_out, len(rows_out))
+    return len(rows_out)
+
+
 def main():
     import sys
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if "apply" in sys.argv:
         print(apply(dry=False))
+    elif "fresh" in sys.argv:
+        print("строк:", build_fresh())
     elif "list" in sys.argv:
         print("строк в листе:", build_list())
     else:
