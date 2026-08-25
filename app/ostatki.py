@@ -115,6 +115,20 @@ td{border-bottom:1px solid #ddd;padding:6px 4px;font-size:11pt;vertical-align:to
 """
 
 
+def _split_lena(keep: list[str]) -> tuple[list[str], list[str]]:
+    """Лист Лены собирается из двух частей: её собственная задача — семьи,
+    занимавшиеся у Кати или Инги, — и добор из общего возрастного листа,
+    чтобы работа не кончилась через час. Мерить их одной цифрой нечестно:
+    25.08 выяснилось, что «прошла 6 из 100» на деле означает «прошла 6
+    из своих 20, а до добора не дошла вовсе»."""
+    core, extra = [], []
+    for row in keep:
+        tds = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
+        teacher = re.sub(r"<[^>]+>", "", tds[3]).strip() if len(tds) > 3 else ""
+        (core if teacher in ("Катя", "Инга", "Инга, Катя") else extra).append(row)
+    return core, extra
+
+
 def build() -> dict:
     dialed = _dialed()
     out = {}
@@ -125,13 +139,21 @@ def build() -> dict:
             continue
         head = re.search(r"<thead>.*?</thead>", _yesterday_html(slug) or "", re.S)
         done = total - len(keep)
+        note = ""
+        if slug == "list_lena":
+            core, extra = _split_lena(keep)
+            keep = core + extra
+            note = (f"<br><b>Своих (Катя или Инга) не набрано: {len(core)}</b> — "
+                    f"они идут первыми в таблице. Остальные {len(extra)} — "
+                    f"добор из общего возрастного листа, их можно отдать "
+                    f"другому звонящему.")
         body = (f"<style>{CSS}</style>"
                 f"<h1>{who} — хвост вчерашнего листа ({what})</h1>"
                 f"<div class=sub>{len(keep)} из {total}: вчера и сегодня этих "
                 f"номеров не набирали ни разу. Пройдено {done} "
                 f"({round(100 * done / total)}%). Строки те же, что вчера — "
                 f"имя, возраст и куда звать не менялись. Печатать "
-                f"в альбомной.</div><table>"
+                f"в альбомной.{note}</div><table>"
                 + (head.group(0) if head else "")
                 + "<tbody>" + "".join(keep) + "</tbody></table>")
         (DOCS / f"{target}.html").write_text(body, encoding="utf-8")
