@@ -2352,7 +2352,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.32"
+APP_VERSION = "2026-08-25.33"
 
 
 @app.get("/api/net")
@@ -3559,9 +3559,19 @@ def api_dostavka(hours: int = 1):
 
 
 @app.post("/api/nabormail/liza", dependencies=AUTH)
-def nabormail_liza():
-    """Взять на себя задачи Лизы «написать клиенту»."""
-    from . import nabormail
+def nabormail_liza(reorder: bool = False):
+    """Взять на себя задачи Лизы «написать клиенту».
+
+    reorder=true — только поднять уже поставленные строки в начало очереди,
+    ничего не добавляя: пригодилось 25.08, когда они попали в хвост."""
+    import json as _j
+    from . import db as _db, nabormail
+    if reorder:
+        q = _j.loads(_db.get_setting("nabormail_queue", "[]") or "[]")
+        head = [r for r in q if (r.get("kind") or "nabor") in ("confirm", "liza")]
+        rest = [r for r in q if (r.get("kind") or "nabor") not in ("confirm", "liza")]
+        _db.set_setting("nabormail_queue", _j.dumps(head + rest, ensure_ascii=False))
+        return {"ok": True, "поднято в начало": len(head)}
     return {"ok": True, "поставлено": nabormail.liza_to_queue()}
 
 

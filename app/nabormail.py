@@ -343,7 +343,12 @@ def liza_to_queue() -> int:
                      "seg": _seg(age), "paid": True, "kind": "liza",
                      "task_id": t["id"],
                      "msgr": wazzup.channels_for(phone, uid=uid, mass=True)})
-    db.set_setting(QUEUE_KEY, json.dumps(queue + rows, ensure_ascii=False))
+    # В начало, сразу за подтверждениями: у этих задач срок «сегодня»,
+    # а в хвосте двухсотенной очереди они ушли бы к ночи, когда отправлять
+    # уже нельзя. Порядок внутри очереди — это и есть приоритет.
+    head = [r for r in queue if (r.get("kind") or "nabor") == "confirm"]
+    rest = [r for r in queue if (r.get("kind") or "nabor") != "confirm"]
+    db.set_setting(QUEUE_KEY, json.dumps(head + rows + rest, ensure_ascii=False))
     log.info("задач Лизы в очередь: %d", len(rows))
     return len(rows)
 
