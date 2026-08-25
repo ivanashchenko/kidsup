@@ -300,8 +300,22 @@ def close_done(dry: bool = True) -> dict:
                 payload["isComplete"] = True
                 payload["body"] = (f"✅ Закрыто автоматически: {r['why']}. "
                                    + str(payload.get("body") or ""))[:250]
-                mk.post(f"/v1/company/tasks/{r['id']}", payload)
-                stat["закрыто"] += 1
+                # Проверяем результат, а не верим ответу: 25.08 из 134 задач
+                # реально закрылись 67 — МойКласс отвечал 200, но на потоке
+                # молча не применял isComplete. Ошибок при этом не было ни
+                # одной, и список выглядел разобранным, оставаясь прежним.
+                ok = False
+                for attempt in range(3):
+                    mk.post(f"/v1/company/tasks/{r['id']}", payload)
+                    time.sleep(0.5)
+                    if mk.get(f"/v1/company/tasks/{r['id']}").get("isComplete"):
+                        ok = True
+                        break
+                    time.sleep(1.0)
+                if ok:
+                    stat["закрыто"] += 1
+                else:
+                    stat["не применилось"] = stat.get("не применилось", 0) + 1
             except Exception as e:
                 stat["ошибок"] += 1
                 log.warning("задача %s: %s", r["id"], str(e)[:80])
