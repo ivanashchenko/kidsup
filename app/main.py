@@ -2356,7 +2356,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.47"
+APP_VERSION = "2026-08-25.48"
 
 
 @app.get("/api/net")
@@ -3622,6 +3622,26 @@ def api_dostavka(hours: int = 1):
                          "вид": r["kind"] or "—", "статус": r["status"],
                          "телефон": "+7" + (r["phone"] or "")[-10:]}
                         for r in nd[:8]]}
+
+
+@app.get("/api/nabormail/preview", dependencies=AUTH)
+def nabormail_preview(n: int = 5, kind: str = ""):
+    """Показать тексты, которые уйдут следующими. Ничего не отправляет."""
+    import json as _j
+    from . import db as _db, nabormail
+    q = _j.loads(_db.get_setting("nabormail_queue", "[]") or "[]")
+    if kind:
+        q = [r for r in q if (r.get("kind") or "nabor") == kind]
+    out = []
+    for r in q[:n]:
+        txt = (r.get("text")
+               or (nabormail.push_text(r["name"], r["seg"]) if r.get("push")
+                   else nabormail.text_for(r["name"], r["seg"], r.get("paid", True))))
+        out.append({"кому": r.get("name") or "", "телефон": "+7" + r["phone"],
+                    "возраст": r.get("seg"), "вид": r.get("kind") or "nabor",
+                    "второе касание": bool(r.get("push")),
+                    "каналы": r.get("msgr"), "текст": txt})
+    return {"всего в очереди": len(q), "показано": len(out), "письма": out}
 
 
 @app.post("/api/nabormail/tasks", dependencies=AUTH)
