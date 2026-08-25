@@ -197,8 +197,7 @@ def collect() -> list[dict]:
 def build() -> int:
     rows = collect()
     done = set(json.loads(db.get_setting(DONE_KEY, "[]") or "[]"))
-    rows = [r for r in rows if f"nabor:{r['uid']}" not in done
-            and str(r["uid"]) not in done]
+    rows = [r for r in rows if f"confirm:{r['uid']}" not in done]
     db.set_setting(QUEUE_KEY, json.dumps(rows, ensure_ascii=False))
     log.info("очередь рассылки: %d семей", len(rows))
     return len(rows)
@@ -313,7 +312,8 @@ def main():
 
 
 
-def confirms_to_queue(days=("2026-08-24", "2026-08-25")) -> int:
+def confirms_to_queue(days=("2026-08-24", "2026-08-25"),
+                      rebuild: bool = False) -> int:
     """Поставить в начало очереди подтверждения записи, не дошедшие из-за
     десятизначного chatId (25.08). Одно письмо на семью, все её записи
     списком — как и в confirm_joins после правки того же дня."""
@@ -376,8 +376,14 @@ def confirms_to_queue(days=("2026-08-24", "2026-08-25")) -> int:
     finally:
         mk.close()
     queue = json.loads(db.get_setting(QUEUE_KEY, "[]") or "[]")
-    have = {r["uid"] for r in queue if r.get("text")}
-    rows = [r for r in rows if r["uid"] not in have]
+    if rebuild:
+        # Текст письма лежит прямо в строке очереди, поэтому правка
+        # формулировки не догоняет то, что уже поставлено. Пересборка
+        # выбрасывает неотправленные подтверждения и кладёт их заново.
+        queue = [r for r in queue if (r.get("kind") or "nabor") != "confirm"]
+    else:
+        have = {r["uid"] for r in queue if r.get("text")}
+        rows = [r for r in rows if r["uid"] not in have]
     # в начало: подтверждение записи ждать не должно
     db.set_setting(QUEUE_KEY, json.dumps(rows + queue, ensure_ascii=False))
     log.info("подтверждений в очередь: %d", len(rows))
