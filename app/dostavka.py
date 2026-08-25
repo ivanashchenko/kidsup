@@ -59,9 +59,18 @@ def _table() -> None:
 
 
 def undelivered(hours: int = WAIT_HOURS, kinds: set | None = None) -> list[dict]:
-    """Отправленное больше `hours` назад, по чему не пришло ни delivered,
-    ни read. Статуса нет вовсе — тоже сюда: Wazzup молчит и когда канал
-    не смог доставить."""
+    """Что действительно не дошло.
+
+    Тонкость, выясненная 25.08: разные каналы присылают разные статусы.
+    WhatsApp даёт полную цепочку sent → delivered → read. Telegram и MAX
+    «delivered» не присылают вовсе — только sent и read. Поэтому отсутствие
+    «delivered» в мессенджере ничего не значит: сообщение доставлено,
+    человек просто ещё не открыл чат, и слать ему вдогонку СМС — значит
+    платить за собственное незнание.
+
+    Недоставленным считаем только явный провал: статус «error» или
+    отсутствие любого статуса — Wazzup промолчал, значит сообщение
+    не ушло никуда."""
     _table()
     edge = (_now() - timedelta(hours=hours)).isoformat(timespec="seconds")
     q = """SELECT s.message_id, s.ts, s.phone, s.uid, s.transport, s.kind,
@@ -69,7 +78,7 @@ def undelivered(hours: int = WAIT_HOURS, kinds: set | None = None) -> list[dict]
              FROM wazzup_sent s
         LEFT JOIN wazzup_status st ON st.message_id = s.message_id
             WHERE s.ts <= ? AND s.chased = 0
-              AND COALESCE(st.rank, 0) < 2
+              AND (st.status IS NULL OR st.status = 'error')
          ORDER BY s.ts"""
     with db.get_conn() as conn:
         rows = conn.execute(q, (edge,)).fetchall()
@@ -153,8 +162,13 @@ def channel_health(hours: int = 1, ripe_min: int = 30) -> list[dict]:
     _table()
     edge = (_now() - timedelta(hours=hours)).isoformat(timespec="seconds")
     ripe = (_now() - timedelta(minutes=ripe_min)).isoformat(timespec="seconds")
+    # «дошло» = канал подтвердил приём или человек прочитал. Для WhatsApp
+    # это delivered/read, для Telegram и MAX — sent/read: «delivered»
+    # они не присылают вовсе, и требовать его значило бы считать здоровый
+    # канал сломанным.
     q = """SELECT s.transport, COUNT(*),
-                  SUM(CASE WHEN COALESCE(st.rank, 0) >= 2 THEN 1 ELSE 0 END)
+                  SUM(CASE WHEN st.status IN ('delivered','read','sent')
+                           THEN 1 ELSE 0 END)
              FROM wazzup_sent s
         LEFT JOIN wazzup_status st ON st.message_id = s.message_id
             WHERE s.ts >= ? AND s.ts <= ?
@@ -172,7 +186,7 @@ def watch() -> dict:
     Порог намеренно грубый: половина недоставленного при пяти и более
     отправках. Мессенджеры отвечают статусом не мгновенно, и на мелких
     числах любая тонкая настройка даст ложную тревогу каждый час."""
-    bad = [c for c in channel_health(1) if c["всего"] >= 5 and c["доля"] < 50]
+    bad = [c for c in channel_health(1) if c["всего"] >= 5 and c["доля"] < 60]
     if not bad:
         return {"ok": True}
     from . import autopilot
