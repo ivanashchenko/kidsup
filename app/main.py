@@ -2335,7 +2335,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.24"
+APP_VERSION = "2026-08-25.25"
 
 
 @app.get("/api/net")
@@ -3560,7 +3560,10 @@ def nabormail_state():
     from collections import Counter as _C
     dup = [k for k, n in _C(f"{r.get('kind') or 'nabor'}:{r['uid']}"
                             for r in q).items() if n > 1]
+    from datetime import datetime as _dt, timedelta as _td
     return {"в очереди": len(q), "отправлено": len(d),
+            "следующая отправка": _db.get_setting("nabormail_next", "") or "—",
+            "сейчас МСК": (_dt.utcnow() + _td(hours=3)).isoformat(timespec="seconds"),
             "по возрастам": dict(_C(r["seg"] for r in q)),
             "дубли в очереди": dup[:10],
             "первые": [f"{r.get('kind') or 'nabor'}:{r['uid']} {r.get('name','')[:18]}"
