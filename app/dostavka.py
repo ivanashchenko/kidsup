@@ -40,7 +40,7 @@ log = logging.getLogger("kidsup.dostavka")
 
 # Сообщения, ради которых имеет смысл платить за СМС: без них человек
 # просто не придёт. Всё остальное — переписка и новости — молчит.
-CHASE_KINDS = {"confirm", "trial_reminder", "reschedule"}
+CHASE_KINDS = {"confirm", "trial_reminder", "reschedule", "missed"}
 WAIT_HOURS = 2          # столько ждём доставки, прежде чем слать СМС
 SMS_FROM, SMS_TO = 9, 20
 
@@ -113,6 +113,8 @@ def sms_text(kind: str, note: str = "") -> str:
                           "Рокоссовского 6к1В. Вопросы: 4951209024",
         "reschedule": "KidsUP: изменение по занятию{note}. "
                       "Позвоните нам: 4951209024",
+        "missed": "KidsUP: звонили вам по набору групп на новый год, "
+                  "не дозвонились. Перезвоните: 4951209024",
     }.get(kind, "KidsUP: у нас для вас сообщение. Позвоните: 4951209024")
     return base.replace("{note}", f" — {note}" if note else "")
 

@@ -1997,7 +1997,7 @@ def evening_digest(mk: MoyklassClient) -> None:
     text = "\n".join(lines)[:1800]
     phone = db.get_setting("digest_phone") or ""
     if phone:
-        _wa(phone, text)
+        _wa(phone, text, kind="digest")
         log.info("вечерняя сводка отправлена владельцу")
 
 
@@ -2017,7 +2017,7 @@ def missed_calls() -> None:
                 text = MISSED_OUR.format(child=f" по занятиям {_genitive(child)}" if child else "")
             else:
                 text = MISSED_COLD
-            delivered = _wa(phone, text)
+            delivered = _wa(phone, text, kind="missed")
             # Правило владельца 24.08 (вечер): если с семьёй НЕТ переписки
             # в Telegram и MAX, СМС уходит ВМЕСТЕ с WhatsApp — не как
             # запасной канал, а параллельно. Плюс страховка: все каналы
