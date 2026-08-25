@@ -2356,7 +2356,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.38"
+APP_VERSION = "2026-08-25.39"
 
 
 @app.get("/api/net")
@@ -3595,7 +3595,19 @@ def api_dostavka(hours: int = 1):
     """Что уходит и что доходит. Первый экран при подозрении, что канал лёг."""
     from . import dostavka
     nd = dostavka.undelivered()
+    from collections import Counter as _C2
+    st = []
+    try:
+        with db.get_conn() as conn:
+            st = conn.execute(
+                "SELECT s.transport, COALESCE(x.status,'нет статуса') "
+                "FROM wazzup_sent s LEFT JOIN wazzup_status x "
+                "ON x.message_id = s.message_id").fetchall()
+    except Exception:
+        pass
     return {"здоровье каналов за час": dostavka.channel_health(hours),
+            "какие статусы вообще приходят":
+                {f"{t}/{v}": n for (t, v), n in _C2((a, b) for a, b in st).most_common(12)},
             "не дошло за 2 часа": len(nd),
             "из них важного (пойдёт СМС)":
                 len([r for r in nd if r["kind"] in dostavka.CHASE_KINDS]),
