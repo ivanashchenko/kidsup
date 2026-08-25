@@ -2356,7 +2356,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.51"
+APP_VERSION = "2026-08-25.52"
 
 
 @app.get("/api/net")
@@ -3645,9 +3645,18 @@ def nabormail_preview(n: int = 5, kind: str = ""):
 
 
 @app.post("/api/akciya", dependencies=AUTH)
-def api_akciya():
-    """Письма записанным без оплаты: старая цена действует до 30 августа."""
-    from . import akciya
+def api_akciya(rebuild: bool = False):
+    """Письма записанным без оплаты: старая цена действует до 30 августа.
+
+    rebuild=true выбрасывает уже поставленные письма и собирает заново —
+    нужно, когда правится текст или цена: текст лежит прямо в строке
+    очереди и сам не обновляется."""
+    import json as _j
+    from . import akciya, db as _db
+    if rebuild:
+        q = _j.loads(_db.get_setting("nabormail_queue", "[]") or "[]")
+        q = [r for r in q if (r.get("kind") or "") != "akciya"]
+        _db.set_setting("nabormail_queue", _j.dumps(q, ensure_ascii=False))
     return akciya.to_queue()
 
 
