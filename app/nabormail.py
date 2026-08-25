@@ -49,7 +49,8 @@ log = logging.getLogger("kidsup.nabormail")
 SEASON = date(2026, 9, 1)
 QUEUE_KEY = "nabormail_queue"      # что осталось отправить
 DONE_KEY = "nabormail_done"        # кому уже ушло, чтобы не задвоить
-BATCH = 40                         # сколько уходит за один заход
+NEXT_KEY = "nabormail_next"        # когда разрешена следующая отправка
+BATCH = 1                          # по одному письму за заход — темп живого человека
 MSGR = ("tgapi", "max")            # только мессенджеры: WABA на модерации
 ACTIVE_JOIN = {2, 50509, 58131, 58132, 83760}
 SKIP_STATE = {146328, 125954, 125957}
@@ -202,17 +203,39 @@ def build() -> int:
     return len(rows)
 
 
-def tick(dry_run: bool = False, batch: int = BATCH) -> dict:
-    """Порция рассылки. Автопилот зовёт каждые десять минут в рабочем окне:
-    265 сообщений одним залпом создали бы очередь ответов, которую два
-    администратора не разгребут, — а так поток растягивается на пару часов."""
+def tick(dry_run: bool = False, batch: int = 1) -> dict:
+    """Одно сообщение за заход, в темпе живого человека.
+
+    Первая версия слала по 40 штук с паузой в полсекунды — сорок
+    сообщений за двадцать секунд. Для Telegram и MAX это подпись
+    рассылочного бота: аккаунт с таким поведением блокируют, и тогда
+    мы теряем не одну рассылку, а единственный бесплатный канал связи
+    с семьями. Владелец остановил это 25.08 на сороковом сообщении.
+
+    Теперь автопилот зовёт tick каждую минуту, а темп задаёт сам модуль:
+    следующая отправка разрешена не раньше времени в NEXT_KEY, и после
+    каждого сообщения оно сдвигается на случайные 60–150 секунд. Примерно
+    раз в пятнадцать сообщений — «перерыв» на 5–12 минут: человек не пишет
+    ровным метрономом весь день, и именно ровность выдаёт машину.
+
+    Выходит около тридцати сообщений в час. Двести с лишним писем
+    занимают рабочий день целиком — и это правильная цена за то, чтобы
+    каналы остались живыми."""
+    import random
+    from datetime import datetime, timedelta
+
+    now = datetime.utcnow() + timedelta(hours=3)          # МСК
+    if not dry_run:
+        nxt = db.get_setting(NEXT_KEY, "") or ""
+        if nxt and now.isoformat(timespec="seconds") < nxt:
+            return {}
     queue = json.loads(db.get_setting(QUEUE_KEY, "[]") or "[]")
     if not queue:
         return {}
     done = set(json.loads(db.get_setting(DONE_KEY, "[]") or "[]"))
     stat: Counter = Counter()
     sent_uids = []
-    for r in queue[:batch]:
+    for r in queue[:max(1, batch)]:
         if r["uid"] in done:
             sent_uids.append(r["uid"])
             continue
@@ -229,14 +252,20 @@ def tick(dry_run: bool = False, batch: int = BATCH) -> dict:
         stat["доставлено" if ok else "отказ"] += 1
         if ok:
             sent_uids.append(r["uid"])
-        if not dry_run:
-            time.sleep(0.5)
-    if not dry_run and sent_uids:
-        done |= set(sent_uids)
-        db.set_setting(DONE_KEY, json.dumps(sorted(done)))
-        left = [r for r in queue if r["uid"] not in done]
-        db.set_setting(QUEUE_KEY, json.dumps(left, ensure_ascii=False))
-        stat["осталось"] = len(left)
+    if not dry_run:
+        n = len(done) + len(sent_uids)
+        pause = random.uniform(300, 720) if n and n % 15 == 0 \
+            else random.uniform(60, 150)
+        if not stat.get("доставлено"):
+            pause = max(pause, 240)      # отказ — притормозить, не долбить
+        db.set_setting(NEXT_KEY,
+                       (now + timedelta(seconds=pause)).isoformat(timespec="seconds"))
+        if sent_uids:
+            done |= set(sent_uids)
+            db.set_setting(DONE_KEY, json.dumps(sorted(done)))
+            left = [r for r in queue if r["uid"] not in done]
+            db.set_setting(QUEUE_KEY, json.dumps(left, ensure_ascii=False))
+            stat["осталось"] = len(left)
     return dict(stat)
 
 
