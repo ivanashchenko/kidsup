@@ -263,7 +263,8 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
         for t in r["msgr"]:
             try:
                 if wazzup.send_via(t, r["phone"], txt, dry_run=dry_run,
-                                   uid=r["uid"]):
+                                   uid=r["uid"],
+                                   kind=r.get("kind") or "nabor"):
                     stat[t] += 1
                     ok = True
             except Exception as e:

@@ -123,8 +123,40 @@ def _pick(chans: list[dict], transport: str) -> dict | None:
     return cand[0] if cand else None
 
 
+def _remember(resp, transport: str, phone: str, uid=None, kind: str = "") -> None:
+    """Запомнить, какому человеку принадлежит отправленное сообщение.
+
+    Wazzup присылает статусы доставки по messageId, но сам по себе он
+    бесполезен: известно, что «сообщение X не доставлено», и неизвестно,
+    кому. 25.08 из-за этого 77 писем сутки висели недоставленными, и
+    заметили это администраторы глазами. Здесь мы связываем id с телефоном
+    и карточкой — тогда недоставленное можно догнать СМС и увидеть, что
+    канал перестал работать, в тот же час."""
+    try:
+        mid = ((resp.json() or {}).get("messageId")
+               or (resp.json() or {}).get("id") or "")
+    except Exception:
+        mid = ""
+    if not mid:
+        return
+    import datetime as _dt
+    try:
+        with db.get_conn() as conn:
+            conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_sent (
+                message_id TEXT PRIMARY KEY, ts TEXT, phone TEXT, uid TEXT,
+                transport TEXT, kind TEXT, chased INTEGER DEFAULT 0)""")
+            conn.execute(
+                "INSERT OR IGNORE INTO wazzup_sent "
+                "(message_id, ts, phone, uid, transport, kind) VALUES (?,?,?,?,?,?)",
+                (str(mid), (_dt.datetime.utcnow() + _dt.timedelta(hours=3))
+                 .isoformat(timespec="seconds"), _msisdn(phone),
+                 str(uid or ""), transport, kind))
+    except Exception:
+        logging.getLogger("kidsup.wazzup").warning("не записал отправку %s", mid)
+
+
 def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
-         transports: list[str] | None = None) -> list[str]:
+         transports: list[str] | None = None, kind: str = "") -> list[str]:
     """Отправка сообщения. transports ограничивает каналы (например ["tgapi"])."""
     phone = _msisdn(phone)
     log, chans = [], channels()
@@ -143,6 +175,8 @@ def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
                 "chatId": phone, "text": text,
             }, timeout=30)
             ok = r.status_code in (200, 201)
+            if ok:
+                _remember(r, transport, phone, None, kind)
             log.append(f"{transport} → {phone}: HTTP {r.status_code} {r.text[:120]}")
         if ok and mode == "cascade":
             break
@@ -202,7 +236,7 @@ def _tg_index() -> dict[str, str]:
 def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
              sender: str | None = None, template_id: str | None = None,
              template_values: list | None = None,
-             uid: str | int | None = None) -> bool:
+             uid: str | int | None = None, kind: str = "") -> bool:
     """Отправка строго через один канал. sender — plainId конкретного номера
     (для ротации WhatsApp). True = принял к доставке.
 
@@ -256,6 +290,8 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
         if r.status_code not in (200, 201):
             logging.getLogger("kidsup.wazzup").warning(
                 "wazzup шаблон отклонён: %s %s", r.status_code, r.text[:200])
+        else:
+            _remember(r, transport, phone, uid, kind)
         return r.status_code in (200, 201)
     # MAX сюда добавлен 23.08: у части контактов там внутренний номер
     # аккаунта, и отправка по телефону возвращает CHANNEL_MAX_PHONE_NOT_OCCUPIED
@@ -272,6 +308,8 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
     if r.status_code not in (200, 201):
         logging.getLogger("kidsup.wazzup").warning(
             "wazzup %s → %s: HTTP %s %s", transport, chat_id, r.status_code, r.text[:160])
+    else:
+        _remember(r, transport, phone, uid, kind)
     return r.status_code in (200, 201)
 
 

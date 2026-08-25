@@ -993,7 +993,8 @@ def _wa_unanswered(phone: str) -> bool:
 WA_HOUR_FROM, WA_HOUR_TO = 9, 20
 
 
-def _wa(phone: str, text: str, mode: str = "broadcast") -> bool | None:
+def _wa(phone: str, text: str, mode: str = "broadcast",
+        kind: str = "") -> bool | None:
     """broadcast — во все мессенджеры (WhatsApp+Telegram+MAX): у кого какой есть."""
     hour = _now().hour
     if not (WA_HOUR_FROM <= hour < WA_HOUR_TO) \
@@ -1006,7 +1007,7 @@ def _wa(phone: str, text: str, mode: str = "broadcast") -> bool | None:
         return None
     dry = db.get_setting("wazzup_dry_run", "1") == "1"
     try:
-        lines = wazzup.send(phone, text, mode=mode, dry_run=dry)
+        lines = wazzup.send(phone, text, mode=mode, dry_run=dry, kind=kind)
         for line in lines:
             log.info("wazzup: %s", line)
         # HTTP 20x хотя бы в одном канале — сообщение принято к доставке
@@ -1330,7 +1331,7 @@ def trial_reminder(mk: MoyklassClient) -> None:
                    f"переодеться. Нужна сменная обувь, бахилы дадим.\n"
                    f"Первое занятие условно-бесплатное: не понравится — платить не нужно, "
                    f"понравится — войдёт в первый абонемент.\n"
-                   f"Вы подойдёте?")
+                   f"Вы подойдёте?", kind="trial_reminder")
         log.info("напоминание о пробном: %s на %s", phone[-4:], when)
 
 
@@ -1740,7 +1741,7 @@ def confirm_joins(mk: MoyklassClient) -> None:
             f"от метро Бульвар Рокоссовского. Первое занятие "
             f"условно-бесплатное, и на нём же бесплатная диагностика — "
             f"педагог посмотрит уровень и подберёт ступень. Если "
-            f"что-то поменяется, просто ответьте здесь."))
+            f"что-то поменяется, просто ответьте здесь."), kind="confirm")
         short = ", ".join(t[:34] for t in titles)
         status_note = ("отправлено" if ok else
                        "каналы не приняли, поставлена задача подтвердить голосом")
@@ -3395,6 +3396,21 @@ def _loop() -> None:
                         log.info("рассылка набора: %s", r)
                 except Exception:
                     log.exception("рассылка набора упала — продолжаем")
+            # Доставка: раз в 15 минут догоняем СМС то, что не дошло за два
+            # часа, раз в час смотрим здоровье каналов. 25.08 семьдесят семь
+            # сообщений сутки висели недоставленными, и заметили это люди,
+            # а не система, — этот блок закрывает именно ту дыру.
+            if 9 <= now.hour < 20 and now.minute % 15 < 2 \
+                    and _mark("dostavka", now.strftime("%Y-%m-%d %H:%M")[:15]):
+                try:
+                    from . import dostavka
+                    r = dostavka.chase(dry=False)
+                    if r.get("смс"):
+                        log.info("догон СМС: %s", r)
+                    if now.minute < 15:
+                        dostavka.watch()
+                except Exception:
+                    log.exception("контроль доставки упал — продолжаем")
             try:
                 _broadcast_tick()
             except Exception as e:
