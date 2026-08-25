@@ -2327,7 +2327,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.17"
+APP_VERSION = "2026-08-25.18"
 
 
 @app.get("/api/net")
@@ -3532,8 +3532,13 @@ def nabormail_state():
     q = _j.loads(_db.get_setting("nabormail_queue", "[]") or "[]")
     d = _j.loads(_db.get_setting("nabormail_done", "[]") or "[]")
     from collections import Counter as _C
+    dup = [k for k, n in _C(f"{r.get('kind') or 'nabor'}:{r['uid']}"
+                            for r in q).items() if n > 1]
     return {"в очереди": len(q), "отправлено": len(d),
-            "по возрастам": dict(_C(r["seg"] for r in q))}
+            "по возрастам": dict(_C(r["seg"] for r in q)),
+            "дубли в очереди": dup[:10],
+            "первые": [f"{r.get('kind') or 'nabor'}:{r['uid']} {r.get('name','')[:18]}"
+                       for r in q[:5]]}
 
 
 @app.post("/api/autopilot/missed-now", dependencies=AUTH)
