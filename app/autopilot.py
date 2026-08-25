@@ -1932,8 +1932,11 @@ def missed_calls() -> None:
             # не слать. Включается настройкой sms_on=1 после регистрации
             # имени отправителя в ЛК Манго.
             sms_on = db.get_setting("sms_on", "0") == "1"
-            need_sms = sms_on and paid_before and (
-                (delivered is True and not has_msgr) or delivered is False)
+            # Решение владельца 25.08: СМС уходит ВСЕГДА, если клиент у нас
+            # платил, — независимо от того, есть ли переписка в мессенджерах.
+            # Прежде она была замыкающим каналом «на случай, если больше
+            # некуда»; теперь это полноценная третья опора рядом с WhatsApp.
+            need_sms = sms_on and paid_before and delivered is not None
             if need_sms and _mark("missed_sms", f"{today}:{phone}"):
                 # Кириллический сегмент — 70 символов; прежний текст был
                 # три сегмента и полз до абонента десять минут. Два сегмента
