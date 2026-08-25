@@ -2356,7 +2356,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.49"
+APP_VERSION = "2026-08-25.50"
 
 
 @app.get("/api/net")
@@ -3642,6 +3642,13 @@ def nabormail_preview(n: int = 5, kind: str = ""):
                     "второе касание": bool(r.get("push")),
                     "каналы": r.get("msgr"), "текст": txt})
     return {"всего в очереди": len(q), "показано": len(out), "письма": out}
+
+
+@app.post("/api/akciya", dependencies=AUTH)
+def api_akciya():
+    """Письма записанным без оплаты: старая цена действует до 30 августа."""
+    from . import akciya
+    return akciya.to_queue()
 
 
 @app.post("/api/nabormail/tasks", dependencies=AUTH)
