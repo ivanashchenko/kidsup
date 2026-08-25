@@ -125,6 +125,22 @@ td{border-bottom:1px solid #e3e3e3;padding:6px;font-size:13px}
 """
 
 
+def potential(data: dict) -> dict:
+    """Сколько будет начислено, если каждая запись дойдёт до пробного и
+    закончится покупкой в тот же день. Верхняя граница фонда: реальность
+    ляжет ниже, но владельцу нужно понимать масштаб обязательств заранее."""
+    out = {}
+    for who, d in data.items():
+        n = d["count"]
+        if who == "Админ Бураковых":
+            out[who] = {"n": n, "max": n * RATE_TRIAL,
+                        "note": "только за доведённых до пробного"}
+        else:
+            out[who] = {"n": n, "max": n * (RATE_TRIAL + RATE_SAME_DAY),
+                        "note": "пробное + продажа в тот же день"}
+    return out
+
+
 def page(data: dict) -> str:
     order = sorted(data, key=lambda w: -data[w]["count"])
     out = [f"<style>{CSS}</style>", "<h1>Рейтинг администраторов и бонусы</h1>",
@@ -149,6 +165,24 @@ def page(data: dict) -> str:
                f"<td>{sum(data[w]['came'] for w in order)}</td>"
                f"<td>{sum(data[w]['paid'] for w in order)}</td>"
                f"<td class=money>{total:,} ₽</td></tr></table>".replace(",", " "))
+    pot = potential(data)
+    out.append("<h2>Если все дойдут и все купят</h2>"
+               "<div class=sub>Верхняя граница: каждая сделанная запись "
+               "доходит до пробного и заканчивается покупкой в тот же день. "
+               "Реальность ляжет ниже — но так виден масштаб обязательств.</div>"
+               "<table><tr><th>Кто</th><th>Записей</th><th>Максимум</th>"
+               "<th>Из чего</th></tr>")
+    tot_max = 0
+    for w in order:
+        p = pot[w]
+        tot_max += p["max"]
+        out.append(f"<tr><td><b>{w}</b></td><td>{p['n']}</td>"
+                   f"<td class=money>{p['max']:,} ₽</td>"
+                   f"<td class=rate>{p['note']}</td></tr>".replace(",", " "))
+    out.append(f"<tr class=tot><td>Всего</td>"
+               f"<td>{sum(p['n'] for p in pot.values())}</td>"
+               f"<td class=money>{tot_max:,} ₽</td><td></td></tr></table>"
+               .replace(",", " "))
     for w in order:
         d = data[w]
         out.append(f"<h2>{w} — {d['count']} записей, {d['money']} ₽</h2>"
