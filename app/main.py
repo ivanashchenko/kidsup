@@ -2352,7 +2352,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-25.34"
+APP_VERSION = "2026-08-25.35"
 
 
 @app.get("/api/net")
@@ -3568,6 +3568,12 @@ def nabormail_liza(reorder: bool = False):
     from . import db as _db, nabormail
     if reorder:
         q = _j.loads(_db.get_setting("nabormail_queue", "[]") or "[]")
+        # Строки, поставленные до 25.08 14:30, несут канал WABA — её шаблон
+        # ещё на модерации, и такие письма не уходят вовсе. Меняем на обычный
+        # WhatsApp: это адресное сообщение, а не рассылка.
+        for r in q:
+            if (r.get("kind") or "") == "liza" and "wapi" in (r.get("msgr") or []):
+                r["msgr"] = [t if t != "wapi" else "whatsapp" for t in r["msgr"]]
         head = [r for r in q if (r.get("kind") or "nabor") in ("confirm", "liza")]
         rest = [r for r in q if (r.get("kind") or "nabor") not in ("confirm", "liza")]
         _db.set_setting("nabormail_queue", _j.dumps(head + rest, ensure_ascii=False))
