@@ -274,6 +274,18 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
             sent_uids.append(_key(r))
             if r.get("task_id") and not dry_run:
                 close_task(r["task_id"])
+    if not dry_run and stat.get("отказ") and not stat.get("доставлено"):
+        # Ни один канал не принял. Раньше такая строка оставалась первой
+        # и держала всю очередь: каждый заход упирался в неё и уходил
+        # на четырёхминутную паузу. Отодвигаем в конец — остальные идут,
+        # а к ней вернёмся позже, когда канал оживёт.
+        q = json.loads(db.get_setting(QUEUE_KEY, "[]") or "[]")
+        if q:
+            stuck, q = q[0], q[1:]
+            stuck["misses"] = int(stuck.get("misses") or 0) + 1
+            if stuck["misses"] < 4:        # четыре отказа — бросаем совсем
+                q = q + [stuck]
+            db.set_setting(QUEUE_KEY, json.dumps(q, ensure_ascii=False))
     if not dry_run:
         n = len(done) + len(sent_uids)
         pause = random.uniform(300, 720) if n and n % 15 == 0 \
@@ -342,7 +354,10 @@ def liza_to_queue() -> int:
         rows.append({"uid": uid, "phone": phone, "name": (u.get("name") or "").strip(),
                      "seg": _seg(age), "paid": True, "kind": "liza",
                      "task_id": t["id"],
-                     "msgr": wazzup.channels_for(phone, uid=uid, mass=True)})
+                     # адресное письмо конкретному человеку, а не рассылка:
+                     # у mass=True каналом становится WABA, а её шаблон
+                     # ещё на модерации — 25.08 из-за этого очередь встала
+                     "msgr": wazzup.channels_for(phone, uid=uid)})
     # В начало, сразу за подтверждениями: у этих задач срок «сегодня»,
     # а в хвосте двухсотенной очереди они ушли бы к ночи, когда отправлять
     # уже нельзя. Порядок внутри очереди — это и есть приоритет.
