@@ -2375,7 +2375,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-26.16"
+APP_VERSION = "2026-08-26.18"
 
 
 @app.get("/api/net")
@@ -4036,7 +4036,14 @@ def nabormail_skip(uid: int, kind: str = "confirm"):
 
 @app.post("/api/nabormail/send-now", dependencies=AUTH)
 def nabormail_send_now(batch: int = 40, dry: bool = True):
+    """Прогнать очередь. Большой batch — только для сухого предпросмотра.
+
+    При реальной отправке batch зажимается до 1: залп в 40 сообщений
+    за полминуты — подпись рассылочного бота, каналы за такое банят
+    (владелец останавливал это руками 25.08 на сороковом письме)."""
     from . import nabormail
+    if not dry:
+        batch = 1
     return nabormail.tick(dry_run=dry, batch=batch)
 
 

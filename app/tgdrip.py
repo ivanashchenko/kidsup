@@ -108,8 +108,11 @@ def send(rows: list[dict], text_of, dry_run: bool = True,
             hour_start, in_hour = time.time(), 0
         txt = variant(text_of(r), int(r.get("uid") or 0))
         try:
-            ok = wazzup.send_via("tgapi", "", txt, dry_run=dry_run,
-                                 uid=r.get("uid"))
+            # Телефон обязателен: с пустым phone предохранитель слепнет —
+            # otkaz.is_refused("") молчит, суточный лимит не считается,
+            # и капля уходит даже тому, кто письменно отказался.
+            ok = wazzup.send_via("tgapi", r.get("phone") or "", txt,
+                                 dry_run=dry_run, uid=r.get("uid"))
         except Exception as e:  # noqa: BLE001
             log.warning("tgdrip: %s — %s", r.get("name"), type(e).__name__)
             ok = False

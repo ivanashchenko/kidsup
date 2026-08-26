@@ -190,6 +190,21 @@ def _accusative(name: str) -> str:
     return _genitive(name)                        # Марк → Марка, Игорь → Игоря
 
 
+def _ru_date(iso: str) -> str:
+    """«2026-09-01» → «во вторник 1 сентября» — как говорят люди."""
+    from datetime import date as _date
+    try:
+        d = _date.fromisoformat(str(iso)[:10])
+    except Exception:
+        return str(iso)
+    wd = ["в понедельник", "во вторник", "в среду", "в четверг",
+          "в пятницу", "в субботу", "в воскресенье"][d.weekday()]
+    mon = ["", "января", "февраля", "марта", "апреля", "мая", "июня",
+           "июля", "августа", "сентября", "октября", "ноября",
+           "декабря"][d.month]
+    return f"{wd} {d.day} {mon}"
+
+
 def _child_name(full: str) -> str | None:
     """Имя ребёнка из строки CRM или None, если уверенного имени нет."""
     clean = re.sub(r"\([^)]*\)", " ", full or "")
@@ -576,7 +591,11 @@ def _template_for(phone: str, campaign: str) -> str | None:
         tpls = {}
     if not tpls:
         return db.get_setting("waba_template_id") or None
-    if not campaign.startswith("nabor"):
+    # Лагерный шаблон — ТОЛЬКО лагерным кампаниям. До 26.08 сюда падала
+    # любая не-nabor кампания: invite_a/b/v, promo_nedozvon, no1_digest —
+    # и 161 приглашение на праздник ждало одобрения WABA, чтобы уйти
+    # текстом про лагерную смену. Нашёл аудит, клиенты — не успели.
+    if campaign.startswith(("camp", "lager")):
         camp = next((v for k, v in tpls.items() if k.startswith("lager")), None)
         return camp or db.get_setting("waba_template_id") or None
     age = _age_by_phone(phone)
@@ -1321,7 +1340,10 @@ def trial_reminder(mk: MoyklassClient) -> None:
         phone = user.get("phone")
         if not phone:
             continue
-        child = _child_name(user.get("name") or "") or "вашего ребёнка"
+        # винительный падеж: «Викторию ждём», а не «Виктория ждём» —
+        # клиенты уже получали несклонённые письма, это читается как робот
+        nm = _child_name(user.get("name") or "")
+        child = _accusative(nm) if nm else "вашего ребёнка"
         when = f"завтра в {begin}" if begin else "завтра"
         _wa(phone, f"Здравствуйте! Это KidsUP на Бульваре Рокоссовского 🌿\n"
                    f"Напоминаем: {child} ждём на пробном занятии {when}.\n"
@@ -1360,7 +1382,8 @@ def booking_summary(mk: MoyklassClient) -> None:
         phone = user.get("phone")
         if not phone:
             continue
-        child = _child_name(user.get("name") or "") or "вашего ребёнка"
+        nm = _child_name(user.get("name") or "")
+        child = _accusative(nm) if nm else "вашего ребёнка"
         parts = (cls.get("name") or "").split("_")
         when = " · ".join(p for p in parts[1:3] if p) or "время уточним"
         _wa(phone, f"Записали {child} — подтверждаем 🌿\n"
@@ -1713,15 +1736,41 @@ def confirm_joins(mk: MoyklassClient) -> None:
                     past.setdefault(j["userId"], []).append(j)
         except Exception:
             log.warning("подтверждение: история записей недоступна")
+    # Дата первого занятия — своя у каждой группы: 57 групп из 78 стартуют
+    # позже 31 августа, и «занятия начинаются 31 августа» уже путало
+    # клиентов до звонка «вы меня совсем запутали». Тот же приём, что в
+    # письмах акции: одна выборка занятий на весь вызов.
+    first_day: dict = {}
+    if by_user:
+        try:
+            for l in sorted(mk.fetch_all("/v1/company/lessons", ["lessons"],
+                                         params={"date": ["2026-08-31",
+                                                          "2026-09-14"]}) or [],
+                            key=lambda x: str(x.get("date"))):
+                cid = l.get("classId")
+                if cid and cid not in first_day:
+                    first_day[cid] = str(l.get("date"))[:10]
+        except Exception:
+            first_day = {}
+    # Склейка по телефону: два ребёнка — две карточки — один номер.
+    # Группировка по userId слала два письма в одну семью (случалось
+    # 25.08); правильная единица здесь — семья, то есть телефон.
+    by_phone: dict = {}
     for uid, titles in by_user.items():
         try:
             u = mk.get(f"/v1/company/users/{uid}")
         except Exception:
             continue
-        phone = "".join(ch for ch in (u.get("phone") or "") if ch.isdigit())[-10:]
-        if len(phone) != 10:
+        ph = "".join(ch for ch in (u.get("phone") or "") if ch.isdigit())[-10:]
+        if len(ph) != 10:
             continue
-        titles = list(dict.fromkeys(titles))
+        fam = by_phone.setdefault(ph, {"uids": [], "titles": [], "cids": []})
+        fam["uids"].append(uid)
+        fam["titles"] += titles
+        fam["cids"] += fresh_ids.get(uid, [])
+    for phone, fam in by_phone.items():
+        uid = fam["uids"][0]
+        titles = list(dict.fromkeys(fam["titles"]))
         if len(titles) == 1:
             what = f"Подтверждаем запись: {titles[0]}."
         else:
@@ -1729,14 +1778,25 @@ def confirm_joins(mk: MoyklassClient) -> None:
                     + "\n".join(f"• {t}" for t in titles))
         # Продолжающему — ни слова про условно-бесплатное занятие
         # и диагностику: он ходит второй год и то, и другое давно прошёл.
-        mine = past.get(uid, [])
-        cont = all(_continuing(mine, cls, cid) for cid in fresh_ids.get(uid, []))
+        mine = []
+        for fuid in fam["uids"]:
+            mine += past.get(fuid, [])
+        cont = all(_continuing(mine, cls, cid) for cid in fam["cids"])
+        starts = sorted({first_day[c] for c in fam["cids"] if c in first_day})
+        if starts:
+            d0 = starts[0]
+            when_start = (f"Первое занятие — "
+                          f"{_ru_date(d0)}." if len(starts) == 1 else
+                          f"Первые занятия — с {_ru_date(d0)}, "
+                          f"по каждой группе напомним отдельно.")
+        else:
+            when_start = "Учебный год начинается 31 августа."
         ok = _wa(phone, f"Здравствуйте! {what}\n\n" + (
-            f"Занятия начинаются 31 августа, всё как обычно — б-р Маршала "
+            f"{when_start} Всё как обычно — б-р Маршала "
             f"Рокоссовского, 6к1В. Рады, что продолжаете с нами. Если "
             f"что-то поменяется, просто ответьте здесь."
             if cont else
-            f"Занятия начинаются 31 августа. Адрес: б-р Маршала "
+            f"{when_start} Адрес: б-р Маршала "
             f"Рокоссовского, 6к1В (напротив ТЦ «Янтарь»), 2 минуты "
             f"от метро Бульвар Рокоссовского. Первое занятие "
             f"условно-бесплатное, и на нём же бесплатная диагностика — "

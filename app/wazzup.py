@@ -136,6 +136,13 @@ def _pick(chans: list[dict], transport: str) -> dict | None:
 # количество на одного человека ограничено.
 FREE_KINDS = {"reply", "digest", "owner", "apology"}
 DAY_LIMIT = 2            # автосообщений одному человеку в сутки
+# Сервисные виды: подтверждение, напоминание о пробном, догон недозвона.
+# Всё остальное — реклама, и её человеку положено не больше ОДНОЙ в день:
+# два разных конвейера (nabor и akciya) законно укладывались в общий
+# лимит 2 и вдвоём засыпали семью предложениями.
+SERVICE_KINDS = {"confirm", "trial_reminder", "reschedule", "missed",
+                 "booking", "sms"}
+MARKETING_DAY_LIMIT = 1
 HOUR_FROM, HOUR_TO = 9, 20
 
 # Приглашения с датой живут ровно до этой даты. Текст кампании готовится
@@ -155,6 +162,13 @@ EXPIRED = (
     ("праздник начала учебного года", "2026-08-31"),
     ("праздник открытия сезона", "2026-08-31"),
     ("день открытых дверей", "2026-08-31"),
+    # акция «сентябрь по старой цене»: письма заморожены в очереди с
+    # текстом «если оплатить до 31 августа» — 1 сентября они превращаются
+    # в обман, каким бы путём ни дошли до отправки
+    ("оплатить до 31 августа", "2026-09-01"),
+    ("цены прошлого года", "2026-09-01"),
+    ("цене прошлого учебного года", "2026-09-01"),
+    ("цена прошлого учебного года", "2026-09-01"),
 )
 
 
@@ -188,6 +202,12 @@ def guard(phone: str, text: str, kind: str = "",
     p = _msisdn(phone)[-10:]
     if p and p == owner:
         return None                      # владельцу пишем всегда
+    # Без телефона предохранитель слеп: стоп-лист отказов, лимиты и
+    # антидубль считаются по номеру. Ответ в открытый диалог (reply)
+    # пропускаем — там адресат определён самим диалогом; инициирующее
+    # сообщение «в никуда» не выпускаем.
+    if not p and kind not in FREE_KINDS:
+        return "нет телефона — предохранитель не может проверить адресата"
     # Письменный отказ важнее любого сценария. 26.08 семья Муралевых
     # получила подтверждение записи через два дня после просьбы снять
     # бронь: отказ жил только текстом в чате мессенджера, а рассылки
@@ -237,6 +257,16 @@ def guard(phone: str, text: str, kind: str = "",
                              (p, day)).fetchone()[0]
             if n >= DAY_LIMIT:
                 return f"за сегодня уже {n} автосообщения — лимит {DAY_LIMIT}"
+            if kind not in SERVICE_KINDS:
+                m = conn.execute(
+                    "SELECT COUNT(DISTINCT digest) FROM wazzup_guard "
+                    "WHERE phone=? AND day=? AND kind NOT IN "
+                    "('reply','digest','owner','apology','confirm',"
+                    "'trial_reminder','reschedule','missed','booking','sms')",
+                    (p, day)).fetchone()[0]
+                if m >= MARKETING_DAY_LIMIT:
+                    return (f"рекламное сегодня уже уходило ({m}) — "
+                            f"второй рекламы в день не бывает")
     return None
 
 
@@ -416,7 +446,10 @@ def send_via(transport: str, phone: str, text: str, dry_run: bool = True,
     if stop:
         logging.getLogger("kidsup.wazzup").info(
             "предохранитель: %s → %s (%s)", phone[-4:], stop, kind or "auto")
-        return False
+        # None, а не False: вызывающему важно отличать «канал не смог»
+        # (можно пробовать другой канал или позже) от «предохранитель
+        # запретил» (ретраи бессмысленны — причина не в канале)
+        return None
     if transport == "wapi" and template_id is None:
         template_id = db.get_setting("waba_template_id", "") or None
     if transport == "wapi" and not template_id:

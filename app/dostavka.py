@@ -127,6 +127,24 @@ def chase(dry: bool = True, limit: int = 25) -> dict:
         return {"пропуск": f"сейчас {hour}:00, вне окна 9-20"}
     if db.get_setting("sms_on", "0") != "1":
         return {"пропуск": "СМС выключены настройкой sms_on"}
+    # Страховка от мёртвого вебхука: статусы доставки пишет только вебхук
+    # Wazzup (инцидент 19.08 — интеграция МойКласс перехватила адрес, и
+    # статусы не приходили 20 часов). Если за последние часы отправки
+    # есть, а статусов нет ВООБЩЕ — недоставленным выглядит всё подряд,
+    # и догон обзвонил бы СМС половину базы. В такой час не догоняем.
+    with db.get_conn() as conn:
+        try:
+            edge = (_now() - timedelta(hours=3)).isoformat(timespec="seconds")
+            sent_n = conn.execute("SELECT COUNT(*) FROM wazzup_sent "
+                                  "WHERE ts >= ?", (edge,)).fetchone()[0]
+            st_n = conn.execute("SELECT COUNT(*) FROM wazzup_status "
+                                "WHERE ts >= ?", (edge,)).fetchone()[0]
+        except Exception:
+            sent_n, st_n = 0, 1
+    if sent_n >= 5 and st_n == 0:
+        return {"пропуск": f"за 3 часа {sent_n} отправок и ни одного статуса "
+                           f"доставки — вебхук статусов, похоже, мёртв; "
+                           f"догонять СМС по слепым данным нельзя"}
     rows = undelivered(kinds=CHASE_KINDS)[:limit]
     stat = {"недоставлено": len(rows), "смс": 0, "без оплат": 0, "ошибок": 0}
     for r in rows:

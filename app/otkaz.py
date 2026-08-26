@@ -62,6 +62,23 @@ KEEP = re.compile(
     r"|что\s+нам\s+делать|как\s+быть",
     re.I)
 
+# Переезд. Правило владельца 26.08: кто написал или сказал, что переехал,
+# — статус карточки меняется сразу, без ожидания «снимите бронь»: переезд
+# сам по себе означает, что семья не придёт, и звонить ей больше не надо.
+MOVED = re.compile(
+    r"переехал|переезжа|переедем|уеха(ли|въ)|уезжаем\s+(насовсем|навсегда"
+    r"|в\s+друг)|съехал|в\s+друг(ой|ом)\s+город|сменили\s+(город|район"
+    r"|адрес)|живём\s+теперь\s+в|живем\s+теперь\s+в", re.I)
+
+# «Переезжаем на дачу», «уехали в отпуск до сентября» — это не переезд,
+# а сезонная жизнь семьи. Ошибка здесь дороже пропуска: ложный «переехал»
+# выбрасывает живого клиента из воронки, и никто ему больше не позвонит.
+NOT_MOVED = re.compile(
+    r"дач[уае]|отпуск|каникул|отдых|на\s+выходн|к\s+бабушк|на\s+месяц"
+    r"|на\s+недел|до\s+(сентября|осени|конца)|вернемся|вернёмся|вернутся"
+    r"|приедем|временно", re.I)
+
+
 # Имя ребёнка внутри просьбы: «не сможем водить Муралева Андрея на…».
 CHILD = re.compile(
     r"(?:водить|ходить|записать|снять\s+бронь\s+(?:с|у))\s+"
@@ -156,9 +173,18 @@ def _family_phone(chat: str, text: str) -> tuple[str, str, str]:
 
 def note(chat: str, text: str, ts: str = "") -> bool:
     """Записать отказ. True — если это новый отказ."""
-    if not is_refusal(text):
+    t = (text or "")
+    moved = (bool(MOVED.search(t)) and not NOT_MOVED.search(t)
+             and len(t.strip()) >= 8)
+    if not is_refusal(text) and not moved:
         return False
     phone, name, how = _family_phone(chat, text)
+    if moved and phone:
+        try:
+            mark_moved(phone, quote=(text or "")[:200])
+        except Exception as e:
+            log.warning("статус «переехал» не поставился %s: %s",
+                        phone, str(e)[:80])
     key = _is_phone(chat) or str(chat)
     with db.get_conn() as conn:
         _tables(conn)
@@ -194,6 +220,48 @@ def is_refused(phone: str) -> str | None:
     if not row:
         return None
     return (f"клиент отказался {str(row[0])[5:16]}: «{str(row[1])[:60]}»")
+
+
+def mark_moved(phone: str, quote: str = "") -> int:
+    """Семья переехала: сменить статус всем её карточкам.
+
+    Если владелец завёл в CRM статус «Переехал» — используем его; пока
+    его нет, ставим «Отказ» (125957) с причиной 313606 «Ушёл: переехали /
+    обстоятельства» — то же самое по смыслу, и воронка набора чиста.
+    Возвращает число обновлённых карточек."""
+    from . import sync
+    from .moyklass_client import MoyklassClient
+    p = _digits(phone)[-10:]
+    if not p:
+        return 0
+    mk = MoyklassClient(sync.get_api_key())
+    mk.authenticate()
+    n = 0
+    try:
+        st = mk.get("/v1/company/clientStatuses")
+        st = st if isinstance(st, list) else st.get("statuses") or []
+        target = next((x["id"] for x in st
+                       if "переех" in (x.get("name") or "").lower()), 125957)
+        reason = 313606 if target == 125957 else None
+        r = mk.get("/v1/company/users", params={"phone": "7" + p})
+        users = r.get("users") if isinstance(r, dict) else r
+        for u in (users or []):
+            body = {"statusId": target}
+            if reason:
+                body["statusChangeReasonId"] = reason
+            try:
+                mk.post(f"/v1/company/users/{u['id']}/status", body)
+                mk.post("/v1/company/userComments", {
+                    "userId": u["id"], "showToUser": False,
+                    "comment": (f"Переехали — статус изменён автоматически. "
+                                f"Из сообщения: «{quote[:150]}»")[:400]})
+                n += 1
+            except Exception as e:
+                log.warning("статус переехал uid=%s: %s", u.get("id"), str(e)[:80])
+    finally:
+        mk.close()
+    log.info("переезд: %s — обновлено карточек %d", p, n)
+    return n
 
 
 def release(chat: str) -> bool:

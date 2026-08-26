@@ -36,6 +36,7 @@ WhatsApp сюда НЕ входит осознанно: обычный номе�
 from __future__ import annotations
 
 import json
+import threading
 import logging
 import re
 import time
@@ -50,6 +51,12 @@ log = logging.getLogger("kidsup.nabormail")
 SEASON = date(2026, 9, 1)
 QUEUE_KEY = "nabormail_queue"      # что осталось отправить
 DONE_KEY = "nabormail_done"        # кому уже ушло, чтобы не задвоить
+# Один tick за раз. Автопилот зовёт tick() из своего потока ежеминутно,
+# а /api/nabormail/send-now — из потока веб-запроса; оба читают очередь до
+# того, как первый успел записать done, и клиент получает письмо дважды.
+# Процесс один (uvicorn без воркеров), поэтому threading.Lock достаточно.
+_TICK_LOCK = threading.Lock()
+
 NEXT_KEY = "nabormail_next"        # когда разрешена следующая отправка
 BATCH = 1                          # по одному письму за заход — темп живого человека
 MSGR = ("tgapi", "max")            # только мессенджеры: WABA на модерации
@@ -275,6 +282,15 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
     Выходит около тридцати сообщений в час. Двести с лишним писем
     занимают рабочий день целиком — и это правильная цена за то, чтобы
     каналы остались живыми."""
+    if not _TICK_LOCK.acquire(blocking=False):
+        return {"пропуск": "tick уже идёт в другом потоке"}
+    try:
+        return _tick_inner(dry_run=dry_run, batch=batch)
+    finally:
+        _TICK_LOCK.release()
+
+
+def _tick_inner(dry_run: bool = False, batch: int = 1) -> dict:
     import random
     from datetime import datetime, timedelta
 
@@ -314,15 +330,26 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
                or (push_text(r["name"], r["seg"]) if r.get("push")
                    else text_for(r["name"], r["seg"], r["paid"])))
         ok = False
+        guard_stopped = False
         for t in r["msgr"]:
             try:
-                if wazzup.send_via(t, r["phone"], txt, dry_run=dry_run,
-                                   uid=r["uid"],
-                                   kind=r.get("kind") or "nabor"):
+                res = wazzup.send_via(t, r["phone"], txt, dry_run=dry_run,
+                                      uid=r["uid"],
+                                      kind=r.get("kind") or "nabor")
+                if res:
                     stat[t] += 1
                     ok = True
+                elif res is None:
+                    guard_stopped = True
             except Exception as e:
                 log.warning("uid=%s %s: %s", r["uid"], t, str(e)[:90])
+        if not ok and guard_stopped:
+            # предохранитель запретил (отказ клиента, лимит, протухший
+            # текст) — ретраи бессмысленны: убираем строку как сделанную,
+            # причина уже в логе предохранителя
+            sent_uids.append(_key(r))
+            stat["снято предохранителем"] = stat.get("снято предохранителем", 0) + 1
+            continue
         # СМС вдогонку — вторая опора, а не дубль. Решение владельца 25.08:
         # уходит ВСЕГДА, если клиент у нас когда-либо платил, независимо
         # от того, есть ли переписка в мессенджерах. Тем, кто не платил,
@@ -364,9 +391,28 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
         db.set_setting(NEXT_KEY,
                        (now + timedelta(seconds=pause)).isoformat(timespec="seconds"))
         if sent_uids:
-            done |= set(sent_uids)
+            # Слить со свежим состоянием, а не перезаписать своим снимком:
+            # пока шла отправка, другой поток мог доложить строки в очередь
+            # или дописать done — их правки терять нельзя.
+            try:
+                fresh_done = {str(x) for x in
+                              json.loads(db.get_setting(DONE_KEY, "[]") or "[]")}
+            except ValueError:
+                fresh_done = set()
+            done = done | fresh_done | set(sent_uids)
             db.set_setting(DONE_KEY, json.dumps(sorted(done)))
-            left = [r for r in queue if _key(r) not in done]
+            try:
+                fresh_q = json.loads(db.get_setting(QUEUE_KEY, "[]") or "[]")
+            except ValueError:
+                fresh_q = queue
+            seen_keys = set()
+            left = []
+            for r in fresh_q:
+                k = _key(r)
+                if k in done or k in seen_keys:
+                    continue
+                seen_keys.add(k)
+                left.append(r)
             db.set_setting(QUEUE_KEY, json.dumps(left, ensure_ascii=False))
             stat["осталось"] = len(left)
     return dict(stat)
@@ -440,8 +486,9 @@ def liza_to_queue() -> int:
 def close_task(task_id: int) -> None:
     """Закрыть задачу Лизы после того, как сообщение ушло."""
     from .moyklass_client import MoyklassClient
-    mk = MoyklassClient(sync.get_api_key())
+    mk = None
     try:
+        mk = MoyklassClient(sync.get_api_key())
         t = mk.get(f"/v1/company/tasks/{task_id}")
         payload = {k: t.get(k) for k in ("body", "beginDate", "endDate", "isAllDay",
                                          "managerIds", "userId", "classIds",
@@ -453,7 +500,8 @@ def close_task(task_id: int) -> None:
     except Exception as e:
         log.warning("задача %s не закрылась: %s", task_id, str(e)[:80])
     finally:
-        mk.close()
+        if mk is not None:
+            mk.close()
 
 
 # Задачи, где нужно НАПИСАТЬ клиенту. Формулировок много — они копились
@@ -606,6 +654,20 @@ def confirms_to_queue(days=("2026-08-24", "2026-08-25"),
         for j in taskguard.pull_all(mk, "/v1/company/joins", "joins"):
             if j.get("userId") in by_user:
                 past.setdefault(j["userId"], []).append(j)
+        # Дата первого занятия своей группы: «занятия начинаются 31 августа»
+        # верно лишь для двадцати групп из семидесяти восьми, остальным
+        # это уже приносило звонок «вы меня совсем запутали».
+        first_day: dict = {}
+        try:
+            for l in sorted(mk.fetch_all("/v1/company/lessons", ["lessons"],
+                                         params={"date": ["2026-08-31",
+                                                          "2026-09-14"]}) or [],
+                            key=lambda x: str(x.get("date"))):
+                cid = l.get("classId")
+                if cid and cid not in first_day:
+                    first_day[cid] = str(l.get("date"))[:10]
+        except Exception:
+            first_day = {}
         rows = []
         for uid, titles in by_user.items():
             try:
@@ -622,11 +684,21 @@ def confirms_to_queue(days=("2026-08-24", "2026-08-25"),
             # он ходит второй год на то же самое (решение владельца 25.08).
             cont = all(autopilot._continuing(past.get(uid, []), cls, cid)
                        for cid in new_cls.get(uid, []))
-            tail = ("Занятия начинаются 31 августа, всё как обычно — б-р "
+            starts = sorted({first_day[c] for c in new_cls.get(uid, [])
+                             if c in first_day})
+            if starts:
+                w = autopilot._ru_date(starts[0])
+                when_start = (f"Первое занятие — {w}."
+                              if len(starts) == 1 else
+                              f"Первые занятия — с {w}, по каждой группе "
+                              f"напомним отдельно.")
+            else:
+                when_start = "Учебный год начинается 31 августа."
+            tail = (f"{when_start} Всё как обычно — б-р "
                     "Маршала Рокоссовского, 6к1В. Рады, что продолжаете "
                     "с нами. Если что-то поменяется, просто ответьте здесь."
                     if cont else
-                    "Занятия начинаются 31 августа. Адрес: б-р Маршала "
+                    f"{when_start} Адрес: б-р Маршала "
                     "Рокоссовского, 6к1В (напротив ТЦ «Янтарь»), 2 минуты "
                     "от метро Бульвар Рокоссовского. Первое занятие "
                     "условно-бесплатное, и на нём же бесплатная диагностика — "
@@ -650,8 +722,8 @@ def confirms_to_queue(days=("2026-08-24", "2026-08-25"),
         # выбрасывает неотправленные подтверждения и кладёт их заново.
         queue = [r for r in queue if (r.get("kind") or "nabor") != "confirm"]
     else:
-        have = {r["uid"] for r in queue if r.get("text")}
-        rows = [r for r in rows if r["uid"] not in have]
+        have = {f"{r.get('kind') or 'nabor'}:{r['uid']}" for r in queue}
+        rows = [r for r in rows if f"confirm:{r['uid']}" not in have]
     # в начало: подтверждение записи ждать не должно
     db.set_setting(QUEUE_KEY, json.dumps(rows + queue, ensure_ascii=False))
     log.info("подтверждений в очередь: %d", len(rows))
