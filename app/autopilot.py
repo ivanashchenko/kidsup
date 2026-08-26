@@ -551,12 +551,32 @@ def _waba_template_watch() -> dict:
         log.warning("шаблоны WABA недоступны: %s", e)
         return {"ok": False, "ошибка": str(e)[:120]}
     ok = {}
+    from datetime import date as _date
+    today = _date.today().isoformat()
     for t in items:
         if str(t.get("status") or "").lower() not in {"approved", "active", "одобрен"}:
             continue
         name, tid = (t.get("name") or "").strip(), (t.get("id") or t.get("templateId"))
-        if name and tid:
-            ok[name] = str(tid)
+        if not (name and tid):
+            continue
+        # Протухший шаблон в работу не берём. Тело шаблона утверждено Meta
+        # и уходит как есть — guard видит только текст строки очереди,
+        # поэтому срок годности проверяется здесь, при подхвате: одобрение
+        # может прийти через неделю после события, и лагерный шаблон
+        # «24–28 августа» иначе сам встал бы в строй третьего сентября.
+        body = (t.get("text") or t.get("body") or "")
+        try:
+            from . import wabatexts
+            body = body or wabatexts.TEMPLATES.get(name, "")
+        except Exception:
+            pass
+        low = body.lower()
+        dead = next((d for m, d in wazzup.EXPIRED
+                     if m.lower() in low and today >= d), None)
+        if dead:
+            log.info("шаблон %s просрочен с %s — в работу не берём", name, dead)
+            continue
+        ok[name] = str(tid)
     if not ok:
         return {"ok": True, "одобренных_нет": True, "всего_шаблонов": len(items)}
     db.set_setting("waba_templates", json.dumps(ok, ensure_ascii=False))
