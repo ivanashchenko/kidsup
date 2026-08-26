@@ -181,6 +181,14 @@ def collect() -> list[dict]:
 
 
 def send(dry_run: bool = True, limit: int = 0) -> dict:
+    # Приглашать можно только пока смена не началась. 26.08 маме Сутулова
+    # ушло приглашение записаться на смену, которая шла третий день — и
+    # это было ответом на её же вопрос про остаток дня по абонементу.
+    # Такое письмо читается как «нас не слушают», а не как приглашение.
+    from datetime import date
+    if not dry_run and date.today().isoformat() >= LAST_WEEK[0]:
+        log.warning("смена %s уже идёт — приглашения не отправляются", LAST_WEEK[0])
+        return {"остановлено": "смена уже началась, приглашать поздно"}
     rows = json.load(open(f"{SP}/campmail.json"))
     if limit:
         rows = rows[:limit]

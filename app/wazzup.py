@@ -138,6 +138,18 @@ FREE_KINDS = {"reply", "digest", "owner", "apology"}
 DAY_LIMIT = 2            # автосообщений одному человеку в сутки
 HOUR_FROM, HOUR_TO = 9, 20
 
+# Приглашения с датой живут ровно до этой даты. Текст кампании готовится
+# заранее и лежит в очередях, черновиках и списках сразу в нескольких
+# модулях — уследить за всеми путями отправки не выходит. 26.08 маме
+# Сутулова ушло приглашение записаться на смену 24–28 августа, шедшую
+# третий день. Поэтому срок годности проверяется здесь, у самой двери:
+# что бы ни поставило письмо в очередь, просроченное наружу не выйдет.
+EXPIRED = (
+    ("24–28 августа", "2026-08-24"),   # последняя смена лагеря
+    ("24-28 августа", "2026-08-24"),
+    ("ШОУ-БИЗНЕС: В ПОГОНЕ ЗА ПРОДЮСЕРОМ", "2026-08-24"),
+)
+
 
 def _msk() -> "datetime.datetime":
     import datetime as _dt
@@ -169,7 +181,24 @@ def guard(phone: str, text: str, kind: str = "",
     p = _msisdn(phone)[-10:]
     if p and p == owner:
         return None                      # владельцу пишем всегда
+    # Письменный отказ важнее любого сценария. 26.08 семья Муралевых
+    # получила подтверждение записи через два дня после просьбы снять
+    # бронь: отказ жил только текстом в чате мессенджера, а рассылки
+    # ходят по телефонам из CRM и того чата не видели.
+    if kind not in ("reply", "apology", "owner", "digest"):
+        try:
+            from . import otkaz
+            why = otkaz.is_refused(phone)
+            if why:
+                return why
+        except Exception:
+            pass
     now = _msk()
+    if kind not in ("reply", "owner"):
+        today = now.date().isoformat()
+        for marker, dead in EXPIRED:
+            if marker in (text or "") and today >= dead:
+                return f"приглашение просрочено с {dead}: «{marker}»"
     if not (HOUR_FROM <= now.hour < HOUR_TO):
         return f"сейчас {now.hour}:00 — вне окна {HOUR_FROM}-{HOUR_TO}"
     import hashlib

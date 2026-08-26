@@ -2216,6 +2216,15 @@ def _inbox_store(payload: dict) -> None:
                 "VALUES (?, ?, ?, ?)", echoes)
         for ts, phone, chat_type, text, mid in rows:
             _match_click(conn, ts, phone, chat_type)
+    # Отказ ловим в момент получения, а не при следующем разборе: между
+    # просьбой снять бронь и очередной рассылкой бывает меньше часа.
+    for ts, phone, chat_type, text, mid in rows:
+        try:
+            from . import otkaz
+            if otkaz.note(phone, text, ts):
+                log.warning("отказ от %s — автосообщения остановлены", phone)
+        except Exception:
+            pass
 
 
 # --- переходы по кнопкам мессенджеров (номер Roistat) -----------------------
@@ -2366,7 +2375,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-26.05"
+APP_VERSION = "2026-08-26.09"
 
 
 @app.get("/api/net")
@@ -3605,6 +3614,82 @@ def api_guard_stop(off: bool = True):
     """Мгновенный стоп-кран для ВСЕХ автосообщений."""
     db.set_setting("messages_off", "1" if off else "0")
     return {"ok": True, "автосообщения": "остановлены" if off else "включены"}
+
+
+@app.get("/api/otkazy", dependencies=AUTH)
+def api_otkazy():
+    """Кто письменно просил снять бронь — им автоматика не пишет."""
+    from . import otkaz
+    return {"отказов": otkaz.feed()}
+
+
+@app.get("/api/otkazy/check", dependencies=AUTH)
+def api_otkazy_check(phone: str, kind: str = "nabor"):
+    """Уйдёт ли письмо на этот номер прямо сейчас и если нет, то почему.
+
+    Нужен, чтобы проверять предохранитель фактом, а не рассуждением:
+    26.08 мы дважды узнавали о поломке рассылки от самих клиентов."""
+    from . import wazzup
+    why = wazzup.guard(phone, "проверка предохранителя", kind=kind,
+                       transport="whatsapp")
+    return {"телефон": phone, "уйдёт": why is None, "причина": why}
+
+
+@app.post("/api/otkazy/scan", dependencies=AUTH)
+def api_otkazy_scan(hours: int = 720, rebuild: bool = False):
+    """Пройти по входящим и собрать отказы, которые раньше нигде не жили."""
+    from . import otkaz
+    return otkaz.scan(hours=hours, rebuild=rebuild)
+
+
+@app.post("/api/otkazy/release", dependencies=AUTH)
+def api_otkazy_release(chat: str):
+    """Снять стоп-лист — когда клиент сам написал, что передумал.
+
+    Только руками: автоматика не должна решать, что отказ «устарел»."""
+    from . import otkaz
+    otkaz.release(chat)
+    return {"ok": True, "чат": chat, "статус": "снят со стоп-листа"}
+
+
+@app.get("/otkazy", response_class=HTMLResponse, dependencies=AUTH)
+def otkazy_page():
+    """Отказы глазами администратора: кто, когда, дословно и на чём связали."""
+    from . import otkaz
+    import html as _h
+    rows = otkaz.feed()
+    body = []
+    for r in rows:
+        cls = "off" if r["снят"] else "on"
+        who = r["кто"] or "—"
+        ph = ("+7" + r["телефон"]) if r["телефон"] else \
+             f"<span class=warn>чат без телефона ({_h.escape(str(r['чат']))})</span>"
+        body.append(
+            f"<tr class={cls}><td>{_h.escape(str(r['когда'])[:16])}</td>"
+            f"<td>{_h.escape(who)}<br>{ph}</td>"
+            f"<td class=q>«{_h.escape(str(r['цитата'])[:220])}»</td>"
+            f"<td>{_h.escape(r['как связали'] or '—')}</td>"
+            f"<td>{'снят' if r['снят'] else 'не пишем'}</td></tr>")
+    n_live = sum(1 for r in rows if not r["снят"])
+    return f"""<!doctype html><meta charset=utf-8>
+<title>Отказы — KidsUP</title>
+<style>
+body{{font:15px/1.5 system-ui,sans-serif;margin:24px;color:#312783;max-width:1100px}}
+h1{{font-size:22px}} .sub{{color:#666;margin-bottom:18px}}
+table{{border-collapse:collapse;width:100%}}
+td,th{{border-bottom:1px solid #e6e6ef;padding:8px 10px;vertical-align:top;text-align:left}}
+th{{background:#f6f6fb;font-size:13px;color:#555}}
+tr.off{{opacity:.45}} .q{{color:#444;font-style:italic}}
+.warn{{color:#E30613}}
+</style>
+<h1>Отказы: {n_live} семей, которым автоматика не пишет</h1>
+<div class=sub>Сюда попадает всё, где клиент письменно просил снять бронь.
+Пока строка активна, ни одна рассылка этому телефону не уходит — только
+живые ответы администратора. Снять стоп-лист может только человек:
+<code>POST /api/otkazy/release?chat=…</code></div>
+<table><tr><th>Когда</th><th>Кто</th><th>Что написали</th>
+<th>Как связали с семьёй</th><th>Статус</th></tr>
+{''.join(body) or '<tr><td colspan=5>Пока пусто</td></tr>'}</table>"""
 
 
 @app.get("/api/dostavka", dependencies=AUTH)
