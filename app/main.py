@@ -2375,7 +2375,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-26.10"
+APP_VERSION = "2026-08-26.14"
 
 
 @app.get("/api/net")
@@ -3650,6 +3650,115 @@ def api_otkazy_release(chat: str):
     from . import otkaz
     otkaz.release(chat)
     return {"ok": True, "чат": chat, "статус": "снят со стоп-листа"}
+
+
+@app.get("/spiski", response_class=HTMLResponse, dependencies=AUTH)
+def spiski_page():
+    """Три списка обзвона одной страницей — короткий адрес для админов.
+
+    Сами списки лежат в базе знаний под /base/spisok_a|b|c, и это тот
+    адрес, который никто не помнит. 26.08 задачи первичного обзвона были
+    закрыты с отсылкой на app.kidsup.ru/spiski — адреса, которого не
+    существовало, и администраторы упёрлись в 404 в разгар набора.
+
+    Пересчёт трёх списков занимает полторы минуты: он поднимает всю базу
+    клиентов, платежи и звонки. Телефон администратора столько не ждёт —
+    в тот же день Аня увидела вместо страницы «сайт недоступен». Поэтому
+    результат живёт в настройке, а не в памяти процесса: перезапуск не
+    обнуляет его, и утренний заход в смену не упирается в полторы минуты
+    ожидания. Протухший кэш отдаём сразу, а считаем следом — за четверть
+    часа список меняется на единицы строк, и показать их минутой позже
+    безопаснее, чем не показать вовсе."""
+    from . import spiski as S
+    import json as _j
+    import threading
+    import time as _t
+    now = _t.time()
+    raw = db.get_setting("spiski_cache", "") or ""
+    stamp, data = 0.0, None
+    if raw:
+        try:
+            box = _j.loads(raw)
+            stamp, data = float(box.get("ts") or 0), box.get("data")
+        except Exception:
+            stamp, data = 0.0, None
+    age = now - stamp
+    if data and age < 900:
+        return _spiski_html(S, data, int(age / 60))
+    if data:
+        threading.Thread(target=_spiski_refresh, daemon=True).start()
+        return _spiski_html(S, data, int(age / 60))
+    try:
+        data = _spiski_refresh()
+    except Exception as e:
+        return HTMLResponse(
+            f"<meta charset=utf-8><p style='font:16px system-ui;margin:40px'>"
+            f"Списки не собрались: {html.escape(str(e)[:200])}<br><br>"
+            f"Откройте напрямую: <a href='/base/spisok_a'>A</a> · "
+            f"<a href='/base/spisok_b'>B</a> · <a href='/base/spisok_c'>C</a></p>",
+            status_code=200)
+    return _spiski_html(S, data, 0)
+
+
+def _spiski_refresh() -> dict:
+    """Пересчитать списки и положить в настройку. Зовётся и из фона."""
+    import json as _j
+    import time as _t
+    from . import spiski as S
+    data = S.collect()
+    db.set_setting("spiski_cache",
+                   _j.dumps({"ts": _t.time(), "data": data}, ensure_ascii=False))
+    # Заодно перекладываем сами списки: счётчик на /spiski и строки в
+    # /base/spisok_* обязаны сходиться. Пока файлы собирались отдельной
+    # командой, на витрине стояло 82, а внутри лежало 78 — и администратор
+    # не знает, какой цифре верить.
+    try:
+        for k in ("A", "B", "C"):
+            (BASE.parent / "docs" / f"spisok_{k.lower()}.html").write_text(
+                S.page(k, data[k]), encoding="utf-8")
+    except Exception as e:
+        logging.getLogger("kidsup").warning("списки не перезаписались: %s", str(e)[:90])
+    return data
+
+
+def _spiski_html(S, data: dict, age_min: int) -> "HTMLResponse":
+    """Разметка страницы списков. Вынесена, чтобы отдавать и свежий
+    расчёт, и кэш одним и тем же кодом."""
+    cards = []
+    for k in ("A", "B", "C"):
+        title, sub = S.TITLES[k]
+        n = len(data.get(k) or [])
+        cards.append(
+            f"<a class=card href='/base/spisok_{k.lower()}'>"
+            f"<div class=n>{n}</div><div class=t>{html.escape(title)}</div>"
+            f"<div class=s>{html.escape(sub)}</div></a>")
+    return f"""<!doctype html><meta charset=utf-8>
+<meta name=viewport content="width=device-width, initial-scale=1">
+<title>Списки обзвона — KidsUP</title>
+<style>
+body{{font:16px/1.5 system-ui,sans-serif;margin:0;padding:20px;color:#312783;
+     background:#fff;max-width:760px}}
+h1{{font-size:21px;margin:0 0 6px}}
+.sub{{color:#666;font-size:14px;margin-bottom:20px}}
+.card{{display:block;text-decoration:none;color:inherit;border:1px solid #e6e6ef;
+      border-radius:14px;padding:16px 18px;margin-bottom:12px}}
+.card:active{{background:#f6f6fb}}
+.n{{font-size:30px;font-weight:700;color:#1DA7E0;line-height:1}}
+.t{{font-weight:600;margin-top:6px}}
+.s{{color:#666;font-size:14px;margin-top:2px}}
+.foot{{color:#666;font-size:14px;margin-top:22px;border-top:1px solid #e6e6ef;
+      padding-top:14px}}
+a.plain{{color:#1DA7E0}}
+</style>
+<h1>Списки обзвона</h1>
+<div class=sub>Кому за август не звонили ни разу. {"Посчитано только что"
+if not age_min else f"Данные {age_min} мин назад"}: позвонили — человек
+из списка уходит сам.</div>
+{''.join(cards)}
+<div class=foot>Начинать с A: они были у нас этим летом и помнят центр.
+Дальше B, потом C.<br><br>
+Очередь дня и задачи — <a class=plain href="/ochered">app.kidsup.ru/ochered</a><br>
+Кому не пишем — <a class=plain href="/otkazy">app.kidsup.ru/otkazy</a></div>"""
 
 
 @app.get("/otkazy", response_class=HTMLResponse, dependencies=AUTH)
