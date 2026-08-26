@@ -36,7 +36,11 @@ log = logging.getLogger("kidsup.spiski")
 SEASON = date(2026, 9, 1)
 ACTIVE_JOIN = {2, 50509, 58131, 58132, 83760}
 SKIP_STATE = {146328, 125954, 125957}
-CALLED_SINCE = date(2026, 8, 17)
+# Граница «ему уже звонили». Была 17 августа — по началу нынешнего обзвона,
+# но это была наша внутренняя дата, а не факт: 26.08 проверка показала, что
+# тринадцать человек в списках получали звонок в начале августа, и для них
+# «ни разу не звонили» звучало неправдой. Считаем по всему месяцу.
+CALLED_SINCE = date(2026, 8, 1)
 
 _SUBJ = (("_ПШ_", "подготовка к школе"), ("_АЯ_", "английский"),
          ("Первая школа", "раннее развитие"), ("Музыка и речь", "музыка и речь"),
@@ -108,7 +112,9 @@ def collect() -> dict:
             booked.add(j["userId"])
         hist[j["userId"]].append((str(j.get("createdAt") or "")[:10], nm))
 
-    called = set()
+    # {телефон: дата последнего звонка} — дату показываем в листе: знать,
+    # что человеку уже звонили и когда, важнее, чем просто выкинуть его.
+    called: dict = {}
     for dd in range((date.today() - CALLED_SINCE).days + 1):
         day = CALLED_SINCE + timedelta(days=dd)
         try:
@@ -120,7 +126,7 @@ def collect() -> dict:
             n = (r.get("to_num") if r.get("from_ext") else r.get("from_num")) or ""
             x = "".join(c for c in str(n) if c.isdigit())[-10:]
             if len(x) == 10:
-                called.add(x)
+                called[x] = day.isoformat()
 
     out = {"A": [], "B": [], "C": []}
     for u in users:
@@ -130,7 +136,7 @@ def collect() -> dict:
             continue
         phone = "".join(c for c in str(u.get("phone") or "") if c.isdigit())[-10:]
         if len(phone) != 10 or phone in called:
-            continue
+            continue          # в этом месяце уже звонили — в список не берём
         cat = "A" if d >= "2026-06-01" else "B" if d >= "2025-09-01" else "C"
         bd = next((a.get("value") for a in (u.get("attributes") or [])
                    if a.get("attributeAlias") == "birthday"), None)
