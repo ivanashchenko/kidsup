@@ -856,6 +856,11 @@ DOC_GROUPS = [
         ("spisok_b", "📗 Список B — ходили в 2025/26 учебном году",
          "163 семьи: занимались весь прошлый год и просто не продлили. "
          "Разговор простой — «продолжаем?». Конверсия вдвое выше холодных"),
+        ("spisok_b_lena", "📗 Список B — половина Лены",
+         "Чётные строки списка B: Лена звонит только по ним, Ира — по своей "
+         "половине. Деление не плывёт при пересчёте"),
+        ("spisok_b_ira", "📗 Список B — половина Иры",
+         "Нечётные строки списка B: половина Иры. Вторая половина — у Лены"),
         ("spisok_c", "📘 Список C — 2024/25 и лето 2025",
          "299 семей: год и больше не были. Нужен повод вернуться — "
          "новый педагог, новое направление, другое расписание"),
@@ -2380,7 +2385,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.07"
+APP_VERSION = "2026-08-27.09"
 
 
 @app.get("/api/net")
@@ -3882,6 +3887,14 @@ def _spiski_refresh() -> dict:
         for k in ("A", "B", "C"):
             (BASE.parent / "docs" / f"spisok_{k.lower()}.html").write_text(
                 S.page(k, data[k]), encoding="utf-8")
+        # Список B делится пополам между Леной и Ирой (решение владельца
+        # 27.08): чёт/нечёт вместо «сверху и снизу» — так деление не
+        # плывёт при пересчёте и никто не звонит по чужой половине.
+        rows_b = data.get("B") or []
+        (BASE.parent / "docs" / "spisok_b_lena.html").write_text(
+            S.page("B", rows_b[0::2]), encoding="utf-8")
+        (BASE.parent / "docs" / "spisok_b_ira.html").write_text(
+            S.page("B", rows_b[1::2]), encoding="utf-8")
     except Exception as e:
         logging.getLogger("kidsup").warning("списки не перезаписались: %s", str(e)[:90])
     return data
@@ -3923,6 +3936,9 @@ if not age_min else f"Данные {age_min} мин назад"}: позвони
 {''.join(cards)}
 <div class=foot>Начинать с A: они были у нас этим летом и помнят центр.
 Дальше B, потом C.<br><br>
+Список B поделён пополам, чтобы не звонить по одним номерам:
+<a class=plain href="/base/spisok_b_lena">половина Лены</a> ·
+<a class=plain href="/base/spisok_b_ira">половина Иры</a><br><br>
 Очередь дня и задачи — <a class=plain href="/ochered">app.kidsup.ru/ochered</a><br>
 Кому не пишем — <a class=plain href="/otkazy">app.kidsup.ru/otkazy</a></div>"""
 

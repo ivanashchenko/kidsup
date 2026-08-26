@@ -363,7 +363,7 @@ body.js .reveal.in{opacity:1;transform:none}
   <div class="wrap">
     <div>
       <div class="badge-row">
-        <span class="badge hot">До 31 августа — цены прошлого года</span>
+        <span class="badge hot" id="offer-badge">До 31 августа — цены прошлого года</span>
         <span class="badge">от 1,3 до 12 лет</span>
         <span class="badge">группы 6–8 детей</span>
         <span class="badge" id="live-enrolled" hidden></span>
@@ -386,8 +386,8 @@ body.js .reveal.in{opacity:1;transform:none}
       <p class="hero-geo">📍 б-р Маршала Рокоссовского, 6 к1В · 2 минуты от метро
       Бульвар Рокоссовского · напротив ТЦ «Янтарь»</p>
     </div>
-    <div class="hero-card">
-      <h3>⏳ Старые цены действуют ещё</h3>
+    <div class="hero-card" id="offer-card">
+      <h3 id="offer-title">⏳ Старые цены действуют ещё</h3>
       <div class="count" id="cnt">
         <div><b id="cd">–</b><span>дней</span></div>
         <div><b id="ch">–</b><span>часов</span></div>
@@ -1366,6 +1366,17 @@ body.js .reveal.in{opacity:1;transform:none}
     </div>
   </div>
 </section>
+<section id="team-call" style="display:none">
+  <div class="wrap">
+    <h2>Кто возьмёт трубку</h2>
+    <div class="t-grid">
+      <div class="tcard"><span class="av"><img src="/static/img/adm_anya.jpg" alt="Аня" loading="lazy"></span><h3>Аня</h3><p>Знает расписание наизусть и подберёт группу за один звонок.</p></div>
+      <div class="tcard"><span class="av"><img src="/static/img/adm_lena.jpg" alt="Лена" loading="lazy"></span><h3>Лена</h3><p>Поможет собрать несколько занятий в один вечер.</p></div>
+      <div class="tcard"><span class="av"><img src="/static/img/adm_ira.jpg" alt="Ира" loading="lazy"></span><h3>Ира</h3><p>Ответит на вопросы по оплате и абонементам.</p></div>
+      <div class="tcard"><span class="av"><img src="/static/img/adm_liza.jpg" alt="Лиза" loading="lazy"></span><h3>Лиза</h3><p>На связи в WhatsApp и Telegram каждый день.</p></div>
+    </div>
+  </div>
+</section>
 <section id="founder" style="display:none">
   <div class="wrap">
     <h2>Основатель</h2>
@@ -1547,7 +1558,7 @@ document.getElementById('lead').addEventListener('submit', async e => {
       try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
       e.target.setAttribute('role', 'status'); e.target.setAttribute('aria-live', 'polite');
       e.target.innerHTML = '<div class="done"><h3>✅ Заявка отправлена!</h3>' +
-        '<p>Администратор позвонит вам в ближайшее время — в рабочие часы обычно в течение 15 минут.</p>' +
+        '<p>Вам перезвонит администратор — Аня, Лена или Ира — в рабочие часы обычно в течение 15 минут. Если удобнее вечером, просто скажите ей об этом.</p>' +
         '<p>Не хочется ждать звонка? Напишите нам:</p>' +
         '<a class="btn btn-green" href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">WhatsApp</a>' +
         '<a class="btn btn-line" href="https://app.kidsup.ru/go/telegram?src=site" target="_blank" rel="noopener">Telegram</a></div>';
@@ -1927,5 +1938,40 @@ document.querySelectorAll('.mini-lead').forEach(function(f){
   <a href="https://app.kidsup.ru/go/whatsapp?src=site_bar&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D1%83%D0%B7%D0%BD%D0%B0%D1%82%D1%8C%20%D0%BF%D1%80%D0%BE%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D1%8F" target="_blank" rel="noopener">💬 WhatsApp</a>
   <a class="sb-main" href="#signup">Записаться</a>
 </div>
+
+<script>
+window.__applyOffer = function(today){
+  // Оффер живёт по календарю сам: после 31.08 счётчик и «цены прошлого
+  // года» умирают, их место занимает Неделя открытых уроков (по 6.09),
+  // после — вечнозелёное условно-бесплатное занятие. Функция принимает
+  // дату параметром, чтобы переключение можно было проверить тестом,
+  // не подменяя Date всему документу.
+  var y = today.getFullYear();
+  function d(m,day){ return new Date(y, m-1, day, 23,59,59); }
+  var badge=document.getElementById('offer-badge'),
+      card=document.getElementById('offer-card'),
+      title=document.getElementById('offer-title'),
+      cnt=document.getElementById('cnt');
+  if(!badge||!card) return 'нет элементов';
+  if (today <= d(8,31)) return 'старые цены';
+  if (today <= d(9,6)) {
+    badge.textContent='Неделя открытых уроков — до 6 сентября';
+    title.textContent='📚 Неделя открытых уроков';
+    if(cnt) cnt.hidden=true;
+    card.querySelector('.note').innerHTML='До 6 сентября можно прийти на обычное '+
+      'занятие своей группы. Первое занятие — условно-бесплатное: не понравится — '+
+      'платить не нужно.';
+    return 'неделя уроков';
+  }
+  badge.textContent='Первое занятие — условно-бесплатное';
+  title.textContent='🌿 Присоединяйтесь в течение года';
+  if(cnt) cnt.hidden=true;
+  card.querySelector('.note').innerHTML='Группы идут весь учебный год — '+
+    'присоединиться можно в любой месяц. Первое занятие условно-бесплатное, '+
+    'с диагностикой уровня от педагога.';
+  return 'вечнозелёный';
+};
+window.__applyOffer(new Date());
+</script>
 </body>
 </html>
