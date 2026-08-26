@@ -323,6 +323,21 @@ def tick(dry_run: bool = False, batch: int = 1) -> dict:
                     ok = True
             except Exception as e:
                 log.warning("uid=%s %s: %s", r["uid"], t, str(e)[:90])
+        # СМС вдогонку — вторая опора, а не дубль. Решение владельца 25.08:
+        # уходит ВСЕГДА, если клиент у нас когда-либо платил, независимо
+        # от того, есть ли переписка в мессенджерах. Тем, кто не платил,
+        # не шлём никогда: это подпадает под закон о рекламе.
+        if r.get("sms") and r.get("sms_text") and not dry_run:
+            try:
+                from . import mango
+                if db.get_setting("sms_on", "0") == "1":
+                    if mango.send_sms(r["phone"], r["sms_text"]):
+                        stat["смс"] = stat.get("смс", 0) + 1
+                else:
+                    stat["смс выключены"] = stat.get("смс выключены", 0) + 1
+            except Exception as e:
+                stat["смс — ошибка"] = stat.get("смс — ошибка", 0) + 1
+                log.warning("СМС %s: %s", r["phone"][-4:], str(e)[:80])
         stat["доставлено" if ok else "отказ"] += 1
         if ok:
             sent_uids.append(_key(r))

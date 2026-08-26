@@ -35,7 +35,10 @@ log = logging.getLogger("kidsup.akciya")
 
 ACTIVE_JOIN = {2, 50509, 58131, 58132, 83760}
 SKIP_STATE = {146328, 125954, 125957}
-DEADLINE = "30 августа"
+# Владелец 26.08 назвал 31-е — и это совпадает с тем, что администраторы
+# уже говорят в разговорах и что написано на сайте. Держим одну дату везде:
+# разъехавшийся на день дедлайн выглядит как обман, а не как мелочь.
+DEADLINE = "31 августа"
 
 # Цены сверены с прайсом на 25.08.2026: слева цена прошлого учебного года
 # (действует по 30 августа), справа — с 1 сентября. Восемь занятий, то есть
@@ -220,6 +223,7 @@ def text_for(row: dict) -> str:
 def to_queue() -> dict:
     """Поставить письма в общую очередь отправки — тем же спокойным темпом."""
     rows = collect()
+    paid_ever = ever_paid_ids()
     done = {str(x) for x in json.loads(db.get_setting("nabormail_done", "[]") or "[]")}
     queue = json.loads(db.get_setting("nabormail_queue", "[]") or "[]")
     have = {f"{r.get('kind') or 'nabor'}:{r['uid']}" for r in queue}
@@ -230,13 +234,39 @@ def to_queue() -> dict:
             continue
         fresh.append({"uid": r["uid"], "phone": r["phone"], "name": r["name"],
                       "seg": "?", "paid": True, "kind": "akciya",
-                      "text": text_for(r),
+                      "text": text_for(r), "sms": r["uid"] in paid_ever,
+                      "sms_text": sms_text(r),
                       "msgr": wazzup.channels_for(r["phone"], uid=r["uid"])})
     # в самое начало: у письма есть срок, и он ближе всех остальных
     db.set_setting("nabormail_queue",
                    json.dumps(fresh + queue, ensure_ascii=False))
     log.info("акция: поставлено %d писем", len(fresh))
     return {"записаны без оплаты": len(rows), "поставлено в очередь": len(fresh)}
+
+
+def sms_text(row: dict) -> str:
+    """Короткая СМС вдогонку — два сегмента вместо пяти.
+
+    Дублировать мессенджер целиком нельзя: длинный текст кириллицей это
+    пять сегментов и 12 ₽ за штуку. Оставляем только то, без чего человек
+    не дойдёт: что место держим, до какого числа старая цена и куда звонить."""
+    return ("KidsUP: место для вашего ребёнка держим. "
+            f"До {DEADLINE} сентябрь по цене прошлого года. "
+            "Оплата в центре или переводом: 4951209024")
+
+
+def ever_paid_ids() -> set:
+    """Кто хоть когда-то у нас платил. СМС уходит только им — решение
+    владельца от 25.08: тем, кто не платил, СМС не шлём никогда, это
+    подпадает под закон о рекламе."""
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        subs = taskguard.pull_all(mk, "/v1/company/userSubscriptions",
+                                  "subscriptions", cache_hours=6)
+    finally:
+        mk.close()
+    return {s["userId"] for s in subs
+            if (s.get("stats") or {}).get("totalPayed", 0) > 0}
 
 
 def main():
