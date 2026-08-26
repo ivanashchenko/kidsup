@@ -2375,7 +2375,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-26.14"
+APP_VERSION = "2026-08-26.16"
 
 
 @app.get("/api/net")
@@ -3159,6 +3159,104 @@ async def api_waba_pick(payload: dict = None):
     то же, что автопилот делает раз в пять минут."""
     from . import autopilot
     return autopilot._waba_template_watch()
+
+
+@app.get("/api/prelaunch", dependencies=AUTH)
+def api_prelaunch():
+    """Предполётный чек рассылок: одна страница вместо десяти проверок.
+
+    Появился 26.08 после дня, когда сбои находили клиенты, а не мы.
+    Каждый пункт — то, что в этот день сработало или должно было
+    сработать. Вердикт «можно включать» значит: все автосообщения
+    пройдут через предохранитель и ни одно из известных настоящему
+    моменту протухших не уйдёт."""
+    from . import dostavka, otkaz, wazzup
+    from datetime import date as _d
+    blockers, warns = [], []
+    # 1. стоп-кран
+    off = db.get_setting("messages_off", "0") == "1"
+    # 2. здоровье каналов за 4 часа
+    try:
+        health = dostavka.channel_health(hours=4)
+    except Exception as e:
+        health = []
+        warns.append(f"здоровье каналов не посчиталось: {str(e)[:80]}")
+    for h in health:
+        if h.get("всего", 0) >= 5 and h.get("доля", 100) < 60:
+            blockers.append(f"канал {h['transport']}: доходит {h['доля']}% — сначала чинить канал")
+    # 3. очередь nabormail: размер и дубли
+    try:
+        q = json.loads(db.get_setting("nabormail_queue", "[]") or "[]")
+        seen, dups = set(), 0
+        for x in q:
+            k = f"{x.get('kind') or 'nabor'}:{x.get('uid')}"
+            dups += k in seen
+            seen.add(k)
+        if dups:
+            blockers.append(f"в очереди nabormail {dups} дублей")
+    except Exception:
+        q = []
+    # 4. протухшие тексты в broadcast_queue: прогоняем маркеры EXPIRED
+    stale = 0
+    today = _d.today().isoformat()
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute("SELECT id, text FROM broadcast_queue "
+                                "WHERE status='pending'").fetchall()
+        except Exception:
+            rows = []
+        for rid, text in rows:
+            low = (text or "").lower()
+            if any(m.lower() in low and today >= dead
+                   for m, dead in wazzup.EXPIRED):
+                stale += 1
+    if stale:
+        warns.append(f"{stale} pending-писем уже режутся маркерами EXPIRED — "
+                     f"похоронить через /api/broadcast/cancel-campaign")
+    # 5. стоп-лист отказов
+    try:
+        ref = [r for r in otkaz.feed() if not r["снят"]]
+        unlinked = [r for r in ref if not r["телефон"]]
+        if unlinked:
+            blockers.append(f"{len(unlinked)} отказов не связаны с телефоном — "
+                            f"их семьи не защищены: app.kidsup.ru/otkazy")
+    except Exception as e:
+        blockers.append(f"стоп-лист отказов не читается: {str(e)[:80]}")
+        ref = []
+    # 6. отправители
+    senders = db.get_setting("wa_senders", "") or ""
+    blocked = db.get_setting("blocked_senders", "") or ""
+    for num in [x.strip() for x in senders.split(",") if x.strip()]:
+        if num in blocked or f"{num}:whatsapp" in blocked:
+            blockers.append(f"номер {num} стоит и в wa_senders, и в blocked_senders")
+    verdict = "можно включать" if not blockers else "НЕ включать"
+    return {"вердикт": verdict,
+            "стоп-кран": "включён (сообщения стоят)" if off else "снят (сообщения идут)",
+            "блокеры": blockers, "предупреждения": warns,
+            "каналы за 4ч": health,
+            "очередь nabormail": len(q),
+            "отказов в стоп-листе": len(ref),
+            "sms_on": db.get_setting("sms_on", "0") == "1",
+            "отправители": senders}
+
+
+@app.post("/api/broadcast/cancel-campaign", dependencies=AUTH)
+async def api_broadcast_cancel_campaign(payload: dict = Body(...)):
+    """Отменить все неотправленные письма кампании. Насовсем.
+
+    Появилось 26.08: в очереди лежали 290 приглашений в лагерь «ещё
+    можно успеть» — за два дня до конца смены. Их держал только
+    выключатель broadcast_transports=off, то есть одно неосторожное
+    включение рассылки отправило бы все 290. Протухшую кампанию надо
+    хоронить, а не ставить на паузу."""
+    camp = str((payload or {}).get("campaign") or "").strip()
+    if not camp:
+        raise HTTPException(400, "нужна campaign")
+    with db.get_conn() as conn:
+        n = conn.execute(
+            "UPDATE broadcast_queue SET status='cancelled' "
+            "WHERE status='pending' AND campaign=?", (camp,)).rowcount
+    return {"ok": True, "кампания": camp, "отменено": n}
 
 
 @app.post("/api/broadcast/hold", dependencies=AUTH)

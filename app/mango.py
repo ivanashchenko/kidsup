@@ -257,6 +257,19 @@ def send_sms(phone: str, text: str, from_ext: str = "12") -> bool:
     num = "".join(ch for ch in phone if ch.isdigit())
     if len(num) == 10:
         num = "7" + num
+    # СМС проходит тот же предохранитель, что и мессенджеры. До 26.08 у неё
+    # не было НИ ОДНОЙ общей проверки: вызывающие смотрели каждый своё
+    # (оплату, sms_on), но стоп-кран, стоп-лист отказов, окно времени,
+    # суточный лимит и антидубль жили только в wazzup.guard — и СМС «идёт
+    # набор групп» могла уйти клиенту, который письменно попросил снять
+    # бронь. Один канал — одна дверь.
+    from . import wazzup as _wz
+    stop = _wz.guard(num, text, kind="sms", transport="sms")
+    if stop:
+        import logging
+        logging.getLogger("kidsup.mango").info(
+            "СМС %s не ушла: %s", num[-4:], stop)
+        return False
     # Имя отправителя, выбранное в ЛК (USLUGI_MT), на API-отправки само
     # не действует — 24.08 тест пришёл по-прежнему от «MDeveloper».
     # Передаём имя явно; настройка sms_sender_name позволяет сменить его
@@ -268,7 +281,9 @@ def send_sms(phone: str, text: str, from_ext: str = "12") -> bool:
                                "to_number": num, "text": text[:480],
                                "sms_sender": sender})
     ok = r.status_code == 200 and '"result":1000' in r.text
-    if not ok:
+    if ok:
+        _wz.guard_note(num, text, kind="sms", transport="sms")
+    else:
         import logging
         logging.getLogger("kidsup.mango").warning(
             "sms %s: %s %s", num[-4:], r.status_code, r.text[:120])

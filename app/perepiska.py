@@ -132,17 +132,17 @@ def _yesterday_subjects() -> dict[str, str]:
 
 
 def _price_block(subject: str) -> str:
-    """Строки прайса по предмету. Две цены: до 30.08 и после."""
+    """Строки прайса по предмету. Две цены: до 31.08 включительно и после."""
     from .main import PRICES
     block = PRICES.get(subject)
     if not block:
         return ""
-    early = date.today() <= date(2026, 8, 30)
+    early = date.today() <= date(2026, 8, 31)
     out = [f"{subject}:"]
     for name, p_early, p_late in block["lines"]:
         out.append(f"- {name} — {(p_early if early else p_late):,} ₽".replace(",", " "))
     if early:
-        out.append("До 30 августа действуют цены прошлого года.")
+        out.append("До 31 августа включительно действуют цены прошлого года.")
     return "\n".join(out)
 
 
