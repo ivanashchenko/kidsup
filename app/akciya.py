@@ -123,16 +123,34 @@ def collect() -> list[dict]:
         rc = mk.get("/v1/company/classes", {"limit": 500})
         cls = {c["id"]: (c.get("name") or "")
                for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+        # Дата ПЕРВОГО занятия каждой группы. 26.08 клиент позвонил
+        # и сказал прямым текстом: «я ничего не понимаю, когда мне
+        # приходить» — в письме стояло «занятия начинаются 31 августа»,
+        # а его группа стартует 2 сентября. Из 78 групп 57 начинаются
+        # позже 31-го, так что общая фраза врала большинству.
+        first_day = {}
+        try:
+            for l in sorted(mk.fetch_all("/v1/company/lessons", ["lessons"],
+                                         params={"date": ["2026-08-31",
+                                                          "2026-09-14"]}) or [],
+                            key=lambda x: str(x.get("date"))):
+                cid = l.get("classId")
+                if cid and cid not in first_day:
+                    first_day[cid] = str(l.get("date"))[:10]
+        except Exception:
+            first_day = {}
     finally:
         mk.close()
 
     mine: dict = defaultdict(list)
+    starts: dict = defaultdict(list)
     for j in joins:
         nm = cls.get(j.get("classId"), "")
         if not nm.startswith("2627") or "аявк" in nm.lower():
             continue
         if j.get("statusId") in ACTIVE_JOIN:
             mine[j["userId"]].append(nm)
+            starts.setdefault(j["userId"], []).append(first_day.get(j.get("classId")))
     paid = {s["userId"] for s in subs
             if (s.get("stats") or {}).get("totalPayed", 0) > 0
             and (s.get("beginDate") or "")[:10] >= "2026-08-01"}
@@ -148,9 +166,10 @@ def collect() -> list[dict]:
         if len(phone) != 10:
             continue
         groups = list(dict.fromkeys(groups))
+        days = sorted(d for d in starts.get(uid, []) if d)
         out.append({"uid": uid, "phone": phone,
                     "name": (u.get("name") or "").strip(),
-                    "groups": groups})
+                    "groups": groups, "start": days[0] if days else None})
     # Семья с двумя детьми — это два клиента в CRM и ОДИН телефон.
     # 25.08 предпросмотр показал, что маме ушли бы два письма подряд,
     # почти одинаковых, — ровно то, на что в этот же день жаловались
@@ -163,6 +182,8 @@ def collect() -> list[dict]:
             by_phone[r["phone"]] = r
         else:
             cur["kids"].append({"name": r["name"], "groups": r["groups"]})
+            if r.get("start") and (not cur.get("start") or r["start"] < cur["start"]):
+                cur["start"] = r["start"]
             cur["groups"] = list(dict.fromkeys(cur["groups"] + r["groups"]))
     return list(by_phone.values())
 
@@ -209,9 +230,22 @@ def text_for(row: dict) -> str:
         money = ("\n\nПо стоимости всё расскажем при оплате — у этого "
                  "направления абонемент считается индивидуально.")
 
+    # Дату называем ЕГО группы, а не общую: «занятия начинаются 31 августа»
+    # верно только для двадцати групп из семидесяти восьми.
+    st = row.get("start")
+    if st:
+        wd = ["понедельник", "вторник", "среду", "четверг",
+              "пятницу", "субботу", "воскресенье"][
+            __import__("datetime").date.fromisoformat(st).weekday()]
+        mon = ["", "января", "февраля", "марта", "апреля", "мая", "июня",
+               "июля", "августа", "сентября", "октября", "ноября",
+               "декабря"][int(st[5:7])]
+        when_start = (f"Первое занятие — в {wd} {int(st[8:10])} {mon}.")
+    else:
+        when_start = "Учебный год начинается 31 августа."
     return (f"Здравствуйте! Место для {who} на новый учебный год мы держим:\n\n"
             f"{what}\n\n"
-            f"Занятия начинаются 31 августа."
+            f"{when_start}"
             f"{money}\n\n"
             f"Если оплатить до {DEADLINE} включительно, сентябрь пойдёт "
             f"по старой цене. Оплатить можно в центре или переводом — "
