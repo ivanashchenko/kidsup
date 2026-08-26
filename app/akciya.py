@@ -121,8 +121,9 @@ def collect() -> list[dict]:
         users = {u["id"]: u for u in
                  taskguard.pull_all(mk, "/v1/company/users", "users", cache_hours=2)}
         rc = mk.get("/v1/company/classes", {"limit": 500})
-        cls = {c["id"]: (c.get("name") or "")
-               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+        _classes = (rc.get("classes") if isinstance(rc, dict) else rc)
+        cls = {c["id"]: (c.get("name") or "") for c in _classes}
+        caps = {c["id"]: c.get("maxStudents") for c in _classes}
         # Дата ПЕРВОГО занятия каждой группы. 26.08 клиент позвонил
         # и сказал прямым текстом: «я ничего не понимаю, когда мне
         # приходить» — в письме стояло «занятия начинаются 31 августа»,
@@ -144,6 +145,8 @@ def collect() -> list[dict]:
 
     mine: dict = defaultdict(list)
     starts: dict = defaultdict(list)
+    classes_of: dict = defaultdict(list)
+    conflicts: list = []
     for j in joins:
         nm = cls.get(j.get("classId"), "")
         if not nm.startswith("2627") or "аявк" in nm.lower():
@@ -151,9 +154,21 @@ def collect() -> list[dict]:
         if j.get("statusId") in ACTIVE_JOIN:
             mine[j["userId"]].append(nm)
             starts.setdefault(j["userId"], []).append(first_day.get(j.get("classId")))
+            classes_of[j["userId"]].append(j.get("classId"))
     paid = {s["userId"] for s in subs
             if (s.get("stats") or {}).get("totalPayed", 0) > 0
             and (s.get("beginDate") or "")[:10] >= "2026-08-01"}
+    # Группы, где записей БОЛЬШЕ, чем мест. 26.08 письмо пообещало семье
+    # «место держим» на слот логопеда, куда тремя днями позже записали
+    # другого ребёнка и первую запись не сняли. Обещание места — то, за что
+    # мы отвечаем лицом, поэтому по спорным группам письмо не уходит вовсе:
+    # пусть их сперва разведёт человек.
+    seats: dict = defaultdict(int)
+    for j in joins:
+        if j.get("statusId") in ACTIVE_JOIN:
+            seats[j.get("classId")] += 1
+    overbooked = {c for c, n in seats.items()
+                  if caps.get(c) and n > caps[c]}
 
     out = []
     for uid, groups in mine.items():
@@ -164,6 +179,10 @@ def collect() -> list[dict]:
             continue
         phone = "".join(c for c in str(u.get("phone") or "") if c.isdigit())[-10:]
         if len(phone) != 10:
+            continue
+        if any(c in overbooked for c in classes_of.get(uid, [])):
+            conflicts.append({"uid": uid, "name": (u.get("name") or "").strip(),
+                              "groups": list(dict.fromkeys(groups))})
             continue
         groups = list(dict.fromkeys(groups))
         days = sorted(d for d in starts.get(uid, []) if d)
@@ -185,6 +204,9 @@ def collect() -> list[dict]:
             if r.get("start") and (not cur.get("start") or r["start"] < cur["start"]):
                 cur["start"] = r["start"]
             cur["groups"] = list(dict.fromkeys(cur["groups"] + r["groups"]))
+    if conflicts:
+        log.warning("спорных групп — писем не отправлено: %d", len(conflicts))
+    collect.conflicts = conflicts
     return list(by_phone.values())
 
 
