@@ -310,6 +310,32 @@ body.js .reveal.in{opacity:1;transform:none}
 .wk-card b{color:var(--indigo)}
 .wk-sum{font:700 1.05rem Rubik;color:var(--indigo);margin-top:.8rem}
 .wk-note{color:var(--muted);font-size:.85rem}
+
+.age-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:1.1rem 0 .3rem}
+.age-lbl{font:700 .95rem Rubik;color:var(--indigo)}
+.age-chip{display:inline-block;border:2px solid var(--blue);color:var(--blue);
+  background:#fff;border-radius:999px;padding:.5rem 1.15rem;font:800 1.02rem Rubik;
+  text-decoration:none;transition:all .15s}
+.age-chip:hover{background:var(--blue);color:#fff;transform:translateY(-1px)}
+.hero-geo{color:var(--muted);font-size:.88rem;margin-top:.9rem}
+.mini-lead{background:var(--soft);border-radius:16px;padding:16px 18px;margin:1.6rem 0 0;
+  display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mini-lead b{font:700 1rem Rubik;color:var(--indigo);flex-basis:100%}
+.mini-lead input{flex:1 1 190px;border:1px solid #d6d3ea;border-radius:10px;
+  padding:.7rem .9rem;font:400 1rem Inter,system-ui}
+.mini-lead button{border:0;background:var(--green);color:#fff;border-radius:10px;
+  padding:.7rem 1.4rem;font:700 .95rem Rubik;cursor:pointer}
+.mini-lead .ok-msg{color:var(--green-ink,#2e7d32);font-weight:700}
+.stickybar{display:none}
+@media(max-width:760px){
+  .stickybar{position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;
+    background:#fff;box-shadow:0 -4px 18px rgba(49,39,131,.16)}
+  .stickybar a{flex:1;text-align:center;padding:.85rem .3rem;font:700 .84rem Rubik;
+    text-decoration:none;color:var(--indigo)}
+  .stickybar a.sb-main{background:var(--green);color:#fff}
+  body{padding-bottom:52px}
+  .fab{bottom:132px}
+}
 </style>
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "ChildCare", "name": "KidsUP", "alternateName": "Детский центр и английский сад KidsUP", "description": "Детский центр и английский сад на Бульваре Рокоссовского: подготовка к школе, английский по программе Cambridge, раннее развитие, мини-сад и нулевой класс, логопед, ИЗО, шахматы, ментальная арифметика. Дети от 1,3 до 12 лет.", "url": "https://kidsup.ru", "telephone": "+74951209024", "address": {"@type": "PostalAddress", "streetAddress": "бульвар Маршала Рокоссовского, 6к1В", "addressLocality": "Москва", "addressRegion": "Москва", "addressCountry": "RU"}, "areaServed": [{"@type": "Place", "name": "Метрогородок"}, {"@type": "Place", "name": "Богородское"}, {"@type": "Place", "name": "Преображенское"}, {"@type": "Place", "name": "Восточный округ Москвы"}], "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "09:00", "closes": "20:00"}], "publicAccess": true, "isAccessibleForFree": false, "audience": {"@type": "PeopleAudience", "suggestedMinAge": 1, "suggestedMaxAge": 12}, "sameAs": ["https://vk.com/club220359229"], "aggregateRating": {"@type": "AggregateRating", "ratingValue": "5.0", "reviewCount": "253", "bestRating": "5", "worstRating": "1"}}</script>
@@ -321,14 +347,11 @@ body.js .reveal.in{opacity:1;transform:none}
   <div class="wrap">
     <img src="/static/img/c83c6b5de853.png" alt="KidsUP — детский центр" loading="lazy" decoding="async">
     <nav id="mainnav">
-      <a href="#events">Праздник 29.08</a>
       <a href="#courses">Занятия</a>
-      <a href="#dod">ДОД 30.08</a>
       <a href="#schedule">Расписание</a>
-      <a href="#prices">Цены и скидки</a>
+      <a href="#prices">Цены</a>
       <a href="#reviews">Отзывы</a>
-      <a href="#faq">Вопросы</a>
-      <a href="#contact">Как найти</a>
+      <a href="#contact">Контакты</a>
     </nav>
     <button class="burger" id="burger" aria-label="Меню" aria-expanded="false" aria-controls="mainnav">☰</button>
     <a class="tel" href="tel:+74951209024">+7 495 120-90-24</a>
@@ -349,10 +372,19 @@ body.js .reveal.in{opacity:1;transform:none}
       <p class="sub">Детский центр и английский сад KidsUP на Бульваре Рокоссовского.
       Учебный год стартует <b>31 августа</b> — выберите занятие и приходите на первое:
       оно условно-бесплатное, с диагностикой от педагога.</p>
+      <div class="age-row" aria-label="Выберите возраст ребёнка">
+        <span class="age-lbl">Сколько лет ребёнку?</span>
+        <a class="age-chip" href="#week-builder" data-wk="0">1–3</a>
+        <a class="age-chip" href="#week-builder" data-wk="1">3–5</a>
+        <a class="age-chip" href="#week-builder" data-wk="2">5–7</a>
+        <a class="age-chip" href="#week-builder" data-wk="3">7–12</a>
+      </div>
       <div class="cta-row">
         <a class="btn btn-green" href="#signup">Выбрать занятие</a>
         <a class="btn btn-line" href="#events">🎉 Праздник 29 августа</a>
       </div>
+      <p class="hero-geo">📍 б-р Маршала Рокоссовского, 6 к1В · 2 минуты от метро
+      Бульвар Рокоссовского · напротив ТЦ «Янтарь»</p>
     </div>
     <div class="hero-card">
       <h3>⏳ Старые цены действуют ещё</h3>
@@ -881,60 +913,67 @@ body.js .reveal.in{opacity:1;transform:none}
 </section>
 
 
-<section class="dod" id="dod">
-  <div class="wrap">
-    <h2>🚪 День открытых дверей — 30 августа</h2>
-    <p style="color:var(--muted)">Воскресенье, 11:00–15:00, вход по записи. Каждое занятие —
-    30–45 минут вживую: ребёнок пробует, вы смотрите. Плюс экскурсия по центру,
-    знакомство с педагогами и бесплатная диагностика уровня.</p>
-    <div style="overflow-x:auto"><table class="dod-t">
-      <tr><td class="dt">11:00–11:45</td><td><b>Раннее развитие</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2011%3A00%E2%80%9311%3A45%20%D0%A0%D0%B0%D0%BD%D0%BD%D0%B5%D0%B5%20%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">12:00–12:45</td><td><b>Раннее развитие</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2012%3A00%E2%80%9312%3A45%20%D0%A0%D0%B0%D0%BD%D0%BD%D0%B5%D0%B5%20%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">13:00–13:45</td><td><b>Подготовка к школе</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2013%3A00%E2%80%9313%3A45%20%D0%9F%D0%BE%D0%B4%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%BA%D0%B0%20%D0%BA%20%D1%88%D0%BA%D0%BE%D0%BB%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">13:00–13:45</td><td><b>Английский язык</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2013%3A00%E2%80%9313%3A45%20%D0%90%D0%BD%D0%B3%D0%BB%D0%B8%D0%B9%D1%81%D0%BA%D0%B8%D0%B9%20%D1%8F%D0%B7%D1%8B%D0%BA%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">14:00–14:45</td><td><b>Подготовка к школе</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2014%3A00%E2%80%9314%3A45%20%D0%9F%D0%BE%D0%B4%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%BA%D0%B0%20%D0%BA%20%D1%88%D0%BA%D0%BE%D0%BB%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">14:00–14:45</td><td><b>Английский язык</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2014%3A00%E2%80%9314%3A45%20%D0%90%D0%BD%D0%B3%D0%BB%D0%B8%D0%B9%D1%81%D0%BA%D0%B8%D0%B9%20%D1%8F%D0%B7%D1%8B%D0%BA%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">14:00–14:45</td><td><b>Робототехника</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2014%3A00%E2%80%9314%3A45%20%D0%A0%D0%BE%D0%B1%D0%BE%D1%82%D0%BE%D1%82%D0%B5%D1%85%D0%BD%D0%B8%D0%BA%D0%B0%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">15:00–15:45</td><td><b>Подготовка к школе</b> <span class="dg">группа 3</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2015%3A00%E2%80%9315%3A45%20%D0%9F%D0%BE%D0%B4%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%BA%D0%B0%20%D0%BA%20%D1%88%D0%BA%D0%BE%D0%BB%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%203" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">15:00–15:45</td><td><b>Английский язык</b> <span class="dg">группа 3</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2015%3A00%E2%80%9315%3A45%20%D0%90%D0%BD%D0%B3%D0%BB%D0%B8%D0%B9%D1%81%D0%BA%D0%B8%D0%B9%20%D1%8F%D0%B7%D1%8B%D0%BA%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%203" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">15:00–15:45</td><td><b>Робототехника</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2015%3A00%E2%80%9315%3A45%20%D0%A0%D0%BE%D0%B1%D0%BE%D1%82%D0%BE%D1%82%D0%B5%D1%85%D0%BD%D0%B8%D0%BA%D0%B0%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
-    </table></div>
-    <p style="color:var(--muted);font-size:.86rem;margin-top:.6rem">Не нашли своё время —
-    приходите в любой момент с 11:00 до 15:00: экскурсии и диагностика идут весь день.</p>
-  </div>
-</section>
+  <div class="wrap"><form class="mini-lead" data-mini="1"
+      action="https://app.kidsup.ru/api/public/lead" method="post">
+    <b>Не хочется разбираться самим? Оставьте номер — администратор подберёт группу за один звонок.</b>
+    <input name="phone" type="tel" inputmode="tel" required
+      placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
+    <input type="hidden" name="course" value="мини-форма-1">
+    <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
+    <button type="submit">Перезвоните мне</button>
+    <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅</span>
+  </form></div>
 
-<section class="sched" id="schedule">
+<section class="rev" id="reviews">
   <div class="wrap">
-    <h2>📅 Расписание групп 2026/27</h2>
-    <p style="color:var(--muted)">Живые данные из нашей CRM МойКласс: свободные места в каждой группе
-    обновляются автоматически. Нажмите на направление — выберите день и время.</p>
-    <div id="sched-box" role="status" aria-live="polite"><p style="color:var(--muted)">Загружаем расписание…</p></div>
-  </div>
-</section>
-
-<section class="why">
-  <div class="wrap">
-    <h2>Почему родители выбирают KidsUP</h2>
-    <div class="grid">
-      <div class="item reveal"><b>Методика малых шагов Буракова</b>
-        <p>Ребёнок движется маленькими победами — без перегруза и слёз. Так дети начинают
-        читать за 3 месяца и, главное, учатся любить учиться.</p></div>
-      <div class="item reveal"><b>12 лет работаем в районе</b>
-        <p>Сотни выпускников подготовки к школе и английского. Многие семьи приводят
-        уже второго и третьего ребёнка.</p></div>
-      <div class="item reveal"><b>Малые группы 6–8 детей</b>
-        <p>Педагог видит каждого. Английский — по уровням Cambridge (Starters/Movers/Flyers),
-        подготовка к школе — отдельно для читающих и нечитающих.</p></div>
-      <div class="item reveal"><b>Занятия не сгорают</b>
-        <p>Заболели — отработаете в другой группе. Плюс 2 недели «заморозки» абонемента
-        в году на отпуск.</p></div>
-      <div class="item reveal"><b>Обратная связь после занятий</b>
-        <p>Педагог рассказывает, что получается и над чем работаем. Два раза в год —
-        открытые уроки, где дети показывают результат.</p></div>
-      <div class="item reveal"><b>2 минуты от метро</b>
-        <p>Бульвар Рокоссовского, 6 к1В — напротив ТЦ «Янтарь». Удобно совмещать
-        с садиком и школой: занятия с утра до 20:00.</p></div>
+    <h2>Что говорят родители</h2>
+    <p style="color:var(--muted)">Отзывы с Яндекс.Карт — мы не можем их редактировать или удалять, виджет показывает всё как есть.</p>
+    <div class="rev-grid">
+      <div class="rev-widget">
+        <div class="rev-fallback">Загружаем отзывы с Яндекс.Карт…<br>
+          <a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">Открыть отзывы в новой вкладке →</a></div>
+        <iframe src="https://yandex.ru/maps-reviews-widget/220508405205?comments" title="Отзывы о KidsUP на Яндекс.Картах" loading="lazy"></iframe>
+      </div>
+      <div class="rev-note reveal">
+        <div class="rev-stars">⭐️⭐️⭐️⭐️⭐️</div>
+        <h3><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank"
+        rel="noopener" style="color:inherit;text-decoration:none;border-bottom:2px solid var(--amber)">5,0
+        на Яндекс.Картах · 253 отзыва</a></h3>
+        <p style="font-size:.78rem;color:var(--muted);margin:.1rem 0 .6rem">данные на 23 августа 2026 ·
+        каждая цифра ниже кликается и ведёт на первоисточник</p>
+        <!-- Оценки по темам: у Яндекса это отдельные срезы, и они сильнее общей
+             пятёрки — родитель видит, что именно хвалят, а не «нам поставили 5». -->
+        <ul class="rev-cats">
+          <li><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">
+            <b>97%</b><span>хвалят отношение к детям</span><i>181 отзыв</i></a></li>
+          <li><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">
+            <b>96%</b><span>довольны педагогами</span><i>168 отзывов</i></a></li>
+          <li><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">
+            <b>99%</b><span>довольны качеством обучения</span><i>141 отзыв</i></a></li>
+        </ul>
+        <p style="color:var(--ink);font-size:.95rem;margin-top:.2rem"><b>«Хорошее место 2026»</b> — награда Яндекса
+        центрам, которые родители выбирают и рекомендуют чаще других.</p>
+        <p>12 лет в районе: многие приводят уже второго и третьего ребёнка, а выпускники
+        подготовки возвращаются на английский и скорочтение. Мы не просим писать отзывы
+        «за скидку» — всё, что вы читаете слева, родители написали сами.</p>
+        <p><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener"
+        style="color:var(--indigo);font-weight:600">Открыть все отзывы на Яндекс.Картах →</a></p>
+        <!-- Виджет MyReviews со старого сайта: сводит отзывы с разных
+             площадок, uuid тот же — история отзывов сохраняется. -->
+        <div class="myReviews__block-widget" style="margin:14px 0"></div>
+        <script src="https://myreviews.dev/widget/dist/index.js" defer></script>
+        <script>
+        window.addEventListener("load", function () {
+          if (window.myReviews) new window.myReviews.BlockWidget({
+            uuid: "19ccaa9d-c508-4a38-b59e-33d01d38f2f7",
+            name: "customWidget-1", additionalFrame: "none", lang: "ru"
+          }).init();
+        });
+        </script>
+        <p>Хотите увидеть центр вживую — приходите 29 августа на праздник: аниматоры,
+        конкурсы и беспроигрышная лотерея, вход свободный.</p>
+        <a class="btn btn-green" href="#signup">Записаться на занятие</a>
+      </div>
     </div>
   </div>
 </section>
@@ -1059,6 +1098,49 @@ body.js .reveal.in{opacity:1;transform:none}
 </section>
 
 
+  <div class="wrap"><form class="mini-lead" data-mini="2"
+      action="https://app.kidsup.ru/api/public/lead" method="post">
+    <b>Понравился педагог? Оставьте номер — запишем к нему на условно-бесплатное первое занятие.</b>
+    <input name="phone" type="tel" inputmode="tel" required
+      placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
+    <input type="hidden" name="course" value="мини-форма-2">
+    <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
+    <button type="submit">Перезвоните мне</button>
+    <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅</span>
+  </form></div>
+
+<section class="dod" id="dod">
+  <div class="wrap">
+    <h2>🚪 День открытых дверей — 30 августа</h2>
+    <p style="color:var(--muted)">Воскресенье, 11:00–15:00, вход по записи. Каждое занятие —
+    30–45 минут вживую: ребёнок пробует, вы смотрите. Плюс экскурсия по центру,
+    знакомство с педагогами и бесплатная диагностика уровня.</p>
+    <div style="overflow-x:auto"><table class="dod-t">
+      <tr><td class="dt">11:00–11:45</td><td><b>Раннее развитие</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2011%3A00%E2%80%9311%3A45%20%D0%A0%D0%B0%D0%BD%D0%BD%D0%B5%D0%B5%20%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
+      <tr><td class="dt">12:00–12:45</td><td><b>Раннее развитие</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2012%3A00%E2%80%9312%3A45%20%D0%A0%D0%B0%D0%BD%D0%BD%D0%B5%D0%B5%20%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
+      <tr><td class="dt">13:00–13:45</td><td><b>Подготовка к школе</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2013%3A00%E2%80%9313%3A45%20%D0%9F%D0%BE%D0%B4%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%BA%D0%B0%20%D0%BA%20%D1%88%D0%BA%D0%BE%D0%BB%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
+      <tr><td class="dt">13:00–13:45</td><td><b>Английский язык</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2013%3A00%E2%80%9313%3A45%20%D0%90%D0%BD%D0%B3%D0%BB%D0%B8%D0%B9%D1%81%D0%BA%D0%B8%D0%B9%20%D1%8F%D0%B7%D1%8B%D0%BA%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
+      <tr><td class="dt">14:00–14:45</td><td><b>Подготовка к школе</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2014%3A00%E2%80%9314%3A45%20%D0%9F%D0%BE%D0%B4%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%BA%D0%B0%20%D0%BA%20%D1%88%D0%BA%D0%BE%D0%BB%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
+      <tr><td class="dt">14:00–14:45</td><td><b>Английский язык</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2014%3A00%E2%80%9314%3A45%20%D0%90%D0%BD%D0%B3%D0%BB%D0%B8%D0%B9%D1%81%D0%BA%D0%B8%D0%B9%20%D1%8F%D0%B7%D1%8B%D0%BA%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
+      <tr><td class="dt">14:00–14:45</td><td><b>Робототехника</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2014%3A00%E2%80%9314%3A45%20%D0%A0%D0%BE%D0%B1%D0%BE%D1%82%D0%BE%D1%82%D0%B5%D1%85%D0%BD%D0%B8%D0%BA%D0%B0%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
+      <tr><td class="dt">15:00–15:45</td><td><b>Подготовка к школе</b> <span class="dg">группа 3</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2015%3A00%E2%80%9315%3A45%20%D0%9F%D0%BE%D0%B4%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%BA%D0%B0%20%D0%BA%20%D1%88%D0%BA%D0%BE%D0%BB%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%203" target="_blank" rel="noopener">Записаться</a></td></tr>
+      <tr><td class="dt">15:00–15:45</td><td><b>Английский язык</b> <span class="dg">группа 3</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2015%3A00%E2%80%9315%3A45%20%D0%90%D0%BD%D0%B3%D0%BB%D0%B8%D0%B9%D1%81%D0%BA%D0%B8%D0%B9%20%D1%8F%D0%B7%D1%8B%D0%BA%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%203" target="_blank" rel="noopener">Записаться</a></td></tr>
+      <tr><td class="dt">15:00–15:45</td><td><b>Робототехника</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2015%3A00%E2%80%9315%3A45%20%D0%A0%D0%BE%D0%B1%D0%BE%D1%82%D0%BE%D1%82%D0%B5%D1%85%D0%BD%D0%B8%D0%BA%D0%B0%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
+    </table></div>
+    <p style="color:var(--muted);font-size:.86rem;margin-top:.6rem">Не нашли своё время —
+    приходите в любой момент с 11:00 до 15:00: экскурсии и диагностика идут весь день.</p>
+  </div>
+</section>
+
+<section class="sched" id="schedule">
+  <div class="wrap">
+    <h2>📅 Расписание групп 2026/27</h2>
+    <p style="color:var(--muted)">Живые данные из нашей CRM МойКласс: свободные места в каждой группе
+    обновляются автоматически. Нажмите на направление — выберите день и время.</p>
+    <div id="sched-box" role="status" aria-live="polite"><p style="color:var(--muted)">Загружаем расписание…</p></div>
+  </div>
+</section>
+
 <section class="wk" id="week-builder">
   <div class="wrap">
     <h2>🧩 Соберите неделю ребёнка</h2>
@@ -1066,23 +1148,6 @@ body.js .reveal.in{opacity:1;transform:none}
     в удобные дни. На второй предмет — скидка 10%.</p>
     <div class="wk-ages" id="wk-ages"></div>
     <div id="wk-out"></div>
-  </div>
-</section>
-
-<section class="gal" id="gallery">
-  <div class="wrap">
-    <h2>Как проходят наши занятия</h2>
-    <p>Настоящие кадры из центра — без постановки.</p>
-    <div class="g-strip">
-      <figure><img src="/static/img/43da73900d06.jpg" alt="Подготовка к школе" loading="lazy"><figcaption>Подготовка к школе</figcaption></figure>
-      <figure><img src="/static/img/c8bbc94beb5f.jpg" alt="Раннее развитие" loading="lazy"><figcaption>Раннее развитие — занятие с малышом</figcaption></figure>
-      <figure><img src="/static/img/e3e2e61877ab.jpg" alt="Мини-группа" loading="lazy"><figcaption>Мини-группы до 8 детей</figcaption></figure>
-      <figure><img src="/static/img/672d02865848.jpg" alt="Праздник KidsUP" loading="lazy"><figcaption>Праздник KidsUP — такой же будет 29 августа</figcaption></figure>
-      <figure><img src="/static/img/1d806a712952.jpg" alt="ИЗО-студия" loading="lazy"><figcaption>ИЗО и подготовка руки</figcaption></figure>
-      <figure><img src="/static/img/3b628bb1e686.jpg" alt="Английский сад" loading="lazy"><figcaption>Английский мини-сад</figcaption></figure>
-      <figure><img src="/static/img/805e3fd46cc7.jpg" alt="Прогулка" loading="lazy"><figcaption>Прогулки и городской лагерь</figcaption></figure>
-    </div>
-    <p class="soc">Больше фото и видео — в наших соцсетях ниже 👇</p>
   </div>
 </section>
 
@@ -1111,13 +1176,13 @@ body.js .reveal.in{opacity:1;transform:none}
     <h2>Записаться на занятие</h2>
     <p>Оставьте заявку — администратор подберёт группу и время и ответит на вопросы.</p>
     <form class="form-box" id="lead" style="text-align:left" action="https://app.kidsup.ru/api/public/lead" method="post" novalidate>
+      <label for="f-phone">Ваш телефон — перезвоним в течение 15 минут</label>
+      <input id="f-phone" name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-describedby="f-phone-err">
+      <p id="f-phone-err" class="f-err" hidden>Проверьте номер: нужен российский мобильный, например +7 916 000-00-00</p>
       <label for="f-name">Имя ребёнка</label>
       <input id="f-name" name="name" placeholder="Мария" autocomplete="off">
       <label for="f-age">Возраст ребёнка</label>
       <input id="f-age" name="age" placeholder="5 лет">
-      <label for="f-phone">Ваш телефон</label>
-      <input id="f-phone" name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-describedby="f-phone-err">
-      <p id="f-phone-err" class="f-err" hidden>Проверьте номер: нужен российский мобильный, например +7 916 000-00-00</p>
       <label for="f-course">Что интересует</label>
       <select id="f-course" name="course">
         <option>Подобрать под ребёнка</option>
@@ -1131,6 +1196,49 @@ body.js .reveal.in{opacity:1;transform:none}
       Удобнее самим? <a href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">WhatsApp</a> ·
       <a href="tel:+74951209024">+7 495 120-90-24</a> · ежедневно с 9:00</p>
     </form>
+  </div>
+</section>
+
+<section class="why">
+  <div class="wrap">
+    <h2>Почему родители выбирают KidsUP</h2>
+    <div class="grid">
+      <div class="item reveal"><b>Методика малых шагов Буракова</b>
+        <p>Ребёнок движется маленькими победами — без перегруза и слёз. Так дети начинают
+        читать за 3 месяца и, главное, учатся любить учиться.</p></div>
+      <div class="item reveal"><b>12 лет работаем в районе</b>
+        <p>Сотни выпускников подготовки к школе и английского. Многие семьи приводят
+        уже второго и третьего ребёнка.</p></div>
+      <div class="item reveal"><b>Малые группы 6–8 детей</b>
+        <p>Педагог видит каждого. Английский — по уровням Cambridge (Starters/Movers/Flyers),
+        подготовка к школе — отдельно для читающих и нечитающих.</p></div>
+      <div class="item reveal"><b>Занятия не сгорают</b>
+        <p>Заболели — отработаете в другой группе. Плюс 2 недели «заморозки» абонемента
+        в году на отпуск.</p></div>
+      <div class="item reveal"><b>Обратная связь после занятий</b>
+        <p>Педагог рассказывает, что получается и над чем работаем. Два раза в год —
+        открытые уроки, где дети показывают результат.</p></div>
+      <div class="item reveal"><b>2 минуты от метро</b>
+        <p>Бульвар Рокоссовского, 6 к1В — напротив ТЦ «Янтарь». Удобно совмещать
+        с садиком и школой: занятия с утра до 20:00.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="gal" id="gallery">
+  <div class="wrap">
+    <h2>Как проходят наши занятия</h2>
+    <p>Настоящие кадры из центра — без постановки.</p>
+    <div class="g-strip">
+      <figure><img src="/static/img/43da73900d06.jpg" alt="Подготовка к школе" loading="lazy"><figcaption>Подготовка к школе</figcaption></figure>
+      <figure><img src="/static/img/c8bbc94beb5f.jpg" alt="Раннее развитие" loading="lazy"><figcaption>Раннее развитие — занятие с малышом</figcaption></figure>
+      <figure><img src="/static/img/e3e2e61877ab.jpg" alt="Мини-группа" loading="lazy"><figcaption>Мини-группы до 8 детей</figcaption></figure>
+      <figure><img src="/static/img/672d02865848.jpg" alt="Праздник KidsUP" loading="lazy"><figcaption>Праздник KidsUP — такой же будет 29 августа</figcaption></figure>
+      <figure><img src="/static/img/1d806a712952.jpg" alt="ИЗО-студия" loading="lazy"><figcaption>ИЗО и подготовка руки</figcaption></figure>
+      <figure><img src="/static/img/3b628bb1e686.jpg" alt="Английский сад" loading="lazy"><figcaption>Английский мини-сад</figcaption></figure>
+      <figure><img src="/static/img/805e3fd46cc7.jpg" alt="Прогулка" loading="lazy"><figcaption>Прогулки и городской лагерь</figcaption></figure>
+    </div>
+    <p class="soc">Больше фото и видео — в наших соцсетях ниже 👇</p>
   </div>
 </section>
 
@@ -1175,59 +1283,27 @@ body.js .reveal.in{opacity:1;transform:none}
   </div>
 </section>
 
-<section class="rev" id="reviews">
-  <div class="wrap">
-    <h2>Что говорят родители</h2>
-    <p style="color:var(--muted)">Отзывы с Яндекс.Карт — мы не можем их редактировать или удалять, виджет показывает всё как есть.</p>
-    <div class="rev-grid">
-      <div class="rev-widget">
-        <div class="rev-fallback">Загружаем отзывы с Яндекс.Карт…<br>
-          <a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">Открыть отзывы в новой вкладке →</a></div>
-        <iframe src="https://yandex.ru/maps-reviews-widget/220508405205?comments" title="Отзывы о KidsUP на Яндекс.Картах" loading="lazy"></iframe>
-      </div>
-      <div class="rev-note reveal">
-        <div class="rev-stars">⭐️⭐️⭐️⭐️⭐️</div>
-        <h3><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank"
-        rel="noopener" style="color:inherit;text-decoration:none;border-bottom:2px solid var(--amber)">5,0
-        на Яндекс.Картах · 253 отзыва</a></h3>
-        <p style="font-size:.78rem;color:var(--muted);margin:.1rem 0 .6rem">данные на 23 августа 2026 ·
-        каждая цифра ниже кликается и ведёт на первоисточник</p>
-        <!-- Оценки по темам: у Яндекса это отдельные срезы, и они сильнее общей
-             пятёрки — родитель видит, что именно хвалят, а не «нам поставили 5». -->
-        <ul class="rev-cats">
-          <li><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">
-            <b>97%</b><span>хвалят отношение к детям</span><i>181 отзыв</i></a></li>
-          <li><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">
-            <b>96%</b><span>довольны педагогами</span><i>168 отзывов</i></a></li>
-          <li><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener">
-            <b>99%</b><span>довольны качеством обучения</span><i>141 отзыв</i></a></li>
-        </ul>
-        <p style="color:var(--ink);font-size:.95rem;margin-top:.2rem"><b>«Хорошее место 2026»</b> — награда Яндекса
-        центрам, которые родители выбирают и рекомендуют чаще других.</p>
-        <p>12 лет в районе: многие приводят уже второго и третьего ребёнка, а выпускники
-        подготовки возвращаются на английский и скорочтение. Мы не просим писать отзывы
-        «за скидку» — всё, что вы читаете слева, родители написали сами.</p>
-        <p><a href="https://yandex.ru/maps/org/kids_up/220508405205/reviews/" target="_blank" rel="noopener"
-        style="color:var(--indigo);font-weight:600">Открыть все отзывы на Яндекс.Картах →</a></p>
-        <!-- Виджет MyReviews со старого сайта: сводит отзывы с разных
-             площадок, uuid тот же — история отзывов сохраняется. -->
-        <div class="myReviews__block-widget" style="margin:14px 0"></div>
-        <script src="https://myreviews.dev/widget/dist/index.js" defer></script>
-        <script>
-        window.addEventListener("load", function () {
-          if (window.myReviews) new window.myReviews.BlockWidget({
-            uuid: "19ccaa9d-c508-4a38-b59e-33d01d38f2f7",
-            name: "customWidget-1", additionalFrame: "none", lang: "ru"
-          }).init();
-        });
-        </script>
-        <p>Хотите увидеть центр вживую — приходите 29 августа на праздник: аниматоры,
-        конкурсы и беспроигрышная лотерея, вход свободный.</p>
-        <a class="btn btn-green" href="#signup">Записаться на занятие</a>
-      </div>
-    </div>
-  </div>
-</section>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 <section class="contact" id="contact">
   <div class="wrap">
@@ -1254,10 +1330,20 @@ body.js .reveal.in{opacity:1;transform:none}
       <div>
       <!-- Видео с прохода от метро — перенесено со старого сайта: для
            родителя с коляской «как дойти» важнее схемы. -->
-      <iframe class="map" style="margin-bottom:10px" loading="lazy"
-        title="Видео: как к нам пройти от метро"
-        src="https://vk.com/video_ext.php?oid=-220359229&id=456239329&hd=2"
-        allow="encrypted-media; fullscreen; picture-in-picture" frameborder="0"></iframe>
+      <div class="route-btns">
+        <b>Как к нам пройти</b>
+        <a class="dod-btn" target="_blank" rel="noopener"
+           href="https://yandex.ru/maps/?rtext=~55.815361,37.734239&rtt=pd">Маршрут с бульвара Рокоссовского</a>
+        <a class="dod-btn" target="_blank" rel="noopener" style="background:var(--blue)"
+           href="https://yandex.ru/maps/?rtext=~55.815361,37.734239&rtt=pd&z=17">Маршрут с Открытого шоссе</a>
+        <p style="color:var(--muted);font-size:.86rem;margin:.5rem 0 0">Вход со стороны
+        ЖК «Богородский», 7-й подъезд, 2-й этаж — ориентир «Дикси». Запутались —
+        позвоните, встретим: +7 495 120-90-24.</p>
+      </div>
+      <!-- сюда встанут два видеоролика прохода (с бульвара и с Открытого шоссе):
+           пришлите ссылки на ролики или файлы — включу.
+      <iframe class="map" loading="lazy" title="Как пройти с бульвара" src="..."></iframe>
+      <iframe class="map" loading="lazy" title="Как пройти с Открытого шоссе" src="..."></iframe> -->
       <iframe class="map" loading="lazy" title="KidsUP на карте"
         src="https://yandex.ru/map-widget/v1/?text=%D0%B1%D1%83%D0%BB%D1%8C%D0%B2%D0%B0%D1%80%20%D0%9C%D0%B0%D1%80%D1%88%D0%B0%D0%BB%D0%B0%20%D0%A0%D0%BE%D0%BA%D0%BE%D1%81%D1%81%D0%BE%D0%B2%D1%81%D0%BA%D0%BE%D0%B3%D0%BE%206%D0%BA1%D0%92&z=16"></iframe>
       </div>
@@ -1332,7 +1418,7 @@ body.js .reveal.in{opacity:1;transform:none}
         <span><b>Instagram*</b><span>Фото и сторис</span></span>
       </a>
     </div>
-    <p class="soc-note">* Instagram принадлежит компании Meta, признанной экстремистской организацией
+    <p class="soc-note">* WhatsApp и Instagram принадлежат компании Meta, признанной экстремистской организацией
     и запрещённой на территории Российской Федерации.</p>
   </div>
 </section>
@@ -1800,7 +1886,7 @@ document.head.appendChild(t)}();</script>
         (p2? ' \u00b7 <s style="color:#999">'+second.g.price.toLocaleString('ru')+'</s> '+p2.toLocaleString('ru')+' \u20bd/\u043c\u0435\u0441 <span class="wk-note">(\u221210% \u043d\u0430 \u0432\u0442\u043e\u0440\u043e\u0439 \u043f\u0440\u0435\u0434\u043c\u0435\u0442)</span>':'')+'</div>';
       if(p2) total+=p2;
     }
-    if(total) html+='<div class="wk-sum">\u0418\u0442\u043e\u0433\u043e: '+total.toLocaleString('ru')+' \u20bd \u0432 \u043c\u0435\u0441\u044f\u0446</div>';
+    if(total){ html+='<div class="wk-sum">\u0418\u0442\u043e\u0433\u043e: '+total.toLocaleString('ru')+' \u20bd \u0432 \u043c\u0435\u0441\u044f\u0446</div>'; var per=Math.round(total/(second?16:8)); html+='<div class="wk-note">\u2248 '+per.toLocaleString('ru')+' \u20bd \u0437\u0430 \u0437\u0430\u043d\u044f\u0442\u0438\u0435</div>'; }
     html+='<p class="wk-note">\u041f\u0435\u0440\u0432\u043e\u0435 \u0437\u0430\u043d\u044f\u0442\u0438\u0435 \u043a\u0430\u0436\u0434\u043e\u0433\u043e \u043f\u0440\u0435\u0434\u043c\u0435\u0442\u0430 \u2014 \u0443\u0441\u043b\u043e\u0432\u043d\u043e-\u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e\u0435. \u041d\u0430\u043f\u0438\u0448\u0438\u0442\u0435 \u2014 \u043f\u043e\u0434\u0431\u0435\u0440\u0451\u043c \u0442\u043e\u0447\u043d\u043e \u043f\u043e\u0434 \u0432\u0430\u0448 \u0433\u0440\u0430\u0444\u0438\u043a.</p>'+
       '<a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_week&t=%D0%A5%D0%BE%D1%87%D1%83%20%D1%81%D0%BE%D0%B1%D1%80%D0%B0%D1%82%D1%8C%20%D0%BD%D0%B5%D0%B4%D0%B5%D0%BB%D1%8E%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B9" target="_blank" rel="noopener">\u041e\u0431\u0441\u0443\u0434\u0438\u0442\u044c \u0432 WhatsApp</a>';
     out.innerHTML=html;
@@ -1808,5 +1894,38 @@ document.head.appendChild(t)}();</script>
 })();
 </script>
 
+
+<script>
+document.addEventListener('click', function(e){
+  var c = e.target.closest('.age-chip'); if(!c) return;
+  setTimeout(function(){
+    var btns = document.querySelectorAll('#wk-ages .wk-age');
+    var b = btns[+c.dataset.wk]; if(b) b.click();
+  }, 350);
+});
+</script>
+
+<script>
+document.querySelectorAll('.mini-lead').forEach(function(f){
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    var btn=f.querySelector('button'), ok=f.querySelector('.ok-msg');
+    btn.disabled=true; btn.textContent='Отправляем…';
+    fetch(f.action,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:f.phone.value, course:f.course.value, website:f.website.value})})
+      .then(function(r){return r.json()})
+      .then(function(d){
+        if(d.ok){ btn.hidden=true; f.phone.hidden=true; ok.hidden=false; }
+        else { btn.disabled=false; btn.textContent='Перезвоните мне'; alert(d.error||'Проверьте номер'); }
+      }).catch(function(){ btn.disabled=false; btn.textContent='Перезвоните мне'; alert('Не получилось — позвоните нам: +7 495 120-90-24'); });
+  });
+});
+</script>
+
+<div class="stickybar" role="navigation" aria-label="Быстрые действия">
+  <a href="tel:+74951209024">📞 Позвонить</a>
+  <a href="https://app.kidsup.ru/go/whatsapp?src=site_bar&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D1%83%D0%B7%D0%BD%D0%B0%D1%82%D1%8C%20%D0%BF%D1%80%D0%BE%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D1%8F" target="_blank" rel="noopener">💬 WhatsApp</a>
+  <a class="sb-main" href="#signup">Записаться</a>
+</div>
 </body>
 </html>
