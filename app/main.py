@@ -2297,8 +2297,13 @@ async def go_messenger(channel: str, request: Request):
                      "VALUES (?, ?, ?, ?, ?)",
                      (autopilot._now().isoformat(timespec="seconds"), channel,
                       visit, utm, (request.headers.get("referer") or "")[:300]))
-    if channel == "whatsapp" and visit:
-        target += "?text=" + quote(WA_HELLO + visit)
+    if channel == "whatsapp":
+        if visit:
+            target += "?text=" + quote(WA_HELLO + visit)
+        elif q.get("t"):
+            # кнопка сайта передаёт готовое приветствие — без него клиент
+            # попадает в пустой чат и половина не пишет первой
+            target += "?text=" + quote(q.get("t")[:200])
     return RedirectResponse(target, status_code=302)
 
 
@@ -2375,7 +2380,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-26.23"
+APP_VERSION = "2026-08-27.03"
 
 
 @app.get("/api/net")
@@ -2653,6 +2658,20 @@ def _build_schedule():
     import time as _t
     all_groups = _enrollment_groups()
     groups = [g for g in all_groups if not g["buffer"]]
+    # Витрина держит два запасных места в каждой группе (решение владельца
+    # 27.08): сайт показывает свободными max(0, вместимость−2−занято).
+    # Живая цифра для админов на /enrollment не трогается — буфер только
+    # здесь, на публичной выдаче. Побочный бонус: «свободно 8 мест» больше
+    # не выглядит пустым залом, а «мест нет» наступает раньше и подгоняет.
+    def _pub_cap(g):
+        cap = g["capacity"]
+        # у сада и нулевого класса реальная вместимость 10 (владелец 26.08),
+        # что бы ни стояло в maxStudents МойКласса
+        if "Мини-сад" in g["name"] or "Нулевой" in g["name"]:
+            cap = min(cap, 10)
+        return max(1, cap - 2)
+    groups = [{**g, "capacity": _pub_cap(g),
+               "free": max(0, _pub_cap(g) - g["enrolled"])} for g in groups]
     free_by_course: dict[str, int] = {}
     sad_split = {"Мини-сад": 0, "Нулевой": 0}
     for g in groups:
