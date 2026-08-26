@@ -2380,7 +2380,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.03"
+APP_VERSION = "2026-08-27.05"
 
 
 @app.get("/api/net")
@@ -2658,20 +2658,20 @@ def _build_schedule():
     import time as _t
     all_groups = _enrollment_groups()
     groups = [g for g in all_groups if not g["buffer"]]
-    # Витрина держит два запасных места в каждой группе (решение владельца
-    # 27.08): сайт показывает свободными max(0, вместимость−2−занято).
-    # Живая цифра для админов на /enrollment не трогается — буфер только
-    # здесь, на публичной выдаче. Побочный бонус: «свободно 8 мест» больше
-    # не выглядит пустым залом, а «мест нет» наступает раньше и подгоняет.
-    def _pub_cap(g):
+    # Витринное правило владельца (27.08, заменяет «минус два всем»):
+    # где свободных мест мало — показываем честную цифру; где много —
+    # прижимаем к 3-4, чтобы «свободно 8 мест» не читалось пустым залом.
+    # Цифра прижатия детерминирована именем группы и не прыгает между
+    # пересчётами. Живая цифра для админов на /enrollment не трогается.
+    # У сада и нулевого класса вместимость 10 (решение владельца).
+    def _pub(g):
         cap = g["capacity"]
-        # у сада и нулевого класса реальная вместимость 10 (владелец 26.08),
-        # что бы ни стояло в maxStudents МойКласса
         if "Мини-сад" in g["name"] or "Нулевой" in g["name"]:
             cap = min(cap, 10)
-        return max(1, cap - 2)
-    groups = [{**g, "capacity": _pub_cap(g),
-               "free": max(0, _pub_cap(g) - g["enrolled"])} for g in groups]
+        real = max(0, cap - g["enrolled"])
+        shown = real if real <= 4 else 3 + (sum(map(ord, g["name"])) % 2)
+        return {**g, "capacity": cap, "free": shown}
+    groups = [_pub(g) for g in groups]
     free_by_course: dict[str, int] = {}
     sad_split = {"Мини-сад": 0, "Нулевой": 0}
     for g in groups:
@@ -2713,7 +2713,10 @@ def _build_schedule():
             "by_key": by_key, "waitlist": waitlist,
             "groups": [{"name": g["name"], "course": g["course"], "day": g["day"],
                         "time": g["time"], "age": g["age"], "free": g["free"],
-                        "capacity": g["capacity"]} for g in groups]}
+                        "capacity": g["capacity"],
+                        "age_lo": g["age_lo"], "age_hi": g["age_hi"],
+                        "price": g["price_new"],
+                        "price_label": g["price_label"]} for g in groups]}
     _SCHED_CACHE.update(ts=_t.time(), data=data)
     return JSONResponse(data, headers=_SCHED_HEADERS)
 
