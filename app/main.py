@@ -2375,7 +2375,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-26.20"
+APP_VERSION = "2026-08-26.21"
 
 
 @app.get("/api/net")
@@ -3238,6 +3238,52 @@ def api_prelaunch():
             "отказов в стоп-листе": len(ref),
             "sms_on": db.get_setting("sms_on", "0") == "1",
             "отправители": senders}
+
+
+@app.get("/prelaunch", response_class=HTMLResponse, dependencies=AUTH)
+def prelaunch_page():
+    """Предполётный чек глазами человека: светофор вместо JSON.
+
+    /api/prelaunch отдаёт машинный ответ с русскими ключами в юникоде —
+    владелец открыл его с телефона и увидел кашу. Люди смотрят сюда."""
+    d = api_prelaunch()
+    ok = d["вердикт"] == "можно включать"
+    rows = []
+    for b in d["блокеры"]:
+        rows.append(f"<li class=bad>⛔ {html.escape(b)}</li>")
+    for w in d["предупреждения"]:
+        rows.append(f"<li class=warn>⚠️ {html.escape(w)}</li>")
+    ch = "".join(
+        f"<tr><td>{html.escape(str(c['transport']))}</td>"
+        f"<td>{c['всего']}</td><td>{c['дошло']}</td>"
+        f"<td class={'ok' if c['доля'] >= 80 else 'warn'}>{c['доля']}%</td></tr>"
+        for c in d["каналы за 4ч"])
+    return f"""<!doctype html><meta charset=utf-8>
+<meta name=viewport content="width=device-width, initial-scale=1">
+<title>Предполётный чек — KidsUP</title>
+<style>
+body{{font:16px/1.5 system-ui,sans-serif;margin:0;padding:20px;color:#312783;
+     background:#fff;max-width:720px}}
+.verdict{{font-size:26px;font-weight:700;padding:18px 22px;border-radius:14px;
+  background:{'#e8f6e8' if ok else '#fdeaea'};color:{'#1b7a1b' if ok else '#c01818'}}}
+.sub{{color:#666;margin:10px 0 22px}}
+ul{{padding-left:20px}} li{{margin:6px 0}}
+li.bad{{color:#c01818}} li.warn{{color:#b07500}}
+table{{border-collapse:collapse;margin-top:8px}}
+td,th{{border-bottom:1px solid #e6e6ef;padding:6px 14px;text-align:left}}
+td.ok{{color:#1b7a1b;font-weight:600}} td.warn{{color:#b07500;font-weight:600}}
+.kv{{margin-top:18px;color:#444}} .kv b{{color:#312783}}
+</style>
+<div class=verdict>{'✅ Можно включать' if ok else '⛔ НЕ включать'}</div>
+<div class=sub>Стоп-кран: {html.escape(d["стоп-кран"])}</div>
+{('<ul>' + ''.join(rows) + '</ul>') if rows else '<p>Блокеров и предупреждений нет.</p>'}
+<h3>Доставка за 4 часа</h3>
+<table><tr><th>Канал</th><th>Отправлено</th><th>Дошло</th><th>Доля</th></tr>{ch}</table>
+<div class=kv>
+Очередь рассылки: <b>{d["очередь nabormail"]}</b> ·
+Отказов в стоп-листе: <b>{d["отказов в стоп-листе"]}</b> ·
+СМС: <b>{'включены' if d["sms_on"] else 'выключены'}</b><br>
+Отправители WhatsApp: <b>{html.escape(d["отправители"])}</b></div>"""
 
 
 @app.post("/api/broadcast/cancel-campaign", dependencies=AUTH)
