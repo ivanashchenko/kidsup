@@ -242,7 +242,10 @@ def mark_moved(phone: str, quote: str = "") -> int:
         st = st if isinstance(st, list) else st.get("statuses") or []
         target = next((x["id"] for x in st
                        if "переех" in (x.get("name") or "").lower()), 125957)
-        reason = 313606 if target == 125957 else None
+        # Причины клиентских статусов — ОТДЕЛЬНЫЙ справочник (313609-313613),
+        # не тот, что у записей в группы (313602-313607): проверено пробами
+        # 26.08, из общего ряда сервер принимает только 313613.
+        reason = 313613 if target == 125957 else None
         r = mk.get("/v1/company/users", params={"phone": "7" + p})
         users = r.get("users") if isinstance(r, dict) else r
         for u in (users or []):
