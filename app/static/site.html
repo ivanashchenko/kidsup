@@ -406,10 +406,10 @@ body.js .reveal.in{opacity:1;transform:none}
       оно условно-бесплатное, с диагностикой от педагога.</p>
       <div class="age-row" aria-label="Выберите возраст ребёнка">
         <span class="age-lbl">Сколько лет ребёнку?</span>
-        <a class="age-chip" href="#week-builder" data-wk="0">1–3</a>
-        <a class="age-chip" href="#week-builder" data-wk="1">3–5</a>
-        <a class="age-chip" href="#week-builder" data-wk="2">5–7</a>
-        <a class="age-chip" href="#week-builder" data-wk="3">7–12</a>
+        <a class="age-chip" href="#quiz" data-wk="0">1–3</a>
+        <a class="age-chip" href="#quiz" data-wk="1">3–5</a>
+        <a class="age-chip" href="#quiz" data-wk="2">5–7</a>
+        <a class="age-chip" href="#quiz" data-wk="3">7–12</a>
       </div>
       <div class="cta-row">
         <a class="btn btn-green" href="#signup">Выбрать занятие</a>
@@ -1987,7 +1987,7 @@ document.head.appendChild(t)}();</script>
 document.addEventListener('click', function(e){
   var c = e.target.closest('.age-chip'); if(!c) return;
   setTimeout(function(){
-    var btns = document.querySelectorAll('#wk-ages .wk-age');
+    var btns = document.querySelectorAll('#q-age button');
     var b = btns[+c.dataset.wk]; if(b) b.click();
   }, 350);
 });
