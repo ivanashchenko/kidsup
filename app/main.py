@@ -2438,7 +2438,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.23"
+APP_VERSION = "2026-08-27.24"
 
 
 @app.get("/api/net")
@@ -3964,10 +3964,12 @@ def _spiski_refresh() -> dict:
             S.page("B", rows_b[1::2]), encoding="utf-8")
         # Личные листы на день (владелец 27.08): одна ссылка на человека,
         # внутри сначала её доля A (тёплые), затем её доля B.
+        # Схема владельца 27.08: лагерь-2026 (A) целиком у Иры, учебный
+        # год (B) пополам — Лене чёт, Ире нечет.
         (BASE.parent / "docs" / "spisok_lena.html").write_text(
-            S.personal("Лена", rows_a[0::2], rows_b[0::2]), encoding="utf-8")
+            S.personal("Лена", [], rows_b[0::2]), encoding="utf-8")
         (BASE.parent / "docs" / "spisok_ira.html").write_text(
-            S.personal("Ира", rows_a[1::2], rows_b[1::2]), encoding="utf-8")
+            S.personal("Ира", rows_a, rows_b[1::2]), encoding="utf-8")
     except Exception as e:
         logging.getLogger("kidsup").warning("списки не перезаписались: %s", str(e)[:90])
     return data
