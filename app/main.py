@@ -1129,8 +1129,43 @@ def base_page(request: Request):
     return render(request, "base_docs.html", active="base", groups=groups)
 
 
+
+def _page_cache(key: str, ttl_min: int, builder, fresh: bool = False) -> str:
+    """Кэш тяжёлых страниц (/nedozvony, /zayavki собираются 30-60 сек:
+    Mango и МойКласс медленные). Свежий кэш отдаётся мгновенно; протухший
+    пересобирается в этом же запросе (первый посетитель ждёт, остальные нет).
+    ?fresh=1 — пересобрать принудительно."""
+    import json as _j
+    from datetime import datetime as _dt
+    now = _dt.now()
+    if not fresh:
+        try:
+            c = _j.loads(db.get_setting(f"cache_{key}") or "{}")
+            ts = _dt.fromisoformat(c["ts"])
+            if (now - ts).total_seconds() < ttl_min * 60 and c.get("html"):
+                return c["html"].replace("<!--cache-note-->",
+                    f"<p style='color:#8A8A9E;font-size:.8rem'>данные на {ts.strftime('%H:%M')} · "
+                    f"<a href='?fresh=1'>обновить сейчас</a></p>")
+        except Exception:
+            pass
+    html_text = builder()
+    try:
+        db.set_setting(f"cache_{key}", _j.dumps(
+            {"ts": now.isoformat(), "html": html_text}))
+    except Exception:
+        pass
+    return html_text.replace("<!--cache-note-->", "")
+
+
 @app.get("/nedozvony", response_class=HTMLResponse, dependencies=AUTH)
-def nedozvony_page():
+def nedozvony_page(fresh: int = 0):
+    def _build():
+        r = _nedozvony_build()
+        return r.body.decode() if hasattr(r, "body") else str(r)
+    return HTMLResponse(_page_cache("nedozvony", 10, _build, fresh=bool(fresh)))
+
+
+def _nedozvony_build():
     """Живой список сегодняшних недозвонов для вечернего прозвона.
 
     Бумажный лист устаревает за день (24.08 семья получила третий звонок,
@@ -2448,7 +2483,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.35"
+APP_VERSION = "2026-08-28.1"
 
 
 @app.get("/api/net")
@@ -3742,7 +3777,14 @@ def autopilot_digest_now():
 
 
 @app.get("/zayavki", response_class=HTMLResponse, dependencies=AUTH)
-def zayavki_page():
+def zayavki_page(fresh: int = 0):
+    def _build():
+        r = _zayavki_build()
+        return r.body.decode() if hasattr(r, "body") else str(r)
+    return HTMLResponse(_page_cache("zayavki", 15, _build, fresh=bool(fresh)))
+
+
+def _zayavki_build():
     """Листы заявок сезона 2026/27 поимённо: кому звонить и что говорить.
 
     27.08 план дня отправил админов «обзвонить 19 заявок», не сказав, где
@@ -3830,7 +3872,7 @@ a.wa{background:#25D366}a.crm{background:#1DA7E0}
     if not rows:
         out.append("<p>Открытых заявок нет — все разобраны 🎉</p>")
     out.append(f"<p style='color:#5B5876;font-size:.85rem'>Собрано {_dt.now().strftime('%d.%m %H:%M')} · "
-               f"всего {len(rows)} заявок</p>")
+               f"всего {len(rows)} заявок</p><!--cache-note-->")
     return HTMLResponse("".join(out))
 
 
