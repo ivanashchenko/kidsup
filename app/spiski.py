@@ -209,6 +209,50 @@ def page(cat: str, rows: list) -> str:
     return "\n".join(out)
 
 
+def _table(rows: list) -> str:
+    out = ["<table><thead><tr><th>Фамилия Имя</th><th>Возраст<br>на 1.09</th>"
+           "<th>Что посещал</th><th>Перестал ходить</th><th>Телефон</th>"
+           "<th>Что предлагаем</th><th>Итог разговора</th></tr></thead><tbody>"]
+    for r in rows:
+        age = ("%g" % r["age"]).replace(".", ",") if r["age"] is not None else "—"
+        d = r["last"]
+        out.append(f"<tr><td>{_html.escape(r['name'] or '—')}</td>"
+                   f"<td class=ag>{age}</td>"
+                   f"<td>{_html.escape(r['was'])}</td>"
+                   f"<td class=old>{d[8:10]}.{d[5:7]}.{d[2:4]}</td>"
+                   f"<td class=ph>+7{r['phone']}</td>"
+                   f"<td class=of>{_html.escape(r['offer'])}</td>"
+                   f"<td class=res></td></tr>")
+    out.append("</tbody></table>")
+    return "\n".join(out)
+
+
+def personal(admin: str, a_rows: list, b_rows: list) -> str:
+    """Личный лист администратора на день: сначала её доля A, затем B.
+
+    Владелец 27.08: «понятные списки на день для Лены и Иры» — одна
+    ссылка на человека, без навигации по общим спискам. Кому позвонили —
+    строка исчезает при следующем пересчёте сама."""
+    total = len(a_rows) + len(b_rows)
+    out = [f"<style>{CSS}</style>",
+           f"<h1>📞 {admin} — список на сегодня: {total} семей</h1>",
+           "<div class=sub><b>В каждом звонке:</b> праздник 29-го в «Янтарной "
+           "горке» · День открытых дверей 30-го · до 31.08 — цены прошлого "
+           "года · в день пробного −10% на первый абонемент. "
+           "Список живой: дозвонились — семья исчезает сама.</div>",
+           f"<h2 style='color:#E30613'>Сначала: лето-2026, самые тёплые "
+           f"({len(a_rows)})</h2>",
+           "<div class=sub>Были у нас месяц-два назад, помнят педагогов. "
+           "Разговор: «продолжаем?»</div>",
+           _table(a_rows),
+           f"<h2 style='color:#1DA7E0;margin-top:26px'>Затем: учебный год "
+           f"2025/26 ({len(b_rows)})</h2>",
+           "<div class=sub>Занимались весь прошлый год и просто не продлили. "
+           "Конверсия вдвое выше холодных.</div>",
+           _table(b_rows)]
+    return "\n".join(out)
+
+
 def main():
     import sys
     from pathlib import Path
