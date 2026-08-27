@@ -336,6 +336,16 @@ body.js .reveal.in{opacity:1;transform:none}
   body{padding-bottom:52px}
   .fab{bottom:132px}
 }
+
+.vstrip{background:var(--soft)}
+.v-strip{display:flex;gap:14px;overflow-x:auto;padding:1rem 0 .5rem;
+  scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;-ms-overflow-style:none}
+.v-strip::-webkit-scrollbar{display:none}
+.v-item{flex:0 0 auto;margin:0;scroll-snap-align:start}
+.v-item iframe{width:238px;height:423px;border-radius:16px;display:block;
+  box-shadow:0 10px 28px rgba(49,39,131,.16);border:0}
+.v-item figcaption{font-size:.8rem;color:var(--muted);margin-top:.45rem;max-width:238px}
 </style>
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "ChildCare", "name": "KidsUP", "alternateName": "Детский центр и английский сад KidsUP", "description": "Детский центр и английский сад на Бульваре Рокоссовского: подготовка к школе, английский по программе Cambridge, раннее развитие, мини-сад и нулевой класс, логопед, ИЗО, шахматы, ментальная арифметика. Дети от 1,3 до 12 лет.", "url": "https://kidsup.ru", "telephone": "+74951209024", "address": {"@type": "PostalAddress", "streetAddress": "бульвар Маршала Рокоссовского, 6к1В", "addressLocality": "Москва", "addressRegion": "Москва", "addressCountry": "RU"}, "areaServed": [{"@type": "Place", "name": "Метрогородок"}, {"@type": "Place", "name": "Богородское"}, {"@type": "Place", "name": "Преображенское"}, {"@type": "Place", "name": "Восточный округ Москвы"}], "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "09:00", "closes": "20:00"}], "publicAccess": true, "isAccessibleForFree": false, "audience": {"@type": "PeopleAudience", "suggestedMinAge": 1, "suggestedMaxAge": 12}, "sameAs": ["https://vk.com/club220359229"], "aggregateRating": {"@type": "AggregateRating", "ratingValue": "5.0", "reviewCount": "253", "bestRating": "5", "worstRating": "1"}}</script>
@@ -978,6 +988,33 @@ body.js .reveal.in{opacity:1;transform:none}
   </div>
 </section>
 
+
+<section class="vstrip" id="video">
+  <div class="wrap">
+    <h2>🎬 60 секунд из наших занятий</h2>
+    <p style="color:var(--muted)">Живые кадры — как всё устроено изнутри: занятия,
+    педагоги и отзывы родителей. Больше — на наших каналах ниже.</p>
+    <div class="v-strip">
+      <figure class="v-item"><iframe loading="lazy" title="Английский с носителем — дошкольники"
+        src="https://www.youtube.com/embed/Q70vVr4qZhQ?rel=0&modestbranding=1"
+        allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen
+        frameborder="0"></iframe><figcaption>Английский с носителем — дошкольники</figcaption></figure>
+      <figure class="v-item"><iframe loading="lazy" title="Как проходит урок английского"
+        src="https://www.youtube.com/embed/MJhlSTcPSQY?rel=0&modestbranding=1"
+        allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen
+        frameborder="0"></iframe><figcaption>Как проходит урок английского</figcaption></figure>
+      <figure class="v-item"><iframe loading="lazy" title="Нулевой класс — один день"
+        src="https://www.youtube.com/embed/nhqjFOBwuHo?rel=0&modestbranding=1"
+        allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen
+        frameborder="0"></iframe><figcaption>Нулевой класс — один день</figcaption></figure>
+      <figure class="v-item"><iframe loading="lazy" title="Родители — о нас, своими словами"
+        src="https://www.youtube.com/embed/CUhGt6afIyM?rel=0&modestbranding=1"
+        allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen
+        frameborder="0"></iframe><figcaption>Родители — о нас, своими словами</figcaption></figure>
+    </div>
+  </div>
+</section>
+
 <section class="teach" id="teachers">
   <div class="wrap">
     <h2>Наши педагоги</h2>
@@ -1311,7 +1348,7 @@ body.js .reveal.in{opacity:1;transform:none}
     <div class="grid">
       <div class="box reveal">
         <p><b>📍 Адрес:</b> б-р Маршала Рокоссовского, 6 к1В — напротив ТЦ «Янтарь»,
-        БЦ «Богородский», 7-й подъезд, 2-й этаж.</p>
+        БЦ «Богородский», 7-й подъезд, 2-й этаж, домофон 12.</p>
         <p><b>🚇 Метро:</b> Бульвар Рокоссовского — 2 минуты пешком: из метро
         направо вдоль бульвара, мимо ТЦ «Янтарь», вход со стороны двора.</p>
         <!-- Названия районов нужны не для красоты: по «детский центр
@@ -1323,7 +1360,7 @@ body.js .reveal.in{opacity:1;transform:none}
         парковка у ТЦ «Янтарь» бесплатная.</p>
         <p><b>🕘 Часы работы:</b> ежедневно; в августе 8:00–19:00, с сентября 9:00–20:00.</p>
         <p><b>☎️ Телефон:</b> <a href="tel:+74951209024">+7 495 120-90-24</a></p>
-        <p><b>💬 WhatsApp:</b> <a href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">написать нам</a></p>
+        <p><b>💬 WhatsApp:</b> <a href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">написать нам</a> · <b>✉️</b> <a href="mailto:hello@kidsup.ru">hello@kidsup.ru</a></p>
         <p><b>📄 Работаем по образовательной лицензии:</b> оплата материнским капиталом
         и налоговый вычет 13%.</p>
       </div>
@@ -1340,10 +1377,15 @@ body.js .reveal.in{opacity:1;transform:none}
         ЖК «Богородский», 7-й подъезд, 2-й этаж — ориентир «Дикси». Запутались —
         позвоните, встретим: +7 495 120-90-24.</p>
       </div>
-      <!-- сюда встанут два видеоролика прохода (с бульвара и с Открытого шоссе):
-           пришлите ссылки на ролики или файлы — включу.
-      <iframe class="map" loading="lazy" title="Как пройти с бульвара" src="..."></iframe>
-      <iframe class="map" loading="lazy" title="Как пройти с Открытого шоссе" src="..."></iframe> -->
+      <p style="font-weight:700;color:var(--indigo);margin:14px 0 6px">🎬 Видео: как к нам пройти</p>
+      <iframe class="map" style="margin-bottom:10px" loading="lazy"
+        title="Как пройти со стороны Открытого шоссе (от ТЦ «Янтарь»)"
+        src="https://vk.com/video_ext.php?oid=-220359229&id=456239325&hd=2"
+        allow="encrypted-media; fullscreen; picture-in-picture" frameborder="0"></iframe>
+      <iframe class="map" style="margin-bottom:10px" loading="lazy"
+        title="Как пройти со стороны бульвара Маршала Рокоссовского"
+        src="https://vk.com/video_ext.php?oid=-220359229&id=456239326&hd=2"
+        allow="encrypted-media; fullscreen; picture-in-picture" frameborder="0"></iframe>
       <iframe class="map" loading="lazy" title="KidsUP на карте"
         src="https://yandex.ru/map-widget/v1/?text=%D0%B1%D1%83%D0%BB%D1%8C%D0%B2%D0%B0%D1%80%20%D0%9C%D0%B0%D1%80%D1%88%D0%B0%D0%BB%D0%B0%20%D0%A0%D0%BE%D0%BA%D0%BE%D1%81%D1%81%D0%BE%D0%B2%D1%81%D0%BA%D0%BE%D0%B3%D0%BE%206%D0%BA1%D0%92&z=16"></iframe>
       </div>
