@@ -50,6 +50,27 @@ async def _public_hosts(request, call_next):
     публичных доменах работают как обычно — их зовёт сам сайт."""
     host = (request.headers.get("host") or "").split(":")[0].lower().lstrip("www.")
     path = request.url.path
+    if host in ("kidsup.ru",):
+        # Старые страницы Tilda не должны стать 404 после переезда: у них
+        # есть позиции в поиске и живые ссылки в переписках. 301 ведёт на
+        # соответствующий раздел новой главной.
+        TILDA_301 = {
+            "/english": "/#courses", "/schoolpreparation1": "/#courses",
+            "/schoolpreparation2": "/#courses", "/preschooluniversity": "/#courses",
+            "/precocity1": "/#courses", "/precocity2": "/#courses",
+            "/chess": "/#courses", "/drawing": "/#courses",
+            "/arithmetic": "/#courses", "/speechtherapist": "/#courses",
+            "/robotics": "/#courses", "/music": "/#courses",
+            "/calligraphy": "/#courses", "/fastreading": "/#courses",
+            "/brainstorm": "/#courses", "/dancing": "/#courses",
+            "/celebration": "/#events", "/table": "/#schedule",
+            "/contacts": "/#contact", "/o": "/static/oferta.html",
+            "/privacy": "/static/privacy.html",
+        }
+        if path in TILDA_301:
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse("https://kidsup.ru" + TILDA_301[path],
+                                    status_code=301)
     if host in ("kidsup.ru",) and path == "/":
         # HTMLResponse, а не FileResponse: FileResponse из middleware на
         # этом стеке отдавал заголовки без тела (0 байт) — читаем сами
@@ -2411,7 +2432,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.14"
+APP_VERSION = "2026-08-27.15"
 
 
 @app.get("/api/net")
