@@ -2438,7 +2438,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.25"
+APP_VERSION = "2026-08-27.26"
 
 
 @app.get("/api/net")
@@ -2727,7 +2727,9 @@ def _build_schedule():
         if "Мини-сад" in g["name"] or "Нулевой" in g["name"]:
             cap = min(cap, 10)
         real = max(0, cap - g["enrolled"])
-        shown = real if real <= 4 else 3 + (sum(map(ord, g["name"])) % 2)
+        # Витрина (26.08): группа близка к заполнению или полна (<=3 свободных) —
+        # показываем как есть; свободных ещё много — показываем на 2 меньше.
+        shown = real if real <= 3 else real - 2
         return {**g, "capacity": cap, "free": shown}
     groups = [_pub(g) for g in groups]
     free_by_course: dict[str, int] = {}
