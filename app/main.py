@@ -249,7 +249,7 @@ def api_search(q: str = ""):
             SELECT cl.id, cl.name, co.name course, cl.max_students,
                    COUNT(DISTINCT j.user_id) enrolled
             FROM classes cl LEFT JOIN courses co ON co.id = cl.course_id
-            LEFT JOIN joins j ON j.class_id = cl.id
+            LEFT JOIN joins j ON j.class_id = cl.id AND j.status_id NOT IN (1, 4)
             WHERE cl.name LIKE '2627%'
             GROUP BY cl.id""").fetchall()
         hits = [r for r in rows
@@ -495,7 +495,7 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
                                        THEN j.user_id END) fresh
             FROM classes cl
             LEFT JOIN courses co ON co.id = cl.course_id
-            LEFT JOIN joins j ON j.class_id = cl.id
+            LEFT JOIN joins j ON j.class_id = cl.id AND j.status_id NOT IN (1, 4)
             WHERE cl.name LIKE '2627%'
             GROUP BY cl.id ORDER BY co.name, cl.name""").fetchall()
     groups = []
@@ -746,7 +746,7 @@ def _enrollment_groups() -> list[dict]:
                    COUNT(DISTINCT j.user_id) enrolled
             FROM classes cl
             LEFT JOIN courses co ON co.id = cl.course_id
-            LEFT JOIN joins j ON j.class_id = cl.id
+            LEFT JOIN joins j ON j.class_id = cl.id AND j.status_id NOT IN (1, 4)
             WHERE cl.name LIKE '2627%'
             GROUP BY cl.id ORDER BY co.name, cl.name""").fetchall()
     out = []
@@ -1568,7 +1568,7 @@ def constructor_page(request: Request, age: str = "", day: str = "",
                    COUNT(DISTINCT j.user_id) enrolled
             FROM classes cl
             LEFT JOIN courses co ON co.id = cl.course_id
-            LEFT JOIN joins j ON j.class_id = cl.id
+            LEFT JOIN joins j ON j.class_id = cl.id AND j.status_id NOT IN (1, 4)
             WHERE cl.name LIKE '2627%' AND cl.name NOT LIKE '%аявк%'
             GROUP BY cl.id""").fetchall()
     tpl = db.get_setting("moyklass_group_url",
@@ -1866,7 +1866,7 @@ def brief_page(request: Request, phone: str = ""):
                 SELECT cl.id, cl.name, cl.max_students, co.name course,
                        COUNT(DISTINCT j.user_id) enrolled
                 FROM classes cl LEFT JOIN courses co ON co.id = cl.course_id
-                LEFT JOIN joins j ON j.class_id = cl.id
+                LEFT JOIN joins j ON j.class_id = cl.id AND j.status_id NOT IN (1, 4)
                 WHERE cl.name LIKE '2627%' AND cl.name NOT LIKE '%аявк%'
                 GROUP BY cl.id""").fetchall()
         for r in rows:
@@ -2440,7 +2440,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.32"
+APP_VERSION = "2026-08-27.33"
 
 
 @app.get("/api/net")
