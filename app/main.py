@@ -2440,7 +2440,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.27"
+APP_VERSION = "2026-08-27.28"
 
 
 @app.get("/api/net")
@@ -3881,6 +3881,25 @@ def api_otkazy_scan(hours: int = 720, rebuild: bool = False):
     """Пройти по входящим и собрать отказы, которые раньше нигде не жили."""
     from . import otkaz
     return otkaz.scan(hours=hours, rebuild=rebuild)
+
+
+@app.post("/api/otkazy/add", dependencies=AUTH)
+def api_otkazy_add(phone: str, text: str, name: str = ""):
+    """Внести отказ руками — когда клиент попросил голосом (в звонке), а не
+    текстом: сканеру переписки такой отказ увидеть неоткуда."""
+    from datetime import datetime as _dt
+    from . import otkaz
+    p = "".join(ch for ch in phone if ch.isdigit())[-10:]
+    if len(p) != 10:
+        return {"ok": False, "почему": "нужен телефон из 10-11 цифр"}
+    with db.get_conn() as conn:
+        otkaz._tables(conn)
+        conn.execute(
+            "INSERT OR REPLACE INTO otkazy (chat, phone, name, ts, text, source) "
+            "VALUES (?,?,?,?,?,?)",
+            ("7" + p, p, name, _dt.now().isoformat(timespec="seconds"),
+             (text or "")[:400], "руками"))
+    return {"ok": True, "phone": p, "стоп": otkaz.is_refused(p)}
 
 
 @app.post("/api/otkazy/release", dependencies=AUTH)
