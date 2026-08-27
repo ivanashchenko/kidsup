@@ -37,6 +37,32 @@ BASE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 
+
+@app.middleware("http")
+async def _public_hosts(request, call_next):
+    """Боевые домены на этом же сервере.
+
+    kidsup.ru отдаёт сайт прямо с корня; kidsupday.ru и kidsupweek.ru —
+    те же страницы, но сразу на своём разделе (день открытых дверей и
+    расписание). Пока DNS этих доменов смотрит на Tilda, middleware
+    просто спит; в момент переключения записей всё уже готово — сайт
+    поднимется без деплоя. Служебные пути (/api, /static, вебхуки) на
+    публичных доменах работают как обычно — их зовёт сам сайт."""
+    host = (request.headers.get("host") or "").split(":")[0].lower().lstrip("www.")
+    path = request.url.path
+    if host in ("kidsup.ru",) and path == "/":
+        # HTMLResponse, а не FileResponse: FileResponse из middleware на
+        # этом стеке отдавал заголовки без тела (0 байт) — читаем сами
+        html_text = (BASE / "static" / "site.html").read_text(encoding="utf-8")
+        return HTMLResponse(html_text)
+    if host == "kidsupday.ru" and not path.startswith(("/api", "/static", "/go", "/wazzup", "/hook")):
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("https://kidsup.ru/#dod", status_code=301)
+    if host == "kidsupweek.ru" and not path.startswith(("/api", "/static", "/go", "/wazzup", "/hook")):
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse("https://kidsup.ru/#schedule", status_code=301)
+    return await call_next(request)
+
 _security = HTTPBasic(auto_error=False)
 
 
@@ -2385,7 +2411,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.12"
+APP_VERSION = "2026-08-27.14"
 
 
 @app.get("/api/net")
