@@ -2438,7 +2438,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.22"
+APP_VERSION = "2026-08-27.23"
 
 
 @app.get("/api/net")
@@ -3831,6 +3831,19 @@ def api_guard(hours: int = 24):
             "больше всех получили":
                 [{"телефон": "+7" + p, "сообщений": n}
                  for p, n in per_phone.most_common(5)]}
+
+
+@app.post("/api/caddy-reload", dependencies=AUTH)
+def api_caddy_reload():
+    """Перезагрузить Caddy на этом же сервере. Постоянный, но узкий рычаг:
+    никаких аргументов, только reload. Нужен, когда у нового домена DNS
+    доехал позже, чем Caddy попытался выпустить сертификат, и выпуск ушёл
+    в часовой бэкофф — reload сбрасывает его и пробует сразу (так чинили
+    kidsupday и kidsupweek 27.08)."""
+    import subprocess
+    out = subprocess.run(["systemctl", "reload", "caddy"],
+                         capture_output=True, text=True, timeout=30)
+    return {"код": out.returncode, "вывод": (out.stdout + out.stderr)[-400:]}
 
 
 @app.post("/api/guard/stop", dependencies=AUTH)
