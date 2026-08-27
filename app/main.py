@@ -853,6 +853,10 @@ CLIENT_STATE_NAMES = {
 
 DOC_GROUPS = [
     ("Каждый день на смене", [
+        ("__url:/zayavki", "📋 Листы заявок — кому звонить",
+         "Все открытые заявки сезона поимённо с телефонами и кнопками: "
+         "действующие курсы со скриптом записи, будущие (робототехника, "
+         "танцы, скорочтение) со скриптом-мостом. Собирается при открытии"),
         ("plan341", "🎯 План «341 к 30 сентября» — по шагам",
          "Детальный план заполнения групп: решения владельца, спринт дедлайна "
          "цен 28–31.08, конвейер праздника и ДОД, сетка под спрос, сентябрь. "
@@ -2444,7 +2448,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.34"
+APP_VERSION = "2026-08-27.35"
 
 
 @app.get("/api/net")
@@ -3735,6 +3739,99 @@ def autopilot_digest_now():
         return {"ok": False, "error": traceback.format_exc()[-700:]}
     finally:
         mk.close()
+
+
+@app.get("/zayavki", response_class=HTMLResponse, dependencies=AUTH)
+def zayavki_page():
+    """Листы заявок сезона 2026/27 поимённо: кому звонить и что говорить.
+
+    27.08 план дня отправил админов «обзвонить 19 заявок», не сказав, где
+    взять имена и телефоны, — владелец справедливо спросил «откуда это
+    брать?». Страница собирает живые заявки из МойКласс при открытии:
+    группы «…Заявки…» сезона 2627, без отказавшихся и завершивших."""
+    import html as H
+    from datetime import datetime as _dt
+    from . import sync as _sync, taskguard as _tg
+    from .moyklass_client import MoyklassClient
+    mk = MoyklassClient(_sync.get_api_key())
+    try:
+        joins = _tg.pull_all(mk, "/v1/company/joins", "joins")
+        rc = mk.get("/v1/company/classes", {"limit": 500})
+        cls = {c["id"]: (c.get("name") or "")
+               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
+        users_ = _tg.pull_all(mk, "/v1/company/users", "users", cache_hours=2)
+    finally:
+        mk.close()
+    byid = {u["id"]: u for u in users_}
+    DEAD = {1, 4}
+    # существующий курс → что говорить; несуществующий → мост
+    FUTURE = {"Робототехника": "шахматы или ментальная арифметика",
+              "Танцы": "«Музыка и речь» (движение и ритм)",
+              "Скорочтение": "подготовка к школе (читающие) или Нулевой класс"}
+    rows = []
+    for j in joins:
+        nm = cls.get(j.get("classId"), "")
+        if not nm.startswith("2627") or "аявк" not in nm:
+            continue
+        if j.get("statusId") in DEAD:
+            continue
+        u = byid.get(j.get("userId")) or {}
+        phone = "".join(ch for ch in (u.get("phone") or "") if ch.isdigit())
+        course = (nm.replace("2627_", "").replace("_Заявки", "")
+                  .replace("Заявки_", "")) or "?"
+        rows.append({"course": course, "name": u.get("name") or f"id {j.get('userId')}",
+                     "uid": j.get("userId"), "phone": phone,
+                     "when": str(j.get("createdAt") or "")[:10]})
+    rows.sort(key=lambda r: (r["course"] in FUTURE, r["course"], r["when"]))
+    out = ["""<!doctype html><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Листы заявок — кому звонить</title>
+<style>body{font:16px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;
+padding:14px 16px 50px;background:#F7F7FC;color:#232046;max-width:820px}
+h1{font-size:1.4rem;color:#312783}h2{font-size:1.05rem;color:#312783;margin:1.6rem 0 .4rem}
+.c{background:#fff;border:1px solid #E3E1F0;border-radius:12px;padding:10px 14px;margin:8px 0;
+display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.c .n{font-weight:700}.c .d{color:#5B5876;font-size:.85rem}
+a.btn{background:#7DB928;color:#fff;text-decoration:none;border-radius:999px;
+padding:.45rem 1rem;font-weight:700;font-size:.9rem}
+a.wa{background:#25D366}a.crm{background:#1DA7E0}
+.scr{background:#EEF3FB;border-radius:10px;padding:10px 14px;margin:6px 0 14px;font-size:.92rem}
+.warn{background:#FFF4E0;border:1px solid #F59C00;border-radius:10px;padding:10px 14px;margin:10px 0}
+</style>
+<h1>📋 Листы заявок — кому звонить</h1>
+<p style="color:#5B5876">Живые данные из МойКласс на этот момент. Позвонили — поставьте итог
+в CRM (запись / пробное / не актуально), и человек исчезнет отсюда после смены статуса.</p>"""]
+    cur = None
+    n_exist = sum(1 for r in rows if r["course"] not in FUTURE)
+    out.append(f"<div class=warn><b>Заявки на действующие курсы: {n_exist}.</b> Скрипт: "
+               "«Здравствуйте! Вы оставляли заявку на [курс] в KidsUP. Место есть, и до 31 августа "
+               "включительно действуют цены прошлого года. Могу записать сразу — или удобнее прийти "
+               "на открытый урок на следующей неделе? Первое занятие условно-бесплатное».</div>")
+    for r in rows:
+        if r["course"] != cur:
+            cur = r["course"]
+            if cur in FUTURE:
+                out.append(f"<h2>🕐 {H.escape(cur)} — курса пока НЕТ</h2>"
+                           f"<div class=scr>Скрипт: «Вы у нас первые в списке на {H.escape(cur.lower())} — "
+                           f"откроем при наборе группы, вы узнаете первыми. А уже сейчас есть "
+                           f"{FUTURE[cur]} — и приходите в субботу на праздник в парке „Янтарная горка“, "
+                           f"вход свободный». Даты старта НЕ обещаем.</div>")
+            else:
+                out.append(f"<h2>{H.escape(cur)}</h2>")
+        tel = f"+7{r['phone'][-10:]}" if len(r["phone"]) >= 10 else ""
+        btns = ""
+        if tel:
+            btns = (f"<span><a class=btn href='tel:{tel}'>Позвонить</a> "
+                    f"<a class='btn wa' target=_blank href='https://wa.me/{tel.lstrip('+')}'>WhatsApp</a> "
+                    f"<a class='btn crm' target=_blank "
+                    f"href='https://app.moyklass.com/user/{r['uid']}/info'>CRM</a></span>")
+        out.append(f"<div class=c><span><span class=n>{H.escape(r['name'])}</span> "
+                   f"<span class=d>{tel} · заявка от {r['when']}</span></span>{btns}</div>")
+    if not rows:
+        out.append("<p>Открытых заявок нет — все разобраны 🎉</p>")
+    out.append(f"<p style='color:#5B5876;font-size:.85rem'>Собрано {_dt.now().strftime('%d.%m %H:%M')} · "
+               f"всего {len(rows)} заявок</p>")
+    return HTMLResponse("".join(out))
 
 
 @app.get("/zapolnyaemost", response_class=HTMLResponse, dependencies=AUTH)
