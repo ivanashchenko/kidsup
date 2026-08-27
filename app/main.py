@@ -78,7 +78,9 @@ async def _public_hosts(request, call_next):
         return HTMLResponse(html_text)
     if host == "kidsupday.ru" and not path.startswith(("/api", "/static", "/go", "/wazzup", "/hook")):
         from fastapi.responses import RedirectResponse
-        return RedirectResponse("https://kidsup.ru/#dod", status_code=301)
+        # 27.08: СМС про праздник 29.08 зовёт на KidsUPday.ru — ведём на блок
+        # событий (праздник + ДОД + неделя уроков), а не только на ДОД.
+        return RedirectResponse("https://kidsup.ru/#events", status_code=301)
     if host == "kidsupweek.ru" and not path.startswith(("/api", "/static", "/go", "/wazzup", "/hook")):
         from fastapi.responses import RedirectResponse
         return RedirectResponse("https://kidsup.ru/#schedule", status_code=301)
@@ -2438,7 +2440,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.26"
+APP_VERSION = "2026-08-27.27"
 
 
 @app.get("/api/net")
