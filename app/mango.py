@@ -276,7 +276,11 @@ def send_sms(phone: str, text: str, from_ext: str = "12") -> bool:
     # без правки кода, когда согласуют индивидуальное.
     from . import db as _db
     sender = _db.get_setting("sms_sender_name", "USLUGI_MT") or "USLUGI_MT"
-    r = _call("commands/sms", {"command_id": f"sms_{num[-4:]}",
+    # command_id несёт полный номер и время: уведомление о доставке
+    # (events/sms) возвращает только command_id + код, и по «sms_4673»
+    # раньше нельзя было понять, чья это СМС.
+    import time as _t
+    r = _call("commands/sms", {"command_id": f"sms{num}_{int(_t.time())}",
                                "from_extension": from_ext,
                                "to_number": num, "text": text[:480],
                                "sms_sender": sender})

@@ -2440,7 +2440,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-27.31"
+APP_VERSION = "2026-08-27.32"
 
 
 @app.get("/api/net")
@@ -5183,6 +5183,73 @@ async def marquiz_webhook(request: Request, key: str = ""):
     logging.getLogger("kidsup.marquiz").info("заявка %s (%s): crm=%s %s",
                                              name, phone, ok, msg)
     return {"ok": True, "lead_id": lead_id, "crm": ok}
+
+
+@app.post("/events/sms")
+async def mango_sms_status(request: Request):
+    """Статус доставки СМС от Манго (уведомление events/sms).
+
+    Другого способа узнать судьбу СМС нет: команда отправки отвечает лишь
+    «принято», а 27.08 выяснилось, что МТС молча фильтрует часть массовых
+    отправок (у владельца из двух одинаковых СМС дошла одна). Адрес этого
+    обработчика прописывается в ЛК Манго как «адрес внешней системы» —
+    Манго сама добавляет суффикс /events/sms.
+    Коды reason: 1000 доставлено; 43xx — нет (4300 не удалось, 4301
+    устарело, 4391 утеряно оператором, 4392 отклонено оператором,
+    4393 отменено)."""
+    import hashlib as _h
+    import json as _j
+    from datetime import datetime as _dt
+    try:
+        form = await request.form()
+        raw = form.get("json") or "{}"
+        key = form.get("vpbx_api_key") or ""
+        sign = form.get("sign") or ""
+        data = _j.loads(raw)
+    except Exception:
+        return {"ok": True}
+    our_key = db.get_setting("mango_key") or ""
+    salt = db.get_setting("mango_salt") or ""
+    valid = (key == our_key and sign == _h.sha256(
+        (our_key + raw + salt).encode()).hexdigest())
+    cid = str(data.get("command_id") or "")
+    phone = ""
+    if cid.startswith("sms") and "_" in cid:
+        digits = "".join(ch for ch in cid.split("_")[0] if ch.isdigit())
+        phone = digits[-11:] if len(digits) >= 11 else digits
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS sms_status (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, command_id TEXT,
+            phone TEXT, reason INTEGER, valid_sign INTEGER)""")
+        conn.execute(
+            "INSERT INTO sms_status (ts, command_id, phone, reason, valid_sign)"
+            " VALUES (?,?,?,?,?)",
+            (_dt.now().isoformat(timespec="seconds"), cid[:128], phone,
+             int(data.get("reason") or 0), int(valid)))
+    return {"ok": True}
+
+
+@app.get("/api/sms-report", dependencies=AUTH)
+def api_sms_report(day: str = ""):
+    """Сводка доставки СМС по вебхук-статусам Манго (за день, МСК)."""
+    from datetime import datetime as _dt
+    d = day or _dt.now().strftime("%Y-%m-%d")
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                "SELECT phone, reason, ts FROM sms_status WHERE ts LIKE ? "
+                "ORDER BY ts", (d + "%",)).fetchall()
+        except Exception:
+            rows = []
+    dostavleno = [r[0] for r in rows if r[1] == 1000]
+    problemy = [{"phone": r[0], "code": r[1], "ts": r[2]}
+                for r in rows if r[1] != 1000]
+    return {"день": d, "событий": len(rows),
+            "доставлено": len(dostavleno),
+            "не_доставлено": len(problemy), "проблемные": problemy[:200],
+            "подсказка": ("пусто = в ЛК Манго не прописан адрес внешней "
+                          "системы https://app.kidsup.ru — см. Настройки → "
+                          "Интеграции → API")}
 
 
 @app.get("/wazzup/webhook")
