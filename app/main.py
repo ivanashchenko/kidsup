@@ -2392,7 +2392,7 @@ def _match_click(conn, ts: str, phone: str, chat_type: str) -> None:
 
 MESSENGER_LINKS = {
     # мессенджеры для обращений
-    "whatsapp": "https://wa.me/79160170918",   # 28.08 19:00: WhatsApp 0077 снова забанен Meta — единственный живой канал
+    "whatsapp": "https://wa.me/79199683507",   # 29.08 02:00: публикуем WABA-номер 3507 (0077 в бане, 0918 — только рассылки и напоминания)
     "telegram": "https://t.me/KidsUPchat",
     "max": "https://max.ru/u/f9LHodD0cOL7ouxX67LQufADpyAmbvMGRUdMqaGj2Ya-F1EuIVQMGWeU9gc",
     # соцсети — тоже через /go, чтобы видеть, откуда приходят
@@ -2506,7 +2506,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-29.2"
+APP_VERSION = "2026-08-29.3"
 
 
 @app.get("/api/net")
