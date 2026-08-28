@@ -2491,7 +2491,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-28.17"
+APP_VERSION = "2026-08-28.19"
 
 
 @app.get("/api/net")
@@ -2897,10 +2897,10 @@ def _lead_to_crm(lead: dict) -> None:
     # дежурного и соединяет с клиентом; одна попытка на номер в день,
     # ночная заявка получает обычный порядок (уведомление + задача) и
     # звонок утром.
-    # Кто за какой трубкой (сверено с CDR 28.08): Ира на доб.12 (SIP user5),
-    # Аня — ноутбук доб.15 (user3), Лена — доб.10 (user1). Прежняя карта
-    # ставила Иру на 10 — мгновенный перезвон по заявке звонил не туда.
-    MGR_EXT = {232763: "12", 232805: "15", 202856: "10"}
+    # Кто за какой трубкой. 28.08 16:00 Ира ушла с доб.12 (трубка глючит)
+    # на доб.10; Аня — ноутбук доб.15. Менять здесь при каждой пересадке:
+    # по этой карте мгновенный перезвон по заявке набирает дежурного.
+    MGR_EXT = {232763: "10", 232805: "15", 202856: "12"}
     try:
         from . import mango as _mango
         hour = autopilot._now().hour
@@ -4024,6 +4024,14 @@ def api_wazzup_channels_map():
             return {"rows": []}
     return {"rows": [{"phone": r[0], "chat_type": r[1], "n": r[2], "last": r[3]}
                      for r in rows]}
+
+
+@app.post("/api/chat-watchdog", dependencies=AUTH)
+def api_chat_watchdog():
+    """Проверить прямо сейчас, кто ждёт ответа в переписке (обычно
+    запускается сам каждые 10 минут)."""
+    from . import autopilot
+    return autopilot.chat_watchdog()
 
 
 @app.get("/api/otkazy", dependencies=AUTH)

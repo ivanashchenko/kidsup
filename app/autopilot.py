@@ -3248,6 +3248,86 @@ def team_chat_tick() -> None:
     db.set_state("team_chat_last_id", str(max(r[0] for r in rows)))
 
 
+
+# --- сторож чатов: клиент написал и ждёт --------------------------------
+# 28.08: два сообщения об оплате провисели по три часа. Человек, который
+# отправил деньги, не должен ждать дольше, чем ждал бы у кассы. Раз в
+# десять минут смотрим, где последнее слово осталось за клиентом, и
+# напоминаем администратору переписки — с именем, временем и цитатой.
+CHAT_SLA_MIN = 15          # обычное сообщение
+CHAT_SLA_MONEY_MIN = 5     # про оплату — быстрее
+_MONEY_RE = re.compile(r"оплат|плачу|платил|перевел|перевёл|перевод|чек|"
+                       r"квитанц|транзакц|счёт|счет|деньг", re.I)
+
+
+def chat_watchdog() -> dict:
+    """Диалоги, где ждёт ответа клиент. Возвращает {'waiting': N, 'sent': bool}."""
+    from . import db as _db, wazzup as _wz
+    now = _now()
+    since = (now - timedelta(hours=14)).isoformat(timespec="seconds")
+    last: dict[str, tuple] = {}
+    with _db.get_conn() as conn:
+        for table, direction in (("wazzup_inbox", "in"), ("wazzup_outbox", "out")):
+            try:
+                rows = conn.execute(
+                    f"SELECT ts, phone, text FROM {table} WHERE ts >= ?", (since,)).fetchall()
+            except Exception:
+                rows = []
+            for ts, phone, text in rows:
+                p = "".join(ch for ch in str(phone or "") if ch.isdigit())
+                if not p:
+                    continue
+                cur = last.get(p)
+                if not cur or str(ts) > cur[0]:
+                    last[p] = (str(ts), direction, (text or "")[:70])
+    waiting = []
+    for p, (ts, direction, text) in last.items():
+        if direction != "in":
+            continue
+        try:
+            mins = (now - datetime.fromisoformat(ts.replace("Z", "")).replace(
+                tzinfo=now.tzinfo)).total_seconds() / 60
+        except Exception:
+            continue
+        money = bool(_MONEY_RE.search(text))
+        limit = CHAT_SLA_MONEY_MIN if money else CHAT_SLA_MIN
+        if mins < limit or mins > 600:
+            continue
+        waiting.append((money, int(mins), p, text, ts))
+    if not waiting:
+        return {"waiting": 0, "sent": False}
+    waiting.sort(key=lambda x: (not x[0], -x[1]))
+    # напоминаем не чаще раза в 30 минут и только по новым адресатам
+    fresh = [w for w in waiting
+             if _mark("chatwatch", f"{w[2]}:{_now().strftime('%Y-%m-%d %H')}{'0' if _now().minute < 30 else '1'}")]
+    if not fresh:
+        return {"waiting": len(waiting), "sent": False}
+    names = {}
+    try:
+        with _db.get_conn() as conn:
+            for _, _, p, _, _ in fresh:
+                r = conn.execute("SELECT name FROM users WHERE substr(phone,-10)=? LIMIT 1",
+                                 (p[-10:],)).fetchone()
+                if r:
+                    names[p] = r["name"]
+    except Exception:
+        pass
+    lines = ["⏳ Ждут ответа в переписке:"]
+    for money, mins, p, text, _ in fresh[:8]:
+        who = names.get(p) or f"+{p}"
+        lines.append(f"{'💰 ' if money else ''}{who} — {mins} мин: «{text}»")
+    lines.append("Ответьте и закройте задачу в CRM. — Клод")
+    try:
+        phones = json.loads(_db.get_setting("admin_phones") or "{}")
+        chat_admin = _db.get_setting("chat_admin") or "154181"
+        dphone = phones.get(str(chat_admin)) or _db.get_setting("digest_phone")
+        if dphone:
+            _wz.send_via("tgapi", dphone, "\n".join(lines), dry_run=False)
+    except Exception:
+        log.exception("сторож чатов: напоминание не ушло")
+    return {"waiting": len(waiting), "sent": True, "fresh": len(fresh)}
+
+
 def poll_calls() -> dict:
     """Минутный опрос Mango вместо платных уведомлений.
 
@@ -3442,6 +3522,13 @@ def _loop() -> None:
                     team_chat_tick()
                 except Exception:
                     log.exception("team_chat_tick упал — продолжаем")
+            # сторож чатов: раз в 10 минут проверяем, не ждёт ли кто ответа
+            if 9 <= now.hour < 21 and now.minute % 10 == 0 \
+                    and _mark("chatwatch_tick", now.strftime("%Y-%m-%d %H:%M")):
+                try:
+                    chat_watchdog()
+                except Exception:
+                    log.exception("сторож чатов упал — продолжаем")
             # лёгкий синк групп и записей каждые 5 минут (08:00-21:00) —
             # «Набор 26/27» видит новые записи почти сразу; полный синк —
             # раз в день утром и по кнопке
