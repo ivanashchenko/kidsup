@@ -2483,7 +2483,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-28.10"
+APP_VERSION = "2026-08-28.11"
 
 
 @app.get("/api/net")
@@ -3998,6 +3998,21 @@ def api_guard_stop(off: bool = True):
     """Мгновенный стоп-кран для ВСЕХ автосообщений."""
     db.set_setting("messages_off", "1" if off else "0")
     return {"ok": True, "автосообщения": "остановлены" if off else "включены"}
+
+
+@app.get("/api/wazzup/channels-map", dependencies=AUTH)
+def api_wazzup_channels_map():
+    """Номера с живой перепиской по каналам (для точечных рассылок в
+    Telegram/MAX: туда можно писать только тем, кто писал нам сам)."""
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                "SELECT phone, chat_type, COUNT(*) n, MAX(ts) last FROM wazzup_inbox "
+                "WHERE phone != '' GROUP BY phone, chat_type").fetchall()
+        except Exception:
+            return {"rows": []}
+    return {"rows": [{"phone": r[0], "chat_type": r[1], "n": r[2], "last": r[3]}
+                     for r in rows]}
 
 
 @app.get("/api/otkazy", dependencies=AUTH)
