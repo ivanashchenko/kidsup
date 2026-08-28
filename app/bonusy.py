@@ -165,7 +165,10 @@ def collect(since: str = SINCE) -> dict:
                          "came": uid in came, "paid": bool(pays),
                          "bonus": bonus if who in PAID_ADMINS else 0,
                          "why": ", ".join(why)})
+        new_no_trial = sum(1 for r in rows if not r["cont"] and not r["came"])
+        trial_pot = (money + new_no_trial * RATE_TRIAL) if who in PAID_ADMINS else 0
         out[who] = {"rows": sorted(rows, key=lambda r: r["date"]),
+                    "trial_pot": trial_pot,
                     "count": len(rows),
                     "total_all": total_all.get(who, 0),
                     "today": today_all.get(who, 0),
@@ -180,7 +183,7 @@ def collect(since: str = SINCE) -> dict:
             out[who] = {"rows": [], "count": 0, "total_all": n,
                         "today": today_all.get(who, 0), "cont": 0,
                         "zayavki": 0, "came": 0, "paid": 0,
-                        "money": 0, "forecast": 0}
+                        "money": 0, "forecast": 0, "trial_pot": 0}
     return out
 
 
@@ -230,23 +233,29 @@ def page(data: dict) -> str:
            "<h2>Итог</h2><table><tr><th>Кто</th><th>Записей всего</th>"
            "<th>Сегодня</th><th>С 17.08</th><th>из них заявки</th>"
            "<th>Продолж.</th><th>Дошли</th><th>Оплатили</th>"
-           "<th>Начислено</th><th>Прогноз «все купят»</th></tr>"]
-    t = {"all": 0, "today": 0, "cnt": 0, "money": 0, "fc": 0}
+           "<th>Начислено (факт, включая проданные абонементы)</th>"
+           "<th>Если все дойдут до пробного</th>"
+           "<th>Максимум: все дойдут и купят</th></tr>"]
+    t = {"all": 0, "today": 0, "cnt": 0, "money": 0, "fc": 0, "tp": 0}
     for w in order:
         d = data[w]
         t["all"] += d["total_all"]; t["today"] += d["today"]
         t["cnt"] += d["count"]; t["money"] += d["money"]; t["fc"] += d["forecast"]
+        t["tp"] += d.get("trial_pot", 0)
         fc = f"{d['forecast']:,} ₽".replace(",", " ") if w in PAID_ADMINS else "—"
         mn = f"{d['money']:,} ₽".replace(",", " ") if w in PAID_ADMINS else "—"
+        tp = f"{d.get('trial_pot',0):,} ₽".replace(",", " ") if w in PAID_ADMINS else "—"
         out.append(f"<tr><td><b>{w}</b></td><td>{d['total_all']}</td>"
                    f"<td>{d['today']}</td><td>{d['count']}</td>"
                    f"<td>{d['zayavki']}</td><td>{d['cont']}</td>"
                    f"<td>{d['came']}</td><td>{d['paid']}</td>"
-                   f"<td class=money>{mn}</td><td class=money>{fc}</td></tr>")
+                   f"<td class=money>{mn}</td><td class=money>{tp}</td>"
+                   f"<td class=money>{fc}</td></tr>")
     out.append(f"<tr class=tot><td>Всего</td><td>{t['all']}</td>"
                f"<td>{t['today']}</td><td>{t['cnt']}</td><td></td><td></td>"
                f"<td></td><td></td>"
                f"<td class=money>{t['money']:,} ₽</td>"
+               f"<td class=money>{t['tp']:,} ₽</td>"
                f"<td class=money>{t['fc']:,} ₽</td></tr></table>"
                .replace(",", " "))
     for w in order:
