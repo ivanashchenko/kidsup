@@ -2377,7 +2377,7 @@ def _match_click(conn, ts: str, phone: str, chat_type: str) -> None:
 
 MESSENGER_LINKS = {
     # мессенджеры для обращений
-    "whatsapp": "https://wa.me/79160170918",
+    "whatsapp": "https://wa.me/79165610077",   # номер входящих (см. wa_incoming)
     "telegram": "https://t.me/KidsUPchat",
     "max": "https://max.ru/u/f9LHodD0cOL7ouxX67LQufADpyAmbvMGRUdMqaGj2Ya-F1EuIVQMGWeU9gc",
     # соцсети — тоже через /go, чтобы видеть, откуда приходят
@@ -2491,7 +2491,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-08-28.14"
+APP_VERSION = "2026-08-28.15"
 
 
 @app.get("/api/net")
