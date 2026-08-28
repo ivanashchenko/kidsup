@@ -20,6 +20,9 @@ h2{font-size:17px;color:#312783;margin:12px 0 5px}
 .cb{display:flex;gap:8px;align-items:center;padding:5px 0;font-size:14px}
 .cb i{width:16px;height:16px;border:2px solid #312783;border-radius:3px;flex:0 0 auto}
 .small{font-size:11px;color:#5B5876;line-height:1.3}
+.steps{display:flex;gap:6px;margin:8px 0 2px}
+.steps div{flex:1;background:#F0F7E4;border:1.5px solid #7DB928;border-radius:9px;padding:6px 8px;font-size:11.5px;line-height:1.25;color:#3d6b00}
+.steps b{display:block;font-size:15px;color:#7DB928;line-height:1}
 .lot{background:#F0F7E4;border:2px dashed #7DB928;border-radius:12px;padding:10px 14px;margin-top:12px;display:flex;justify-content:space-between;align-items:center}
 .lot b{font-size:16px;color:#3d6b00}
 .num{border:2px solid #7DB928;border-radius:8px;width:80px;height:34px}
@@ -35,7 +38,7 @@ td{border-bottom:1px solid #E3E1F0;padding:6px 8px;font-size:13px;vertical-align
 </style></head><body>
 
 <div class="no-print"><b>Настройки печати (Chrome):</b> Ctrl+P → Бумага <b>A4</b> · Масштаб <b>100% (по умолчанию)</b> · Поля <b>по умолчанию</b> · <b>снять галочку «Колонтитулы»</b> · Двусторонняя, переплёт по короткой стороне. На принтере, если просит бумагу: «Выбор бумаги» → <b>Кассета 1, A4, Обычная</b> (не «Калька», не «Обходной лоток»).<br><b>Тираж:</b> Ctrl+P → двусторонняя (переплёт по короткой стороне) → 300 копий.
-Сторона 1 — анкета-билет лотереи, сторона 2 — карта занятий. После праздника анкеты — стопкой Лизе: телефоны в CRM в тот же вечер.</div>
+Сторона 1 — анкета, сторона 2 — карта занятий.<br><b>Механика подарка:</b> родитель заполняет анкету (обязательно имя + телефон) → отдаёт администратору → администратор проверяет, что телефон вписан, и допускает ребёнка к барабану → ребёнок крутит барабан и достаёт жетон с номером → администратор выдаёт игрушку с этим номером, пишет номер в зелёной плашке внизу анкеты и ставит галочку «выдана». Один ребёнок — одно вращение; на второго ребёнка в семье заполняется отдельная строка в анкете и даётся ещё одно вращение.<br>После праздника анкеты — стопкой Лизе: телефоны в CRM в тот же вечер.</div>
 
 <!-- ================= СТОРОНА 1: АНКЕТА ================= -->
 <div class="sheet">
@@ -44,8 +47,9 @@ td{border-bottom:1px solid #E3E1F0;padding:6px 8px;font-size:13px;vertical-align
     <div class="slog">Научим читать за 3 месяца!<br>Заговорит по-английски за год!</div>
   </div>
 
-  <h1>🎁 Билет беспроигрышной лотереи</h1>
-  <p class="lead">Заполните анкету, опустите в барабан на стойке KidsUP — и заберите гарантированный приз. Розыгрыш главных призов — в 13:30 на сцене!</p>
+  <h1>🎁 Анкета — и подарок ребёнку</h1>
+  <p class="lead">Подарок получает <b>каждый</b> ребёнок — просто заполните анкету.</p>
+  <div class="steps"><div><b>1</b>Родитель заполняет анкету</div><div><b>2</b>Отдаёт администратору KidsUP</div><div><b>3</b>Ребёнок крутит барабан и вытягивает номер</div><div><b>4</b>Забирает игрушку с этим номером 🧸</div></div>
 
   <div class="box">
     <div class="line"><b>Родитель (имя):</b><span class="fill"></span><b>Телефон:</b><span class="fill" style="min-width:52mm"></span></div>
@@ -84,7 +88,7 @@ td{border-bottom:1px solid #E3E1F0;padding:6px 8px;font-size:13px;vertical-align
 
   <div class="deadline">💛 <b>До 31 августа включительно — цены прошлого года.</b> Первое занятие — условно-бесплатное: не понравится — платить не нужно, понравится — войдёт в первый абонемент. В день пробного — скидка 10%.</div>
 
-  <div class="lot"><b>🎡 Опустите билет в барабан — приз гарантирован!</b><span style="display:flex;gap:8px;align-items:center"><span class="small">№ билета</span><span class="num"></span></span></div>
+  <div class="lot"><b>🎡 Барабан с подарками</b><span style="display:flex;gap:10px;align-items:center"><span class="small">Заполняет администратор:<br>№ игрушки из барабана</span><span class="num"></span><span class="cb" style="font-size:12px"><i></i>выдана</span></span></div>
 
   <p class="small" style="margin-top:8px">☐ Согласен(на) на обработку персональных данных и получение сообщений от KidsUP (ИП Иванащенко Б.М.) о занятиях и событиях. Отказаться можно в любой момент: письмо на hello@kidsup.ru с пометкой «Отказ от уведомлений» или «Стоп» в мессенджере. Политика: kidsup.ru/privacy</p>
 
