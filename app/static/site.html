@@ -55,17 +55,14 @@ section{scroll-margin-top:76px;padding:56px 0}
 .top .btn{padding:.55rem 1.2rem;font-size:.88rem}
 .burger{display:none;background:none;border:1.5px solid var(--line);border-radius:10px;padding:.4rem .6rem;cursor:pointer;font-size:1.2rem;line-height:1;color:var(--indigo)}
 @media(max-width:900px){
-  /* меню на весь экран: с маленькой выпадашкой пункты терялись (28.08) */
-  .top nav{display:none;position:fixed;inset:0;z-index:49;background:#fff;
-    flex-direction:column;align-items:stretch;gap:0;padding:86px 22px 20px;overflow-y:auto}
+  .fab{display:none!important}
+  .top nav{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;flex-direction:column;
+    align-items:flex-start;gap:0;padding:.4rem 1rem 1rem;box-shadow:0 14px 30px rgba(49,39,131,.12)}
   .top nav.open{display:flex}
-  .top nav a{padding:1.05rem 0;width:100%;border-bottom:1px solid var(--line);
-    font:700 1.25rem Rubik,-apple-system,sans-serif;color:var(--indigo)}
-  .top nav a[href="#signup"]{background:var(--green);color:#fff;border-radius:14px;
-    text-align:center;margin-top:1.1rem;padding:1rem;border-bottom:none}
-  .burger{display:block;order:2;position:relative;z-index:52}
-  body.menu-open .top{backdrop-filter:none;-webkit-backdrop-filter:none}
-  .top .wrap{flex-wrap:wrap;position:relative}
+  .top nav a{padding:.7rem 0;width:100%;border-bottom:1px solid var(--line)}
+  .top nav a.nav-cta{background:none;color:var(--green);border-radius:0;padding:.7rem 0}
+  .burger{display:block;order:2}
+  .top .wrap{flex-wrap:wrap;position:relative;width:100%;max-width:none;justify-content:space-between}
 }
 @media(max-width:420px){.top .tel{display:none}}
 /* hero */
@@ -348,7 +345,7 @@ body.js .reveal.in{opacity:1;transform:none}
   .sb-sheet a span{font:400 .85rem Inter;color:var(--muted)}
   .sb-sheet i{width:14px;height:14px;border-radius:50%;flex:0 0 auto}
   body{padding-bottom:52px}
-  .fab{bottom:132px}
+  .fab{display:none!important}
 }
 
 .vstrip{background:var(--soft)}
@@ -1592,14 +1589,11 @@ document.getElementById('wait').addEventListener('click', e => {
   if (!bt || !nav) return;
   bt.addEventListener('click', () => {
     const open = nav.classList.toggle('open');
-    document.body.classList.toggle('menu-open', open);
     bt.setAttribute('aria-expanded', open ? 'true' : 'false');
     bt.textContent = open ? '✕' : '☰';
   });
   nav.addEventListener('click', e => {
-    if (e.target.tagName === 'A') { nav.classList.remove('open');
-      document.body.classList.remove('menu-open');
-      bt.textContent = '☰'; bt.setAttribute('aria-expanded','false'); }
+    if (e.target.tagName === 'A') { nav.classList.remove('open'); bt.textContent = '☰'; bt.setAttribute('aria-expanded','false'); }
   });
 })();
 document.getElementById('flt').addEventListener('click', e => {
@@ -2035,7 +2029,7 @@ document.querySelectorAll('.mini-lead').forEach(function(f){
   <a class="sb-main" href="#signup">Записаться</a>
 </div>
 <div class="sb-sheet" id="sb-sheet" hidden>
-  <a href="https://app.kidsup.ru/go/whatsapp?src=site_bar&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D1%83%D0%B7%D0%BD%D0%B0%D1%82%D1%8C%20%D0%BF%D1%80%D0%BE%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D1%8F" target="_blank" rel="noopener"><i style="background:#25D366"></i>WhatsApp <span>— быстрее всего</span></a>
+  <a href="https://app.kidsup.ru/go/whatsapp?src=site_bar&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D1%83%D0%B7%D0%BD%D0%B0%D1%82%D1%8C%20%D0%BF%D1%80%D0%BE%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D1%8F" target="_blank" rel="noopener"><i style="background:#25D366"></i>WhatsApp</a>
   <a href="https://app.kidsup.ru/go/telegram?src=site_bar" target="_blank" rel="noopener"><i style="background:#2AABEE"></i>Telegram</a>
   <a href="https://app.kidsup.ru/go/max?src=site_bar" target="_blank" rel="noopener"><i style="background:#8A2BE2"></i>MAX</a>
 </div>
