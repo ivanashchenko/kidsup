@@ -2,37 +2,39 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Анкета праздника — печать</title>
 <style>
-@page{size:A4;margin:10mm}
-body{font:13px/1.45 -apple-system,'Segoe UI',Roboto,sans-serif;color:#232046;margin:0}
-.sheet{width:190mm;min-height:277mm;margin:0 auto;padding:6mm 4mm;box-sizing:border-box;page-break-after:always;position:relative}
-.no-print{background:#FFF4E0;padding:10px 14px;border-radius:10px;margin:10px auto;max-width:190mm}
-@media print{.no-print{display:none}}
-h1{font-size:22px;color:#312783;margin:0 0 2px}
-h2{font-size:15px;color:#312783;margin:10px 0 4px}
-.lead{color:#5B5876;margin:0 0 8px}
-.box{border:2px solid #312783;border-radius:12px;padding:8px 12px;margin:8px 0}
-.line{display:flex;align-items:flex-end;gap:8px;margin:10px 0}
-.line b{white-space:nowrap}
-.fill{flex:1;border-bottom:2px dotted #9a96c0;height:20px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin:6px 0}
-.cb{display:flex;gap:7px;align-items:center;padding:3px 0}
-.cb i{width:14px;height:14px;border:2px solid #312783;border-radius:4px;flex:0 0 auto}
-.small{font-size:10.5px;color:#5B5876;line-height:1.35}
-.lot{background:#F0F7E4;border:2px dashed #7DB928;border-radius:12px;padding:8px 12px;margin-top:8px;display:flex;justify-content:space-between;align-items:center}
-.lot b{font-size:15px;color:#3d6b00}
-.num{border:2px solid #7DB928;border-radius:8px;width:70px;height:30px}
-.hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1DA7E0;padding-bottom:6px;margin-bottom:8px}
-.hdr .brand{font-weight:900;font-size:20px;color:#312783}
-.hdr .slog{color:#1DA7E0;font-weight:700;font-size:12px;text-align:right}
-table{border-collapse:collapse;width:100%;margin:6px 0}
-th{background:#312783;color:#fff;font-size:11px;padding:5px 7px;text-align:left}
-td{border-bottom:1px solid #E3E1F0;padding:5px 7px;font-size:12px;vertical-align:top}
+@page{size:A4 portrait;margin:9mm}
+html,body{margin:0;padding:0}
+body{font:15px/1.45 -apple-system,'Segoe UI',Roboto,sans-serif;color:#232046;background:#fff}
+.sheet{width:100%;max-width:192mm;margin:0 auto;padding:0;box-sizing:border-box;page-break-after:always;break-after:page;position:relative}
+.sheet:last-of-type{page-break-after:auto;break-after:auto}
+.no-print{background:#FFF4E0;padding:10px 14px;border-radius:10px;margin:10px auto;max-width:192mm;font-size:13px}
+@media print{.no-print{display:none!important}}
+h1{font-size:25px;color:#312783;margin:0 0 2px}
+h2{font-size:17px;color:#312783;margin:12px 0 5px}
+.lead{color:#5B5876;margin:0 0 10px;font-size:14px}
+.box{border:2px solid #312783;border-radius:12px;padding:10px 14px;margin:10px 0}
+.line{display:flex;align-items:flex-end;gap:9px;margin:14px 0}
+.line b{white-space:nowrap;font-size:14.5px}
+.fill{flex:1;border-bottom:2px dotted #9a96c0;height:26px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 16px;margin:4px 0}
+.cb{display:flex;gap:8px;align-items:center;padding:5px 0;font-size:14px}
+.cb i{width:16px;height:16px;border:2px solid #312783;border-radius:3px;flex:0 0 auto}
+.small{font-size:11px;color:#5B5876;line-height:1.3}
+.lot{background:#F0F7E4;border:2px dashed #7DB928;border-radius:12px;padding:10px 14px;margin-top:12px;display:flex;justify-content:space-between;align-items:center}
+.lot b{font-size:16px;color:#3d6b00}
+.num{border:2px solid #7DB928;border-radius:8px;width:80px;height:34px}
+.hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1DA7E0;padding-bottom:4px;margin-bottom:6px}
+.hdr .brand{font-weight:900;font-size:21px;color:#312783}
+.hdr .slog{color:#1DA7E0;font-weight:700;font-size:12.5px;text-align:right}
+table{border-collapse:collapse;width:100%;margin:4px 0}
+th{background:#312783;color:#fff;font-size:12px;padding:6px 8px;text-align:left}
+td{border-bottom:1px solid #E3E1F0;padding:6px 8px;font-size:13px;vertical-align:top}
 .age{color:#1DA7E0;font-weight:700;white-space:nowrap}
-.deadline{background:#FFF4E0;border-left:4px solid #F59C00;padding:7px 10px;margin:8px 0;font-size:12.5px}
-.foot{position:absolute;bottom:4mm;left:4mm;right:4mm;font-size:10.5px;color:#5B5876;border-top:1px solid #E3E1F0;padding-top:4px;display:flex;justify-content:space-between}
+.deadline{background:#FFF4E0;border-left:5px solid #F59C00;padding:9px 12px;margin:11px 0;font-size:13.5px}
+.foot{margin-top:14px;font-size:11px;color:#5B5876;border-top:1px solid #E3E1F0;padding-top:3px;display:flex;justify-content:space-between}
 </style></head><body>
 
-<div class="no-print"><b>Печать:</b> Ctrl+P → двусторонняя (переплёт по короткой стороне) → 300 копий.
+<div class="no-print"><b>Настройки печати (Chrome):</b> Ctrl+P → Бумага <b>A4</b> · Масштаб <b>100% (по умолчанию)</b> · Поля <b>по умолчанию</b> · <b>снять галочку «Колонтитулы»</b> · Двусторонняя, переплёт по короткой стороне. На принтере, если просит бумагу: «Выбор бумаги» → <b>Кассета 1, A4, Обычная</b> (не «Калька», не «Обходной лоток»).<br><b>Тираж:</b> Ctrl+P → двусторонняя (переплёт по короткой стороне) → 300 копий.
 Сторона 1 — анкета-билет лотереи, сторона 2 — карта занятий. После праздника анкеты — стопкой Лизе: телефоны в CRM в тот же вечер.</div>
 
 <!-- ================= СТОРОНА 1: АНКЕТА ================= -->
