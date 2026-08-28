@@ -50,7 +50,7 @@ section{scroll-margin-top:76px;padding:56px 0}
 .top nav{display:flex;gap:18px;margin-left:auto;font:600 .88rem Inter}
 .top nav a{color:var(--ink);text-decoration:none;white-space:nowrap}
 .top nav a:hover{color:var(--blue)}
-.top nav a.nav-cta{background:var(--green);color:#fff;border-radius:999px;padding:.35rem .9rem}
+.top nav a.nav-cta{display:none}   /* на десктопе есть кнопка в шапке — второй не нужно */
 .top .tel{font:700 1rem Rubik;color:var(--indigo);text-decoration:none;white-space:nowrap}
 .top .btn{padding:.55rem 1.2rem;font-size:.88rem}
 .burger{display:none;background:none;border:1.5px solid var(--line);border-radius:10px;padding:.4rem .6rem;cursor:pointer;font-size:1.2rem;line-height:1;color:var(--indigo)}
@@ -60,7 +60,7 @@ section{scroll-margin-top:76px;padding:56px 0}
     align-items:flex-start;gap:0;padding:.4rem 1rem 1rem;box-shadow:0 14px 30px rgba(49,39,131,.12)}
   .top nav.open{display:flex}
   .top nav a{padding:.7rem 0;width:100%;border-bottom:1px solid var(--line)}
-  .top nav a.nav-cta{background:none;color:var(--green);border-radius:0;padding:.7rem 0}
+  .top nav a.nav-cta{display:block;background:none;color:var(--green);border-radius:0;padding:.7rem 0;font-weight:700}
   .burger{display:block;order:2}
   .top .wrap{flex-wrap:wrap;position:relative;width:100%;max-width:none;justify-content:space-between}
 }
