@@ -1,0 +1,162 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<title>Форма записи на открытые уроки</title>
+<style>
+@page{size:A4 portrait;margin:9mm}
+html,body{margin:0;padding:0}
+body{font:13px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;color:#232046;background:#fff}
+.sheet{width:100%;max-width:192mm;margin:0 auto;page-break-after:always;break-after:page}
+.sheet:last-of-type{page-break-after:auto;break-after:auto}
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1DA7E0;padding-bottom:5px;margin-bottom:8px}
+.brand{font-weight:900;font-size:19px;color:#312783}
+.brand span{font-weight:400;font-size:11px;color:#5B5876}
+.when{text-align:right;font-weight:700;color:#1DA7E0;font-size:12.5px;line-height:1.3}
+h1{font-size:20px;color:#312783;margin:0 0 3px}
+.lead{color:#5B5876;font-size:12px;margin:0 0 8px}
+table{border-collapse:collapse;width:100%;margin-bottom:9px}
+th{background:#312783;color:#fff;font-size:11px;padding:5px 6px;text-align:left;border:1px solid #312783}
+td{border:1px solid #C9C5E4;padding:0;height:26px}
+td.slot{background:#EEF3FB;font-weight:700;color:#312783;text-align:center;width:20mm;font-size:12px;height:auto;padding:4px}
+td.subj{background:#F7F7FC;font-weight:700;color:#232046;padding:4px 7px;font-size:12px;height:auto}
+.mini{font-weight:400;color:#5B5876;font-size:10.5px}
+.row-h{height:24px}
+.cols{display:grid;grid-template-columns:52mm 26mm 40mm auto;font-size:10px;color:#5B5876;padding:2px 6px;background:#F7F7FC;border:1px solid #C9C5E4;border-bottom:none}
+.note{background:#FFF4E0;border-left:5px solid #F59C00;padding:7px 10px;font-size:11.5px;margin:8px 0}
+.foot{margin-top:8px;padding-top:4px;border-top:1px solid #E3E1F0;font-size:10px;color:#5B5876;display:flex;justify-content:space-between}
+.talon{border:2px dashed #7DB928;border-radius:10px;padding:8px 11px;margin:7px 0;display:grid;grid-template-columns:1fr 1fr}
+.talon h3{margin:0 0 4px;font-size:13px;color:#3d6b00}
+.talon .line{margin:7px 0;font-size:11.5px}
+.fill{display:inline-block;border-bottom:1.5px dotted #9a96c0;min-width:34mm;height:15px;vertical-align:bottom}
+.talon .adr{font-size:10.5px;color:#5B5876;line-height:1.35}
+h2{font-size:14px;color:#312783;margin:10px 0 4px}
+</style></head><body>
+
+<!-- ЛИСТ 1: запись по слотам -->
+<div class="sheet">
+  <div class="hdr">
+    <div class="brand">KidsUP <span>· детский центр и английский сад · б-р Маршала Рокоссовского, 6 к1В</span></div>
+    <div class="when">ВОСКРЕСЕНЬЕ<br>30 августа, 11:00–15:00</div>
+  </div>
+
+  <h1>Запись на открытые уроки</h1>
+  <p class="lead">Записываем сразу на конкретное время: ребёнок пробует занятие 30–45 минут, родитель смотрит. Вход свободный, но место в группе — по записи. Максимум 8 детей на урок.</p>
+
+  <div class="cols"><span>Имя и фамилия ребёнка</span><span>Возраст</span><span>Телефон родителя</span><span>Кто записал / отметка</span></div>
+  <table>
+    <tr><th style="width:20mm">Время</th><th colspan="4">Занятие и записанные дети</th></tr>
+
+    <tr><td class="slot" rowspan="4">11:00<br>11:45</td><td class="subj" colspan="4">🧸 Раннее развитие · группа 1 <span class="mini">(1,3–3 года, с мамой)</span></td></tr>
+    <tr class="row-h"><td style="width:52mm"></td><td style="width:26mm"></td><td style="width:40mm"></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+
+    <tr><td class="slot" rowspan="4">12:00<br>12:45</td><td class="subj" colspan="4">🧸 Раннее развитие · группа 2 <span class="mini">(2–4 года)</span></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+
+    <tr><td class="slot" rowspan="4">13:00<br>13:45</td><td class="subj" colspan="4">✏️ Подготовка к школе · группа 1 <span class="mini">(4–7 лет)</span></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+
+    <tr><td class="slot" rowspan="4">13:00<br>13:45</td><td class="subj" colspan="4">🇬🇧 Английский язык · группа 1 <span class="mini">(3–12 лет)</span></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+
+    <tr><td class="slot" rowspan="4">14:00<br>14:45</td><td class="subj" colspan="4">✏️ Подготовка к школе · группа 2 <span class="mini">(4–7 лет)</span></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+
+    <tr><td class="slot" rowspan="4">14:00<br>14:45</td><td class="subj" colspan="4">🇬🇧 Английский язык · группа 2 <span class="mini">(3–12 лет)</span></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+  </table>
+
+  <div class="note"><b>Что сказать при записи:</b> «Записываю вас на [время], занятие идёт 30–45 минут — ребёнок пробует, вы смотрите. Приходите за 10 минут. С 31 августа стартует учебный год, и <b>до 31 августа включительно держим цены прошлого года</b>».
+  <br><b>Сразу после записи:</b> отдать талон (обратная сторона) и вечером передать лист Лизе — она внесёт всех в CRM.</div>
+
+  <div class="foot"><span>KidsUP · +7 (495) 120-90-24 · kidsup.ru</span><span>2 минуты от метро Бульвар Рокоссовского · напротив ТЦ «Янтарь»</span></div>
+</div>
+
+<!-- ЛИСТ 2: талоны и общая запись -->
+<div class="sheet">
+  <div class="hdr">
+    <div class="brand">Талоны гостю <span>· отдать сразу после записи</span></div>
+    <div class="when">30 августа · 11:00–15:00</div>
+  </div>
+
+  <div class="talon">
+    <div>
+      <h3>🚪 Вы записаны на открытый урок</h3>
+      <div class="line">Ребёнок: <span class="fill"></span></div>
+      <div class="line">Занятие: <span class="fill"></span></div>
+      <div class="line">Время: <span class="fill" style="min-width:20mm"></span> · воскресенье 30 августа</div>
+    </div>
+    <div class="adr" style="padding-left:8px;border-left:1px solid #C9C5E4">
+      <b>KidsUP</b><br>б-р Маршала Рокоссовского, 6 к1В<br>
+      «БЦ Богородский», 7-й подъезд, 2 этаж, домофон 12<br>
+      2 минуты от метро Бульвар Рокоссовского<br><br>
+      Приходите за 10 минут до начала.<br>
+      Вопросы: <b>+7 (495) 120-90-24</b><br>
+      WhatsApp: <b>+7 916 017-09-18</b><br>
+      Расписание: <b>kidsup.ru</b>
+    </div>
+  </div>
+
+  <div class="talon">
+    <div>
+      <h3>🚪 Вы записаны на открытый урок</h3>
+      <div class="line">Ребёнок: <span class="fill"></span></div>
+      <div class="line">Занятие: <span class="fill"></span></div>
+      <div class="line">Время: <span class="fill" style="min-width:20mm"></span> · воскресенье 30 августа</div>
+    </div>
+    <div class="adr" style="padding-left:8px;border-left:1px solid #C9C5E4">
+      <b>KidsUP</b><br>б-р Маршала Рокоссовского, 6 к1В<br>
+      «БЦ Богородский», 7-й подъезд, 2 этаж, домофон 12<br>
+      2 минуты от метро Бульвар Рокоссовского<br><br>
+      Приходите за 10 минут до начала.<br>
+      Вопросы: <b>+7 (495) 120-90-24</b><br>
+      WhatsApp: <b>+7 916 017-09-18</b><br>
+      Расписание: <b>kidsup.ru</b>
+    </div>
+  </div>
+
+  <div class="talon">
+    <div>
+      <h3>🚪 Вы записаны на открытый урок</h3>
+      <div class="line">Ребёнок: <span class="fill"></span></div>
+      <div class="line">Занятие: <span class="fill"></span></div>
+      <div class="line">Время: <span class="fill" style="min-width:20mm"></span> · воскресенье 30 августа</div>
+    </div>
+    <div class="adr" style="padding-left:8px;border-left:1px solid #C9C5E4">
+      <b>KidsUP</b><br>б-р Маршала Рокоссовского, 6 к1В<br>
+      «БЦ Богородский», 7-й подъезд, 2 этаж, домофон 12<br>
+      2 минуты от метро Бульвар Рокоссовского<br><br>
+      Приходите за 10 минут до начала.<br>
+      Вопросы: <b>+7 (495) 120-90-24</b><br>
+      WhatsApp: <b>+7 916 017-09-18</b><br>
+      Расписание: <b>kidsup.ru</b>
+    </div>
+  </div>
+
+  <h2>Хотят на другое занятие — записываем сюда</h2>
+  <div class="cols" style="grid-template-columns:46mm 20mm 36mm auto"><span>Имя ребёнка</span><span>Возраст</span><span>Телефон</span><span>Какое занятие интересует / когда удобно</span></div>
+  <table>
+    <tr class="row-h"><td style="width:46mm"></td><td style="width:20mm"></td><td style="width:36mm"></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+  </table>
+
+  <div class="note">Первое занятие любого курса — <b>условно-бесплатное</b>: не понравится — платить не нужно, понравится — войдёт в первый абонемент. В день пробного — скидка 10%. <b>До 31 августа включительно — цены прошлого года.</b></div>
+
+  <div class="foot"><span>Заполненные листы вечером — Лизе, в CRM в тот же день</span><span>KidsUP · kidsup.ru</span></div>
+</div>
+</body></html>
