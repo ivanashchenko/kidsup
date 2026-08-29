@@ -130,7 +130,10 @@ class MoyklassClient:
                 attrs.append({"attributeId": a["attributeId"], "valueIds": a["valueIds"]})
             elif a.get("valueId") is not None:
                 attrs.append({"attributeId": a["attributeId"], "valueId": a["valueId"]})
-            elif a.get("value") is not None:
+            elif a.get("value") not in (None, ""):
+                # Пустая строка в атрибуте типа phone/date заваливает POST 400-й
+                # (29.08.2026: карточка 8030380 с пустым «Телефон 2»), поэтому
+                # пустые значения просто не переотправляем — они и так пусты.
                 attrs.append({"attributeId": a["attributeId"], "value": a["value"]})
         if attrs:
             body["attributes"] = attrs
