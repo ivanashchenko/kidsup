@@ -1,162 +1,186 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8">
-<title>Форма записи на открытые уроки</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Форма записи на День открытых дверей 30 августа</title>
 <style>
 @page{size:A4 portrait;margin:9mm}
 html,body{margin:0;padding:0}
-body{font:13px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;color:#232046;background:#fff}
-.sheet{width:100%;max-width:192mm;margin:0 auto;page-break-after:always;break-after:page}
+body{font:14px/1.4 -apple-system,'Segoe UI',Roboto,sans-serif;color:#232046;background:#fff}
+.sheet{width:100%;max-width:192mm;margin:0 auto;box-sizing:border-box;page-break-after:always;break-after:page}
 .sheet:last-of-type{page-break-after:auto;break-after:auto}
-.hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1DA7E0;padding-bottom:5px;margin-bottom:8px}
-.brand{font-weight:900;font-size:19px;color:#312783}
-.brand span{font-weight:400;font-size:11px;color:#5B5876}
-.when{text-align:right;font-weight:700;color:#1DA7E0;font-size:12.5px;line-height:1.3}
-h1{font-size:20px;color:#312783;margin:0 0 3px}
-.lead{color:#5B5876;font-size:12px;margin:0 0 8px}
-table{border-collapse:collapse;width:100%;margin-bottom:9px}
-th{background:#312783;color:#fff;font-size:11px;padding:5px 6px;text-align:left;border:1px solid #312783}
-td{border:1px solid #C9C5E4;padding:0;height:26px}
-td.slot{background:#EEF3FB;font-weight:700;color:#312783;text-align:center;width:20mm;font-size:12px;height:auto;padding:4px}
-td.subj{background:#F7F7FC;font-weight:700;color:#232046;padding:4px 7px;font-size:12px;height:auto}
-.mini{font-weight:400;color:#5B5876;font-size:10.5px}
-.row-h{height:24px}
-.cols{display:grid;grid-template-columns:52mm 26mm 40mm auto;font-size:10px;color:#5B5876;padding:2px 6px;background:#F7F7FC;border:1px solid #C9C5E4;border-bottom:none}
-.note{background:#FFF4E0;border-left:5px solid #F59C00;padding:7px 10px;font-size:11.5px;margin:8px 0}
-.foot{margin-top:8px;padding-top:4px;border-top:1px solid #E3E1F0;font-size:10px;color:#5B5876;display:flex;justify-content:space-between}
-.talon{border:2px dashed #7DB928;border-radius:10px;padding:8px 11px;margin:7px 0;display:grid;grid-template-columns:1fr 1fr}
-.talon h3{margin:0 0 4px;font-size:13px;color:#3d6b00}
-.talon .line{margin:7px 0;font-size:11.5px}
-.fill{display:inline-block;border-bottom:1.5px dotted #9a96c0;min-width:34mm;height:15px;vertical-align:bottom}
-.talon .adr{font-size:10.5px;color:#5B5876;line-height:1.35}
-h2{font-size:14px;color:#312783;margin:10px 0 4px}
+.no-print{background:#FFF4E0;padding:9px 13px;border-radius:10px;margin:9px auto;max-width:192mm;font-size:12.5px;line-height:1.4}
+@media print{.no-print{display:none!important}}
+.hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1DA7E0;padding-bottom:4px;margin-bottom:5px}
+.hdr .brand{font-weight:900;font-size:19px;color:#312783}
+.hdr .when{color:#E30613;font-weight:900;font-size:13px;text-align:right;line-height:1.2}
+h1{font-size:18px;color:#312783;margin:3px 0 1px}
+.lead{color:#5B5876;margin:0 0 6px;font-size:12px;line-height:1.35}
+table{border-collapse:collapse;width:100%;table-layout:fixed}
+.slot{margin-bottom:5px;border:1.5px solid #C9C5E4;border-radius:8px;overflow:hidden}
+.slot .th{background:#312783;color:#fff;padding:3px 9px;font-size:12.5px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline}
+.slot .th .t{background:#F59C00;border-radius:20px;padding:1px 9px;font-size:12px;white-space:nowrap;margin-right:8px}
+.slot .th .ag{font-weight:400;font-size:11px;opacity:.85}
+.slot .th .l{display:flex;align-items:baseline;gap:2px}
+th.h{background:#EEF3FB;color:#5B5876;font-size:9px;font-weight:700;padding:1px 6px;text-align:left;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid #E3E1F0;white-space:nowrap}
+th.h:nth-child(1){width:7mm;text-align:center}th.h:nth-child(3){width:16mm}th.h:nth-child(4){width:38mm}th.h:nth-child(5){width:27mm}
+.wide th.h:nth-child(5){width:52mm}
+td{border-bottom:1px solid #E3E1F0;padding:0;height:5.1mm}
+td.n{text-align:center;color:#9a96c0;font-size:10px;border-right:1px solid #E3E1F0}
+td.nm{border-right:1px solid #E3E1F0}
+td.ag{border-right:1px solid #E3E1F0}
+td.ph{border-right:1px solid #E3E1F0}
+td.ok{}
+tr:last-child td{border-bottom:none}
+.note{background:#F0F7E4;border-left:5px solid #7DB928;padding:6px 10px;margin:6px 0;font-size:11.3px;line-height:1.35}
+.warn{background:#FFF4E0;border-left:5px solid #F59C00;padding:6px 10px;margin:6px 0;font-size:11.3px;line-height:1.35}
+.foot{margin-top:7px;font-size:10.5px;color:#5B5876;border-top:1px solid #E3E1F0;padding-top:3px;display:flex;justify-content:space-between}
+h2{font-size:15px;color:#312783;margin:9px 0 3px}
+.subj{font-size:11px;color:#5B5876;margin:0 0 4px}
 </style></head><body>
 
-<!-- ЛИСТ 1: запись по слотам -->
+<div class="no-print"><b>Печать (Chrome):</b> Ctrl+P → A4 · масштаб 100% · поля по умолчанию · <b>снять «Колонтитулы»</b> · односторонняя, 3–4 комплекта (ресепшен, стойка на празднике, запас).<br>
+<b>Как пользоваться:</b> лист 1 — демо-занятия 11:00–14:00, лист 2 — 15:00 и запись на другие направления. Записали — сразу назвали время и попросили прийти за 10 минут. Вечером 30.08 оба листа Лизе: она заводит всех в МойКласс в тот же вечер.</div>
+
+<!-- ============ ЛИСТ 1 ============ -->
 <div class="sheet">
   <div class="hdr">
-    <div class="brand">KidsUP <span>· детский центр и английский сад · б-р Маршала Рокоссовского, 6 к1В</span></div>
-    <div class="when">ВОСКРЕСЕНЬЕ<br>30 августа, 11:00–15:00</div>
+    <div class="brand">KidsUP <span style="font-weight:400;font-size:10.5px;color:#5B5876">· б-р Маршала Рокоссовского, 6 к1В · «БЦ Богородский», 7-й подъезд, 2 этаж</span></div>
+    <div class="when">ВОСКРЕСЕНЬЕ<br>30 августа · 11:00–15:00</div>
   </div>
 
-  <h1>Запись на открытые уроки</h1>
-  <p class="lead">Записываем сразу на конкретное время: ребёнок пробует занятие 30–45 минут, родитель смотрит. Вход свободный, но место в группе — по записи. Максимум 8 детей на урок.</p>
+  <h1>Запись на День открытых дверей · лист 1 из 2</h1>
+  <p class="lead">Занятие 30–45 минут: ребёнок пробует, родитель смотрит. Место в группе — по записи, максимум 8 детей. Экскурсия и диагностика — весь день без записи.</p>
 
-  <div class="cols"><span>Имя и фамилия ребёнка</span><span>Возраст</span><span>Телефон родителя</span><span>Кто записал / отметка</span></div>
-  <table>
-    <tr><th style="width:20mm">Время</th><th colspan="4">Занятие и записанные дети</th></tr>
+  <div class="slot">
+    <div class="th"><span class="l"><span class="t">11:00–11:45</span>🧸 Раннее развитие · группа 1</span><span class="ag">1,3–3 года, с мамой</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Пришёл / в CRM</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr></table>
+  </div>
 
-    <tr><td class="slot" rowspan="4">11:00<br>11:45</td><td class="subj" colspan="4">🧸 Раннее развитие · группа 1 <span class="mini">(1,3–3 года, с мамой)</span></td></tr>
-    <tr class="row-h"><td style="width:52mm"></td><td style="width:26mm"></td><td style="width:40mm"></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+  <div class="slot">
+    <div class="th"><span class="l"><span class="t">12:00–12:45</span>🧸 Раннее развитие · группа 2</span><span class="ag">2–4 года</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Пришёл / в CRM</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr></table>
+  </div>
 
-    <tr><td class="slot" rowspan="4">12:00<br>12:45</td><td class="subj" colspan="4">🧸 Раннее развитие · группа 2 <span class="mini">(2–4 года)</span></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+  <div class="slot">
+    <div class="th"><span class="l"><span class="t">13:00–13:45</span>✏️ Подготовка к школе · группа 1</span><span class="ag">4–7 лет</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Пришёл / в CRM</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr></table>
+  </div>
 
-    <tr><td class="slot" rowspan="4">13:00<br>13:45</td><td class="subj" colspan="4">✏️ Подготовка к школе · группа 1 <span class="mini">(4–7 лет)</span></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+  <div class="slot">
+    <div class="th"><span class="l"><span class="t">13:00–13:45</span>🇬🇧 Английский язык · группа 1</span><span class="ag">3–12 лет, уровень определит педагог</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Пришёл / в CRM</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr></table>
+  </div>
 
-    <tr><td class="slot" rowspan="4">13:00<br>13:45</td><td class="subj" colspan="4">🇬🇧 Английский язык · группа 1 <span class="mini">(3–12 лет)</span></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+  <div class="slot">
+    <div class="th"><span class="l"><span class="t">14:00–14:45</span>✏️ Подготовка к школе · группа 2</span><span class="ag">4–7 лет</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Пришёл / в CRM</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr></table>
+  </div>
 
-    <tr><td class="slot" rowspan="4">14:00<br>14:45</td><td class="subj" colspan="4">✏️ Подготовка к школе · группа 2 <span class="mini">(4–7 лет)</span></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
+  <div class="slot">
+    <div class="th"><span class="l"><span class="t">14:00–14:45</span>🇬🇧 Английский язык · группа 2</span><span class="ag">3–12 лет</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Пришёл / в CRM</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr></table>
+  </div>
 
-    <tr><td class="slot" rowspan="4">14:00<br>14:45</td><td class="subj" colspan="4">🇬🇧 Английский язык · группа 2 <span class="mini">(3–12 лет)</span></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-  </table>
-
-  <div class="note"><b>Что сказать при записи:</b> «Записываю вас на [время], занятие идёт 30–45 минут — ребёнок пробует, вы смотрите. Приходите за 10 минут. С 31 августа стартует учебный год, и <b>до 31 августа включительно держим цены прошлого года</b>».
-  <br><b>Сразу после записи:</b> отдать талон (обратная сторона) и вечером передать лист Лизе — она внесёт всех в CRM.</div>
-
-  <div class="foot"><span>KidsUP · +7 (495) 120-90-24 · kidsup.ru</span><span>2 минуты от метро Бульвар Рокоссовского · напротив ТЦ «Янтарь»</span></div>
+  <div class="foot"><span>KidsUP · +7 (495) 120-90-24 · WhatsApp +7 919 968-35-07 · kidsup.ru</span><span>лист 1 из 2 · продолжение на листе 2</span></div>
 </div>
 
-<!-- ЛИСТ 2: талоны и общая запись -->
+<!-- ============ ЛИСТ 2 ============ -->
 <div class="sheet">
   <div class="hdr">
-    <div class="brand">Талоны гостю <span>· отдать сразу после записи</span></div>
-    <div class="when">30 августа · 11:00–15:00</div>
+    <div class="brand">KidsUP <span style="font-weight:400;font-size:10.5px;color:#5B5876">· День открытых дверей · лист 2 из 2</span></div>
+    <div class="when">ВОСКРЕСЕНЬЕ<br>30 августа · 11:00–15:00</div>
   </div>
 
-  <div class="talon">
-    <div>
-      <h3>🚪 Вы записаны на открытый урок</h3>
-      <div class="line">Ребёнок: <span class="fill"></span></div>
-      <div class="line">Занятие: <span class="fill"></span></div>
-      <div class="line">Время: <span class="fill" style="min-width:20mm"></span> · воскресенье 30 августа</div>
-    </div>
-    <div class="adr" style="padding-left:8px;border-left:1px solid #C9C5E4">
-      <b>KidsUP</b><br>б-р Маршала Рокоссовского, 6 к1В<br>
-      «БЦ Богородский», 7-й подъезд, 2 этаж, домофон 12<br>
-      2 минуты от метро Бульвар Рокоссовского<br><br>
-      Приходите за 10 минут до начала.<br>
-      Вопросы: <b>+7 (495) 120-90-24</b><br>
-      WhatsApp: <b>+7 919 968-35-07</b><br>
-      Расписание: <b>kidsup.ru</b>
-    </div>
+  <div class="slot">
+    <div class="th"><span class="l"><span class="t">14:00–14:45</span>🤖 Робототехника · группа 1</span><span class="ag">4–12 лет · тестируем спрос</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Пришёл / в CRM</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr></table>
   </div>
 
-  <div class="talon">
-    <div>
-      <h3>🚪 Вы записаны на открытый урок</h3>
-      <div class="line">Ребёнок: <span class="fill"></span></div>
-      <div class="line">Занятие: <span class="fill"></span></div>
-      <div class="line">Время: <span class="fill" style="min-width:20mm"></span> · воскресенье 30 августа</div>
-    </div>
-    <div class="adr" style="padding-left:8px;border-left:1px solid #C9C5E4">
-      <b>KidsUP</b><br>б-р Маршала Рокоссовского, 6 к1В<br>
-      «БЦ Богородский», 7-й подъезд, 2 этаж, домофон 12<br>
-      2 минуты от метро Бульвар Рокоссовского<br><br>
-      Приходите за 10 минут до начала.<br>
-      Вопросы: <b>+7 (495) 120-90-24</b><br>
-      WhatsApp: <b>+7 919 968-35-07</b><br>
-      Расписание: <b>kidsup.ru</b>
-    </div>
+  <div class="slot">
+    <div class="th"><span class="l"><span class="t">15:00–15:45</span>✏️ Подготовка к школе · группа 3</span><span class="ag">4–7 лет</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Пришёл / в CRM</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr></table>
   </div>
 
-  <div class="talon">
-    <div>
-      <h3>🚪 Вы записаны на открытый урок</h3>
-      <div class="line">Ребёнок: <span class="fill"></span></div>
-      <div class="line">Занятие: <span class="fill"></span></div>
-      <div class="line">Время: <span class="fill" style="min-width:20mm"></span> · воскресенье 30 августа</div>
-    </div>
-    <div class="adr" style="padding-left:8px;border-left:1px solid #C9C5E4">
-      <b>KidsUP</b><br>б-р Маршала Рокоссовского, 6 к1В<br>
-      «БЦ Богородский», 7-й подъезд, 2 этаж, домофон 12<br>
-      2 минуты от метро Бульвар Рокоссовского<br><br>
-      Приходите за 10 минут до начала.<br>
-      Вопросы: <b>+7 (495) 120-90-24</b><br>
-      WhatsApp: <b>+7 919 968-35-07</b><br>
-      Расписание: <b>kidsup.ru</b>
-    </div>
+  <div class="slot">
+    <div class="th"><span class="l"><span class="t">15:00–15:45</span>🇬🇧 Английский язык · группа 3</span><span class="ag">3–12 лет</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Пришёл / в CRM</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr></table>
   </div>
 
-  <h2>Хотят на другое занятие — записываем сюда</h2>
-  <div class="cols" style="grid-template-columns:46mm 20mm 36mm auto"><span>Имя ребёнка</span><span>Возраст</span><span>Телефон</span><span>Какое занятие интересует / когда удобно</span></div>
-  <table>
-    <tr class="row-h"><td style="width:46mm"></td><td style="width:20mm"></td><td style="width:36mm"></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-    <tr class="row-h"><td></td><td></td><td></td><td></td></tr>
-  </table>
+  <div class="slot">
+    <div class="th"><span class="l"><span class="t">15:00–15:45</span>🤖 Робототехника · группа 2</span><span class="ag">4–12 лет · тестируем спрос</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Пришёл / в CRM</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr></table>
+  </div>
 
-  <div class="note">Первое занятие любого курса — <b>условно-бесплатное</b>: не понравится — платить не нужно, понравится — войдёт в первый абонемент. В день пробного — скидка 10%. <b>До 31 августа включительно — цены прошлого года.</b></div>
+  <h2>Остальные направления — записываем на Неделю открытых уроков</h2>
+  <p class="subj">Логопед · мини-сад · нулевой класс · лицей для малышей · ИЗО · шахматы · ментальная арифметика · танцы · скорочтение и каллиграфия.
+  Демо 30 августа по ним не идёт, но <b>с 31 августа по 6 сентября</b> ребёнок приходит на первое занятие своей группы: не понравится — платить не нужно.</p>
+  <div class="slot wide">
+    <div class="th"><span class="l">📋 Хочу другое направление</span><span class="ag">записать на пробное 31.08–06.09 или на диагностику</span></div>
+    <table><tr><th class="h">№</th><th class="h">Имя и фамилия ребёнка</th><th class="h">Возраст</th><th class="h">Телефон родителя</th><th class="h">Направление и удобный день</th></tr>
+    <tr><td class="n">1</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">2</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">3</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">4</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">5</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">6</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+    <tr><td class="n">7</td><td class="nm"></td><td class="ag"></td><td class="ph"></td><td class="ok"></td></tr>
+</table>
+  </div>
 
-  <div class="foot"><span>Заполненные листы вечером — Лизе, в CRM в тот же день</span><span>KidsUP · kidsup.ru</span></div>
+  <div class="note"><b>Что говорим при записи:</b> «Записываю вас на [время], занятие 30–45 минут — ребёнок пробует, вы смотрите. Приходите за 10 минут: б-р Рокоссовского, 6 к1В, «БЦ Богородский», 7-й подъезд, 2 этаж, домофон 12. Учебный год стартует 31 августа, <b>до 31 августа включительно держим цены прошлого года</b>».</div>
+
+  <div class="warn"><b>Телефон — обязательно, без него запись не считается.</b> Если группа занята — предлагаем соседний слот или пробное на Неделе открытых уроков. Вечером 30.08 оба листа передать Лизе: все контакты в МойКласс в тот же вечер, иначе завтра их уже никто не найдёт.</div>
+
+  <div class="foot"><span>KidsUP · +7 (495) 120-90-24 · WhatsApp +7 919 968-35-07 · kidsup.ru</span><span>лист 2 из 2</span></div>
 </div>
+
 </body></html>
