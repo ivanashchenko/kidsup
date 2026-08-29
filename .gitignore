@@ -5,3 +5,6 @@ data/
 venv/
 .venv/
 site/kidsup_site.html
+
+# промежуточный прогресс заливки анкет — перезаписывается фоновой задачей
+docs/rabota/zaliv_progress.json
