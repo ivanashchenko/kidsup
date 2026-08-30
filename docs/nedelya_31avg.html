@@ -1,0 +1,201 @@
+<style>
+:root{
+  --indigo:#312783; --blue:#1DA7E0; --green:#7DB928; --amber:#F59C00; --red:#E30613;
+  --ink:#1a1830; --muted:#6b6a80; --line:#e3e1ee; --bg:#faf9fd; --card:#ffffff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 80px}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;color:var(--indigo)}
+.sub{color:var(--muted);font-size:14px;margin:0 0 22px}
+h2{font-size:20px;margin:34px 0 12px;color:var(--indigo);
+   border-bottom:2px solid var(--line);padding-bottom:6px}
+h3{font-size:16px;margin:20px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:14px 16px;margin:12px 0}
+table{width:100%;border-collapse:collapse;font-size:14px;
+  font-variant-numeric:tabular-nums}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--muted);font-weight:600;padding:8px 8px;border-bottom:2px solid var(--line)}
+td{padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+.num{text-align:right;white-space:nowrap}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tot td{font-weight:700;background:#f4f2fb}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;
+  font-weight:600;white-space:nowrap}
+.p-green{background:#eef7e0;color:#4d7511}
+.p-blue{background:#e4f4fc;color:#12668b}
+.p-amber{background:#fdf0dc;color:#94600a}
+.p-red{background:#fce8e9;color:#9c060f}
+.p-gray{background:#eeedf5;color:#5b5a70}
+.big{font-size:30px;font-weight:800;color:var(--indigo);line-height:1.1}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+ul{margin:8px 0;padding-left:20px} li{margin:4px 0}
+.small{font-size:13px;color:var(--muted)}
+.who{font-weight:700}
+.dayhead{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin:18px 0 4px}
+.dayhead .d{font-size:17px;font-weight:700;color:var(--indigo)}
+.names{font-size:13px;color:var(--muted);line-height:1.5}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--ink:#e9e8f2;--muted:#9d9bb2;--line:#33314a;
+    --bg:#141327;--card:#1c1b32;--indigo:#a99df0}
+  :root:not([data-theme="light"]) .tot td{background:#252341}
+  :root:not([data-theme="light"]) .p-green{background:#26361a;color:#a9d96a}
+  :root:not([data-theme="light"]) .p-blue{background:#122f3f;color:#77cdf0}
+  :root:not([data-theme="light"]) .p-amber{background:#3b2b0e;color:#f2b34c}
+  :root:not([data-theme="light"]) .p-red{background:#3d1416;color:#f38b90}
+  :root:not([data-theme="light"]) .p-gray{background:#2a2842;color:#a5a3bb}
+}
+</style>
+<div class="wrap">
+<h1>Неделя 31 августа — 6 сентября</h1>
+<p class="sub">Смены, итоги 30 августа, план на понедельник и полный расчёт бонусов Ани и Иры по дням</p>
+<h2>1. График смен</h2>
+<div class="scroll"><table>
+<tr><th>День</th><th>Дата</th><th>Кто в смене</th><th>Что главное</th></tr>
+<tr><td><b>Понедельник</b></td><td>31.08</td><td>Елена + Ирина</td><td class="small">Первый день занятий. 11 групп, 56 детей. Дожим до абонемента прямо на месте</td></tr>
+<tr><td><b>Вторник</b></td><td>01.09</td><td>Елена + Анна</td><td class="small">Второй день пробных. Догон тех, кто не дошёл в понедельник</td></tr>
+<tr><td><b>Среда</b></td><td>02.09</td><td>Елена + Анна</td><td class="small">Старт ИЗО (11 детей). Дожим вторничных пробных</td></tr>
+<tr><td><b>Четверг</b></td><td>03.09</td><td>Елена + Ирина</td><td class="small">Добор в недокомплектные группы</td></tr>
+<tr><td><b>Пятница</b></td><td>04.09</td><td>Ирина + Анна</td><td class="small">Две в смене — день массового обзвона холодной базы</td></tr>
+<tr><td><b>Суббота</b></td><td>05.09</td><td>Анна</td><td class="small">Суббота: ПШ, МА, РР. Аня одна — приоритет на пришедших</td></tr>
+<tr><td><b>Воскресенье</b></td><td>06.09</td><td>Ирина</td><td class="small">Ира одна: подтверждения на понедельник + недозвоны недели</td></tr>
+</table></div>
+<p class="small">Лиза — онлайн каждый день, работает в свободные часы: переписка, соцсети, догоны по мессенджерам. В график смен не входит.</p>
+<h2>2. Итоги воскресенья 30 августа</h2>
+<div class="grid">
+<div class="kpi"><div class="lbl">Новых записей</div><div class="big">18</div><div class="small">в группы 2026/27</div></div>
+<div class="kpi"><div class="lbl">Новых карточек</div><div class="big">18</div><div class="small">семьи с ДОД и анкет</div></div>
+<div class="kpi"><div class="lbl">Звонков</div><div class="big">163</div><div class="small">136 исх. · 27 вх. · 55 разговоров</div></div>
+<div class="kpi"><div class="lbl">Диалогов</div><div class="big">185</div><div class="small">переписка WhatsApp</div></div>
+<div class="kpi"><div class="lbl">Заполнение</div><div class="big">60%</div><div class="small">238 из 399 мест, было 55%</div></div>
+</div>
+<div class="scroll"><table>
+<tr><th>Кто</th><th>Записей за день</th><th>Всего с 17.08</th><th>Чем занималась</th></tr>
+<tr><td class="who">Лена</td><td class="num">10</td><td class="num">89</td><td class="small">День открытых дверей на площадке + обзвон по анкетам праздника</td></tr>
+<tr><td class="who">Аня</td><td class="num">8</td><td class="num">55</td><td class="small">Подтверждения на ДОД до 11:00, встреча гостей, добор по списку праздника</td></tr>
+<tr><td class="who">Лиза</td><td class="num">0</td><td class="num">28</td><td class="small">122 исходящих сообщения: напоминания на ДОД, догоны недозвонов, ответы в переписке</td></tr>
+</table></div>
+<p class="small">Записи по предметам за день: английский 5, шахматы 2, подготовка 2, логопед 2, робототехника 2, мини-сад 1, нулевой класс 1, ИЗО 1, «Первая школа» 1.</p>
+<h2>3. План на понедельник 31 августа</h2>
+<div class="card"><b>В смене: Елена и Ирина.</b> Первый день учебного года — 11 групп, 56 записанных детей. Главная задача дня не обзвон, а конверсия тех, кто физически придёт: каждый дошедший до пробного = 300 ₽ бонуса, купивший абонемент в тот же день = ещё 300 ₽.</div>
+<h3>До 10:00 — Ирина</h3><ul><li>Прозвонить всех записанных на сегодняшние группы: «ждём вас в ЧЧ:ММ, 7-й подъезд, 2 этаж, домофон 12»</li><li>Отдельно предупредить ИЗО (11 детей) — их занятия начинаются в среду 2.09, а не сегодня</li><li>Отдельно предупредить логопеда Елену (10 детей) — старт 7 сентября</li><li>Кто не берёт трубку — отметить, Клод догонит в мессенджерах</li></ul>
+<h3>В течение дня — обе</h3><ul><li>Каждого родителя на выходе с пробного дожимать до абонемента: скидка −15% на первый абонемент действует только в день пробного</li><li>Второй ребёнок −10%, второй предмет −10%, многодетным и семьям СВО −10%. Скидки не суммируются, называем наибольшую</li><li>Не дожали на месте — назначить конкретное время звонка на вторник, не «перезвоню как-нибудь»</li><li>Кто не пришёл — звонить в тот же час, пока причина свежая, и сразу переносить на вторник или среду</li></ul>
+<h3>В окна между группами</h3><ul><li>Список с праздника — остаток непрозвоненных семей</li><li>71 семья, кому ни разу не звонили: платившие летом 2026 и в 2025/26</li><li>Недокомплектные группы: добор туда, где меньше половины мест</li></ul>
+<h2>4. Бонусы: как считается</h2>
+<div class="scroll"><table>
+<tr><th>Событие</th><th>Сумма</th><th>Условие</th></tr>
+<tr><td>Ребёнок дошёл до пробного</td><td class="num"><b>300 ₽</b></td><td class="small">Новый предмет для этой семьи. Английский и подготовка считаются новым предметом всегда</td></tr>
+<tr><td>Купили абонемент в день пробного</td><td class="num"><b>+300 ₽</b></td><td class="small">Сверху к 300 ₽ за пробное. Итого 600 ₽ с одного ребёнка</td></tr>
+<tr><td>Купили в течение двух недель</td><td class="num"><b>150 ₽</b></td><td class="small">Вместо 300 ₽. Тянуть с решением — терять половину</td></tr>
+</table></div>
+<h2>5. Уже начислено — с проданных абонементов</h2>
+<h3>Ира — <span class="pill p-green">1 800 ₽</span></h3>
+<div class="scroll"><table>
+<tr><th>Дата</th><th>Ребёнок</th><th>Группа</th><th>За что</th><th class='num'>Сумма</th></tr>
+<tr><td>20.08</td><td>Сабирова Александра</td><td class="small">МА вс 12:30</td><td class="small">купил за 2 недели</td><td class="num"><b>150 ₽</b></td></tr>
+<tr><td>20.08</td><td>Экимашев Савелий</td><td class="small">РР.Первая школа гр.3</td><td class="small">купил за 2 недели</td><td class="num"><b>150 ₽</b></td></tr>
+<tr><td>20.08</td><td>Смирнов Роман</td><td class="small">ПШ пн-чт 16:00</td><td class="small">купил за 2 недели</td><td class="num"><b>150 ₽</b></td></tr>
+<tr><td>20.08</td><td>Мукабенов Матвей</td><td class="small">ПШ ср-пт 18:00</td><td class="small">купил за 2 недели</td><td class="num"><b>150 ₽</b></td></tr>
+<tr><td>21.08</td><td>Панишева Екатерина</td><td class="small">АЯ вт-чт 17:00</td><td class="small">купил за 2 недели</td><td class="num"><b>150 ₽</b></td></tr>
+<tr><td>21.08</td><td>Карандеева Мария</td><td class="small">РР.Музыка и речь гр.5</td><td class="small">купил за 2 недели</td><td class="num"><b>150 ₽</b></td></tr>
+<tr><td>21.08</td><td>Самчук Егор</td><td class="small">РР.Музыка и речь гр.4</td><td class="small">дошёл на пробное</td><td class="num"><b>300 ₽</b></td></tr>
+<tr><td>25.08</td><td>Королева Виктория</td><td class="small">ПШ вт-чт 18:00</td><td class="small">купил сразу в день пробного</td><td class="num"><b>300 ₽</b></td></tr>
+<tr><td>27.08</td><td>Новикова София</td><td class="small">ПШ пн-чт 18:00</td><td class="small">купил сразу в день пробного</td><td class="num"><b>300 ₽</b></td></tr>
+<tr class="tot"><td colspan="4">Итого начислено</td><td class="num">1 800 ₽</td></tr>
+</table></div>
+<h3>Аня — <span class="pill p-green">300 ₽</span></h3>
+<div class="scroll"><table>
+<tr><th>Дата</th><th>Ребёнок</th><th>Группа</th><th>За что</th><th class='num'>Сумма</th></tr>
+<tr><td>26.08</td><td>Хохлов Родион</td><td class="small">РР.Музыка и речь гр.2</td><td class="small">купил сразу в день пробного</td><td class="num"><b>300 ₽</b></td></tr>
+<tr class="tot"><td colspan="4">Итого начислено</td><td class="num">300 ₽</td></tr>
+</table></div>
+<p class="small">Шесть из девяти начислений Иры — по 150 ₽ вместо 300 ₽: родители думали дольше двух недель. Это ровно те 900 ₽, которые потерялись на паузе.</p>
+<h2>6. Что можно заработать на этой неделе — по дням</h2>
+<div class="card">Считаю по первому занятию группы на неделе: если группа идёт пн-чт, ребёнок попадает в понедельник. Столбец «дошли» — если все записанные придут. Столбец «+купили» — если каждый пришедший купит абонемент в тот же день.</div>
+<h3>Аня</h3>
+<div class="scroll"><table>
+<tr><th>День</th><th class='num'>Детей</th><th class='num'>Если дошли</th><th class='num'>Если купили в тот же день</th><th class='num'>Максимум за день</th></tr>
+<tr><td><b>Понедельник</b> 31.08</td><td class="num">21</td><td class="num">6 300 ₽</td><td class="num">+6 300 ₽</td><td class="num"><b>12 600 ₽</b></td></tr>
+<tr><td><b>Вторник</b> 01.09</td><td class="num">19</td><td class="num">5 700 ₽</td><td class="num">+5 700 ₽</td><td class="num"><b>11 400 ₽</b></td></tr>
+<tr><td><b>Среда</b> 02.09</td><td class="num">7</td><td class="num">2 100 ₽</td><td class="num">+2 100 ₽</td><td class="num"><b>4 200 ₽</b></td></tr>
+<tr><td><b>Воскресенье</b> 06.09</td><td class="num">1</td><td class="num">300 ₽</td><td class="num">+300 ₽</td><td class="num"><b>600 ₽</b></td></tr>
+<tr class="tot"><td>Итого за неделю</td><td class="num">48</td><td class="num">14 400 ₽</td><td class="num">+14 400 ₽</td><td class="num">28 800 ₽</td></tr>
+</table></div>
+<p class="small">Плюс уже начисленные 300 ₽ → потолок недели <b>29 100 ₽</b>.</p>
+<h3>Ира</h3>
+<div class="scroll"><table>
+<tr><th>День</th><th class='num'>Детей</th><th class='num'>Если дошли</th><th class='num'>Если купили в тот же день</th><th class='num'>Максимум за день</th></tr>
+<tr><td><b>Понедельник</b> 31.08</td><td class="num">25</td><td class="num">7 500 ₽</td><td class="num">+7 500 ₽</td><td class="num"><b>15 000 ₽</b></td></tr>
+<tr><td><b>Вторник</b> 01.09</td><td class="num">14</td><td class="num">4 200 ₽</td><td class="num">+4 200 ₽</td><td class="num"><b>8 400 ₽</b></td></tr>
+<tr><td><b>Среда</b> 02.09</td><td class="num">10</td><td class="num">3 000 ₽</td><td class="num">+3 000 ₽</td><td class="num"><b>6 000 ₽</b></td></tr>
+<tr><td><b>Четверг</b> 03.09</td><td class="num">1</td><td class="num">300 ₽</td><td class="num">+300 ₽</td><td class="num"><b>600 ₽</b></td></tr>
+<tr><td><b>Пятница</b> 04.09</td><td class="num">4</td><td class="num">1 200 ₽</td><td class="num">+1 200 ₽</td><td class="num"><b>2 400 ₽</b></td></tr>
+<tr><td><b>Суббота</b> 05.09</td><td class="num">4</td><td class="num">1 200 ₽</td><td class="num">+1 200 ₽</td><td class="num"><b>2 400 ₽</b></td></tr>
+<tr><td><b>Воскресенье</b> 06.09</td><td class="num">3</td><td class="num">900 ₽</td><td class="num">+900 ₽</td><td class="num"><b>1 800 ₽</b></td></tr>
+<tr class="tot"><td>Итого за неделю</td><td class="num">61</td><td class="num">18 300 ₽</td><td class="num">+18 300 ₽</td><td class="num">36 600 ₽</td></tr>
+</table></div>
+<p class="small">Плюс уже начисленные 1 800 ₽ → потолок недели <b>38 400 ₽</b>.</p>
+<h2>7. Поимённо: кто идёт в понедельник</h2>
+<h3>Ира — 25 детей, до 15 000 ₽ за день</h3>
+<div class="scroll"><table>
+<tr><th>Ребёнок</th><th>Группа</th></tr>
+<tr><td>Аванян Вероника</td><td class="small">РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2</td></tr>
+<tr><td>Алексей</td><td class="small">АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)</td></tr>
+<tr><td>Белокурова Вероника</td><td class="small">ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)</td></tr>
+<tr><td>Бугрова Златослава</td><td class="small">ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись</td></tr>
+<tr><td>Волгина София</td><td class="small">ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)</td></tr>
+<tr><td>Гололобова Нелли</td><td class="small">РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2</td></tr>
+<tr><td>Горелова Алиса</td><td class="small">ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины великих художников</td></tr>
+<tr><td>Горин Федор</td><td class="small">ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)</td></tr>
+<tr><td>Димитров Александр</td><td class="small">ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись</td></tr>
+<tr><td>Димитров Александр</td><td class="small">ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка</td></tr>
+<tr><td>Дубинина Варвара</td><td class="small">РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8</td></tr>
+<tr><td>Карандеева Мария</td><td class="small">РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2</td></tr>
+<tr><td>Катков Лукьян</td><td class="small">АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)</td></tr>
+<tr><td>Кирилл</td><td class="small">ИЗО_Группа 4_пн - ср_19:00_4 - 7 лет_Алфавитная живопись</td></tr>
+<tr><td>Лоева Ирина</td><td class="small">ИЗО_Группа 4_пн - ср_19:00_4 - 7 лет_Алфавитная живопись</td></tr>
+<tr><td>Нариманлы Селин</td><td class="small">ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)</td></tr>
+<tr><td>Нариманлы Селин</td><td class="small">ЛГ Елена_Пн_18:00</td></tr>
+<tr><td>Николаев Виктор</td><td class="small">РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8</td></tr>
+<tr><td>Новикова София</td><td class="small">ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)</td></tr>
+<tr><td>Пахомов Егор</td><td class="small">АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td></tr>
+<tr><td>Пикалин Дмитрий</td><td class="small">АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td></tr>
+<tr><td>Самчук Егор</td><td class="small">РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8</td></tr>
+<tr><td>Синько София</td><td class="small">РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2</td></tr>
+<tr><td>Смирнов Роман</td><td class="small">ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)</td></tr>
+<tr><td>Шамраев Лев</td><td class="small">ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)</td></tr>
+</table></div>
+<h3>Аня — 21 детей, до 12 600 ₽ за день</h3>
+<div class="scroll"><table>
+<tr><th>Ребёнок</th><th>Группа</th></tr>
+<tr><td>Бутовка Варвара</td><td class="small">ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)</td></tr>
+<tr><td>Василиса</td><td class="small">АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)</td></tr>
+<tr><td>Венера (девочке 10, промо Маша)</td><td class="small">АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)</td></tr>
+<tr><td>Гайдуков Мирон</td><td class="small">АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td></tr>
+<tr><td>Гетман Василиса</td><td class="small">АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)</td></tr>
+<tr><td>Головлёв Даниил</td><td class="small">АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td></tr>
+<tr><td>Егоренкова Таисия</td><td class="small">ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись</td></tr>
+<tr><td>Есенкина Надежда</td><td class="small">АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td></tr>
+<tr><td>Заявка Елена (английский)</td><td class="small">АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td></tr>
+<tr><td>Заявка Елена (английский)</td><td class="small">АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)</td></tr>
+<tr><td>Исайкин Денис</td><td class="small">АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td></tr>
+<tr><td>Литовченко Ева</td><td class="small">РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3</td></tr>
+<tr><td>Мирослав</td><td class="small">АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)</td></tr>
+<tr><td>Попов Егор</td><td class="small">АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td></tr>
+<tr><td>Рахманов Федор</td><td class="small">ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)</td></tr>
+<tr><td>Рахманов Федор</td><td class="small">ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка</td></tr>
+<tr><td>Родионова Анна</td><td class="small">АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)</td></tr>
+<tr><td>Романова Милана</td><td class="small">АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td></tr>
+<tr><td>Сорокина Полина</td><td class="small">АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td></tr>
+<tr><td>Ульяна</td><td class="small">АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)</td></tr>
+<tr><td>виктория</td><td class="small">АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)</td></tr>
+</table></div>
+<h2>8. Главное в двух строках</h2>
+<div class="card"><p><b>Ира:</b> сейчас 1 800 ₽. Если все 25 её записанных дойдут в понедельник — 7 500 ₽ сверху, если купят в тот же день — ещё 7 500 ₽. За неделю потолок 38 400 ₽.</p><p><b>Аня:</b> сейчас 300 ₽. Понедельник у неё не в смене, но 21 её ребёнок идёт именно в понедельник — бонус начисляется тому, кто записал, а не тому, кто в смене. За неделю потолок 29 100 ₽.</p><p>Разница между «дошёл» и «купил сразу» — ровно вдвое. И ещё вдвое между «купил сразу» и «купил через две недели». Один и тот же ребёнок стоит 600 ₽, 450 ₽ или 300 ₽ — решает только то, дожали ли на выходе с занятия.</p></div>
+</div>
