@@ -1,0 +1,113 @@
+<style>
+:root{--ink:#12102a;--muted:#6f6d88;--line:#e5e3f0;--bg:#f7f6fc;--card:#fff;
+--indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613;
+--ira:#1DA7E0;--anya:#F59C00}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:0 16px 80px}
+.hero{background:linear-gradient(135deg,#312783 0%,#1DA7E0 100%);color:#fff;
+margin:0 -16px 24px;padding:34px 20px 30px;border-radius:0 0 20px 20px}
+.hero h1{margin:0 0 6px;font-size:30px;line-height:1.1;letter-spacing:-.01em}
+.hero p{margin:0;opacity:.9;font-size:15px}
+.race{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin:20px 0}
+.racer{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px;
+box-shadow:0 2px 10px rgba(49,39,131,.06)}
+.racer .nm{font-size:19px;font-weight:800;display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.dot{width:12px;height:12px;border-radius:50%;flex:none}
+.now{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:12px}
+.money{font-size:40px;font-weight:900;line-height:1.05;font-variant-numeric:tabular-nums}
+.bar{height:12px;border-radius:99px;background:#eceaf6;overflow:hidden;margin:12px 0 6px}
+.bar i{display:block;height:100%;border-radius:99px}
+.goal{font-size:13px;color:var(--muted)}
+h2{font-size:21px;margin:34px 0 10px;color:var(--indigo);border-bottom:2px solid var(--line);padding-bottom:6px}
+h3{font-size:16px;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);
+font-weight:600;padding:9px 8px;border-bottom:2px solid var(--line)}
+td{padding:9px 8px;border-bottom:1px solid var(--line)}
+.num{text-align:right;white-space:nowrap}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tot td{font-weight:800;background:#f1eff9}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 17px;margin:14px 0}
+.big3{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:14px 0}
+.step{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px;text-align:center}
+.step .v{font-size:32px;font-weight:900;line-height:1.1}
+.step .k{font-size:13px;color:var(--muted);margin-top:2px}
+.s1 .v{color:var(--muted)}.s2 .v{color:var(--blue)}.s3 .v{color:var(--green)}
+.small{font-size:13px;color:var(--muted)}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700}
+.p-green{background:#eef7e0;color:#4d7511}.p-amber{background:#fdf0dc;color:#94600a}
+.p-blue{background:#e4f4fc;color:#12668b}.p-red{background:#fce8e9;color:#9c060f}
+.mon{background:linear-gradient(135deg,#7DB928 0%,#4e8f12 100%);color:#fff;border:none}
+.mon .v,.mon .k{color:#fff}.mon .k{opacity:.85}
+ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#eceafa;--muted:#a09eb8;
+--line:#343250;--bg:#12112a;--card:#1d1b38;--indigo:#b0a4f5}
+:root:not([data-theme="light"]) .bar{background:#2c2a4a}
+:root:not([data-theme="light"]) .tot td{background:#272446}
+:root:not([data-theme="light"]) .p-green{background:#26361a;color:#a9d96a}
+:root:not([data-theme="light"]) .p-amber{background:#3b2b0e;color:#f2b34c}
+:root:not([data-theme="light"]) .p-blue{background:#122f3f;color:#77cdf0}
+:root:not([data-theme="light"]) .p-red{background:#3d1416;color:#f38b90}
+:root:not([data-theme="light"]) .racer{box-shadow:none}}
+</style><div class='wrap'>
+<div class='hero'><h1>Неделя, которая стоит 67 500 ₽</h1><p>Ира и Аня · 31 августа — 6 сентября · столько бонусов лежит на столе, если все записанные дойдут и купят</p></div>
+<div class='race'>
+<div class='racer'><div class='nm'><span class='dot' style='background:var(--ira)'></span>Ира</div><div class='small'>61 записанных детей выходят на пробные на этой неделе</div><div class='now'>Заработано сейчас</div><div class='money' style='color:var(--ira)'>1 800 ₽</div><div class='bar'><i style='width:4.7%;background:var(--ira)'></i></div><div class='goal'>это <b>4.7%</b> от потолка недели — <b>38 400 ₽</b></div></div>
+<div class='racer'><div class='nm'><span class='dot' style='background:var(--anya)'></span>Аня</div><div class='small'>48 записанных детей выходят на пробные на этой неделе</div><div class='now'>Заработано сейчас</div><div class='money' style='color:var(--anya)'>300 ₽</div><div class='bar'><i style='width:1.2%;background:var(--anya)'></i></div><div class='goal'>это <b>1.0%</b> от потолка недели — <b>29 100 ₽</b></div></div>
+</div>
+<h2>Один ребёнок — три разные суммы</h2>
+<div class='big3'><div class='step s1'><div class='v'>300 ₽</div><div class='k'>купили через две недели</div></div><div class='step s2'><div class='v'>450 ₽</div><div class='k'>дошёл, купили не сразу</div></div><div class='step s3'><div class='v'>600 ₽</div><div class='k'>дошёл и купил в тот же день</div></div></div>
+<div class='card'>Разница — не в ребёнке и не в родителе. Разница в том, поговорили ли с мамой в коридоре сразу после занятия, пока ребёнок ещё рассказывает, что было. Ушли домой — теряется половина.<br><span class='small'>300 ₽ — дошёл до пробного · +300 ₽ — оформили абонемент в тот же день · 150 ₽ вместо 300 ₽, если решали дольше двух недель.</span></div>
+<h2>Понедельник решает больше всех</h2>
+<div class='big3'>
+<div class='step mon'><div class='v'>15 000 ₽</div><div class='k'>Ира — 25 детей выходят завтра</div></div>
+<div class='step mon'><div class='v'>12 600 ₽</div><div class='k'>Аня — 21 детей выходят завтра</div></div>
+</div>
+<p class='small'>Аня, важно: завтра ты не в смене, но 21 твой ребёнок идёт именно завтра. Бонус получает тот, кто записал — то есть ты. Договорись с Ирой вечером, кого из твоих особенно важно дожать.</p>
+<h2>Вся неделя по дням</h2>
+<h3><span class='dot' style='background:var(--ira)'></span>Ира</h3>
+<div class='scroll'><table><tr><th>День</th><th class='num'>Детей</th><th class='num'>Дошли</th><th class='num'>+ купили сразу</th><th class='num'>Итого за день</th></tr>
+<tr><td><b>Понедельник</b> <span class='small'>31.08</span></td><td class='num'>25</td><td class='num'>7 500 ₽</td><td class='num'>+7 500 ₽</td><td class='num'><b>15 000 ₽</b></td></tr>
+<tr><td><b>Вторник</b> <span class='small'>01.09</span></td><td class='num'>14</td><td class='num'>4 200 ₽</td><td class='num'>+4 200 ₽</td><td class='num'><b>8 400 ₽</b></td></tr>
+<tr><td><b>Среда</b> <span class='small'>02.09</span></td><td class='num'>10</td><td class='num'>3 000 ₽</td><td class='num'>+3 000 ₽</td><td class='num'><b>6 000 ₽</b></td></tr>
+<tr><td><b>Четверг</b> <span class='small'>03.09</span></td><td class='num'>1</td><td class='num'>300 ₽</td><td class='num'>+300 ₽</td><td class='num'><b>600 ₽</b></td></tr>
+<tr><td><b>Пятница</b> <span class='small'>04.09</span></td><td class='num'>4</td><td class='num'>1 200 ₽</td><td class='num'>+1 200 ₽</td><td class='num'><b>2 400 ₽</b></td></tr>
+<tr><td><b>Суббота</b> <span class='small'>05.09</span></td><td class='num'>4</td><td class='num'>1 200 ₽</td><td class='num'>+1 200 ₽</td><td class='num'><b>2 400 ₽</b></td></tr>
+<tr><td><b>Воскресенье</b> <span class='small'>06.09</span></td><td class='num'>3</td><td class='num'>900 ₽</td><td class='num'>+900 ₽</td><td class='num'><b>1 800 ₽</b></td></tr>
+<tr class='tot'><td>За неделю</td><td class='num'>61</td><td class='num'>18 300 ₽</td><td class='num'>+18 300 ₽</td><td class='num'>36 600 ₽</td></tr>
+<tr class='tot'><td colspan='4'>Плюс уже заработано</td><td class='num'>38 400 ₽</td></tr>
+</table></div>
+<h3><span class='dot' style='background:var(--anya)'></span>Аня</h3>
+<div class='scroll'><table><tr><th>День</th><th class='num'>Детей</th><th class='num'>Дошли</th><th class='num'>+ купили сразу</th><th class='num'>Итого за день</th></tr>
+<tr><td><b>Понедельник</b> <span class='small'>31.08</span></td><td class='num'>21</td><td class='num'>6 300 ₽</td><td class='num'>+6 300 ₽</td><td class='num'><b>12 600 ₽</b></td></tr>
+<tr><td><b>Вторник</b> <span class='small'>01.09</span></td><td class='num'>19</td><td class='num'>5 700 ₽</td><td class='num'>+5 700 ₽</td><td class='num'><b>11 400 ₽</b></td></tr>
+<tr><td><b>Среда</b> <span class='small'>02.09</span></td><td class='num'>7</td><td class='num'>2 100 ₽</td><td class='num'>+2 100 ₽</td><td class='num'><b>4 200 ₽</b></td></tr>
+<tr><td><b>Воскресенье</b> <span class='small'>06.09</span></td><td class='num'>1</td><td class='num'>300 ₽</td><td class='num'>+300 ₽</td><td class='num'><b>600 ₽</b></td></tr>
+<tr class='tot'><td>За неделю</td><td class='num'>48</td><td class='num'>14 400 ₽</td><td class='num'>+14 400 ₽</td><td class='num'>28 800 ₽</td></tr>
+<tr class='tot'><td colspan='4'>Плюс уже заработано</td><td class='num'>29 100 ₽</td></tr>
+</table></div>
+<h2>Уже в копилке</h2>
+<h3><span class='dot' style='background:var(--ira)'></span>Ира — 1 800 ₽</h3>
+<div class='scroll'><table><tr><th>Дата</th><th>Ребёнок</th><th>За что</th><th class='num'>Сумма</th></tr>
+<tr><td>20.08</td><td>Сабирова Александра</td><td class='small'>за 2 недели</td><td class='num'><span class='pill p-amber'>150 ₽</span></td></tr>
+<tr><td>20.08</td><td>Экимашев Савелий</td><td class='small'>за 2 недели</td><td class='num'><span class='pill p-amber'>150 ₽</span></td></tr>
+<tr><td>20.08</td><td>Смирнов Роман</td><td class='small'>за 2 недели</td><td class='num'><span class='pill p-amber'>150 ₽</span></td></tr>
+<tr><td>20.08</td><td>Мукабенов Матвей</td><td class='small'>за 2 недели</td><td class='num'><span class='pill p-amber'>150 ₽</span></td></tr>
+<tr><td>21.08</td><td>Панишева Екатерина</td><td class='small'>за 2 недели</td><td class='num'><span class='pill p-amber'>150 ₽</span></td></tr>
+<tr><td>21.08</td><td>Карандеева Мария</td><td class='small'>за 2 недели</td><td class='num'><span class='pill p-amber'>150 ₽</span></td></tr>
+<tr><td>21.08</td><td>Самчук Егор</td><td class='small'>дошёл на пробное</td><td class='num'><span class='pill p-green'>300 ₽</span></td></tr>
+<tr><td>25.08</td><td>Королева Виктория</td><td class='small'>купили в день пробного</td><td class='num'><span class='pill p-green'>300 ₽</span></td></tr>
+<tr><td>27.08</td><td>Новикова София</td><td class='small'>купили в день пробного</td><td class='num'><span class='pill p-green'>300 ₽</span></td></tr>
+</table></div>
+<h3><span class='dot' style='background:var(--anya)'></span>Аня — 300 ₽</h3>
+<div class='scroll'><table><tr><th>Дата</th><th>Ребёнок</th><th>За что</th><th class='num'>Сумма</th></tr>
+<tr><td>26.08</td><td>Хохлов Родион</td><td class='small'>купили в день пробного</td><td class='num'><span class='pill p-green'>300 ₽</span></td></tr>
+</table></div>
+<div class='card'>Шесть из девяти начислений Иры — жёлтые: по 150 ₽ вместо 300 ₽, потому что родители думали дольше двух недель. Это ровно <b>900 ₽</b>, которые были в руках и утекли на паузе. Те же дети, та же работа — просто разговор случился не в тот день.</div>
+<h2>Что делать, чтобы цифры стали зелёными</h2>
+<ul><li><b>Ловить в коридоре, а не звонить вечером.</b> Родитель ещё под впечатлением, ребёнок рядом и доволен — это самая сильная минута за всю неделю</li><li><b>Начинать с ребёнка, а не с цены.</b> Взять у педагога одну живую деталь («Соня сама прочитала два слова») и открыть разговор ею</li><li><b>Называть скидку как окно, а не как цифру:</b> «−10% на первый абонемент действует сегодня» — акция «по ценам прошлого года» закончилась вчера, другой причины оформить сегодня у родителя нет</li><li><b>Не отпускать без даты.</b> Не готов — назначаем конкретный час звонка на завтра и пишем в лист</li><li><b>Всегда предлагать второй предмет:</b> «в соседний день в это же время идёт [предмет] — многие берут парой». Это ещё один ребёнок в твою колонку</li></ul>
+<div class='card'><b>Итог недели, если всё сложится:</b> Ира — 38 400 ₽, Аня — 29 100 ₽. Это не план и не норма — это потолок, который зависит только от того, сколько родителей успеют поговорить с вами до того, как оденут ребёнка и выйдут за дверь.</div>
+<p class='small'>План на понедельник: <a href='/base/plan_31avgusta'>/base/plan_31avgusta</a> · Заполнение групп: <a href='/base/gruppy_2627'>/base/gruppy_2627</a></p>
+</div>
