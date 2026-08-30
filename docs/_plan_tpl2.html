@@ -1,0 +1,56 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>План 30 августа — Аня и Лена</title>
+<style>
+body{{font:16px/1.5 -apple-system,'Segoe UI',Roboto,sans-serif;margin:0;padding:16px 18px 70px;background:#F7F7FC;color:#232046;max-width:940px}}
+h1{{font-size:1.4rem;color:#312783;margin:.3rem 0}}
+.sub{{color:#5B5876;font-size:.9rem;margin:0 0 12px}}
+.tl{{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}}
+.tl div{{background:#fff;border:1px solid #E3E1F0;border-radius:11px;padding:10px 14px;font-size:.85rem;color:#5B5876;flex:1;min-width:250px}}
+.tl b{{display:block;color:#312783;font-size:1rem;margin-bottom:3px}}
+.tl .a{{border-color:#1DA7E0}} .tl .l{{border-color:#7DB928}}
+h2{{font-size:1.1rem;margin:24px 0 6px;padding:9px 14px;border-radius:10px;color:#fff;background:#1DA7E0}}
+h2.l{{background:#7DB928}} h2.r{{background:#E30613}}
+h2 span{{float:right;font-weight:400;font-size:.82rem;opacity:.9}}
+.scr{{background:#FFF4E0;border:1px solid #F59C00;border-radius:12px;padding:11px 15px;margin:10px 0;font-size:.92rem;line-height:1.5}}
+.scr b{{color:#312783}}
+table{{border-collapse:collapse;width:100%;background:#fff;border-radius:12px;overflow:hidden;margin:6px 0}}
+th{{background:#EEF3FB;color:#5B5876;font-size:.72rem;text-transform:uppercase;padding:6px 11px;text-align:left}}
+td{{border-bottom:1px solid #F0EFF7;padding:8px 11px;font-size:.9rem;vertical-align:top}}
+tr:last-child td{{border-bottom:none}}
+td.n{{width:26px;color:#9a96c0;font-size:.78rem}}
+td.ph a{{color:#1DA7E0;font-weight:700;text-decoration:none;white-space:nowrap}}
+td.tg{{color:#5B5876;font-size:.83rem}} td.res{{width:96px;border-left:1px dashed #D9D6EC}}
+.ag2{{color:#8b87ad;font-size:.78rem;margin-left:6px}}
+.warn{{background:#FCE9EA;border-left:5px solid #E30613;padding:10px 14px;border-radius:0 10px 10px 0;margin:12px 0;font-size:.9rem;line-height:1.5}}
+.ok{{background:#F0F7E4;border-left:5px solid #7DB928;padding:10px 14px;border-radius:0 10px 10px 0;margin:12px 0;font-size:.9rem;line-height:1.5}}
+.foot{{margin-top:22px;color:#5B5876;font-size:.8rem;border-top:1px solid #E3E1F0;padding-top:8px}}
+</style></head><body>
+<h1>Что делать после открытых дверей — Аня и Лена</h1>
+<p class="sub">Обновлено {when}. День открытых дверей закончился, до конца смены остаётся время на обзвон. <b>Аня: сначала срочное, потом список праздника с конца. Лена: сразу список праздника с начала.</b></p>
+
+<div class="tl">
+  <div class="a"><b>Аня</b>{nurg} срочных звонков, потом анкеты праздника — идёт <b>с конца</b> своего списка.</div>
+  <div class="l"><b>Лена</b>Анкеты праздника, <b>с начала</b> списка. Уже поговорили сегодня с {ndone} семьями.</div>
+  <div><b>Осталось обзвонить</b>{ntodo} семей с праздника — тех, кому сегодня ещё не набирали.</div>
+</div>
+
+<h2 class="r">Аня — сначала это <span>{nurg} звонков</span></h2>
+<table><tr><th>№</th><th>Кто</th><th>Телефон</th><th>Что сделать</th><th>Итог</th></tr>{urg}</table>
+
+<h2 class="l">Лена — анкеты праздника, с начала <span>{nlena}</span></h2>
+<div class="scr"><b>Текст:</b> «Здравствуйте! Это KidsUP — вы вчера были у нас на празднике в Янтарной горке и заполнили анкету, спасибо! Вы отметили [направление]. С 31 августа стартует учебный год, и всю неделю по группам идут открытые уроки: первое занятие условно-бесплатное. Записать вас?»<br><br>
+Сверху те, кого есть куда посадить прямо сейчас: шахматы, ИЗО, английский, подготовка.</div>
+<div class="warn"><b>Логопед</b> — {log} семей в списке, а свободно одно окно: Марина, суббота 9:10. Всё остальное занято, две группы уже с перебором. Запись не обещаем — только лист ожидания и переключение на второе отмеченное направление.<br>
+<b>Танцы</b> — {tanc} семей, группы нет: «Набираем, стартуем как соберётся. Записать в предзапись?» Фиксируем день и время — по этим цифрам решаем про зал.<br><br>
+<b>И ещё:</b> «Музыка и речь» у Елены почти заполнена (38 из 42, две группы с перебором), а «Первая школа» у Ирины стоит полупустая — 12 из 30. Это то же раннее развитие для того же возраста. Предлагаем её как равноценный вариант, а не как запасной.</div>
+<table><tr><th>№</th><th>Ребёнок</th><th>Телефон</th><th>Что отметили</th><th>Итог</th></tr>{lena}</table>
+
+<h2>Аня — анкеты праздника, с конца <span>{nanya}</span></h2>
+<div class="scr">Тот же текст. Списки не пересекаются: у Лены первая половина, у Ани вторая. Если закончите свою — берите соседкину с обратного конца и отмечайте в колонке «Итог».</div>
+<table><tr><th>№</th><th>Ребёнок</th><th>Телефон</th><th>Что отметили</th><th>Итог</th></tr>{anya}</table>
+
+<div class="ok"><b>Что уже сделано сегодня:</b> все 31 семья с открытых дверей получили напоминание в WhatsApp, четверым платившим ушло СМС. По анкетам поговорили с {ndone} семьями, десяти недозвонившимся отправлен персональный догон. Отказы Афиночетова и Биярслановой зафиксированы, Бернарду (у ребёнка перелом) место придержано, Бутовке перенесли на Неделю открытых уроков.</div>
+
+<div class="foot">Свободные места: подготовка 67 · английский 31 · ИЗО 22 · «Первая школа» 18 · шахматы 12 · мини-сад и нулевой по 8 · менталка 6 · «Музыка и речь» 4 · лицей 4 · логопед 1. Полная таблица по группам — <a href="/base/gruppy_2627">заполнение 2026/27</a>.</div>
+</body></html>
