@@ -1,90 +1,175 @@
 <style>
-:root{--indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613;
---ink:#1a1830;--muted:#6b6a80;--line:#e3e1ee;--bg:#faf9fd;--card:#fff}
+:root{--ink:#15132e;--muted:#6c6a86;--line:#e4e2f0;--bg:#f8f7fc;--card:#fff;
+--indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
 font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-.wrap{max-width:1000px;margin:0 auto;padding:20px 16px 80px}
-h1{font-size:26px;line-height:1.2;margin:0 0 6px;color:var(--indigo)}
-.sub{color:var(--muted);font-size:14px;margin:0 0 20px}
-h2{font-size:20px;margin:32px 0 10px;color:var(--indigo);border-bottom:2px solid var(--line);padding-bottom:6px}
-h3{font-size:16px;margin:18px 0 8px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px 80px}
+.hero{background:linear-gradient(135deg,#312783,#1DA7E0);color:#fff;margin:0 -16px 22px;
+padding:30px 20px 26px;border-radius:0 0 20px 20px}
+.hero h1{margin:0 0 6px;font-size:28px;line-height:1.15}
+.hero p{margin:0;opacity:.92;font-size:15px}
+h2{font-size:21px;margin:34px 0 10px;color:var(--indigo);border-bottom:2px solid var(--line);padding-bottom:6px}
+h3{font-size:16px;margin:20px 0 8px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0}
 .alarm{border-left:4px solid var(--red);background:#fff5f5}
 .warn{border-left:4px solid var(--amber);background:#fffaf0}
 .ok{border-left:4px solid var(--green);background:#f7fbf0}
+.why{border-left:4px solid var(--blue);background:#eef8fd}
 table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
 th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);
 font-weight:600;padding:8px;border-bottom:2px solid var(--line)}
 td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
 .num{text-align:right;white-space:nowrap}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tot td{font-weight:700;background:#f2f0fa}
 .pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
 .p-green{background:#eef7e0;color:#4d7511}.p-amber{background:#fdf0dc;color:#94600a}
 .p-red{background:#fce8e9;color:#9c060f}.p-blue{background:#e4f4fc;color:#12668b}
 .p-gray{background:#eeedf5;color:#5b5a70}
-.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:16px 0}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-.kpi .big{font-size:30px;font-weight:800;color:var(--indigo);line-height:1.15}
+.kpi .big{font-size:29px;font-weight:800;color:var(--indigo);line-height:1.15}
+.step{display:flex;gap:12px;align-items:flex-start;margin:14px 0}
+.step .n{flex:none;width:30px;height:30px;border-radius:50%;background:var(--indigo);color:#fff;
+font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
+.step .b{flex:1}
 ul{margin:8px 0;padding-left:20px}li{margin:5px 0}
 .small{font-size:13px;color:var(--muted)}
-.q{background:#f2f0fb;border-radius:10px;padding:10px 13px;margin:8px 0;font-size:14px;font-style:italic}
+.q{background:#f1effb;border-radius:10px;padding:10px 13px;margin:8px 0;font-size:14px;font-style:italic}
 .kids{font-size:13px;color:var(--muted);line-height:1.5}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#e9e8f2;--muted:#9d9bb2;
---line:#33314a;--bg:#141327;--card:#1c1b32;--indigo:#a99df0}
-:root:not([data-theme="light"]) .alarm{background:#33161a}
-:root:not([data-theme="light"]) .warn{background:#332813}
-:root:not([data-theme="light"]) .ok{background:#1e2c16}
-:root:not([data-theme="light"]) .q{background:#26243f}
+.ph{font-variant-numeric:tabular-nums;white-space:nowrap}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#eae8f6;--muted:#a3a1ba;
+--line:#343150;--bg:#131228;--card:#1d1b36;--indigo:#ab9ff2}
+:root:not([data-theme="light"]) .alarm{background:#331519}
+:root:not([data-theme="light"]) .warn{background:#332812}
+:root:not([data-theme="light"]) .ok{background:#1e2c15}
+:root:not([data-theme="light"]) .why{background:#122b39}
+:root:not([data-theme="light"]) .q{background:#25233e}
+:root:not([data-theme="light"]) .tot td{background:#262344}
 :root:not([data-theme="light"]) .p-green{background:#26361a;color:#a9d96a}
 :root:not([data-theme="light"]) .p-amber{background:#3b2b0e;color:#f2b34c}
 :root:not([data-theme="light"]) .p-red{background:#3d1416;color:#f38b90}
 :root:not([data-theme="light"]) .p-blue{background:#122f3f;color:#77cdf0}
 :root:not([data-theme="light"]) .p-gray{background:#2a2842;color:#a5a3bb}}
 </style><div class='wrap'>
-<h1>Понедельник 31 августа — план на день</h1>
-<p class='sub'>Первый день учебного года. В смене Елена и Ирина. Лиза — онлайн, переписка и догоны</p>
+<div class='hero'><h1>Понедельник 31 августа</h1><p>Первый день учебного года · в смене Елена и Ирина · Лиза онлайн<br>Полная сверка CRM сделана в ночь на 31.08: 101 группа, каждая запись проверена</p></div>
+<h2>Где мы сейчас на самом деле</h2>
 <div class='grid'>
-<div class='kpi'><div class='lbl'>Детей записано</div><div class='big'>77</div><div class='small'>в 21 группу (+1 карточка-заявка)</div></div>
-<div class='kpi'><div class='lbl'>Реально придут</div><div class='big'>59</div><div class='small'>12 групп — остальные стартуют позже</div></div>
-<div class='kpi'><div class='lbl'>Предупредить: ИЗО</div><div class='big'>13</div><div class='small'>их занятия со среды 2.09</div></div>
-<div class='kpi'><div class='lbl'>Предупредить: логопед</div><div class='big'>6</div><div class='small'>Елена принимает с 7.09</div></div>
+<div class='kpi'><div class='lbl'>Детей в группах</div><div class='big'>178</div><div class='small'>уникальных, без двойного счёта</div></div>
+<div class='kpi'><div class='lbl'>Из них платят</div><div class='big'>71</div><div class='small'>статус «Учится»</div></div>
+<div class='kpi'><div class='lbl'>Только на пробном</div><div class='big'>107</div><div class='small'>деньгами ещё не стали</div></div>
+<div class='kpi'><div class='lbl'>Заполнение</div><div class='big'>49%</div><div class='small'>194 из 399 мест</div></div>
+<div class='kpi'><div class='lbl'>Заявок без ответа</div><div class='big'>52</div><div class='small'>самой старой 18 дней</div></div>
 </div>
-<h2>1. Сделать до 10:00 — Ирина</h2>
-<div class='card alarm'><b>Английский пн-ср 19:00 (Movers-Flyers, 8-12 лет) — 9 детей на 8 мест.</b> Перебор на одного. Десятая строка в CRM — не ребёнок, а карточка «Заявка Елена (английский)»: уровень не определён, поэтому её посадили сразу в два слота — и в 19:00, и в 16:00.<br><br><b>Первым делом:</b> позвонить Елене (79263936933), определить уровень и убрать лишнюю запись. Если все девять детей придут — решаем с Борисом: расширяем группу до 9 или открываем второй слот Movers-Flyers. Перевести некуда, Гр1 в 16:00 уровнем ниже. Родителям до решения ничего не говорим.</div>
-<div class='card warn'><b>ПШ 18:00 ПШ2 читающие (Гр7) — 8 из 8, группа полная.</b> Больше туда не записываем: следующего читающего — в лист ожидания или в Гр12 (пн 19:00 + сб 10:00, там 4 из 8).</div>
-<h3>Обзвон подтверждений — 12 групп, 60 детей</h3>
+<div class='card warn'><b>Цифра заполнения снизилась с 60% до 49% — не потому, что кто-то ушёл.</b> Прошлый счёт брал все живые строки подряд. Полная сверка выявила три вида двойного счёта: буферные группы «Заявки» считались как занятые места; логопед и раннее развитие ходят дважды в неделю — один ребёнок занимал две строки; плюс карточки-заявки без имени ребёнка. Сейчас считаем по уникальным детям.</div>
+<div class='scroll'><table><tr><th>Предмет</th><th class='num'>Детей</th><th class='num'>Мест</th><th class='num'>Групп</th><th class='num'>Занято</th></tr>
+<tr><td>Раннее развитие</td><td class='num'>57</td><td class='num'>88</td><td class='num'>13</td><td class='num'><span class='pill p-amber'>65%</span></td></tr>
+<tr><td>Подготовка к школе</td><td class='num'>46</td><td class='num'>120</td><td class='num'>15</td><td class='num'><span class='pill p-red'>38%</span></td></tr>
+<tr><td>Английский</td><td class='num'>33</td><td class='num'>64</td><td class='num'>8</td><td class='num'><span class='pill p-amber'>52%</span></td></tr>
+<tr><td>Логопед</td><td class='num'>23</td><td class='num'>33</td><td class='num'>33</td><td class='num'><span class='pill p-green'>70%</span></td></tr>
+<tr><td>ИЗО</td><td class='num'>9</td><td class='num'>34</td><td class='num'>4</td><td class='num'><span class='pill p-red'>26%</span></td></tr>
+<tr><td>Мини-сад</td><td class='num'>8</td><td class='num'>15</td><td class='num'>1</td><td class='num'><span class='pill p-amber'>53%</span></td></tr>
+<tr><td>Нулевой класс</td><td class='num'>7</td><td class='num'>15</td><td class='num'>1</td><td class='num'><span class='pill p-amber'>47%</span></td></tr>
+<tr><td>Ментальная арифметика</td><td class='num'>7</td><td class='num'>14</td><td class='num'>2</td><td class='num'><span class='pill p-amber'>50%</span></td></tr>
+<tr><td>ШАХ</td><td class='num'>4</td><td class='num'>16</td><td class='num'>2</td><td class='num'><span class='pill p-red'>25%</span></td></tr>
+<tr class='tot'><td>Итого</td><td class='num'>194</td><td class='num'>399</td><td class='num'>79</td><td class='num'>49%</td></tr></table></div>
+<h2>Почему план именно такой</h2>
+<div class='card why'>Воронка на сегодня выглядит так: <b>52 человек сами оставили заявку</b> и ждут ответа → <b>107 записаны на пробное</b>, но ещё не заплатили → <b>71 платят</b>. Порядок работы задаёт не важность, а цена одного ребёнка: чем ближе человек к кассе, тем дешевле его довести.</div>
+<div class='step'><div class='n'>1</div><div class='b'><b>Тот, кто уже в здании</b> — 56 детей придут сегодня на первое занятие. Разговор в коридоре после занятия стоит ноль минут поиска и даёт максимальную конверсию: ребёнок доволен, родитель рядом, скидка действует сегодня. Ушёл домой — половина теряется.</div></div>
+<div class='step'><div class='n'>2</div><div class='b'><b>Тот, кто сам попросился</b> — 52 необработанных заявок. Человек оставил телефон по своей воле и не получил ответа: самая старая заявка от 12 августа, ей 18 дней. Такой контакт конвертируется в разы лучше холодного, а стоит столько же — один звонок.</div></div>
+<div class='step'><div class='n'>3</div><div class='b'><b>Тот, кто записан, но ещё не дошёл</b> — 107 детей. На них уже потрачена вся работа по привлечению. Каждый недошедший обнуляет её целиком.</div></div>
+<div class='step'><div class='n'>4</div><div class='b'><b>И только потом холодная база.</b> 71 семья, кому ни разу не звонили, никуда не денется — а заявка протухает за дни.</div></div>
+<div class='card'><b>Арифметика, почему заявки идут раньше холодного обзвона.</b> 52 заявок при конверсии в запись около половины дают ~26 детей. Те же часы на холодном списке при обычной конверсии дают вчетверо меньше. Разница не в скрипте и не в старании — в том, что один человек уже поднял руку, а другого нужно уговаривать с нуля.<br><br><b>Слабое место плана, чтобы вы знали:</b> он держится на явке. Если из 56 записанных придёт половина, день провалится независимо от того, как хорошо отработают на месте. Поэтому обзвон подтверждений с утра — не формальность, а несущая конструкция.</div>
+<h2>1. До 10:00 — Ирина. Подтверждения</h2>
+<div class='card ok'>56 детей в 11 группах. Цель — не «обзвонить», а услышать «да, будем» от каждого. Кто не берёт трубку — отметить, Клод догонит в WhatsApp и мессенджерах.</div>
 <div class='q'>«Доброе утро! Это KidsUP. Напоминаю: сегодня в ЧЧ:ММ ждём [имя] на первое занятие. Бульвар Маршала Рокоссовского 6 к1В, БЦ «Богородский», 7-й подъезд, 2 этаж, домофон 12. Приходите за 10 минут. Будете?»</div>
 <div class='scroll'><table><tr><th>Время</th><th>Группа</th><th class='num'>Детей</th><th>Кого ждём</th></tr>
-<tr><td><b>10:00</b></td><td class='small'>РР.Музыка и речь · Группа 4 · пн - пт · 10:00 · 1,3 - 1,8</td><td class='num'><span class='pill p-gray'>6/7</span></td><td class='kids'>Малягина Екатерина, Кириллова Виктория, Николаев Виктор, Дубинина Варвара, Самчук Егор, Мартынова Аглая</td></tr>
-<tr><td><b>11:00</b></td><td class='small'>РР.Музыка и речь · Группа 5 · пн - пт · 11:00 · 1,8 - 2.2</td><td class='num'><span class='pill p-gray'>6/7</span></td><td class='kids'>Аванян Вероника, Карандеева Мария, Гололобова Нелли, Романенко София, Петрова Вера, Синько София</td></tr>
-<tr><td><b>12:00</b></td><td class='small'>РР.Музыка и речь · Группа 6 · пн - пт · 12:00 · 2.2 - 3</td><td class='num'><span class='pill p-gray'>4/7</span></td><td class='kids'>Егоров Лука, Шангареева Ева, Нистратова Агата, Литовченко Ева</td></tr>
-<tr><td><b>16:00</b></td><td class='small'>ПШ · пн-чт · 16:00 · 5-7 лет · ПШ1 нечитающие (Гр5)</td><td class='num'><span class='pill p-gray'>3/8</span></td><td class='kids'>Смирнов Роман, Белокурова Вероника, Величутина Алиса</td></tr>
-<tr><td><b>16:00</b></td><td class='small'>АЯ · пн-ср · 16:00 · 8-12 лет · Pre-A1 Starters (Гр1)</td><td class='num'><span class='pill p-gray'>4/8</span></td><td class='kids'>Венера (девочке 10, промо Маша), виктория, Василиса, Ветрова София · <i>заявка Елены — уровень не определён, сидит и здесь, и в 19:00</i></td></tr>
-<tr><td><b>17:00</b></td><td class='small'>ПШ · пн-чт · 17:00 · 4-5 лет · ПШ1 нечитающие (Гр6)</td><td class='num'><span class='pill p-gray'>5/8</span></td><td class='kids'>Бутовка Варвара, Кульков Максим, Бердюгин Федор, Нариманлы Селин, Волгина София</td></tr>
-<tr><td><b>17:00</b></td><td class='small'>АЯ · пн-ср · 17:00 · 3-5 лет · Pre-A1 Starters (Гр2)</td><td class='num'><span class='pill p-gray'>2/8</span></td><td class='kids'>Шиш Савелий (MAX), Шиш Сергей</td></tr>
-<tr><td><b>18:00</b></td><td class='small'>ПШ · пн-чт · 18:00 · 4-7 лет · ПШ2 читающие (Гр7)</td><td class='num'><span class='pill p-amber'>8/8</span></td><td class='kids'>Макшанов Иван, Власова Варвара, Шиш Савелий (MAX), Шиш Сергей, Горин Федор, Панкратова Александра (max), Новикова София, Рахманов Федор</td></tr>
-<tr><td><b>18:00</b></td><td class='small'>АЯ · пн-ср · 18:00 · 5-8 лет · Pre-A1 Starters (Гр3)</td><td class='num'><span class='pill p-gray'>7/8</span></td><td class='kids'>Мирослав, Ульяна, Алексей, Гетман Василиса, Катков Лукьян, Макшанов Иван, Родионова Анна</td></tr>
-<tr><td><b>19:00</b></td><td class='small'>ПШ · пн 19:00 + сб 10:00 · 5-7 лет · ПШ1 нечитающие (Гр12)</td><td class='num'><span class='pill p-gray'>4/8</span></td><td class='kids'>Анисенкова Алена, Красильников Ярослав, Карюков Феликс, Шамраев Лев</td></tr>
-<tr><td><b>19:00</b></td><td class='small'>АЯ · пн-ср · 19:00 · 8-12 лет · A1-A2 Movers-Flyers (Гр4)</td><td class='num'><span class='pill p-red'>9/8</span></td><td class='kids'>Пахомов Егор, Есенкина Надежда, Пикалин Дмитрий, Романова Милана, Попов Егор, Головлёв Даниил, Сорокина Полина, Гайдуков Мирон, Исайкин Денис · <i>заявка Елены — уровень не определён, сидит и здесь, и в 16:00</i></td></tr>
+<tr><td><b>10:00</b></td><td class='small'>РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8</td><td class='num'><span class='pill p-gray'>6/7</span></td><td class='kids'>Малягина Екатерина, Кириллова Виктория, Николаев Виктор, Дубинина Варвара, Самчук Егор, Мартынова Аглая</td></tr>
+<tr><td><b>11:00</b></td><td class='small'>РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2</td><td class='num'><span class='pill p-gray'>6/7</span></td><td class='kids'>Аванян Вероника, Карандеева Мария, Гололобова Нелли, Романенко София, Петрова Вера, Синько София</td></tr>
+<tr><td><b>12:00</b></td><td class='small'>РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3</td><td class='num'><span class='pill p-gray'>4/7</span></td><td class='kids'>Егоров Лука, Шангареева Ева, Нистратова Агата, Литовченко Ева</td></tr>
+<tr><td><b>16:00</b></td><td class='small'>ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)</td><td class='num'><span class='pill p-gray'>3/8</span></td><td class='kids'>Смирнов Роман, Белокурова Вероника, Величутина Алиса</td></tr>
+<tr><td><b>16:00</b></td><td class='small'>АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)</td><td class='num'><span class='pill p-gray'>4/8</span></td><td class='kids'>Венера (девочке 10, промо Маша), виктория, Василиса, Ветрова София</td></tr>
+<tr><td><b>17:00</b></td><td class='small'>ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)</td><td class='num'><span class='pill p-gray'>4/8</span></td><td class='kids'>Бутовка Варвара, Кульков Максим, Бердюгин Федор, Волгина София</td></tr>
+<tr><td><b>17:00</b></td><td class='small'>АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)</td><td class='num'><span class='pill p-gray'>2/8</span></td><td class='kids'>Шиш Савелий (MAX), Шиш Сергей</td></tr>
+<tr><td><b>18:00</b></td><td class='small'>ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)</td><td class='num'><span class='pill p-amber'>8/8</span></td><td class='kids'>Макшанов Иван, Власова Варвара, Шиш Савелий (MAX), Шиш Сергей, Горин Федор, Панкратова Александра (max), Новикова София, Рахманов Федор</td></tr>
+<tr><td><b>18:00</b></td><td class='small'>АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)</td><td class='num'><span class='pill p-gray'>6/8</span></td><td class='kids'>Мирослав, Ульяна, Алексей, Гетман Василиса, Катков Лукьян, Родионова Анна</td></tr>
+<tr><td><b>19:00</b></td><td class='small'>ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)</td><td class='num'><span class='pill p-gray'>4/8</span></td><td class='kids'>Анисенкова Алена, Красильников Ярослав, Карюков Феликс, Шамраев Лев</td></tr>
+<tr><td><b>19:00</b></td><td class='small'>АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)</td><td class='num'><span class='pill p-red'>9/8</span></td><td class='kids'>Пахомов Егор, Есенкина Надежда, Пикалин Дмитрий, Романова Милана, Попов Егор, Головлёв Даниил, Сорокина Полина, Гайдуков Мирон, Исайкин Денис</td></tr>
 </table></div>
-<p class='small'>В английском 16:00 четыре карточки названы не по правилу («Венера (девочке 10, промо Маша)», «виктория», «Василиса») — при встрече уточнить фамилии и переименовать: только имя и фамилия ребёнка.</p>
-<h2>2. Отдельно предупредить — иначе придут зря</h2>
-<div class='card warn'><b>ИЗО — 13 детей. Занятия начинаются в СРЕДУ 2 сентября, не сегодня.</b><div class='q'>«Здравствуйте! Уточняю по ИЗО: группа стартует в среду 2 сентября в ЧЧ:ММ, сегодня занятия нет. Записала вас, ждём в среду. Хорошо?»</div>
-<div class='small'>16:00 · ИЗО · Группа 1 · пн - ср · 16:00 · 6 - 11 лет · Картины вели — Горелова Алиса</div>
-<div class='small'>17:00 · ИЗО · Группа 2 · пн - ср · 17:00 · 4 - 11 лет · Лепка — Семенова Мария, Макшанов Иван, Димитров Александр, Рахманов Федор</div>
-<div class='small'>18:00 · ИЗО · Группа 3 · пн - ср · 18:00 · 5 - 11 лет · Живопись — Семенова Мария, Ломаковская Дарья, Егоренкова Таисия, Бугрова Златослава, Димитров Александр, Лукьянец Алексей (писать в Телеграмм)</div>
-<div class='small'>19:00 · ИЗО · Группа 4 · пн - ср · 19:00 · 4 - 7 лет · Алфавитная жи — Кирилл, Лоева Ирина</div>
-</div>
-<div class='card warn'><b>Логопед Елена — 6 детей. Принимает с 7 сентября.</b><div class='q'>«Здравствуйте! По логопеду: Елена начинает приём 7 сентября, ваше время ЧЧ:ММ за вами закреплено. Если нужно раньше — есть Марина, могу посмотреть окно на этой неделе.»</div>
-<div class='small'>10:30 Рощепкин Владислав · 16:00 Зиньковская Дарья · 17:00 Апсатарова Дания · 18:00 Нариманлы Селин · 19:00 Саркулова Камила · 9:30 Зиньковская Виктория</div></div>
-<p class='small'>Кто не берёт трубку — отметить в листе, Клод догонит в WhatsApp и мессенджерах.</p>
+<h3>Отдельно — иначе приедут зря</h3>
+<div class='card warn'><b>ИЗО — 11 детей: занятия с СРЕДЫ 2 сентября.</b><div class='q'>«Здравствуйте! Уточняю по ИЗО: группа стартует в среду 2 сентября в ЧЧ:ММ, сегодня занятия нет. Ждём в среду, хорошо?»</div><div class='small'>16:00 · ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины велики — Горелова Алиса</div><div class='small'>17:00 · ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка — Семенова Мария, Макшанов Иван, Димитров Александр, Рахманов Федор</div><div class='small'>18:00 · ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись — Семенова Мария, Ломаковская Дарья, Бугрова Златослава, Димитров Александр, Лукьянец Алексей (писать в Телеграмм)</div><div class='small'>19:00 · ИЗО_Группа 4_пн - ср_19:00_4 - 7 лет_Алфавитная живо — Лоева Ирина</div></div>
+<div class='card warn'><b>Логопед Елена — 5 детей: приём с 7 сентября.</b><div class='q'>«Здравствуйте! По логопеду: Елена начинает 7 сентября, ваше время ЧЧ:ММ закреплено. Если нужно раньше — есть Марина, посмотрю окно на этой неделе.»</div><div class='small'>9:30 Зиньковская Виктория · 10:30 Рощепкин Владислав · 16:00 Зиньковская Дарья · 17:00 Апсатарова Дания · 19:00 Саркулова Камила</div></div>
+<h2>2. Весь день — Елена. 52 заявок, которым не ответили</h2>
+<div class='card alarm'>Это главный резерв дня. Люди оставили телефон сами — и не получили ответа. Начинать с самых старых: чем дольше молчим, тем холоднее.</div>
+<div class='q'>«Здравствуйте! Это KidsUP, бульвар Рокоссовского. Вы оставляли заявку на [предмет] — извините, что отвечаем не сразу, был большой поток перед стартом года. Вопрос ещё актуален? Могу записать [имя] на пробное на этой неделе.»</div>
+<div class='scroll'><table><tr><th>Заявка от</th><th>Ребёнок</th><th>Телефон</th><th>Предмет</th><th>Куда записан</th></tr>
+<tr><td><span class='pill p-red'>12.08 · 19 дн.</span></td><td>Белобородова Софья</td><td class='ph'>79167335323</td><td class='small'>Подготовка к школе</td><td class='small'>ПШ_Заявки</td></tr>
+<tr><td><span class='pill p-red'>12.08 · 19 дн.</span></td><td>Табакаева Елизавета</td><td class='ph'>79776380125</td><td class='small'>Подготовка к школе</td><td class='small'>ПШ_Заявки</td></tr>
+<tr><td><span class='pill p-red'>13.08 · 18 дн.</span></td><td>Бугаков Тимофей</td><td class='ph'>79252026779</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-red'>16.08 · 15 дн.</span></td><td>Чижикова Вероника</td><td class='ph'>79778583301</td><td class='small'>Раннее развитие</td><td class='small'>РР.Музыка и речь_Заявки</td></tr>
+<tr><td><span class='pill p-red'>18.08 · 13 дн.</span></td><td>Васильева Ксения</td><td class='ph'>79257647410</td><td class='small'>Раннее развитие</td><td class='small'>РР.Первая школа_Заявки</td></tr>
+<tr><td><span class='pill p-red'>19.08 · 12 дн.</span></td><td>Красильников Ярослав</td><td class='ph'>79165162495</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-red'>19.08 · 12 дн.</span></td><td>Ксюша</td><td class='ph'>79260092907</td><td class='small'>Заявки</td><td class='small'>Заявки_Танцы</td></tr>
+<tr><td><span class='pill p-red'>19.08 · 12 дн.</span></td><td>Ломаковская Дарья</td><td class='ph'>79645259360</td><td class='small'>Заявки</td><td class='small'>Заявки_Танцы</td></tr>
+<tr><td><span class='pill p-red'>19.08 · 12 дн.</span></td><td>Ломаковская Дарья</td><td class='ph'>79645259360</td><td class='small'>ИЗО</td><td class='small'>ИЗО_Заявки</td></tr>
+<tr><td><span class='pill p-red'>19.08 · 12 дн.</span></td><td>Кирилл</td><td class='ph'>79672066432</td><td class='small'>ИЗО</td><td class='small'>ИЗО_Группа 4_пн - ср_19:00_4 - 7 лет_Алф</td></tr>
+<tr><td><span class='pill p-red'>19.08 · 12 дн.</span></td><td>Бакланов Семён</td><td class='ph'>79031415124</td><td class='small'>Мини-сад</td><td class='small'>Мини-сад_Заявки</td></tr>
+<tr><td><span class='pill p-red'>19.08 · 12 дн.</span></td><td>Остонакулова Дарина</td><td class='ph'>79853576898</td><td class='small'>Мини-сад</td><td class='small'>Мини-сад_Заявки</td></tr>
+<tr><td><span class='pill p-red'>19.08 · 12 дн.</span></td><td>Малыш 1,5 МсМ</td><td class='ph'>79036242683</td><td class='small'>Раннее развитие</td><td class='small'>РР.Музыка и речь_Заявки</td></tr>
+<tr><td><span class='pill p-red'>19.08 · 12 дн.</span></td><td>Ниатшина Алевтина</td><td class='ph'>79151003905</td><td class='small'>Раннее развитие</td><td class='small'>РР.Музыка и речь_Заявки</td></tr>
+<tr><td><span class='pill p-red'>20.08 · 11 дн.</span></td><td>Вика</td><td class='ph'>79642258309</td><td class='small'>Английский</td><td class='small'>АЯ_Заявки</td></tr>
+<tr><td><span class='pill p-red'>20.08 · 11 дн.</span></td><td>Купцов Матвей</td><td class='ph'>79689581744</td><td class='small'>Английский</td><td class='small'>АЯ_Заявки</td></tr>
+<tr><td><span class='pill p-red'>20.08 · 11 дн.</span></td><td>Сталмакова Таисия</td><td class='ph'>79772922259</td><td class='small'>Заявки</td><td class='small'>Заявки_Танцы</td></tr>
+<tr><td><span class='pill p-red'>20.08 · 11 дн.</span></td><td>Купцов Матвей</td><td class='ph'>79689581744</td><td class='small'>Подготовка к школе</td><td class='small'>ПШ_Заявки</td></tr>
+<tr><td><span class='pill p-red'>21.08 · 10 дн.</span></td><td>Овчинникова Александра</td><td class='ph'>79152235530</td><td class='small'>Английский</td><td class='small'>АЯ_Заявки</td></tr>
+<tr><td><span class='pill p-amber'>22.08 · 9 дн.</span></td><td>Богданович Федор</td><td class='ph'>79532268089</td><td class='small'>Раннее развитие</td><td class='small'>РР.Музыка и речь_Группа 2_ср - сб_10:45_</td></tr>
+<tr><td><span class='pill p-amber'>23.08 · 8 дн.</span></td><td>Ильин Вячеслав</td><td class='ph'>79776154530</td><td class='small'>Раннее развитие</td><td class='small'>РР.Первая школа_Заявки</td></tr>
+<tr><td><span class='pill p-amber'>23.08 · 8 дн.</span></td><td>Ефремов Демьян</td><td class='ph'>79154365567</td><td class='small'>Раннее развитие</td><td class='small'>РР.Лицей_ср-пт_17:00_3-4 года_Лицей для </td></tr>
+<tr><td><span class='pill p-amber'>24.08 · 7 дн.</span></td><td>Макшанов Иван</td><td class='ph'>79254147710</td><td class='small'>Английский</td><td class='small'>АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (</td></tr>
+<tr><td><span class='pill p-amber'>24.08 · 7 дн.</span></td><td>Егоренкова Таисия</td><td class='ph'>79256462930</td><td class='small'>ИЗО</td><td class='small'>ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Жи</td></tr>
+<tr><td><span class='pill p-amber'>24.08 · 7 дн.</span></td><td>Шодиева Амина</td><td class='ph'>79688050098</td><td class='small'>Подготовка к школе</td><td class='small'>ПШ_Заявки</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Кычанов Андрей</td><td class='ph'>79037945955</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Кузнецов Федор</td><td class='ph'>79637766599</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Червоный Руслан</td><td class='ph'>79265672402</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Горин Федор</td><td class='ph'>79263646859</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Мальков Алексей</td><td class='ph'>79035014475</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Лукьянец Алексей (писать в</td><td class='ph'>79035394798</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Нариманлы Селин</td><td class='ph'>79013412303</td><td class='small'>Логопед</td><td class='small'>ЛГ Елена_Пн_18:00</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Нариманлы Селин</td><td class='ph'>79013412303</td><td class='small'>Логопед</td><td class='small'>ЛГ Елена_Пт_18:00</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Нариманлы Селин</td><td class='ph'>79013412303</td><td class='small'>Подготовка к школе</td><td class='small'>ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Г</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Садофьев Вова</td><td class='ph'>79067230054</td><td class='small'>Подготовка к школе</td><td class='small'>ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Г</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Ермакова Николь</td><td class='ph'>79152063891</td><td class='small'>Подготовка к школе</td><td class='small'>ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Птичкин Борис</td><td class='ph'>79174412179</td><td class='small'>Раннее развитие</td><td class='small'>РР.Первая школа_Группа 1_вт - чт_10:00_1</td></tr>
+<tr><td><span class='pill p-amber'>25.08 · 6 дн.</span></td><td>Лукьянец Алексей (писать в</td><td class='ph'>79035394798</td><td class='small'>ШАХ</td><td class='small'>ШАХ_Заявки</td></tr>
+<tr><td><span class='pill p-amber'>26.08 · 5 дн.</span></td><td>Титова Елизавета</td><td class='ph'>79032952727</td><td class='small'>Английский</td><td class='small'>АЯ_Заявки</td></tr>
+<tr><td><span class='pill p-amber'>26.08 · 5 дн.</span></td><td>Кузнецов Федор</td><td class='ph'>79637766599</td><td class='small'>Заявки</td><td class='small'>Заявки_Скорочтение</td></tr>
+<tr><td><span class='pill p-amber'>26.08 · 5 дн.</span></td><td>Мурашов Юрий</td><td class='ph'>79161077729</td><td class='small'>ШАХ</td><td class='small'>ШАХ_Заявки</td></tr>
+<tr><td><span class='pill p-gray'>27.08 · 4 дн.</span></td><td>Новиков Лев</td><td class='ph'>79037219422</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-gray'>27.08 · 4 дн.</span></td><td>Сусол Максим</td><td class='ph'>79036842717</td><td class='small'>Ментальная арифметик</td><td class='small'>МА_вс_14:00_7-12 лет</td></tr>
+<tr><td><span class='pill p-gray'>27.08 · 4 дн.</span></td><td>Волгина София</td><td class='ph'>79245339203</td><td class='small'>Подготовка к школе</td><td class='small'>ПШ_ср-пт_18:00_4-5 лет_ПШ1 нечитающие (Г</td></tr>
+<tr><td><span class='pill p-gray'>27.08 · 4 дн.</span></td><td>Козловский Глеб</td><td class='ph'>79252259553</td><td class='small'>ШАХ</td><td class='small'>ШАХ_Заявки</td></tr>
+<tr><td><span class='pill p-gray'>28.08 · 3 дн.</span></td><td>Анисенкова Алена</td><td class='ph'>79773392275</td><td class='small'>Заявки</td><td class='small'>Заявки_Танцы</td></tr>
+<tr><td><span class='pill p-gray'>28.08 · 3 дн.</span></td><td>Костанян Марк</td><td class='ph'>79956840945</td><td class='small'>Логопед</td><td class='small'>ЛГ Елена_Заявки</td></tr>
+<tr><td><span class='pill p-gray'>28.08 · 3 дн.</span></td><td>елена</td><td class='ph'>79687557718</td><td class='small'>Логопед</td><td class='small'>ЛГ Елена_Заявки</td></tr>
+<tr><td><span class='pill p-gray'>29.08 · 2 дн.</span></td><td>Литовченко Ева</td><td class='ph'>79850037212</td><td class='small'>Логопед</td><td class='small'>ЛГ Елена_Заявки</td></tr>
+<tr><td><span class='pill p-gray'>30.08 · 1 дн.</span></td><td>Селезнева Алиса</td><td class='ph'>79262151015</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-gray'>30.08 · 1 дн.</span></td><td>Смирнов Роман</td><td class='ph'>79852280602</td><td class='small'>Заявки</td><td class='small'>Заявки_Робототехника</td></tr>
+<tr><td><span class='pill p-gray'>30.08 · 1 дн.</span></td><td>Елисеева Ксения Игоревна</td><td class='ph'>79161120633</td><td class='small'>Логопед</td><td class='small'>ЛГ Елена_Заявки</td></tr>
+</table></div>
 <h2>3. Главное за день — дожим до абонемента</h2>
-<div class='card ok'><b>Скидка −10% на первый абонемент действует только в день пробного.</b> Это единственная причина оформить сегодня: акция «сентябрь по ценам прошлого года» закончилась вчера. Скидки не суммируются — она одна, какая бы ни подошла.</div>
-<ul><li><b>Ловим на выходе, не по телефону вечером.</b> Родитель стоит в коридоре, ребёнок доволен — это лучшая минута дня. Ушёл домой — конверсия падает вдвое</li><li>Педагог передаёт админу одну конкретную деталь про ребёнка («Соня сама прочитала два слова») — с неё начинаем разговор, не с цены</li><li>Не готов сразу — <b>назначаем конкретный час звонка на вторник</b>, записываем в лист. «Перезвоню как-нибудь» не считается</li><li>Второй предмет предлагаем ВСЕГДА: «в соседний день в это же время идёт [предмет] — многие берут парой, рассказать?»</li><li>Кто не пришёл — звонить в тот же час, пока причина свежая, и сразу переносить на вторник или среду</li></ul>
-<div class='q'>Вечером тем, кто не оформил: «Спасибо, что были у нас! [Педагог] передаёт: [конкретика про ребёнка]. Какие впечатления? Напомню: при оформлении до конца завтрашнего дня первый абонемент со скидкой 10%. Забронировать [дни/время]?»</div>
-<h2>4. В окна между группами</h2>
-<ul><li><b>71 семья, кому ни разу не звонили</b> — платившие летом 2026 и в 2025/26. Список: <a href='/base/spisok_final'>/base/spisok_final</a></li><li><b>Остаток анкет с праздника</b> — кого не добрали вчера</li><li><b>Недокомплект:</b> ПШ Гр5 16:00 (3 из 8), английский Гр2 17:00 (2 из 8), ИЗО Гр1 16:00 (1 из 8) — туда добираем в первую очередь</li></ul>
-<p class='small'>Полная таблица по всем 79 группам: <a href='/base/gruppy_2627'>/base/gruppy_2627</a> · Бонусы за неделю: <a href='/base/bonusy_gonka'>/base/bonusy_gonka</a></p>
+<div class='card ok'><b>−10% на первый абонемент действует только в день пробного.</b> Акция «сентябрь по ценам прошлого года» закончилась вчера — другой причины оформить сегодня у родителя нет. Скидки не суммируются: действует одна −10%.</div>
+<ul><li><b>Ловим на выходе, не звоним вечером.</b> Родитель в коридоре, ребёнок доволен — лучшая минута дня</li><li>Педагог передаёт одну конкретную деталь про ребёнка — с неё начинаем, не с цены</li><li>Не готов — <b>назначаем конкретный час звонка на вторник</b> и пишем в лист</li><li>Второй предмет предлагаем всегда: «в соседний день в это же время идёт [предмет]»</li><li>Не пришёл — звоним в тот же час и сразу переносим на вторник или среду</li></ul>
+<div class='q'>Вечером не оформившим: «Спасибо, что были у нас! [Педагог] передаёт: [конкретика]. Какие впечатления? Напомню: при оформлении до конца завтрашнего дня первый абонемент со скидкой 10%. Забронировать [дни/время]?»</div>
+<h2>4. Починить в CRM — сверка нашла ошибки</h2>
+<div class='card alarm'><b>Раннее развитие, Гр3 ср-сб 11:45 (2,2–3 года) — 10 детей на 7 мест.</b> Перебор на троих, и группа идёт уже в среду. Это больше, чем в английском. Решить сегодня: часть детей в Гр6 (пн-пт 12:00, там 4 из 7) — тот же возраст, другие дни. Кому звонить — выбирает Ирина, начиная с записанных последними.</div>
+<div class='card alarm'><b>Английский пн-ср 19:00 (Movers-Flyers) — 9 детей на 8 мест.</b> Десятая строка — карточка «Заявка Елена (английский)» (79263936933), уровень не определён, поэтому её посадили сразу в два слота. Позвонить, определить уровень, лишнее убрать. Если все девять придут — расширяем группу до 9 или открываем второй слот Movers-Flyers: перевести некуда, Гр1 в 16:00 уровнем ниже.</div>
+<div class='card warn'><b>Логопед Марина: двойные записи в одну субботу.</b> Гунт Лео стоит и в 13:20, и в 14:00. Ситковский Александр — сразу в трёх слотах (вт 16:50, чт 17:40, сб 13:20) и при этом конфликтует с Лео за 13:20. Уточнить у родителей реальное расписание и снять лишнее: у Марины все слоты заняты, каждая ошибочная запись держит место живой очереди.</div>
+<div class='card warn'><b>Подготовка: трое записаны сразу в две группы.</b> Шиш Савелий, Шиш Сергей и Панкратова Александра стоят и в Гр7 (пн-чт 18:00), и в Гр11 (вт-пт 19:00). Из-за этого Гр7 показывает 8 из 8 «полная», хотя трое могут уйти в Гр11. Спросить у родителей, какие дни удобнее, и снять вторую запись — это сразу до трёх свободных мест в самой востребованной группе.</div>
+<div class='card warn'><b>Ещё дубли внутри одного предмета:</b> Самчук Егор (РР Гр4 пн-пт и Гр1 ср-сб), Нистратова Агата (РР Гр6 и Гр3), Димитров Александр и Семенова Мария (ИЗО «Лепка» и «Живопись» подряд). У ИЗО это может быть намеренно — уточнить, ходит ли ребёнок на оба направления.</div>
+<div class='card'><b>Четыре пустые группы:</b> ПШ Гр13 (чт 19:00 + сб 11:00), английский Гр5 (вт-чт 16:00) — ноль записей. Туда в первую очередь предлагаем тех, кто не помещается в переполненные. Плюс два слота логопеда Елены (пн и пт 18:00) числятся пустыми, потому что заявка Нариманлы Селин от 25.08 так и осталась необработанной.</div>
+<h2>5. Чего сегодня не делаем</h2>
+<div class='card'>Холодный список из 71 семьи — не сегодня. Не потому что он плохой, а потому что заявки и явка дают больше на том же времени, а холодная база не протухнет за сутки. Возвращаемся к ней в пятницу, когда в смене двое, или раньше, если заявки закончатся.<br><span class='small'>Список: <a href='/base/spisok_final'>/base/spisok_final</a></span></div>
+<p class='small'>Заполнение по всем группам: <a href='/base/gruppy_2627'>/base/gruppy_2627</a> · Бонусы: <a href='/base/bonusy_gonka'>/base/bonusy_gonka</a></p>
 </div>
