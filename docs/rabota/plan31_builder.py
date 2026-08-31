@@ -4,6 +4,16 @@ BASE="/home/user/kidsup/docs/rabota"
 aud=json.load(open(f"{BASE}/audit_zapisey.json"))
 S=json.load(open(f"{BASE}/spiski_31.json"))
 Z=json.load(open(f"{BASE}/zayavki_open.json"))
+ST=json.load(open(f"{BASE}/client_statuses.json"))
+import re as _re
+JUNK_ST={125954}                      # некачественный лид
+def is_junk(p):
+    n=(p.get("name") or "").strip(); ph=p.get("phone") or ""
+    if not n or "дубликат" in n.lower() or n.lower().startswith("анкета"): return True
+    if _re.fullmatch(r"[^\w\s]+", n): return True
+    if not _re.fullmatch(r"7\d{10}", ph): return True
+    if len(set(ph[1:]))<=1: return True
+    return False
 S3ALL=json.load(open(f"{BASE}/spisok3.json")) if os.path.exists(f"{BASE}/spisok3.json") else []
 PAY=set(json.load(open(f"{BASE}/payers.json"))) if os.path.exists(f"{BASE}/payers.json") else set()
 S3=[x for x in S3ALL if x["uid"] in PAY]          # платили раньше — приоритет
@@ -23,7 +33,12 @@ n_go=sum(len(rows(g)) for g in GO); n_izo=sum(len(rows(g)) for g in IZO)
 n_log=sum(len(rows(g)) for g in LOG)
 DOD_NO=[d for d in S["dod"] if d["status"]=="нет записи"]
 DOD_PR=[d for d in S["dod"] if d["status"]=="на пробном"]
-PRZ=S["prazdnik"]
+PRZ_ALL=S["prazdnik"]
+PRZ_JUNK=[p for p in PRZ_ALL if is_junk(p)]
+PRZ_LOW=[p for p in PRZ_ALL if not is_junk(p) and p["state"] in JUNK_ST]
+HEAT={125955:0,125953:1,125952:2,345767:3,146950:4,349497:5,347075:6,125951:7,345768:8}
+PRZ=[p for p in PRZ_ALL if not is_junk(p) and p["state"] not in JUNK_ST]
+PRZ.sort(key=lambda p: HEAT.get(p["state"], 9))
 NEDOZ=[x for x in S3 if x["state"]==345768]; DUM=[x for x in S3 if x["state"]==146950]
 
 CSS="""
@@ -147,17 +162,23 @@ A("</table></div>")
 
 # ── ШАГ 2
 A(f"<h2>Шаг 2. Заявки с Праздника — {len(PRZ)} семей</h2>")
-A("<div class='card'>Люди с тега «Праздник 2026», которые до сих пор не записаны "
-  "ни в одну группу. Они нас знают: были на празднике 29.08 или оставили анкету. "
-  "Идти по списку сверху вниз, отмечать результат в строке.</div>")
+A("<div class='card'>Люди с тега «Праздник 2026», не записанные ни в одну группу. "
+  "Они нас знают: были на празднике 29.08 или оставили анкету.<br><br>"
+  "<b>Список отсортирован по теплу, идти строго сверху вниз.</b> "
+  "Сначала те, с кем уже был разговор или кто был на пробном — там решение ближе всего; "
+  "в конце недозвоны, до которых никто не дошёл.<br>"
+  f"<span class='small'>Из списка убрано: {len(PRZ_JUNK)} мусорных карточек "
+  f"и {len(PRZ_LOW)} помеченных как «Некачественный лид» — по ним не звоним.</span></div>")
 A("<div class='q'>«Здравствуйте! Это KidsUP с бульвара Рокоссовского. Вы оставляли "
   "анкету на нашем празднике. Учебный год начался вчера, группы набраны наполовину — "
   "хочу успеть предложить вам место, пока оно есть. Что интересно для [имя]?»</div>")
 A("<div class='scroll'><table><tr><th>Семья</th><th>Телефон</th><th>Статус в базе</th></tr>")
-SN={125951:"новый лид",345768:"недозвон",146950:"думает",125952:"записался",345759:"архив"}
+SN={int(k):v for k,v in ST.items()}
 for p in PRZ[:200]:
     st=SN.get(p["state"], str(p["state"]))
-    cl="p-amber" if p["state"]==146950 else ("p-blue" if p["state"]==345768 else "p-gray")
+    cl=("p-green" if p["state"] in (125955,125953,125952) else
+        "p-amber" if p["state"] in (146950,345767) else
+        "p-blue" if p["state"]==345768 else "p-gray")
     A(f"<tr><td>{p['name'][:30]}</td><td class='ph'>{p['phone'] or '—'}</td>"
       f"<td><span class='pill {cl}'>{st}</span></td></tr>")
 A("</table></div>")
@@ -268,6 +289,20 @@ A("<div class='card warn'><b>Английский пн-ср 19:00 — 9 дете
 A("<div class='card warn'><b>Подготовка: Шиш Савелий, Шиш Сергей и Панкратова Александра</b> "
   "записаны и в Гр7 (пн-чт 18:00), и в Гр11 (вт-пт 19:00). Из-за этого Гр7 показывает 8 из 8. "
   "Спросить, какие дни удобнее, лишнее снять — освободится до трёх мест.</div>")
+A("<div class='card alarm'><b>Мусор в базе — почистить, чтобы не звонить впустую.</b><br>"
+  "Три карточки с именем «Дубликат» и телефоном-заглушкой 77777777777: "
+  "две из них (29.08 22:22 и 30.08 08:32) создал я при заливке анкет праздника — "
+  "это моя ошибка, живого контакта за ними нет. Третья от 28.08.2025 не моя, "
+  "но тег «Праздник 2026» на неё повесил тоже я, ошибочно.<br>"
+  "Ещё две: карточка с эмодзи вместо имени (79119059702, от 10.12.2025) "
+  "и «Анкета 2096» (79031502096) — имя не распознано со скана.<br>"
+  "<b>Что сделать:</b> три «Дубликата» удалить, у карточки с эмодзи и «Анкеты 2096» "
+  "уточнить имя ребёнка при первом же разговоре и переименовать.</div>")
+A("<div class='card warn'><b>Орловы — это не дубли.</b> Орлов Дмитрий, Орлов Миша "
+  "и Орлова Лада стоят на одном телефоне 79161702367: это семья с тремя детьми, "
+  "карточки заведены отдельно по правилу «имя и фамилия ребёнка». "
+  "Проверить только, что Дмитрий — ребёнок, а не папа: в анкете фамилия была "
+  "неразборчива (Орлов/Фролов).</div>")
 A("<div class='card warn'><b>Логопед Марина:</b> Гунт Лео стоит и в 13:20, и в 14:00 одной субботы; "
   "Ситковский Александр — в трёх слотах. У Марины занято всё, каждая ошибка держит место очереди.</div>")
 A(f"<p class='small'>Записи по каждой группе: <a href='/base/gruppy_2627'>/base/gruppy_2627</a> · "
