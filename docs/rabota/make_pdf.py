@@ -14,6 +14,6 @@ with sync_playwright() as p:
     pg = b.new_page()
     pg.goto("file://" + tmp, wait_until="networkidle")
     pg.pdf(path=dst, format="A4", print_background=True,
-           margin={"top":"10mm","bottom":"10mm","left":"8mm","right":"8mm"})
+           margin={"top":"0","bottom":"0","left":"0","right":"0"})
     b.close()
 print("PDF:", dst, pathlib.Path(dst).stat().st_size, "байт")
