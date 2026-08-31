@@ -4,7 +4,10 @@ BASE="/home/user/kidsup/docs/rabota"
 aud=json.load(open(f"{BASE}/audit_zapisey.json"))
 S=json.load(open(f"{BASE}/spiski_31.json"))
 Z=json.load(open(f"{BASE}/zayavki_open.json"))
-S3=json.load(open(f"{BASE}/spisok3.json")) if os.path.exists(f"{BASE}/spisok3.json") else []
+S3ALL=json.load(open(f"{BASE}/spisok3.json")) if os.path.exists(f"{BASE}/spisok3.json") else []
+PAY=set(json.load(open(f"{BASE}/payers.json"))) if os.path.exists(f"{BASE}/payers.json") else set()
+S3=[x for x in S3ALL if x["uid"] in PAY]          # платили раньше — приоритет
+S3NEW=[x for x in S3ALL if x["uid"] not in PAY]
 REAL=[g for g in aud["groups"] if not g["zayavki_group"]]
 LIVE={"Учится","3. Записался на пробное","5. Посетил пробное"}
 DAYS=["пн","вт","ср","чт","пт","сб","вс"]
@@ -161,9 +164,12 @@ A("</table></div>")
 
 # ── ШАГ 3
 A(f"<h2>Шаг 3. Летние и прошлогодние — {len(S3)} семей</h2>")
-A("<div class='card'>Те, кто ходил летом 2026 или в 2025/26 и сейчас никуда не записан. "
-  f"Делятся на два разговора: <b>{len(NEDOZ)} недозвонов</b> — до них просто не дошли, "
-  f"и <b>{len(DUM)} думающих</b> — с ними уже говорили, но решения нет.</div>")
+A("<div class='card'>Эти семьи <b>платили нам</b> в 2025/26 или летом 2026, сейчас никуда "
+  f"не записаны. Делятся на два разговора: <b>{len(NEDOZ)} недозвонов</b> — до них просто "
+  f"не дошли, и <b>{len(DUM)} думающих</b> — говорили, но решения нет. "
+  "Возврат своего дешевле любого нового: они знают педагогов, дорогу и цены.<br>"
+  f"<span class='small'>Ещё {len(S3NEW)} недозвонов и думающих в базе никогда у нас "
+  "не платили — это следующий круг, после этих.</span></div>")
 A("<div class='q'><b>Недозвон:</b> «Здравствуйте! Это KidsUP. [Имя] ходил к нам "
   "в прошлом году — учебный год начался, я хочу успеть предложить место, пока группа "
   "не закрылась. Продолжаем?»<br><br>"
@@ -173,7 +179,7 @@ A("<div class='q'><b>Недозвон:</b> «Здравствуйте! Это Ki
 if S3:
     A("<div class='scroll'><table><tr><th>Семья</th><th>Телефон</th><th>Разговор</th>"
       "<th>Праздник</th><th>Статус с</th></tr>")
-    for x in S3[:250]:
+    for x in S3[:220]:
         cl="p-blue" if x["state"]==345768 else "p-amber"
         A(f"<tr><td>{x['name'][:30]}</td><td class='ph'>{x['phone'] or '—'}</td>"
           f"<td><span class='pill {cl}'>{x['stname']}</span></td>"
