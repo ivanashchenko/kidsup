@@ -23,7 +23,9 @@ LIVE={"Учится","3. Записался на пробное","5. Посет�
 DAYS=["пн","вт","ср","чт","пт","сб","вс"]
 def rows(g): return [k for k in g["kids"] if k["jstname"] in LIVE and not k["zayavka"]]
 def first(g): return min(g["days"], key=DAYS.index) if g["days"] else None
-MON=[g for g in REAL if first(g)=="пн" and rows(g)]
+DAILY=[g for g in REAL if not g["days"] and rows(g)
+       and g["subj"] in ("Мини-сад","Нулевой класс")]
+MON=[g for g in REAL if first(g)=="пн" and rows(g)] + DAILY
 def tkey(t):
     h,m=(t or "0:0").split(":"); return int(h)*60+int(m)
 MON.sort(key=lambda g:tkey(g["time"]))

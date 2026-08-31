@@ -26,7 +26,7 @@ for line in rows or []:
     rec,start,finish,answer,fe,fn,te,tn,reason=p[:9]
     try: start=int(start or 0); finish=int(finish or 0); answer=int(answer or 0)
     except: continue
-    out.append({"rec":rec,"start":start,"dur":(finish-answer) if answer else 0,"answer":answer,
+    out.append({"rec":rec.strip("[]").split(",")[0],"start":start,"dur":(finish-answer) if answer else 0,"answer":answer,
                 "dir":"in" if not fe.strip() else "out","from":fn,"to":tn,"reason":reason,
                 "t":datetime.datetime.fromtimestamp(start,msk).strftime("%H:%M")})
 json.dump(out, open("/tmp/calls_day.json","w"), ensure_ascii=False)
