@@ -1,0 +1,66 @@
+<style>
+:root{--ink:#15132e;--muted:#6c6a86;--line:#e4e2f0;--bg:#f8f7fc;--card:#fff;
+--indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 14px 70px}
+h1{font-size:24px;margin:0 0 4px;color:var(--indigo)}
+.sub{color:var(--muted);font-size:14px;margin:0 0 18px}
+h2{font-size:18px;margin:26px 0 8px;color:var(--indigo);border-bottom:2px solid var(--line);padding-bottom:5px}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);
+font-weight:600;padding:8px 6px;border-bottom:2px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.num{text-align:right;white-space:nowrap}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tot td{font-weight:800;background:#f2f0fa}
+.grp td{background:#f6f5fb;font-weight:700;font-size:13px;color:var(--indigo)}
+.bar{display:inline-block;width:52px;height:8px;border-radius:99px;background:#e9e7f3;
+vertical-align:middle;overflow:hidden;margin-right:6px}
+.bar i{display:block;height:100%}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin:12px 0}
+.alarm{border-left:4px solid var(--red);background:#fff5f5}
+.small{font-size:13px;color:var(--muted)}
+.kids{font-size:13px;color:var(--muted);line-height:1.5}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:700}
+.p-red{background:#fce8e9;color:#9c060f}.p-amber{background:#fdf0dc;color:#94600a}
+.p-green{background:#eef7e0;color:#4d7511}.p-gray{background:#eeedf5;color:#5b5a70}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#eae8f6;--muted:#a3a1ba;
+--line:#343150;--bg:#131228;--card:#1d1b36;--indigo:#ab9ff2}
+:root:not([data-theme="light"]) .tot td{background:#262344}
+:root:not([data-theme="light"]) .grp td{background:#232043}
+:root:not([data-theme="light"]) .bar{background:#312e4d}
+:root:not([data-theme="light"]) .alarm{background:#331519}
+:root:not([data-theme="light"]) .p-red{background:#3d1416;color:#f38b90}
+:root:not([data-theme="light"]) .p-amber{background:#3b2b0e;color:#f2b34c}
+:root:not([data-theme="light"]) .p-green{background:#26361a;color:#a9d96a}
+:root:not([data-theme="light"]) .p-gray{background:#2a2842;color:#a5a3bb}}
+</style><div class='wrap'>
+<h1>Английский — записи по группам</h1>
+<p class='sub'>Сверка CRM 31.08, 15:00 · 8 групп · кембриджские уровни</p>
+<div class='card'><b>32 записей из 64 мест — 50%.</b> Свободно 32 мест. Плюс 3 необработанных заявок, которые в счёт не входят — они висят в статусе «Новая заявка».</div>
+<div class='scroll'><table><tr><th>Группа</th><th>Возраст</th><th>Уровень</th><th class='num'>Мест</th><th class='num'>Записей</th><th class='num'>Заявок</th><th class='num'>Свободно</th><th>Заполнено</th></tr>
+<tr class='grp'><td colspan='3'>вт-чт — 4 группы</td><td class='num'>32</td><td class='num'>12</td><td class='num'></td><td class='num'>20</td><td>38%</td></tr>
+<tr><td><b>16:00</b> <span class='small'>Pre-A1 Starters (Гр5)</span></td><td class='small'>8-12 лет</td><td class='small'>Pre-A1 Starters</td><td class='num'>8</td><td class='num'><b>0</b></td><td class='num'><span class='pill p-amber'>2</span></td><td class='num'>8</td><td><span class='bar'><i style='width:0%;background:#E30613'></i></span>0%</td></tr>
+<tr><td><b>17:00</b> <span class='small'>Pre-A1 Starters (Гр6)</span></td><td class='small'>5-8 лет</td><td class='small'>Pre-A1 Starters</td><td class='num'>8</td><td class='num'><b>8</b></td><td class='num'></td><td class='num'>0</td><td><span class='bar'><i style='width:100%;background:#7DB928'></i></span>100%</td></tr>
+<tr><td><b>18:00</b> <span class='small'>Pre-A1 Starters (Гр7)</span></td><td class='small'>3-5 лет</td><td class='small'>Pre-A1 Starters</td><td class='num'>8</td><td class='num'><b>3</b></td><td class='num'></td><td class='num'>5</td><td><span class='bar'><i style='width:38%;background:#E30613'></i></span>38%</td></tr>
+<tr><td><b>19:00</b> <span class='small'>A1 Movers (Гр8)</span></td><td class='small'>5-8 лет</td><td class='small'>A1 Movers</td><td class='num'>8</td><td class='num'><b>1</b></td><td class='num'></td><td class='num'>7</td><td><span class='bar'><i style='width:12%;background:#E30613'></i></span>12%</td></tr>
+<tr class='grp'><td colspan='3'>пн-ср — 4 группы</td><td class='num'>32</td><td class='num'>20</td><td class='num'></td><td class='num'>12</td><td>62%</td></tr>
+<tr><td><b>16:00</b> <span class='small'>Pre-A1 Starters (Гр1)</span></td><td class='small'>8-12 лет</td><td class='small'>Pre-A1 Starters</td><td class='num'>8</td><td class='num'><b>4</b></td><td class='num'></td><td class='num'>4</td><td><span class='bar'><i style='width:50%;background:#F59C00'></i></span>50%</td></tr>
+<tr><td><b>17:00</b> <span class='small'>Pre-A1 Starters (Гр2)</span></td><td class='small'>3-5 лет</td><td class='small'>Pre-A1 Starters</td><td class='num'>8</td><td class='num'><b>2</b></td><td class='num'></td><td class='num'>6</td><td><span class='bar'><i style='width:25%;background:#E30613'></i></span>25%</td></tr>
+<tr><td><b>18:00</b> <span class='small'>Pre-A1 Starters (Гр3)</span></td><td class='small'>5-8 лет</td><td class='small'>Pre-A1 Starters</td><td class='num'>8</td><td class='num'><b>6</b></td><td class='num'><span class='pill p-amber'>1</span></td><td class='num'>2</td><td><span class='bar'><i style='width:75%;background:#7DB928'></i></span>75%</td></tr>
+<tr><td><b>19:00</b> <span class='small'>A1-A2 Movers-Flyers (Гр4)</span></td><td class='small'>8-12 лет</td><td class='small'>A1-A2 Movers-Flyers</td><td class='num'>8</td><td class='num'><b>8</b></td><td class='num'></td><td class='num'>0</td><td><span class='bar'><i style='width:100%;background:#7DB928'></i></span>100%</td></tr>
+<tr class='tot'><td colspan='3'>ИТОГО</td><td class='num'>64</td><td class='num'>32</td><td class='num'>3</td><td class='num'>32</td><td>50%</td></tr></table></div>
+<h2>Кто в каждой группе</h2>
+<div class='scroll'><table><tr><th>Группа</th><th>Дети</th></tr>
+<tr><td class='small'><b>вт-чт 16:00</b><br>Pre-A1 Starters</td><td class='kids'><i>пусто</i> · <span class='pill p-amber'>заявки:</span> Михавилов Семен, Михавилова Алиса</td></tr>
+<tr><td class='small'><b>вт-чт 17:00</b><br>Pre-A1 Starters</td><td class='kids'>Андрей, Панишева Екатерина, Сильченко Александра, полина, 79778857001, Коненков Михаил, Купцов Матвей, Молчанов Максим</td></tr>
+<tr><td class='small'><b>вт-чт 18:00</b><br>Pre-A1 Starters</td><td class='kids'>Лоева Ирина, Цуцкова Елизавета, Ситдиков Артур</td></tr>
+<tr><td class='small'><b>вт-чт 19:00</b><br>A1 Movers</td><td class='kids'>Козловский Глеб</td></tr>
+<tr><td class='small'><b>пн-ср 16:00</b><br>Pre-A1 Starters</td><td class='kids'>Венера (девочке 10, промо Маша), виктория, Василиса, Ветрова София</td></tr>
+<tr><td class='small'><b>пн-ср 17:00</b><br>Pre-A1 Starters</td><td class='kids'>Шиш Савелий (MAX), Шиш Сергей</td></tr>
+<tr><td class='small'><b>пн-ср 18:00</b><br>Pre-A1 Starters</td><td class='kids'>Мирослав, Ульяна, Алексей, Гетман Василиса, Катков Лукьян, Родионова Анна · <span class='pill p-amber'>заявки:</span> Макшанов Иван</td></tr>
+<tr><td class='small'><b>пн-ср 19:00</b><br>A1-A2 Movers-Flyers</td><td class='kids'>Пахомов Егор, Пикалин Дмитрий, Романова Милана, Попов Егор, Головлёв Даниил, Сорокина Полина, Гайдуков Мирон, Исайкин Денис</td></tr>
+</table></div>
+</div>
