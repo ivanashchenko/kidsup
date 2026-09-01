@@ -8,3 +8,7 @@ site/kidsup_site.html
 
 # промежуточный прогресс заливки анкет — перезаписывается фоновой задачей
 docs/rabota/zaliv_progress.json
+
+# 86 МБ, пересобирается docs/rabota/banner_metro.py
+app/static/banner_metro_1900x1400.tif
+docs/banner_metro.html
