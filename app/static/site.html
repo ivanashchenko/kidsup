@@ -379,6 +379,25 @@ body.js .reveal.in{opacity:1;transform:none}
   text-align:left;gap:16px;margin-bottom:10px}
 .vfx-wide .vfx-play{flex:0 0 64px}
 .vfx-wide .vfx-cap{flex:1}
+
+/* Неделя открытых уроков — одиночная карточка вместо сетки событий */
+.ev-solo{background:linear-gradient(135deg,rgba(29,167,224,.14),rgba(125,185,40,.10));
+  border:1px solid rgba(255,255,255,.16);border-radius:22px;overflow:hidden;
+  max-width:62rem;margin:0 auto}
+.ev-solo-head{padding:1.6rem 1.9rem 1.1rem;border-bottom:1px solid rgba(255,255,255,.12)}
+.ev-solo-badge{display:inline-block;background:#7DB928;color:#fff;font-weight:700;
+  font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;
+  padding:.3rem .85rem;border-radius:99px;margin-bottom:.7rem}
+.ev-solo-head h3{margin:0;font-size:1.65rem;line-height:1.15}
+.ev-solo-body{padding:1.4rem 1.9rem 1.7rem}
+.ev-solo-lead{font-size:1.08rem;margin:0 0 1.1rem;opacity:.95}
+.ev-solo-list{list-style:none;margin:0 0 1.4rem;padding:0;display:grid;gap:.75rem}
+.ev-solo-list li{padding-left:1.7rem;position:relative;line-height:1.5;opacity:.93}
+.ev-solo-list li:before{content:"✓";position:absolute;left:0;top:0;color:#9BD96A;font-weight:800}
+.ev-solo-cta{display:flex;flex-wrap:wrap;gap:.9rem;align-items:center}
+.ev-solo-note{font-size:.9rem;opacity:.75}
+@media(max-width:640px){.ev-solo-head,.ev-solo-body{padding-left:1.15rem;padding-right:1.15rem}
+  .ev-solo-head h3{font-size:1.35rem}}
 </style>
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "ChildCare", "name": "KidsUP", "alternateName": "Детский центр и английский сад KidsUP", "description": "Детский центр и английский сад на Бульваре Рокоссовского: подготовка к школе, английский по программе Cambridge, раннее развитие, мини-сад и нулевой класс, логопед, ИЗО, шахматы, ментальная арифметика. Дети от 1,3 до 12 лет.", "url": "https://kidsup.ru", "telephone": "+74951209024", "address": {"@type": "PostalAddress", "streetAddress": "бульвар Маршала Рокоссовского, 6к1В", "addressLocality": "Москва", "addressRegion": "Москва", "addressCountry": "RU"}, "areaServed": [{"@type": "Place", "name": "Метрогородок"}, {"@type": "Place", "name": "Богородское"}, {"@type": "Place", "name": "Преображенское"}, {"@type": "Place", "name": "Восточный округ Москвы"}], "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "09:00", "closes": "20:00"}], "publicAccess": true, "isAccessibleForFree": false, "audience": {"@type": "PeopleAudience", "suggestedMinAge": 1, "suggestedMaxAge": 12}, "sameAs": ["https://vk.com/club220359229"], "aggregateRating": {"@type": "AggregateRating", "ratingValue": "5.0", "reviewCount": "253", "bestRating": "5", "worstRating": "1"}}</script>
@@ -425,7 +444,7 @@ body.js .reveal.in{opacity:1;transform:none}
       </div>
       <div class="cta-row">
         <a class="btn btn-green" href="#signup">Выбрать занятие</a>
-        <a class="btn btn-line" href="#events">🎉 Праздник 29 августа</a>
+        <a class="btn btn-line" href="#events">📚 Неделя открытых уроков</a>
       </div>
       <p class="hero-geo">📍 б-р Маршала Рокоссовского, 6 к1В · 2 минуты от метро
       Бульвар Рокоссовского · напротив ТЦ «Янтарь»</p>
@@ -445,36 +464,29 @@ body.js .reveal.in{opacity:1;transform:none}
 
 <section class="events" id="events">
   <div class="wrap">
-    <h2>Три дня, чтобы познакомиться с нами</h2>
-    <p class="sub">Приходите всей семьёй — посмотрите центр, педагогов и занятия до начала учебного года.</p>
-    <div class="ev-grid">
-      <div class="ev reveal">
-        <div class="d">СБ · 29 августа · 11:00</div>
-        <h3>🎉 Праздник KidsUP</h3>
-        <p><b>📍 Парк «Янтарная горка», рядом с ЖК «Богородский»</b> — праздник проходит на улице,
-        не в центре. Аниматоры, мыльное шоу, конкурсы и беспроигрышная лотерея:
-        познакомьтесь с педагогами в игровой атмосфере.</p>
-        <span class="free">Вход свободный</span>
-        <a class="btn btn-green" href="#signup" data-ev="🎉 Праздник 29.08 (11:00)">Приду! Напомните мне</a>
+    <h2>Неделя открытых уроков</h2>
+    <p class="sub">31 августа — 6 сентября. Группы уже стартовали: приходите на обычное
+    занятие своей группы и посмотрите, как всё устроено изнутри.</p>
+    <div class="ev-solo reveal">
+      <div class="ev-solo-head">
+        <span class="ev-solo-badge">31 августа — 6 сентября</span>
+        <h3>📚 Первое занятие — условно-бесплатное</h3>
       </div>
-      <div class="ev reveal">
-        <div class="d">ВС · 30 августа</div>
-        <h3>🚪 День открытых дверей</h3>
-        <p><b>📍 В центре: б-р Рокоссовского, 6 к1В</b>. Экскурсии по центру, знакомство
-        с программами и расписанием нового года.
-        Программу дня пришлём накануне.</p>
-        <span class="free">Приходите с ребёнком</span>
-        <p style="margin-top:.4rem;font-size:.85rem"><a href="https://KidsUPday.ru" target="_blank" rel="noopener" style="color:#9BD7F5;display:inline-block;padding:.35rem 0;font-size:1rem">KidsUPday.ru</a></p>
-        <a class="btn btn-green" href="#signup" data-ev="🚪 День открытых дверей 30.08">Записаться на экскурсию</a>
-      </div>
-      <div class="ev reveal">
-        <div class="d">31 августа — 6 сентября</div>
-        <h3>📚 Неделя открытых уроков</h3>
-        <p>Группы стартуют по расписанию, и на первое занятие можно прийти познакомиться:
-        не понравится — платить не нужно, понравится — занятие войдёт в первый абонемент.</p>
-        <span class="free">Условно-бесплатное первое занятие</span>
-        <p style="margin-top:.4rem;font-size:.85rem"><a href="https://KidsUPweek.ru" target="_blank" rel="noopener" style="color:#9BD7F5;display:inline-block;padding:.35rem 0;font-size:1rem">KidsUPweek.ru</a></p>
-        <a class="btn btn-green" href="#signup" data-ev="📚 Открытый урок (31.08–06.09)">Выбрать открытый урок</a>
+      <div class="ev-solo-body">
+        <p class="ev-solo-lead">Не понравится — платить не нужно. Понравится — занятие
+        войдёт в первый абонемент.</p>
+        <ul class="ev-solo-list">
+          <li><b>Живое занятие, а не показательное.</b> Ребёнок занимается вместе с группой
+          по обычной программе — вы видите настоящий урок.</li>
+          <li><b>Диагностика от педагога.</b> После занятия расскажем, что у ребёнка уже
+          получается и с чего начнём. Письменно, с вами на руках.</li>
+          <li><b>Подберём уровень, а не только время.</b> Английский — по уровням Cambridge,
+          подготовка — по тому, читает ребёнок или ещё нет.</li>
+        </ul>
+        <div class="ev-solo-cta">
+          <a class="btn btn-green" href="#signup" data-ev="📚 Открытый урок (31.08–06.09)">Выбрать открытый урок</a>
+          <span class="ev-solo-note">Мест в группах 6–8 — записываемся заранее</span>
+        </div>
       </div>
     </div>
   </div>
@@ -482,28 +494,7 @@ body.js .reveal.in{opacity:1;transform:none}
 
 
 
-<section class="dod" id="dod">
-  <div class="wrap">
-    <h2>🚪 День открытых дверей — 30 августа</h2>
-    <p style="color:var(--muted)">Воскресенье, 11:00–15:00, вход по записи. Каждое занятие —
-    30–45 минут вживую: ребёнок пробует, вы смотрите. Плюс экскурсия по центру,
-    знакомство с педагогами и бесплатная диагностика уровня.</p>
-    <div style="overflow-x:auto"><table class="dod-t">
-      <tr><td class="dt">11:00–11:45</td><td><b>Раннее развитие</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2011%3A00%E2%80%9311%3A45%20%D0%A0%D0%B0%D0%BD%D0%BD%D0%B5%D0%B5%20%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">12:00–12:45</td><td><b>Раннее развитие</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2012%3A00%E2%80%9312%3A45%20%D0%A0%D0%B0%D0%BD%D0%BD%D0%B5%D0%B5%20%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0%B8%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">13:00–13:45</td><td><b>Подготовка к школе</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2013%3A00%E2%80%9313%3A45%20%D0%9F%D0%BE%D0%B4%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%BA%D0%B0%20%D0%BA%20%D1%88%D0%BA%D0%BE%D0%BB%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">13:00–13:45</td><td><b>Английский язык</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2013%3A00%E2%80%9313%3A45%20%D0%90%D0%BD%D0%B3%D0%BB%D0%B8%D0%B9%D1%81%D0%BA%D0%B8%D0%B9%20%D1%8F%D0%B7%D1%8B%D0%BA%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">14:00–14:45</td><td><b>Подготовка к школе</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2014%3A00%E2%80%9314%3A45%20%D0%9F%D0%BE%D0%B4%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%BA%D0%B0%20%D0%BA%20%D1%88%D0%BA%D0%BE%D0%BB%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">14:00–14:45</td><td><b>Английский язык</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2014%3A00%E2%80%9314%3A45%20%D0%90%D0%BD%D0%B3%D0%BB%D0%B8%D0%B9%D1%81%D0%BA%D0%B8%D0%B9%20%D1%8F%D0%B7%D1%8B%D0%BA%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">14:00–14:45</td><td><b>Робототехника</b> <span class="dg">группа 1</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2014%3A00%E2%80%9314%3A45%20%D0%A0%D0%BE%D0%B1%D0%BE%D1%82%D0%BE%D1%82%D0%B5%D1%85%D0%BD%D0%B8%D0%BA%D0%B0%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%201" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">15:00–15:45</td><td><b>Подготовка к школе</b> <span class="dg">группа 3</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2015%3A00%E2%80%9315%3A45%20%D0%9F%D0%BE%D0%B4%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%BA%D0%B0%20%D0%BA%20%D1%88%D0%BA%D0%BE%D0%BB%D0%B5%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%203" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">15:00–15:45</td><td><b>Английский язык</b> <span class="dg">группа 3</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2015%3A00%E2%80%9315%3A45%20%D0%90%D0%BD%D0%B3%D0%BB%D0%B8%D0%B9%D1%81%D0%BA%D0%B8%D0%B9%20%D1%8F%D0%B7%D1%8B%D0%BA%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%203" target="_blank" rel="noopener">Записаться</a></td></tr>
-      <tr><td class="dt">15:00–15:45</td><td><b>Робототехника</b> <span class="dg">группа 2</span></td><td><a class="dod-btn" href="https://app.kidsup.ru/go/whatsapp?src=site_dod&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%94%D0%B5%D0%BD%D1%8C%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D1%85%20%D0%B4%D0%B2%D0%B5%D1%80%D0%B5%D0%B9%2030%20%D0%B0%D0%B2%D0%B3%D1%83%D1%81%D1%82%D0%B0%3A%2015%3A00%E2%80%9315%3A45%20%D0%A0%D0%BE%D0%B1%D0%BE%D1%82%D0%BE%D1%82%D0%B5%D1%85%D0%BD%D0%B8%D0%BA%D0%B0%2C%20%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0%202" target="_blank" rel="noopener">Записаться</a></td></tr>
-    </table></div>
-    <p style="color:var(--muted);font-size:.86rem;margin-top:.6rem">Не нашли своё время —
-    приходите в любой момент с 11:00 до 15:00: экскурсии и диагностика идут весь день.</p>
-  </div>
-</section>
+<!-- секция «День открытых дверей 30.08» убрана 01.09: событие прошло -->
 
 <section class="quiz" id="quiz">
   <div class="wrap">
@@ -1299,7 +1290,7 @@ body.js .reveal.in{opacity:1;transform:none}
           }).init();
         });
         </script>
-        <p>Хотите увидеть центр вживую — приходите 29 августа на праздник: аниматоры,
+        <p>Хотите увидеть центр вживую — приходите на открытый урок своей группы:
         конкурсы и беспроигрышная лотерея, вход свободный.</p>
         <a class="btn btn-green" href="#signup">Записаться на занятие</a>
       </div>
@@ -1342,7 +1333,7 @@ body.js .reveal.in{opacity:1;transform:none}
       <figure><img src="/static/img/43da73900d06.jpg" alt="Подготовка к школе" loading="lazy"><figcaption>Подготовка к школе</figcaption></figure>
       <figure><img src="/static/img/c8bbc94beb5f.jpg" alt="Раннее развитие" loading="lazy"><figcaption>Раннее развитие — занятие с малышом</figcaption></figure>
       <figure><img src="/static/img/e3e2e61877ab.jpg" alt="Мини-группа" loading="lazy"><figcaption>Мини-группы до 8 детей</figcaption></figure>
-      <figure><img src="/static/img/672d02865848.jpg" alt="Праздник KidsUP" loading="lazy"><figcaption>Праздник KidsUP — такой же будет 29 августа</figcaption></figure>
+      <figure><img src="/static/img/672d02865848.jpg" alt="Праздник KidsUP" loading="lazy"><figcaption>Праздник KidsUP — так мы открывали сезон</figcaption></figure>
       <figure><img src="/static/img/1d806a712952.jpg" alt="ИЗО-студия" loading="lazy"><figcaption>ИЗО и подготовка руки</figcaption></figure>
       <figure><img src="/static/img/3b628bb1e686.jpg" alt="Английский сад" loading="lazy"><figcaption>Английский мини-сад</figcaption></figure>
       <figure><img src="/static/img/805e3fd46cc7.jpg" alt="Прогулка" loading="lazy"><figcaption>Прогулки и городской лагерь</figcaption></figure>
@@ -1556,10 +1547,6 @@ body.js .reveal.in{opacity:1;transform:none}
 const NAMES = ["Подготовка к школе", "Английский язык", "Английский мини-сад", "Нулевой класс", "Раннее развитие", "Логопед", "Ментальная арифметика", "Шахматы", "ИЗО-студия", "Скорочтение (техника чтения)", "Каллиграфия + грамота", "Робототехника"];
 const sel = document.getElementById('f-course');
 NAMES.forEach(n => { const o = document.createElement('option'); o.textContent = n; sel.append(o); });
-const og1 = document.createElement('optgroup'); og1.label = 'События — вход свободный';
-['🎉 Праздник 29.08 (11:00)', '🚪 День открытых дверей 30.08']
-  .forEach(n => { const o = document.createElement('option'); o.textContent = n; og1.append(o); });
-sel.append(og1);
 const og1b = document.createElement('optgroup'); og1b.label = 'Открытый урок — первое занятие условно-бесплатное';
 ['📚 Открытый урок (31.08–06.09)']
   .forEach(n => { const o = document.createElement('option'); o.textContent = n; og1b.append(o); });
@@ -1652,7 +1639,8 @@ document.getElementById('lead').addEventListener('submit', async e => {
         '<p>Вам перезвонит администратор — Аня, Лена или Ира — в рабочие часы обычно в течение 15 минут. Если удобнее вечером, просто скажите ей об этом.</p>' +
         '<p>Не хочется ждать звонка? Напишите нам:</p>' +
         '<a class="btn btn-green" href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">WhatsApp</a>' +
-        '<a class="btn btn-line" href="https://app.kidsup.ru/go/telegram?src=site" target="_blank" rel="noopener">Telegram</a></div>';
+        '<a class="btn btn-line" href="https://app.kidsup.ru/go/telegram?src=site" target="_blank" rel="noopener">Telegram</a>' +
+        '<a class="btn btn-line" href="https://app.kidsup.ru/go/max?src=site" target="_blank" rel="noopener">MAX</a></div>';
       return;
     }
     if (j.error) { alert(j.error); btn.disabled = false; btn.textContent = 'Отправить заявку'; return; }
@@ -1666,6 +1654,7 @@ document.getElementById('lead').addEventListener('submit', async e => {
       '<div style="margin-top:.7rem;display:flex;gap:.5rem;flex-wrap:wrap">' +
       '<a class="btn btn-green" style="padding:.55rem 1.1rem;font-size:.9rem" target="_blank" rel="noopener" href="https://app.kidsup.ru/go/whatsapp?src=site&t=' + txt + '">WhatsApp</a>' +
       '<a class="btn btn-line" style="padding:.55rem 1.1rem;font-size:.9rem" target="_blank" rel="noopener" href="https://app.kidsup.ru/go/telegram?src=site">Telegram</a>' +
+      '<a class="btn btn-line" style="padding:.55rem 1.1rem;font-size:.9rem" target="_blank" rel="noopener" href="https://app.kidsup.ru/go/max?src=site">MAX</a>' +
       '<a class="btn btn-line" style="padding:.55rem 1.1rem;font-size:.9rem" href="tel:+74951209024">Позвонить</a></div>';
     if (!e.target.querySelector('.send-fallback')) { box.className = 'send-fallback'; e.target.append(box); }
     btn.disabled = false; btn.textContent = 'Отправить заявку';
