@@ -2123,7 +2123,11 @@ def missed_calls(days: list[str] | None = None) -> None:
     try:
         for m in mango.missed(rows=_missed_rows(days)):
             phone = m["phone"]
-            if len(phone) < 10 or not _mark("missed_wa", f"{today}:{phone}"):
+            if len(phone) == 11 and phone[0] == "8":
+                phone = "7" + phone[1:]
+            # 01.09 в отчёте Манго попался 10-значный «8906002687» — обрубок
+            # номера; писать по нему некуда, а 10 знаков через проверку проходили
+            if len(phone) != 11 or not _mark("missed_wa", f"{today}:{phone}"):
                 continue
             kind, child = _missed_kind(mk, phone)
             if kind == "team":
