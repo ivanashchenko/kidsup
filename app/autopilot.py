@@ -2074,11 +2074,54 @@ def evening_digest(mk: MoyklassClient) -> None:
         log.info("вечерняя сводка отправлена владельцу")
 
 
-def missed_calls() -> None:
+def _missed_rows(days: list[str] | None) -> list[dict]:
+    """Звонки за несколько дней одним списком: тогда mango.missed() считает
+    «поговорили» по всему периоду — семья, до которой дозвонились во
+    вторник, не получит догон за понедельник."""
+    if not days:
+        return mango._day_calls(None)
+    rows: list[dict] = []
+    for d in days:
+        rows.extend(mango._day_calls(d))
+        time.sleep(1.0)      # stats/request у Манго с жёстким rate-limit
+    return rows
+
+
+def missed_preview(days: list[str] | None = None) -> list[dict]:
+    """Кому уйдёт догон — без отправки. Для проверки перед разовой рассылкой."""
+    today = _today().isoformat()
+    mk = _client()
+    out = []
+    try:
+        with db.get_conn() as conn:
+            for m in mango.missed(rows=_missed_rows(days)):
+                phone = m["phone"]
+                if len(phone) < 10:
+                    continue
+                kind, child = _missed_kind(mk, phone)
+                already = conn.execute(
+                    "SELECT 1 FROM autopilot_state WHERE kind='missed_wa' AND key=?",
+                    (f"{today}:{phone}",)).fetchone() is not None
+                paid = conn.execute(
+                    "SELECT 1 FROM users u JOIN payments p ON p.user_id = u.id "
+                    "WHERE substr(u.phone,-10)=? AND p.summa > 0 LIMIT 1",
+                    (phone[-10:],)).fetchone() is not None
+                out.append({"phone": phone, "attempts": m["attempts"], "kind": kind,
+                            "child": child, "paid_before": paid,
+                            "already_today": already})
+    finally:
+        mk.close()
+    return out
+
+
+def missed_calls(days: list[str] | None = None) -> None:
+    """Догон недозвонов. days=None — за сегодня (часовой тик); список дат —
+    разовый догон за прошедшие дни (окно часа пролетало 29.08, 31.08,
+    01.09 — поручение владельца 01.09: догнать всех за пн–вт 02.09)."""
     today = _today().isoformat()
     mk = _client()
     try:
-        for m in mango.missed():
+        for m in mango.missed(rows=_missed_rows(days)):
             phone = m["phone"]
             if len(phone) < 10 or not _mark("missed_wa", f"{today}:{phone}"):
                 continue
@@ -3466,6 +3509,15 @@ def _loop() -> None:
                                      r["ответили"], r["человеку"])
                     except Exception:
                         log.exception("автоответ в переписке упал — продолжаем")
+                # Разовый догон 02.09 по поручению владельца: недозвоны за
+                # пн 31.08 и вт 01.09 остались без сообщений. Отметка ставится
+                # до запуска — повтор при сбое через /api/autopilot/missed-now.
+                if (_today().isoformat() == "2026-09-02" and 10 <= now.hour <= 20
+                        and _mark("catchup_missed", "2026-09-02")):
+                    try:
+                        missed_calls(days=["2026-08-31", "2026-09-01"])
+                    except Exception:
+                        log.exception("разовый догон за 31.08–01.09 упал")
                 if 10 <= now.hour <= 20 and _mark("slot_hourly_missed", _hour):
                     # Манго жёстко ограничивает stats/request; один 429 в
                     # этом вызове 24.08 убивал весь тик — и вместе с ним все

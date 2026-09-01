@@ -2576,7 +2576,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-01.9"
+APP_VERSION = "2026-09-02.1"
 
 
 @app.get("/api/net")
@@ -4592,18 +4592,38 @@ def nabormail_state():
                        for r in q[:5]]}
 
 
+def _days_param(days: str) -> list[str] | None:
+    out = [d.strip() for d in (days or "").split(",") if d.strip()]
+    for d in out:
+        datetime.strptime(d, "%Y-%m-%d")
+    return out or None
+
+
 @app.post("/api/autopilot/missed-now", dependencies=AUTH)
-def autopilot_missed_now():
+def autopilot_missed_now(days: str = ""):
     """Догон недозвонов немедленно, в процессе сервера.
 
     Нужен, когда часовой тик пропустил своё окно (рестарт при деплое,
     сбой Манго): отметки об отправке живут в серверной базе, и запускать
     догон надо именно здесь, иначе после запуска с другой машины сервер
-    не узнает об отправленном и продублирует."""
+    не узнает об отправленном и продублирует.
+    ?days=2026-08-31,2026-09-01 — разовый догон за прошедшие дни."""
     from . import autopilot
-    before = len(autopilot.db.get_setting("_", "") or "")
-    autopilot.missed_calls()
-    return {"ok": True}
+    autopilot.missed_calls(days=_days_param(days))
+    return {"ok": True, "days": _days_param(days) or "today"}
+
+
+@app.get("/api/autopilot/missed-preview", dependencies=AUTH)
+def autopilot_missed_preview(days: str = ""):
+    """Кому уйдёт догон за указанные дни — без отправки."""
+    from . import autopilot
+    rows = autopilot.missed_preview(days=_days_param(days))
+    return {"days": _days_param(days) or "today", "count": len(rows),
+            "to_send": sum(1 for r in rows if r["kind"] != "team" and not r["already_today"]),
+            "clients": sum(1 for r in rows if r["kind"] == "client"),
+            "cold": sum(1 for r in rows if r["kind"] == "cold"),
+            "sms_eligible": sum(1 for r in rows if r["paid_before"] and r["kind"] != "team"),
+            "rows": rows}
 
 
 @app.get("/api/autopilot/log", dependencies=AUTH)
