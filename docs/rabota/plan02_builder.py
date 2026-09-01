@@ -7,6 +7,7 @@ BASE = "/home/user/kidsup/docs/rabota"
 M = json.load(open(f"{BASE}/metrika_probnye.json"))
 R = json.load(open(f"{BASE}/raspisanie_0209.json"))
 IZV = json.load(open(f"{BASE}/izvinenie_0109.json"))
+V = json.load(open(f"{BASE}/voronka_probnyh.json"))
 Z = open("/home/user/kidsup/docs/zadachi_02sen.html", encoding="utf-8").read()
 
 CSS = re.search(r"<style>.*?</style>", open("/home/user/kidsup/docs/plan_01sen.html", encoding="utf-8").read(), re.S).group(0)
@@ -96,6 +97,43 @@ h.append("<div class='kpi'>"
          "</div>")
 h.append("<div class='card warn'><b>Метрика живёт на отметке явки.</b> Педагог или Аня отмечают в CRM «пришёл» сразу после занятия — иначе семья не попадает ни в счётчик, ни в список дожима. "
          f"Считаем каждую неделю: выше 40% — набор идёт, ниже — разбираем, где теряем: на выходе после занятия или в переписке.</div>")
+
+# воронка недели открытых уроков
+prishli = len(V["купили"]) + len(V["пришли_записались"]) + len(V["пришли_не_записались"])
+vsego = prishli + len(V["не_дошли"]) + len(V["не_дошли_записались"])
+h.append("<h2>Воронка недели открытых уроков — 31.08 и 01.09</h2>")
+h.append("<div class='kpi'>"
+         f"<div class='k'><div class='v good'>{round(100*prishli/vsego)}%</div><div class='l'>доходимость: дошли {prishli} из {vsego} записанных. Норма — выше 50%</div></div>"
+         f"<div class='k'><div class='v good'>{round(100*len(V['купили'])/prishli)}%</div><div class='l'>купили из дошедших: {len(V['купили'])} из {prishli}</div></div>"
+         f"<div class='k'><div class='v'>{len(V['пришли_записались'])+len(V['пришли_не_записались'])}</div><div class='l'>дошли и пока не купили — дожим сегодня</div></div>"
+         f"<div class='k'><div class='v'>{len(V['не_дошли'])+len(V['не_дошли_записались'])}</div><div class='l'>не дошли — зовём на следующий шаг</div></div>"
+         "</div>")
+h.append("<div class='card warn'><b>Доходимость 63% — нижняя граница, а не точная цифра.</b> "
+         f"У {len(V['не_дошли'])+len(V['не_дошли_записались'])} записей нет отметки явки, и они автоматически попали в «не дошли». "
+         "Кто-то из них был на занятии, но этого никто не отметил. Пока отметку не ставят сразу после занятия, "
+         "мы недосчитываем и доходимость, и выручку.</div>")
+
+def grp(title, key, what, pill):
+    rows = V[key]
+    if not rows:
+        return
+    h.append(f"<h3>{title} — {len(rows)}</h3>")
+    h.append(f"<div class='card'><span class='small'>{what}</span></div>")
+    h.append("<div class='scroll'><table><tr><th></th><th>Был</th><th>Ребёнок</th><th>Телефон</th><th>Направление</th><th>Дальше</th></tr>")
+    for i in rows:
+        nxt = f"<span class='pill p-green'>{esc(i['next'])}</span>" if i["next"] else f"<span class='pill {pill}'>нет записи</span>"
+        h.append(f"<tr><td><span class='chk'></span></td><td>{esc(i['when'][5:])}</td><td><b>{esc(i['name'])}</b></td>"
+                 f"<td class='ph'>{esc(i['phone'])}</td><td class='small'>{esc(i['subj'])}</td><td>{nxt}</td></tr>")
+    h.append("</table></div>")
+
+grp("Дошли и не купили", "пришли_не_записались",
+    "Звонит Лена. Спросить впечатление, назвать, что сказал педагог, отработать возражение и закрыть на абонемент или хотя бы на второе занятие.", "p-red")
+grp("Дошли, не купили, но записаны дальше", "пришли_записались",
+    "Подтвердить следующее занятие и на нём закрывать на абонемент. Скидка 10% действует в день первого занятия — сказать об этом заранее.", "p-amber")
+grp("Не дошли и записаны заново", "не_дошли_записались",
+    "Аня: подтвердить новую дату за день, спросить, что помешало в прошлый раз.", "p-amber")
+grp("Не дошли и записи больше нет", "не_дошли",
+    "Аня в окне 13:00–16:00. Не «почему не пришли», а следующий шаг на выбор: прийти на открытый урок на этой неделе, экспресс-консультация с педагогом, диагностика уровня или экскурсия по центру. Одно касание — одно конкретное предложение с днём и временем.", "p-red")
 
 # роли
 h.append("<h2>Кто что делает</h2><div class='who'>")
