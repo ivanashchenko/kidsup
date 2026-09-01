@@ -62,17 +62,20 @@ body{font-family:"M",Arial,sans-serif;font-weight:500;color:#fff;-webkit-print-c
 
 /* поле значимой информации 1670×1170 → 3340×2340, отступ 230 */
 .safe{position:absolute;left:230px;top:230px;width:3340px;height:2340px;
-display:flex;flex-direction:column;gap:56px}
+display:flex;flex-direction:column;gap:46px}
 .guide{position:absolute;inset:0;pointer-events:none;
 box-shadow:0 0 0 230px rgba(0,0,0,.55);border:6px dashed rgba(255,255,255,.7)}
 .guide span{position:absolute;left:0;top:-90px;font-size:44px;font-weight:700;color:#fff}
 
 /* шапка */
 .top{display:flex;align-items:center;gap:70px;height:430px}
-.top img{height:410px;display:block;flex:none}
+.top .lg{position:relative;flex:none}
+.top img{height:410px;display:block}
+.top .lg i{position:absolute;right:-34px;top:-6px;font-style:normal;font-size:96px;font-weight:800;line-height:1;color:#8FE04A}
 .top .t h1{font-size:126px;line-height:.98;font-weight:800;letter-spacing:-.025em}
 .top .t h1 span{color:#8FE04A}
-.top .t p{margin-top:24px;font-size:50px;font-weight:600;color:#C9C4F0}
+.top .t p{margin-top:20px;font-size:46px;line-height:1.25;font-weight:600;color:#C9C4F0}
+.top .t p b{color:#fff;font-weight:700}
 .top .m{margin-left:auto;text-align:right;flex:none;max-width:900px}
 .top .m .ya{display:inline-flex;align-items:center;gap:22px;background:#fff;color:#241C6B;border-radius:99px;padding:14px 40px 14px 30px;margin-bottom:24px}
 .top .m .ya i{font-style:normal;color:#F59C00;font-size:56px;letter-spacing:2px;line-height:1}
@@ -108,23 +111,26 @@ padding:12px 36px;border-radius:99px;margin-bottom:44px;color:#fff}
 .c4 li:before{background:#7B4FD4}.c4 .price{color:#4A2394}
 
 /* подвал */
-.foot{height:330px;background:#8FE04A;border-radius:56px;padding:0 70px;
+.foot{height:300px;background:#8FE04A;border-radius:56px;padding:0 70px;
 display:flex;align-items:center;gap:60px;color:#1C3D00}
 .foot .l b{display:block;font-size:66px;font-weight:800;line-height:1.05;white-space:nowrap}
 .foot .l span{display:block;margin-top:16px;font-size:44px;font-weight:600}
 .foot .r{margin-left:auto;text-align:right}
 .foot .r b{display:block;font-size:76px;font-weight:800;line-height:1.05}
 .foot .r span{display:block;margin-top:14px;font-size:42px;line-height:1.15;font-weight:600;white-space:nowrap}
-.foot img{height:260px;width:260px;border-radius:28px;background:#fff;padding:12px;flex:none}
+.foot img{height:240px;width:240px;border-radius:28px;background:#fff;padding:12px;flex:none}
+/* сноска и возрастная категория рекламы */
+.note{height:64px;display:flex;align-items:center;justify-content:space-between;color:#C9C4F0;font-size:40px;font-weight:600}
+.note .age0{border:5px solid #fff;color:#fff;border-radius:14px;padding:4px 22px;font-size:44px;font-weight:800;line-height:1}
 </style>
 <div class="b">
   <div class="blob b1"></div><div class="blob b2"></div>
   <div class="safe">
     <div class="top">
-      <img src="__LOGO__">
+      <div class="lg"><img src="__LOGO__"><i>*</i></div>
       <div class="t">
         <h1>Учим детей тому,<br>что <span>правда пригодится</span></h1>
-        <p>Детский центр и английский сад · от 1,3 до 12 лет</p>
+        <p>Детский центр и английский сад · от 1,3 до 12 лет<br><b>Образовательная лицензия</b> · оплата маткапиталом · налоговый вычет</p>
       </div>
       <div class="m">
         <div class="ya"><i>★★★★★</i><b>5,0</b><em>на Яндекс Картах</em></div>
@@ -190,6 +196,7 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
       <div class="r"><b>kidsup.ru</b><span>запись на сайте<br>и по QR-коду</span></div>
       <img src="__QR__">
     </div>
+    <div class="note"><span>* KidsUP. Best for our kids — КидсАП. Лучшее нашим детям</span><span class="age0">0+</span></div>
     __GUIDE__
   </div>
 </div>"""
