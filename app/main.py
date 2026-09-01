@@ -1882,17 +1882,23 @@ def _brief_text(phone: str) -> str:
 
 @app.post("/mango/events")
 @app.post("/mango/{rest:path}")
+@app.post("/events/{rest:path}")
 async def mango_events(request: Request, rest: str = ""):
     """Уведомления Mango о звонках.
 
     В ЛК Mango: Интеграции → API коннектор → Внешние системы → Добавить
     систему → адрес https://app.kidsup.ru/mango/ (со слешем на конце).
     Mango дописывает к адресу подпуть события: events/call, events/summary,
-    events/record/added — поэтому ловим любой подпуть, а не один адрес.
+    events/record/added, events/sms — поэтому ловим любой подпуть, а не один
+    адрес; и /events/… без префикса тоже, если адрес прописали как корень
+    сайта. Статусы СМС уходят в свой обработчик.
 
     На входящий звонок шлём дежурному админу справку о клиенте, готовую
     запись разговора сразу ставим в очередь на расшифровку."""
     from . import autopilot, wazzup
+    kind = (rest or "events").strip("/")
+    if kind.endswith("sms"):
+        return await mango_sms_status(request)
     form = await request.form()
     js = form.get("json")
     if js is None:
@@ -2570,7 +2576,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-01.7"
+APP_VERSION = "2026-09-01.8"
 
 
 @app.get("/api/net")
@@ -5574,15 +5580,27 @@ def api_sms_report(day: str = ""):
                 "ORDER BY ts", (d + "%",)).fetchall()
         except Exception:
             rows = []
+        # приходят ли от Манго вообще какие-то вебхуки — иначе «0 статусов»
+        # означает не «всё доставлено», а «адрес внешней системы не прописан»
+        def _last(table):
+            try:
+                r = conn.execute(f"SELECT MAX(ts), COUNT(*) FROM {table} "
+                                 "WHERE ts LIKE ?", (d + "%",)).fetchone()
+                return {"последнее": r[0], "за_день": r[1]}
+            except Exception:
+                return {"последнее": None, "за_день": 0}
+        webhooks = {"звонки": _last("mango_calls"), "смс": _last("sms_status")}
     dostavleno = [r[0] for r in rows if r[1] == 1000]
     problemy = [{"phone": r[0], "code": r[1], "ts": r[2]}
                 for r in rows if r[1] != 1000]
     return {"день": d, "событий": len(rows),
             "доставлено": len(dostavleno),
             "не_доставлено": len(problemy), "проблемные": problemy[:200],
+            "вебхуки_манго": webhooks,
             "подсказка": ("пусто = в ЛК Манго не прописан адрес внешней "
-                          "системы https://app.kidsup.ru — см. Настройки → "
-                          "Интеграции → API")}
+                          "системы https://app.kidsup.ru/mango/ (Интеграции → "
+                          "API коннектор → Внешние системы) и не включены "
+                          "уведомления о звонках и СМС")}
 
 
 @app.get("/wazzup/webhook")

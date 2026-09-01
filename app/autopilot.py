@@ -2131,7 +2131,7 @@ def missed_calls() -> None:
                 # доставляются быстрее и стоят на треть дешевле.
                 if mango.send_sms(phone,
                         "KidsUP: звонили по поводу занятий - идёт набор групп "
-                        "2026/27. Ответьте в WhatsApp 79199683507 или "
+                        "2026/27. Ответьте в WhatsApp 79160170918 или "
                         "перезвоните 74951209024 - подберём группу."):
                     log.info("sms-догон: %s", phone[-4:])
             log.info("missed_calls: +7%s — %s", phone, kind)
@@ -3383,12 +3383,22 @@ def _loop() -> None:
             now = _now()
             if time.monotonic() - last3 >= 180:
                 last3 = time.monotonic()
+                _q15 = now.strftime("%Y-%m-%d %H:") + str(now.minute // 15)
+                _hour = now.strftime("%Y-%m-%d %H")
                 mk = _client()
                 try:
                     speed_to_lead(mk)
-                    if now.minute % 15 < 3:      # каждые 15 минут
+                    # Окна «минута % 15 < 3» и «минута < 3» здесь были
+                    # ловушкой: тик идёт раз в 3 минуты от НАЧАЛА прошлого
+                    # тика, а сам тик в загруженный день (переписка, звонки)
+                    # тянется 3–5 минут — и окно в 3 минуты пролетает мимо.
+                    # 29.08, 31.08 и 01.09 так ни разу не сработали догон
+                    # недозвонов и после-пробного: 0 сообщений при 80 звонках.
+                    # Теперь — отметка на слот: сработало ли уже в этой
+                    # четверти часа / в этом часу. Первый тик слота — делает.
+                    if _mark("slot_q15_inbound", _q15):      # каждые 15 минут
                         unanswered_inbound(mk)
-                    if now.minute < 3 and 9 <= now.hour <= 20:  # раз в час
+                    if 9 <= now.hour <= 20 and _mark("slot_hourly", _hour):  # раз в час
                         no_show(mk)
                         after_trial(mk)
                         booking_summary(mk)
@@ -3398,7 +3408,7 @@ def _loop() -> None:
                         trial_reminder(mk)
                     # пропущенные входящие: каждые 15 мин в рабочие часы —
                     # клиент, до которого не перезвонили, остывает быстро
-                    if now.minute % 15 < 3 and 9 <= now.hour <= 20:
+                    if 9 <= now.hour <= 20 and _mark("slot_q15_missed_in", _q15):
                         missed_inbound(mk)
                 finally:
                     mk.close()
@@ -3456,7 +3466,7 @@ def _loop() -> None:
                                      r["ответили"], r["человеку"])
                     except Exception:
                         log.exception("автоответ в переписке упал — продолжаем")
-                if now.minute < 3 and 10 <= now.hour <= 20:
+                if 10 <= now.hour <= 20 and _mark("slot_hourly_missed", _hour):
                     # Манго жёстко ограничивает stats/request; один 429 в
                     # этом вызове 24.08 убивал весь тик — и вместе с ним все
                     # последующие сценарии часа. Догон не важнее цикла.
