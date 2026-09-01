@@ -924,6 +924,18 @@ def _has_mark(kind: str, key: str) -> bool:
             return False
 
 
+def _seen(kind: str, key: str) -> bool:
+    """Уже помечали? Проверка без установки отметки — когда результат
+    отправки заранее неизвестен и метку надо ставить только после успеха."""
+    with db.get_conn() as conn:
+        try:
+            return conn.execute(
+                "SELECT 1 FROM autopilot_state WHERE kind=? AND key=?",
+                (kind, key)).fetchone() is not None
+        except Exception:
+            return False
+
+
 def _mark(kind: str, key: str) -> bool:
     """True, если ключ новый (и помечает его). False — уже обрабатывали."""
     with db.get_conn() as conn:
@@ -2112,6 +2124,40 @@ def missed_preview(days: list[str] | None = None) -> list[dict]:
     finally:
         mk.close()
     return out
+
+
+def izvinenie_0109() -> dict:
+    """Исправление ошибочного напоминания 01.09 — по решению владельца 01.09.
+
+    Вчерашнее «сегодня ждём вас» ушло по составу групп, а не по записям на
+    день: 22 семьи ждут не вчера, а 3–15 сентября. Каждой уходит её настоящая
+    дата. Тексты готовятся заранее (docs/rabota/izvinenie_0109.py) и лежат
+    рядом с кодом, чтобы отправка не зависела от доступности МойКласса утром."""
+    import pathlib
+    path = pathlib.Path(__file__).resolve().parent.parent / "docs/rabota/izvinenie_0109.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        log.exception("izvinenie_0109: нет файла с текстами")
+        return {"ok": False}
+    sent = waiting = skipped = 0
+    for phone, m in data.items():
+        if _seen("izvinenie_0109", phone):
+            skipped += 1
+            continue
+        # cascade = только WhatsApp: в мессенджеры пишем лишь при живой переписке
+        res = _wa(phone, m["text"], mode="cascade", kind="izvinenie")
+        if res is None:
+            # семья уже ждёт ответа админа — там отвечает человек, а не робот;
+            # отметку не ставим: эти семьи стоят отдельным блоком в плане на 02.09
+            waiting += 1
+        elif res:
+            _mark("izvinenie_0109", phone)
+            sent += 1
+        time.sleep(0.6)
+    log.info("izvinenie_0109: отправлено %d, у админа %d, уже слали %d",
+             sent, waiting, skipped)
+    return {"отправлено": sent, "оставлено_админу": waiting, "повтор": skipped}
 
 
 def missed_calls(days: list[str] | None = None) -> None:
@@ -3516,6 +3562,13 @@ def _loop() -> None:
                 # Разовый догон 02.09 по поручению владельца: недозвоны за
                 # пн 31.08 и вт 01.09 остались без сообщений. Отметка ставится
                 # до запуска — повтор при сбое через /api/autopilot/missed-now.
+                # Исправление ошибочной рассылки 01.09 — утром 02.09, после 9:00
+                if (_today().isoformat() == "2026-09-02" and 9 <= now.hour <= 20
+                        and _mark("catchup_izvinenie", "2026-09-02")):
+                    try:
+                        izvinenie_0109()
+                    except Exception:
+                        log.exception("izvinenie_0109 упал")
                 if (_today().isoformat() == "2026-09-02" and 10 <= now.hour <= 20
                         and _mark("catchup_missed", "2026-09-02")):
                     try:

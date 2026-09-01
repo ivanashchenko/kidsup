@@ -2578,7 +2578,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-02.5"
+APP_VERSION = "2026-09-02.6"
 
 
 @app.get("/api/net")
@@ -4599,6 +4599,15 @@ def _days_param(days: str) -> list[str] | None:
     for d in out:
         datetime.strptime(d, "%Y-%m-%d")
     return out or None
+
+
+@app.post("/api/autopilot/izvinenie-now", dependencies=AUTH)
+def api_izvinenie_now():
+    """Ручной запуск исправления ошибочной рассылки 01.09 (если утренний
+    тик его не выполнил). Повторной отправки не будет: у каждого номера
+    своя отметка, она ставится только после успешной доставки."""
+    from . import autopilot
+    return autopilot.izvinenie_0109()
 
 
 @app.post("/api/autopilot/missed-now", dependencies=AUTH)
