@@ -1,0 +1,357 @@
+<style>
+:root{--ink:#15132e;--muted:#6c6a86;--line:#e4e2f0;--bg:#f8f7fc;--card:#fff;
+--indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613;
+--lena:#7DB928;--anya:#F59C00}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px 70px}
+.hero{background:linear-gradient(135deg,#312783,#1DA7E0);color:#fff;margin:0 -16px 20px;
+padding:26px 20px 22px;border-radius:0 0 18px 18px}
+.hero h1{margin:0 0 5px;font-size:26px;line-height:1.15}
+.hero p{margin:0;opacity:.92;font-size:15px}
+h2{font-size:20px;margin:30px 0 10px;color:var(--indigo);border-bottom:2px solid var(--line);padding-bottom:6px}
+h3{font-size:16px;margin:18px 0 8px}
+.who{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));margin:16px 0}
+.wcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;border-top:4px solid var(--line)}
+.wcard.lena{border-top-color:var(--lena)}.wcard.anya{border-top-color:var(--anya)}
+.wcard .nm{font-size:18px;font-weight:800;margin-bottom:2px}
+.wcard .rl{font-size:13px;color:var(--muted);margin-bottom:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0}
+.alarm{border-left:4px solid var(--red);background:#fff5f5}
+.warn{border-left:4px solid var(--amber);background:#fffaf0}
+.ok{border-left:4px solid var(--green);background:#f7fbf0}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);
+font-weight:600;padding:8px 6px;border-bottom:2px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.num{text-align:right;white-space:nowrap}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.q{background:#f1effb;border-radius:10px;padding:10px 13px;margin:8px 0;font-size:14px;font-style:italic}
+ul,ol{margin:8px 0;padding-left:20px}li{margin:5px 0}
+.small{font-size:13px;color:var(--muted)}
+.kids{font-size:13px;color:var(--muted);line-height:1.5}
+.ph{font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700}
+.p-red{background:#fce8e9;color:#9c060f}.p-amber{background:#fdf0dc;color:#94600a}
+.p-green{background:#eef7e0;color:#4d7511}.p-gray{background:#eeedf5;color:#5b5a70}
+.p-blue{background:#e4f4fc;color:#12668b}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#eae8f6;--muted:#a3a1ba;
+--line:#343150;--bg:#131228;--card:#1d1b36;--indigo:#ab9ff2}
+:root:not([data-theme="light"]) .alarm{background:#331519}
+:root:not([data-theme="light"]) .warn{background:#332812}
+:root:not([data-theme="light"]) .ok{background:#1e2c15}
+:root:not([data-theme="light"]) .q{background:#25233e}
+:root:not([data-theme="light"]) .p-red{background:#3d1416;color:#f38b90}
+:root:not([data-theme="light"]) .p-amber{background:#3b2b0e;color:#f2b34c}
+:root:not([data-theme="light"]) .p-green{background:#26361a;color:#a9d96a}
+:root:not([data-theme="light"]) .p-gray{background:#2a2842;color:#a5a3bb}
+:root:not([data-theme="light"]) .p-blue{background:#122f3f;color:#77cdf0}}
+</style><div class='wrap'>
+<div class='hero'><h1>Вторник 1 сентября</h1><p>Работаем 9:00–20:00 · Лена на ресепшене · Аня на телефоне · Лиза онлайн<br>Сегодня 17 групп и 65 детей — почти все стартуют впервые</p></div>
+<div class='who'>
+<div class='wcard lena'><div class='nm'>Лена — ресепшен</div><div class='rl'>Как вчера: встреча, дожим, неявки</div><ol class='small'><li><b>Первым делом — три переноса со вчера.</b> Им не ответили: Киселев Павел (79651182969), Алимов Максим (79653549344), Лариса (79266774045, просит следующую среду)</li><li>Обзвон подтверждений на сегодня — 65 детей</li><li>Табличка со скидкой на стойке, бланки диагностики педагогам</li><li>Встреча групп, дожим до абонемента на выходе</li><li><b>Через 5–10 минут после начала урока</b> — обзвон тех, кто не пришёл</li></ol></div>
+<div class='wcard anya'><div class='nm'>Аня — телефон</div><div class='rl'>Роль Иры вчера: сначала свои хвосты, потом три списка</div><ol class='small'><li><b>Свои клиенты со вчера</b> — 4 незакрытые задачи, список ниже</li><li>ДОД, не записанные на пробное — <b>35 семей</b></li><li>Анкеты с Праздника — <b>69 семей</b></li><li>Летние и прошлогодние — <b>206 семей</b></li></ol></div>
+</div>
+<h2>Горит прямо сейчас</h2>
+<div class='card alarm'><b>79267095054 — придёт сегодня в 18:00, а карточки в CRM нет.</b> Записались утром по телефону на подготовку, ребёнок не читает (ПШ1). Завести карточку и оформить запись, иначе его не будет в списке группы. Спрашивали про оплату материнским капиталом — ответ уточнить у Бориса.</div>
+<div class='card alarm'><b>Наталья (79057511557) ждёт сумму к оплате со вчера, 18:05.</b> Её расчёт — 31 050 ₽ со скидкой 10%. Скидка была привязана ко вчерашнему дню: уточнить у Бориса, оставляем ли цену, и ответить сегодня.</div>
+<div class='card warn'><b>Романова София (79169105744) — три предмета на 2 сентября.</b> Подготовка, английский, ИЗО = 23 800 ₽. В разговоре пообещали 10% на каждый абонемент — подтвердить у Бориса до её прихода завтра.</div>
+<div class='card warn'><b>Михавиловы Семён и Алиса (79164713342) — сегодня 16:00, английский.</b> Приведёт бабушка, мама на работе. После занятия педагог звонит маме с телефона Алисы — предупредить педагога заранее.</div>
+<h2>Кто идёт сегодня — 17 групп, 65 детей</h2>
+<div class='q'>«Доброе утро! Это KidsUP. Сегодня в ЧЧ:ММ ждём [имя] на первое занятие. Бульвар Рокоссовского 6 к1В, 7-й подъезд, 2 этаж, из лифта налево — код от двери 667788#. Приходите за 10 минут. Будете?»</div>
+<div class='scroll'><table><tr><th>Время</th><th>Группа</th><th class='num'>Детей</th><th>Кого ждём</th></tr>
+<tr><td><b>9:00</b></td><td class='small'>Мини-сад_9:00-13:00</td><td class='num'><span class='pill p-gray'>8/15</span></td><td class='kids'>Рощепкин Владислав, Дубинина Василиса, Киреев Андрей, Асманкин Арсений (телеграмм), Михайлова Апполинария, Кабанник Кирилл, Мухаметшин Даниэль, Маринин Михаил</td></tr>
+<tr><td><b>10:00</b></td><td class='small'>РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 год</td><td class='num'><span class='pill p-gray'>5/6</span></td><td class='kids'>Киселев Павел, 79175670024, Алимов Максим, Кирилл, Демьяненко Вероника</td></tr>
+<tr><td><b>10:00</b></td><td class='small'>Нулевой класс_10:00-14:00</td><td class='num'><span class='pill p-gray'>7/15</span></td><td class='kids'>Кутищев Григорий, Даскалова София, Иванова Милана, Новиков Лев (телеграмм), Лобань Сладислава, Димитров Александр, Епифанов Мирон</td></tr>
+<tr><td><b>11:00</b></td><td class='small'>РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года</td><td class='num'><span class='pill p-gray'>1/6</span></td><td class='kids'>Юдина Варвара</td></tr>
+<tr><td><b>12:00</b></td><td class='small'>РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года</td><td class='num'><span class='pill p-gray'>4/6</span></td><td class='kids'>Экимашев Савелий, Ковтун Александра, Евтюхина Есения, Мария Хромова</td></tr>
+<tr><td><b>16:00</b></td><td class='small'>ПШ_вт-пт_16:00_4-5 лет_ПШ1 нечитающие (Гр8)</td><td class='num'><span class='pill p-gray'>1/8</span></td><td class='kids'>Валиуллин Раян</td></tr>
+<tr><td><b>16:00</b></td><td class='small'>ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)</td><td class='num'><span class='pill p-gray'>2/8</span></td><td class='kids'>Сидиков Мухамед Али, Кико Анна</td></tr>
+<tr><td><b>16:00</b></td><td class='small'>АЯ_вт-чт_16:00_8-12 лет_Pre-A1 Starters (Гр5)</td><td class='num'><span class='pill p-gray'>2/8</span></td><td class='kids'>Михавилов Семен, Михавилова Алиса</td></tr>
+<tr><td><b>17:00</b></td><td class='small'>ПШ_вт-пт_17:00_5-7 лет_ПШ1 нечитающие (Гр9)</td><td class='num'><span class='pill p-gray'>1/8</span></td><td class='kids'>Скворцов Данила</td></tr>
+<tr><td><b>17:00</b></td><td class='small'>АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)</td><td class='num'><span class='pill p-amber'>8/8</span></td><td class='kids'>Андрей, Панишева Екатерина, Сильченко Александра, полина, 79778857001, Коненков Михаил, Купцов Матвей, Молчанов Максим</td></tr>
+<tr><td><b>17:00</b></td><td class='small'>ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)</td><td class='num'><span class='pill p-gray'>3/8</span></td><td class='kids'>Катков Лукьян, Сорокин Денис, Романова Дарина (скидка 10% многодет.)</td></tr>
+<tr><td><b>18:00</b></td><td class='small'>ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)</td><td class='num'><span class='pill p-gray'>1/8</span></td><td class='kids'>Бернард Михаил</td></tr>
+<tr><td><b>18:00</b></td><td class='small'>АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)</td><td class='num'><span class='pill p-gray'>3/8</span></td><td class='kids'>Лоева Ирина, Цуцкова Елизавета, Ситдиков Артур</td></tr>
+<tr><td><b>18:00</b></td><td class='small'>ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)</td><td class='num'><span class='pill p-gray'>7/8</span></td><td class='kids'>Архангельская Варвара, Королева Виктория, Глухов Давид (скидка 10% многодет.), Степанян Даниелла, Деева Лада, Купцов Матвей, Молчанов Максим</td></tr>
+<tr><td><b>19:00</b></td><td class='small'>ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)</td><td class='num'><span class='pill p-gray'>7/8</span></td><td class='kids'>Кузина Агата, Гетман Василиса, Юрченко Полина, Шиш Савелий (MAX), Шиш Сергей, Чемоданова Аделина, Панкратова Александра (max)</td></tr>
+<tr><td><b>19:00</b></td><td class='small'>АЯ_вт-чт_19:00_5-8 лет_A1 Movers (Гр8)</td><td class='num'><span class='pill p-gray'>1/8</span></td><td class='kids'>Козловский Глеб</td></tr>
+<tr><td><b>19:00</b></td><td class='small'>ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)</td><td class='num'><span class='pill p-gray'>4/8</span></td><td class='kids'>Лагутина София, Козлова Екатерина, София, Красильников Ярослав</td></tr>
+</table></div>
+<p class='small'>Плюс логопед Марина — 5 индивидуальных: 16:00 Пугачев Павел · 16:50 Ситковский Александр · 17:40 Бутаков Михаил (телеграмм) · 18:30 Бакланов Семён · 19:20 Яфясов Матвей</p>
+<h2>1. Аня: свои клиенты со вчера</h2>
+<div class='scroll'><table><tr><th>Клиент</th><th>Телефон</th><th>Что сделать</th></tr><tr><td>Романова София</td><td class='ph'>79169105744</td><td>Подтвердить приход 2.09 на три предмета, уточнить скидку</td></tr><tr><td>Михавиловы</td><td class='ph'>79164713342</td><td>Сегодня 16:00, приведёт бабушка — после занятия звонок маме</td></tr><tr><td>Беляев Арсений</td><td class='ph'>79689777007</td><td>Подобрать группу ПШ 2-й уровень и отписаться — обещали вчера. Свободных мест два на три группы</td></tr><tr><td>79150830157</td><td class='ph'>79150830157</td><td>Завести карточку: записан на пробное в субботу 12:00, карточки нет</td></tr><tr><td>Астраханцев Филипп</td><td class='ph'>79683280360</td><td>Перенос на вторник 8.09, переименовать карточку (сейчас «Кирилл»)</td></tr></table></div>
+<h2>2. ДОД — 35 семей</h2>
+<div class='card'>Были у нас на дне открытых дверей 30.08, но до сих пор не записаны на пробное или записаны без оплаты. Самый тёплый список: они видели центр своими глазами.</div>
+<div class='q'>«Здравствуйте! Это KidsUP, вы были у нас на дне открытых дверей. Как вам [предмет]? Занятия уже идут — могу записать [имя] на эту неделю. Какой день удобнее?»</div>
+<div class='scroll'><table><tr><th>Ребёнок</th><th>Телефон</th><th>Был на</th><th>Статус</th></tr>
+<tr><td>Спирин Мирослав</td><td class='ph'>79031081738</td><td class='small'>Раннее развитие гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Штайнбергер Эмили</td><td class='ph'>79263603151</td><td class='small'>Раннее развитие гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Агарунова Моника</td><td class='ph'>79267059658</td><td class='small'>Раннее развитие гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Бексалиева Карина</td><td class='ph'>79227467313</td><td class='small'>Раннее развитие гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Ермолаева Ольга</td><td class='ph'>79285204734</td><td class='small'>Раннее развитие гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Кружкова Ева</td><td class='ph'>79039754694</td><td class='small'>Раннее развитие гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Соколов Михаил</td><td class='ph'>79652271000</td><td class='small'>Раннее развитие гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Малышев Максим (зачёркнут,</td><td class='ph'>79638568943</td><td class='small'>Раннее развитие гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Заволова Милана</td><td class='ph'>79163785258</td><td class='small'>Подготовка к школе гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Бочков Георгий</td><td class='ph'>79152624429</td><td class='small'>Подготовка к школе гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Елисеева Ксения</td><td class='ph'>79161120633</td><td class='small'>Подготовка к школе гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Исаева Оливия Романовна</td><td class='ph'>79263580969</td><td class='small'>Английский гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Тарасенко Мария</td><td class='ph'>79277195604</td><td class='small'>Английский гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Рысаева Расана</td><td class='ph'>79032243479</td><td class='small'>Английский гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Козлова Ангелина Андреевна</td><td class='ph'>79687111684</td><td class='small'>Английский гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Малышев Максим</td><td class='ph'>79638568943</td><td class='small'>Английский гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Бойко Александр</td><td class='ph'>79153817631</td><td class='small'>Подготовка к школе гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Ерофеева Полина</td><td class='ph'>79057556862</td><td class='small'>Английский гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Раджабова Малика</td><td class='ph'>79651244970</td><td class='small'>Робототехника гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Ковалев Кирилл Глебович</td><td class='ph'>79037470467</td><td class='small'>Робототехника гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Соколов Марк</td><td class='ph'>79652271000</td><td class='small'>Робототехника гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Селезнева Алиса</td><td class='ph'>79262151015</td><td class='small'>Робототехника гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Селезнева Дарья</td><td class='ph'>79262151015</td><td class='small'>Робототехника гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Сосненко Лада</td><td class='ph'>79167059977</td><td class='small'>Робототехника гр.1</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Овчарова Есения</td><td class='ph'>79377392834</td><td class='small'>Подготовка к школе гр.3</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Лемиш Марк</td><td class='ph'>79260440972</td><td class='small'>Подготовка к школе гр.3</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Сосненко Лада</td><td class='ph'>79167059977</td><td class='small'>Английский гр.3</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Харьковский Елизар</td><td class='ph'>79260001216</td><td class='small'>Робототехника гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Абрашенко Макар</td><td class='ph'>79995196451</td><td class='small'>Робототехника гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Ванилов Ростислав</td><td class='ph'>79113059702</td><td class='small'>Робототехника гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Бахтимиров Кирилл</td><td class='ph'>79032126589</td><td class='small'>Робототехника гр.2</td><td><span class='pill p-red'>нет записи</span></td></tr>
+<tr><td>Астраханцев Кирилл</td><td class='ph'>79683280360</td><td class='small'>Раннее развитие гр.1</td><td><span class='pill p-amber'>на пробном</span></td></tr>
+<tr><td>Горин Фёдор</td><td class='ph'>79263646859</td><td class='small'>Подготовка к школе гр.2</td><td><span class='pill p-amber'>на пробном</span></td></tr>
+<tr><td>Бернард Михаил</td><td class='ph'>79096821229</td><td class='small'>Подготовка к школе гр.2</td><td><span class='pill p-amber'>на пробном</span></td></tr>
+<tr><td>Горин Фёдор</td><td class='ph'>79263646859</td><td class='small'>Робототехника гр.2</td><td><span class='pill p-amber'>на пробном</span></td></tr>
+</table></div>
+<h2>3. Праздник — 69 семей</h2>
+<div class='card'>Тег «Праздник 2026», ни в одной группе не записаны. Список отсортирован по теплу — идти строго сверху вниз.</div>
+<div class='scroll'><table><tr><th>Семья</th><th>Телефон</th><th>Статус в базе</th></tr>
+<tr><td>Шальнев Дмитрий</td><td class='ph'>79119232802</td><td><span class='pill p-green'>Клиент</span></td></tr>
+<tr><td>Ерофеева Полина Евгеньевна</td><td class='ph'>79057556852</td><td><span class='pill p-green'>5. Посетил пробное</span></td></tr>
+<tr><td>Параскив Мария</td><td class='ph'>79277195664</td><td><span class='pill p-green'>4. Записался на пробное</span></td></tr>
+<tr><td>Синцова Ольга</td><td class='ph'>79162321378</td><td><span class='pill p-amber'>3. Думает (разговор состоялся)</span></td></tr>
+<tr><td>Козлова Ангелина</td><td class='ph'>79687111684</td><td><span class='pill p-amber'>3. Думает (разговор состоялся)</span></td></tr>
+<tr><td>Малышева Екатерина Алексеевна</td><td class='ph'>79152800626</td><td><span class='pill p-amber'>3. Думает (разговор состоялся)</span></td></tr>
+<tr><td>Иван Осадчук</td><td class='ph'>79647675596</td><td><span class='pill p-amber'>3. Думает (разговор состоялся)</span></td></tr>
+<tr><td>Федосова Елизавета</td><td class='ph'>79035254025</td><td><span class='pill p-amber'>3. Думает (разговор состоялся)</span></td></tr>
+<tr><td>Сысоев Александр</td><td class='ph'>79198719188</td><td><span class='pill p-amber'>3. Думает (разговор состоялся)</span></td></tr>
+<tr><td>София</td><td class='ph'>79067321659</td><td><span class='pill p-amber'>3. Думает (разговор состоялся)</span></td></tr>
+<tr><td>Шаманов Платон Витальевич</td><td class='ph'>79167566800</td><td><span class='pill p-amber'>3. Думает (разговор состоялся)</span></td></tr>
+<tr><td>Ермилова Николь</td><td class='ph'>79255201434</td><td><span class='pill p-amber'>3. Думает (разговор состоялся)</span></td></tr>
+<tr><td>Радюхин Тимофей</td><td class='ph'>79267278035</td><td><span class='pill p-amber'>3. Думает (разговор состоялся)</span></td></tr>
+<tr><td>Александр 2.5</td><td class='ph'>79776512101</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Харьковский Элизар</td><td class='ph'>79260001216</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Исаева Оливия Романовна</td><td class='ph'>79263580969</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Авраменко Макар</td><td class='ph'>79995196451</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Алексей</td><td class='ph'>79377392834</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Андреева Анна</td><td class='ph'>79772976082</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Малышев Максим</td><td class='ph'>79638568943</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Регина Чагаева</td><td class='ph'>79639165772</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Ясюлевичюс Михаил</td><td class='ph'>79653174613</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Агарунова Ариэлла</td><td class='ph'>79267054658</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Литовченко Ева Евгеньевна</td><td class='ph'>79850037212</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Бахтимиров Кирилл</td><td class='ph'>79032126589</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Расана</td><td class='ph'>79032243479</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Кружкова Ева Ивановна</td><td class='ph'>79039754694</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Георгий</td><td class='ph'>79152624429</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Холяков Максим</td><td class='ph'>79152748966</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Бойко Александр Иванович</td><td class='ph'>79153817631</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Орлов Дмитрий</td><td class='ph'>79161702367</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Синцов Сергей</td><td class='ph'>79162321375</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Сосненко Лада Игоревна</td><td class='ph'>79167059977</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Бексалиева Карина Дамировна</td><td class='ph'>79227467313</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Селезнева Алиса Александровна</td><td class='ph'>79262156015</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Мария</td><td class='ph'>79268243880</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Князькова Арина</td><td class='ph'>79998117226</td><td><span class='pill p-gray'>1.2. Праздник 2026</span></td></tr>
+<tr><td>Щербина Дарья</td><td class='ph'>79295079150</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Куркина Ксения 10</td><td class='ph'>79262810810</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Бяхова Алиса</td><td class='ph'>79689249590</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Ашкар София</td><td class='ph'>79811710143</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Пшеничников Тимофей</td><td class='ph'>79629669855</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Мирослав</td><td class='ph'>79031081738</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Иванова Кристина Михайловна</td><td class='ph'>79037409001</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Яковлев Кирилл Глебович</td><td class='ph'>79037470467</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Карпов Артем Павлович</td><td class='ph'>79055603919</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Марк</td><td class='ph'>79056240945</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Стефания Разова</td><td class='ph'>79099990089</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Еремин Владислав Анатольевич</td><td class='ph'>79150471268</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Холяков Роман</td><td class='ph'>79152748960</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Арина</td><td class='ph'>79156232928</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Елисеева Ксения Игоревна</td><td class='ph'>79161120633</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Заволова Милана Александровна</td><td class='ph'>79163785258</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Доренко Дарья Алексеевна</td><td class='ph'>79165128226</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Еремина Кира Анатольевна</td><td class='ph'>79167092348</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Лименко Галина Михайловна</td><td class='ph'>79168961304</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Линаева Виктория Максимовна</td><td class='ph'>79205382443</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Обручников Михаил Александрови</td><td class='ph'>79252762192</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Вероника</td><td class='ph'>79252884934</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Серафим</td><td class='ph'>79261324831</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Лиза</td><td class='ph'>79266894516</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Амед</td><td class='ph'>79269573169</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Мискарян София Арсеновна</td><td class='ph'>79539459548</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Соколов Марк</td><td class='ph'>79652999300</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Михаил</td><td class='ph'>79852731379</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Милада</td><td class='ph'>79999096082</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Орлов Миша</td><td class='ph'>79161702367</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Орлова Лада</td><td class='ph'>79161702367</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+<tr><td>Раджабова Малика</td><td class='ph'>79651244970</td><td><span class='pill p-blue'>2. Недозвон (в работе)</span></td></tr>
+</table></div>
+<h2>4. Летние и прошлогодние — 206 семей</h2>
+<div class='card'>Платили нам в 2025/26 или летом 2026, сейчас никуда не записаны. Возврат своего дешевле любого нового: они знают педагогов, дорогу и цены.</div>
+<div class='q'>«Здравствуйте! Это KidsUP. [Имя] ходил к нам в прошлом году — учебный год начался, хочу успеть предложить место, пока группа не закрылась. Продолжаем?»</div>
+<div class='scroll'><table><tr><th>Семья</th><th>Телефон</th><th>Разговор</th></tr>
+<tr><td>Смирнов Роман</td><td class='ph'>79106624812</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Терентьева София</td><td class='ph'>79857763311</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Матяж Данила</td><td class='ph'>79194469049</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Помулев Егор</td><td class='ph'>79031955569</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Цвеляк Ирина</td><td class='ph'>79151393279</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Ибадов Исмаил</td><td class='ph'>79261890191</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Кычанов Андрей</td><td class='ph'>79037945955</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Мальков Алексей</td><td class='ph'>79035014475</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Рысаева Расина</td><td class='ph'>79169202875</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Селезнева Алиса</td><td class='ph'>79262151015</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Ришко Иван</td><td class='ph'>79112902030</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Рябцев Дамир</td><td class='ph'>79275604546</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Журавлев Иван</td><td class='ph'>79262803672</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Прокопович Владимир</td><td class='ph'>79261160071</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Ящук Марк</td><td class='ph'>79199670272</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Ящук Маргарита</td><td class='ph'>79199670272</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Губайдуллина Светлана</td><td class='ph'>79647111477</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Тюрин Тихон</td><td class='ph'>79164341720</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Панченко Леонид</td><td class='ph'>79152581354</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Остонакулова Дарина</td><td class='ph'>79853576898</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Игошев Иван</td><td class='ph'>79671261343</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Игошев Федор</td><td class='ph'>79671261343</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Ковалева Аида</td><td class='ph'>79055359089</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Чегодаев Федор</td><td class='ph'>79035900112</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Сысоев Александр</td><td class='ph'>79198719188</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Будникова Александра</td><td class='ph'>79932662151</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Сычев Савелий</td><td class='ph'>79057511019</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Тряхин Владислав</td><td class='ph'>79375178212</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Славгородский Денис</td><td class='ph'>79257299066</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Белогурова Елизавета</td><td class='ph'>79055265385</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Шевчук София</td><td class='ph'>79168349614</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Глинина Маргарита</td><td class='ph'>79250353796</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Нилова Анастасия</td><td class='ph'>79266992405</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Очиров Давид</td><td class='ph'>79999999999</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Салмин Дмитрий</td><td class='ph'>79670442808</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Шеламова Алина</td><td class='ph'>79037447751</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Мануйлова Арианна</td><td class='ph'>79035967408</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Скалич Лев</td><td class='ph'>79268960815</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Семина Елизавета</td><td class='ph'>79672497171</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Семина Ксения</td><td class='ph'>79672497171</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Бежин Константин</td><td class='ph'>79851199226</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Антонова Агата</td><td class='ph'>79100880702</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Спицын Платон</td><td class='ph'>79852422926</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Журавлев Данила</td><td class='ph'>79208031173</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Нуралимова Айджи</td><td class='ph'>79913046831</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Радюхин Тимофей</td><td class='ph'>79853514482</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Овчинникова Александра</td><td class='ph'>79152235530</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Воронкин Григорий</td><td class='ph'>79651726060</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Беляев Арсений</td><td class='ph'>79689777007</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Величко Максим</td><td class='ph'>79032350334</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Русанов Максим</td><td class='ph'>79251580899</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Гаранджук Ева</td><td class='ph'>79266737273</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Молчанов Максим</td><td class='ph'>79688422412</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Котягина Анна</td><td class='ph'>79032697033</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Блажевский Иван</td><td class='ph'>79163303444</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Дурановская Алёна</td><td class='ph'>79826270170</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Пахомова Ксения</td><td class='ph'>79260104577</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Черноногов Ярослав</td><td class='ph'>79104423647</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Аксенова Анфиса</td><td class='ph'>79267369118</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Федосова Елизавета</td><td class='ph'>79035254025</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Назаров Сергей</td><td class='ph'>79260357785</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Любек Анастасия</td><td class='ph'>79661222204</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Шодиева Амина</td><td class='ph'>79688050098</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Пригорнев Радислав</td><td class='ph'>79774525407</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Габлина Аделина</td><td class='ph'>79263014633</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Ляшкевич Лев</td><td class='ph'>79265775317</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Судакова Александра (скидка 10</td><td class='ph'>79263255865</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Девина Алиса (телеграмм)</td><td class='ph'>79998661128</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Комлев Ярослав (телеграмм)</td><td class='ph'>79251766455</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Игошин Иван</td><td class='ph'>79671261343</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Кулаев Данила (телеграмм)</td><td class='ph'>79854548454</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Изместьева Диана</td><td class='ph'>79269187305</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Липатова София</td><td class='ph'>79096822423</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Батманова Мария</td><td class='ph'>79296247037</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Очкин Мартин</td><td class='ph'>79268205272</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Ахметзянова Мия</td><td class='ph'>79224044988</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Виноградова Кристина</td><td class='ph'>79032567843</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Виноградова Виктория</td><td class='ph'>79032567843</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Аулова Валерия</td><td class='ph'>79859951666</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Ислюкова София</td><td class='ph'>79200152834</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Медведева Виктория</td><td class='ph'>79670183414</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Каприелов Матвей</td><td class='ph'>79651290135</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Яковлев Кирилл</td><td class='ph'>79164155576</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Зайцева Александра</td><td class='ph'>79042082747</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Смирнов Иван</td><td class='ph'>79254440485</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Сеничева Дарина</td><td class='ph'>79265516487</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Кремчеев Алмаз</td><td class='ph'>79276444293</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Савченко Олег</td><td class='ph'>79104514101</td><td><span class='pill p-amber'>думает</span></td></tr>
+<tr><td>Ниатшина Алевтина</td><td class='ph'>79151003905</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Шамлиди Жанна</td><td class='ph'>79267454044</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Мосягин Максим</td><td class='ph'>79960060991</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Бубелло Мирослава</td><td class='ph'>79067507618</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Мухамеджанов Марк</td><td class='ph'>79645537988</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Мухамеджанов Тео</td><td class='ph'>79645537988</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Крамаренко Милана</td><td class='ph'>79266565105</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Игошин Федор</td><td class='ph'>79671261343</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Алешин Марк</td><td class='ph'>79639958330</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Васильев Марат</td><td class='ph'>79506134444</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Каруева Даяна</td><td class='ph'>79032600102</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Мачин Руслан</td><td class='ph'>79636875872</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Занина София (телеграмм)</td><td class='ph'>79299036439</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Солдатова Варвара (МАХ)</td><td class='ph'>79163600466</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Ахмеров Роман</td><td class='ph'>79652474669</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Каруева Амелия</td><td class='ph'>79032600102</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Прокофьев Михаил</td><td class='ph'>79260846991</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Беседина Елизавета</td><td class='ph'>79629319883</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Погодаев Иван</td><td class='ph'>79649481022</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Бублик Татьяна</td><td class='ph'>79651258455</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Бабурин Арсений</td><td class='ph'>79153772551</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Тутова Виолетта</td><td class='ph'>79260141643</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Гришина Варвара</td><td class='ph'>79999084562</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Богородецкий Андрей</td><td class='ph'>79032345000</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Рудакова Елизавета</td><td class='ph'>79262060031</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Лазарев Станислав</td><td class='ph'>79295104459</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Качанова Агата</td><td class='ph'>79262835639</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Поречнева Вероника</td><td class='ph'>79263831819</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Цакун Лев (телеграмм)</td><td class='ph'>79161826159</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Короткова Каролина</td><td class='ph'>79672776696</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Петренко Роман</td><td class='ph'>79099446046</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Рванцева Александра</td><td class='ph'>79672930667</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Чиликин Богдан</td><td class='ph'>79661465218</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Крючков Лев</td><td class='ph'>79265372102</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Кондрашева Варвара</td><td class='ph'>79100966505</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Михайлова Ксения (скидка 10% м</td><td class='ph'>79151581400</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Садъуллаева Васила</td><td class='ph'>79801887883</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Цыбульский Андрей</td><td class='ph'>79654463030</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Святенко Версавия</td><td class='ph'>79058460129</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Титова Елизавета</td><td class='ph'>79032952727</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Савранин Семен</td><td class='ph'>79321181016</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Чегодаева Александра</td><td class='ph'>79035900112</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Сенокосов Александр</td><td class='ph'>79651630870</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Ельпина Софья</td><td class='ph'>79090488700</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Елисейкин Михаил</td><td class='ph'>79267041294</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Королева Виктория</td><td class='ph'>79035582093</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Савков Марк</td><td class='ph'>79645196764</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Шишкин Артем</td><td class='ph'>79166141624</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Черняткин Александр</td><td class='ph'>79253674337</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Оськин Антон</td><td class='ph'>79266125215</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Киселева Александра</td><td class='ph'>79065007231</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Щербакова Анастасия</td><td class='ph'>79096766576</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Речицкая Николь</td><td class='ph'>79267555631</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Жижин Владимир</td><td class='ph'>79774990973</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Панкрухин Данил</td><td class='ph'>79125210989</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Кузнецов Никита</td><td class='ph'>79159746274</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Русакова София</td><td class='ph'>79859793230</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Атапин Иван</td><td class='ph'>79104181492</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Смирнов Артем</td><td class='ph'>79154661339</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Медведева Мира</td><td class='ph'>79650018611</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Лозовицкий Андрей (макс)</td><td class='ph'>79151225290</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+<tr><td>Рогава Торнике</td><td class='ph'>79263081509</td><td><span class='pill p-blue'>недозвон</span></td></tr>
+</table></div>
+<h2>Дожим до абонемента — обеим</h2>
+<div class='card ok'><b>−10% на первый абонемент — только в день первого занятия.</b> Мини-сад и нулевой класс — максимум −5%. Скидки не суммируются.<br>На стойку: <a href='/static/tablichka_skidka.pdf'>табличка с ценами (PDF)</a> · педагогам: <a href='/static/diagnostika_blanki.pdf'>бланки диагностики</a> · родителям: <a href='/static/pasport_psh1.pdf'>паспорт развития ПШ1</a>, <a href='/static/pasport_psh2.pdf'>ПШ2</a></div>
+<ul><li>Ловим на выходе, не звоним вечером</li><li>Начинаем с конкретики от педагога, не с цены</li><li>Не готов — конкретный час звонка на завтра, записать в лист</li><li>Всегда предлагаем второй предмет</li><li>Не пришёл — звонок в тот же час, перенос на среду или четверг</li></ul>
+<p class='small'>Записи по группам: <a href='/base/gruppy_2627'>/base/gruppy_2627</a> · английский: <a href='/base/angliyskiy'>/base/angliyskiy</a> · диагностика: <a href='/base/diagnostika'>/base/diagnostika</a></p>
+</div>
