@@ -2447,7 +2447,8 @@ def _match_click(conn, ts: str, phone: str, chat_type: str) -> None:
 
 MESSENGER_LINKS = {
     # мессенджеры для обращений
-    "whatsapp": "https://wa.me/79199683507",   # 29.08 02:00: публикуем WABA-номер 3507 (0077 в бане, 0918 — только рассылки и напоминания)
+    # 01.09: публикуем 0918 по решению владельца. 3507 (WABA) и 0077 не публикуем.
+    "whatsapp": "https://wa.me/79160170918",
     "telegram": "https://t.me/KidsUPchat",
     "max": "https://max.ru/u/f9LHodD0cOL7ouxX67LQufADpyAmbvMGRUdMqaGj2Ya-F1EuIVQMGWeU9gc",
     # соцсети — тоже через /go, чтобы видеть, откуда приходят
@@ -2561,7 +2562,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-01.1"
+APP_VERSION = "2026-09-01.2"
 
 
 @app.get("/api/net")
@@ -2949,6 +2950,42 @@ def _find_client(mk, phone: str) -> tuple[int | None, int]:
     return None, 0
 
 
+
+# --- заявка с сайта → буферная группа «Заявки» -----------------------------
+# 01.09 (решение владельца): заявка должна быть видна не только задачей, но и
+# записью в буферной группе выбранного направления — тогда она попадает в
+# воронку групп и её не теряют. Порядок ключей важен: «Английский мини-сад»
+# должен уйти в мини-сад, а не в английский.
+_ZAYAVKI_KEYS = [
+    ("мини-сад", "Мини-сад"), ("нулев", "Мини-сад"),
+    ("подготовк", "ПШ_Заявки"), ("англ", "АЯ_Заявки"),
+    ("шахмат", "ШАХ_Заявки"), ("робот", "Робототехника"),
+    ("изо", "ИЗО_Заявки"), ("логопед", "ЛГ"),
+    ("скорочт", "Скорочтение"), ("каллиграф", "Скорочтение"),
+    ("танц", "Танцы"), ("ментальн", "МА"),
+    ("первая школа", "РР.Первая школа"), ("раннее", "РР.Музыка и речь"),
+]
+
+
+def _zayavki_class_id(mk, course: str) -> int | None:
+    """id буферной группы «Заявки» по направлению, выбранному на сайте."""
+    if not course:
+        return None
+    low = course.lower()
+    marker = next((m for k, m in _ZAYAVKI_KEYS if k in low), None)
+    if not marker:
+        return None
+    try:
+        r = mk.get("/v1/company/classes", {"limit": 500})
+        classes = (r.get("classes") if isinstance(r, dict) else r) or []
+    except Exception:
+        return None
+    for c in classes:
+        nm = c.get("name") or ""
+        if nm.startswith("2627_") and "аявк" in nm and marker.lower() in nm.lower():
+            return c.get("id")
+    return None
+
 def _lead_to_crm(lead: dict) -> None:
     """Доводка заявки с сайта. Порядок важен: СНАЧАЛА живому человеку
     (уведомление не зависит от МойКласс), потом CRM — иначе авария в CRM
@@ -3027,6 +3064,28 @@ def _lead_to_crm(lead: dict) -> None:
                         {"userId": uid, "comment": "\n".join(details), "showToUser": False})
             except Exception as e:
                 log.warning("комментарий не записан: %s", e)
+        # карточка могла лежать в архиве/недозвоне — живая заявка возвращает
+        # её в воронку, иначе клиент не попадёт ни в один рабочий список
+        if uid:
+            try:
+                cur = (mk.get(f"/v1/company/users/{uid}") or {}).get("clientStateId")
+                if cur in (345759, 125956, 345768, 125954):
+                    mk.post(f"/v1/company/users/{uid}/status",
+                            {"statusId": 125951, "statusChangeReasonId": 313608})
+                    log.info("заявка подняла карточку %s из статуса %s", uid, cur)
+            except Exception as e:
+                log.warning("статус по заявке не поднят: %s", e)
+        # запись в буферную группу «Заявки» выбранного направления
+        if uid:
+            try:
+                cid = _zayavki_class_id(mk, course)
+                if cid:
+                    mk.post("/v1/company/joins",
+                            {"userId": uid, "classId": cid, "statusId": 50509,
+                             "comment": f"Заявка с сайта: {course}"[:250]})
+                    log.info("заявка +%s → буферная группа %s", phone, cid)
+            except Exception as e:
+                log.warning("запись в буферную группу не создана: %s", e)
         if duty:
             body = ("🤖 Клод: 🔥 НОВАЯ ЗАЯВКА с сайта — позвонить в течение 5 минут! "
                     f"{child or 'имя не указано'}"

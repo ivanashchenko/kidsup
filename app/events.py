@@ -200,7 +200,7 @@ h2.sec{{font-size:1.3rem;font-weight:780;margin:2rem 0 .3rem;color:var(--indigo)
 <div class="cta">
   <h2>Записаться или спросить</h2>
   <p>Скажите возраст ребёнка и удобные дни — подберём группу и время.</p>
-  <a href="https://wa.me/79199683507">Написать в WhatsApp</a>
+  <a href="https://wa.me/79160170918">Написать в WhatsApp</a>
 </div>
 
 <div class="addr">

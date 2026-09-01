@@ -124,7 +124,7 @@ def build(key, title, lead, tiles, nums, quote, marks_title):
 </div>
 <div class="foot">Детский центр и английский сад KidsUP<br>
 б-р Маршала Рокоссовского, 6 к1В · БЦ «Богородский», 7-й подъезд, 2 этаж<br>
-kidsup.ru · +7 919 968-35-07</div></div>''')
+kidsup.ru · +7 916 017-09-18</div></div>''')
     # 2. подход
     tl="".join(f'<div class="tile {c}"><div class="ic">{ic}</div><b>{h}</b><p>{p}</p></div>'
                for ic,h,p,c in tiles)
@@ -165,7 +165,7 @@ kidsup.ru · +7 919 968-35-07</div></div>''')
 <p>Не понравилось — платить не нужно. Понравилось — занятие входит в первый абонемент.
 <b>В день первого занятия действует скидка 10% на первый абонемент.</b>
 Второй предмет и второй ребёнок — тоже −10%; скидки не суммируются, действует одна.</p></div>
-<div class="fin"><span>Вопросы — администратору или в WhatsApp +7 919 968-35-07</span>
+<div class="fin"><span>Вопросы — администратору или в WhatsApp +7 916 017-09-18</span>
 <span>kidsup.ru</span></div></div>''')
     return "".join(H)
 
