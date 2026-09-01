@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import date
 
 ADDRESS = "б-р Маршала Рокоссовского, 6 к1В (напротив ТЦ «Янтарь»)"
-METRO = "2 минуты от м. Бульвар Рокоссовского"
+METRO = "5 минут от м. Бульвар Рокоссовского"
 SITE = "kidsup.ru"
 START = "31 августа"
 DEADLINE = "31 августа"

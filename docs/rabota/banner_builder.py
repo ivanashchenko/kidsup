@@ -105,7 +105,7 @@ justify-content:space-between;gap:20px}
       <div class="win">Свободное утро<br>для мамы</div>
       <ul>
         <li>9:00–13:00, 4 занятия<br>каждый день</li>
-        <li>Английский ежедневно</li>
+        <li>Английский 2 раза в неделю</li>
         <li>Видеотрансляция в группе</li>
       </ul>
       <div class="price">от 19 600 ₽ в месяц</div>

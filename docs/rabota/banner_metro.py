@@ -34,7 +34,13 @@ FONTS = "".join([
     font_face("M", "Montserrat-Bold.ttf", 700),
     font_face("M", "Montserrat-ExtraBold.ttf", 800),
 ])
-LOGO = b64(ROOT / "app/static/logo_white.png")
+def logo_b64():
+    """Логотип без прозрачных полей — иначе на макете он выглядит мелким."""
+    im = Image.open(ROOT / "app/static/logo_white.png").convert("RGBA")
+    im = im.crop(im.getchannel("A").getbbox())
+    buf = io.BytesIO(); im.save(buf, "PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+LOGO = logo_b64()
 
 def qr_png():
     q = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, border=1, box_size=20)
@@ -62,19 +68,24 @@ box-shadow:0 0 0 230px rgba(0,0,0,.55);border:6px dashed rgba(255,255,255,.7)}
 .guide span{position:absolute;left:0;top:-90px;font-size:44px;font-weight:700;color:#fff}
 
 /* шапка */
-.top{display:flex;align-items:center;gap:70px;height:400px}
-.top img{height:310px;display:block;flex:none}
+.top{display:flex;align-items:center;gap:70px;height:430px}
+.top img{height:410px;display:block;flex:none}
 .top .t h1{font-size:126px;line-height:.98;font-weight:800;letter-spacing:-.025em}
 .top .t h1 span{color:#8FE04A}
 .top .t p{margin-top:24px;font-size:50px;font-weight:600;color:#C9C4F0}
-.top .m{margin-left:auto;text-align:right;flex:none;max-width:820px}
-.top .m b{display:block;font-size:58px;font-weight:800;line-height:1.05}
-.top .m span{display:block;margin-top:14px;font-size:42px;line-height:1.2;font-weight:600;color:#C9C4F0}
+.top .m{margin-left:auto;text-align:right;flex:none;max-width:900px}
+.top .m .ya{display:inline-flex;align-items:center;gap:22px;background:#fff;color:#241C6B;border-radius:99px;padding:14px 40px 14px 30px;margin-bottom:24px}
+.top .m .ya i{font-style:normal;color:#F59C00;font-size:56px;letter-spacing:2px;line-height:1}
+.top .m .ya b{font-size:50px;font-weight:800;line-height:1}
+.top .m .ya em{font-style:normal;font-size:40px;font-weight:600;color:#4A44A0}
+.top .m .hm{display:block;font-size:46px;font-weight:800;color:#8FE04A;margin-bottom:18px}
+.top .m b.d{display:block;font-size:54px;font-weight:800;line-height:1.05}
+.top .m span{display:block;margin-top:10px;font-size:40px;line-height:1.2;font-weight:600;color:#C9C4F0}
 
 /* четыре карточки */
 .grid{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:44px}
 .c{border-radius:56px;padding:60px 56px 54px;display:flex;flex-direction:column;overflow:hidden}
-.c .ic{font-size:120px;line-height:1;margin-bottom:26px}
+.c .ic{font-size:110px;line-height:1;margin-bottom:20px}
 .c h2{font-size:100px;line-height:1;font-weight:800;letter-spacing:-.02em;margin-bottom:22px}
 .c .age{display:inline-block;align-self:flex-start;font-size:48px;font-weight:700;
 padding:12px 36px;border-radius:99px;margin-bottom:44px;color:#fff}
@@ -82,7 +93,10 @@ padding:12px 36px;border-radius:99px;margin-bottom:44px;color:#fff}
 .c ul{list-style:none;font-size:54px;line-height:1.28;font-weight:600}
 .c li{padding-left:64px;position:relative;margin-bottom:22px}
 .c li:before{content:"";position:absolute;left:0;top:26px;width:26px;height:26px;border-radius:50%}
-.c .price{margin-top:auto;font-size:62px;font-weight:800;padding-top:26px}
+.c .price{margin-top:auto;font-size:62px;font-weight:800;padding-top:22px}
+.c .g{margin-top:auto;background:#F59C00;color:#fff;border-radius:32px;padding:26px 30px;font-size:46px;line-height:1.22;font-weight:700}
+.c .g b{display:block;font-size:52px;font-weight:800;margin-bottom:8px}
+.c1 .price{margin-top:0}
 
 .c1{background:#FFF3D6;color:#5A3D00}.c1 .age{background:#F59C00}.c1 .win{color:#C97A00}
 .c1 li:before{background:#F59C00}.c1 .price{color:#8A5C00}
@@ -96,11 +110,11 @@ padding:12px 36px;border-radius:99px;margin-bottom:44px;color:#fff}
 /* подвал */
 .foot{height:330px;background:#8FE04A;border-radius:56px;padding:0 70px;
 display:flex;align-items:center;gap:60px;color:#1C3D00}
-.foot .l b{display:block;font-size:82px;font-weight:800;line-height:1.05}
-.foot .l span{display:block;margin-top:14px;font-size:52px;font-weight:600}
+.foot .l b{display:block;font-size:66px;font-weight:800;line-height:1.05;white-space:nowrap}
+.foot .l span{display:block;margin-top:16px;font-size:44px;font-weight:600}
 .foot .r{margin-left:auto;text-align:right}
 .foot .r b{display:block;font-size:76px;font-weight:800;line-height:1.05}
-.foot .r span{display:block;margin-top:14px;font-size:46px;font-weight:600}
+.foot .r span{display:block;margin-top:14px;font-size:42px;line-height:1.15;font-weight:600;white-space:nowrap}
 .foot img{height:260px;width:260px;border-radius:28px;background:#fff;padding:12px;flex:none}
 </style>
 <div class="b">
@@ -112,7 +126,11 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
         <h1>Учим детей тому,<br>что <span>правда пригодится</span></h1>
         <p>Детский центр и английский сад · от 1,3 до 12 лет</p>
       </div>
-      <div class="m"><b>2 минуты от метро</b><span>б-р Маршала Рокоссовского, 6к1В<br>напротив ТЦ «Янтарь»</span></div>
+      <div class="m">
+        <div class="ya"><i>★★★★★</i><b>5,0</b><em>на Яндекс Картах</em></div>
+        <span class="hm">«Хорошее место 2026»</span>
+        <b class="d">5 минут от метро</b><span>б-р Маршала Рокоссовского, 6к1В · напротив ТЦ «Янтарь»</span>
+      </div>
     </div>
 
     <div class="grid">
@@ -124,8 +142,8 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
         <ul>
           <li>Методика Буракова</li>
           <li>Чтение, счёт и письмо на одном занятии</li>
-          <li>Группы 6–8 детей</li>
         </ul>
+        <div class="g"><b>Гарантия</b>Не зачитал за 3 месяца — ходит бесплатно, пока не зачитает</div>
         <div class="price">от 5 000 ₽ в месяц</div>
       </div>
       <div class="c c2">
@@ -147,10 +165,10 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
         <div class="win">Свободное<br>утро для мамы</div>
         <ul>
           <li>9:00–13:00, 4 занятия каждый день</li>
-          <li>Английский ежедневно</li>
+          <li>Английский 2 раза в неделю</li>
           <li>Видеотрансляция для родителей</li>
         </ul>
-        <div class="price">от 19 600 ₽ в месяц</div>
+        <div class="price">от 19 800 ₽ в месяц</div>
       </div>
       <div class="c c4">
         <div class="ic">🎓</div>
@@ -159,17 +177,17 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
         <div class="win">Готов к школе<br>без репетиторов</div>
         <ul>
           <li>10:00–14:00, программа первого класса</li>
-          <li>Английский два раза в неделю</li>
+          <li>Английский 2 раза в неделю</li>
           <li>2–5 дней на выбор</li>
         </ul>
-        <div class="price">от 26 600 ₽ в месяц</div>
+        <div class="price">от 26 800 ₽ в месяц</div>
       </div>
     </div>
 
     <div class="foot">
-      <div class="l"><b>Первое занятие — условно-бесплатное</b>
-        <span>Не понравится — платить не нужно</span></div>
-      <div class="r"><b>kidsup.ru</b><span>запись на сайте и по QR-коду</span></div>
+      <div class="l"><b>Первое занятие — условно-бесплатное, с диагностикой</b>
+        <span>Покажем, где ребёнок сейчас и что подтянуть · Не понравится — платить не нужно</span></div>
+      <div class="r"><b>kidsup.ru</b><span>запись на сайте<br>и по QR-коду</span></div>
       <img src="__QR__">
     </div>
     __GUIDE__
