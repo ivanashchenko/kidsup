@@ -6,6 +6,7 @@ import json, re, html as H
 BASE = "/home/user/kidsup/docs/rabota"
 M = json.load(open(f"{BASE}/metrika_probnye.json"))
 R = json.load(open(f"{BASE}/raspisanie_0209.json"))
+IZV = json.load(open(f"{BASE}/izvinenie_0109.json"))
 Z = open("/home/user/kidsup/docs/zadachi_02sen.html", encoding="utf-8").read()
 
 CSS = re.search(r"<style>.*?</style>", open("/home/user/kidsup/docs/plan_01sen.html", encoding="utf-8").read(), re.S).group(0)
@@ -68,6 +69,21 @@ h = [CSS, "<div class='wrap'>",
      "<div class='hero'><h1>Среда 2 сентября — новый порядок смены</h1>"
      "<p>Работаем 9:00–20:00 · Лена — дожим и оплаты · Аня — встреча, проводы и списки · Лиза — переписка<br>"
      f"Сегодня {n_groups} групп, {n_kids} детей, из них {n_trial} на первом занятии — {len(evening_trial)} из них вечером</p></div>"]
+
+# ошибка вчерашней рассылки
+h.append("<h2>Сначала — вчерашняя ошибка рассылки</h2>")
+h.append(f"<div class='card alarm'><b>Вчера в 13:33 напоминание «сегодня ждём вас» ушло 45 семьям, "
+         f"и {len(IZV)} из них ждут не вчера, а 3–15 сентября.</b> Список собирался по составу групп, "
+         "а не по записям на конкретный день: ребёнок числится в группе задолго до первого занятия. "
+         "Ошибка моя, механизм я поправил — теперь адресат берётся только из записей на этот день. "
+         "Трое уже ответили сами: Деева («я записана на 8.09»), Королева («хожу с 15.09»), Лагутина («у нас четверг»).</div>")
+h.append("<div class='card'><b>Что делать админам:</b> если кто-то из списка позвонит или напишет — "
+         "извиниться и назвать его настоящую дату из таблицы. Сами звонить не нужно: "
+         "исправляющее сообщение уходит утром по команде владельца.</div>")
+h.append("<div class='scroll'><table><tr><th>Кто</th><th>Телефон</th><th>Настоящая запись</th></tr>")
+for ph, m in sorted(IZV.items(), key=lambda kv: kv[1]["when"]):
+    h.append(f"<tr><td><b>{esc(m['kids'])}</b></td><td class='ph'>{esc(ph)}</td><td>{esc(m['when'])}</td></tr>")
+h.append("</table></div>")
 
 # метрика
 h.append("<h2>Метрика набора — доля оплат от пришедших на пробное</h2>")
