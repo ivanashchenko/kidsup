@@ -142,7 +142,7 @@ DAY_LIMIT = 2            # автосообщений одному челове�
 # два разных конвейера (nabor и akciya) законно укладывались в общий
 # лимит 2 и вдвоём засыпали семью предложениями.
 SERVICE_KINDS = {"confirm", "trial_reminder", "reschedule", "missed",
-                 "booking", "sms"}
+                 "booking", "sms", "welcome"}
 MARKETING_DAY_LIMIT = 1
 HOUR_FROM, HOUR_TO = 9, 20
 

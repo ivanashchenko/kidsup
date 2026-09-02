@@ -1468,10 +1468,14 @@ def welcome_series(mk: MoyklassClient) -> None:
     либо чувствует заботу, либо остаётся одна со своими вопросами. До 02.09.2026
     после оплаты не уходило ничего."""
     today = _today()
-    # 1. новые оплаты за сегодня — первое сообщение
+    # Смотрим не только сегодняшние оплаты: суточный лимит автосообщений мог
+    # не пропустить приветствие в день оплаты (семье в тот день уже ушли
+    # подтверждение и напоминание), и без окна в несколько дней оно пропало бы
+    # насовсем — 02.09 так не ушло семи семьям из восьми.
+    since = (today - timedelta(days=3)).isoformat()
     try:
         pays = mk.fetch_all("/v1/company/payments", ["payments"],
-                            params={"date": [today.isoformat(), today.isoformat()]})
+                            params={"date": [since, today.isoformat()]})
     except Exception:
         log.exception("welcome_series: не получить оплаты")
         pays = []
@@ -1479,21 +1483,23 @@ def welcome_series(mk: MoyklassClient) -> None:
         uid = p.get("userId")
         if not uid or p.get("optype") != "income" or (p.get("summa") or 0) <= 0:
             continue
+        pay_day = (p.get("date") or today.isoformat())[:10]
+        # отметку ставим только после успешной отправки: _wa молчит, когда семья
+        # ждёт ответа админа или наступила ночь, и тогда серию надо повторить позже
+        if _seen("welcome1", f"{uid}:{pay_day}"):
+            continue
         # только первая оплата: продлившему абонемент «спасибо, что выбрали нас,
         # место закреплено» читается так, будто мы его впервые видим — ровно та
         # ошибка, что 20.08 ушла маме, которая ходит к нам год
         try:
             older = mk.get("/v1/company/payments", params={
                 "userId": uid, "limit": 5,
-                "date": ["2020-01-01", (today - timedelta(days=1)).isoformat()]})
+                "date": ["2020-01-01",
+                         (date.fromisoformat(pay_day) - timedelta(days=1)).isoformat()]})
             older = (older.get("payments") if isinstance(older, dict) else older) or []
         except Exception:
             older = [1]          # не смогли проверить — молчим, это безопаснее
         if any((o.get("summa") or 0) > 0 for o in older if isinstance(o, dict)):
-            continue
-        # отметку ставим только после успешной отправки: _wa молчит, когда семья
-        # ждёт ответа админа или наступила ночь, и тогда серию надо повторить позже
-        if _seen("welcome1", f"{uid}:{today.isoformat()}"):
             continue
         try:
             user = mk.get(f"/v1/company/users/{uid}")
@@ -1514,7 +1520,7 @@ def welcome_series(mk: MoyklassClient) -> None:
         lines.append("Сохраните, пожалуйста, наш контакт, чтобы не терять сообщения. "
                      "Любые вопросы — прямо сюда 💛")
         if _wa(phone, "\n".join(lines), kind="welcome"):
-            _mark("welcome1", f"{uid}:{today.isoformat()}")
+            _mark("welcome1", f"{uid}:{pay_day}")
             log.info("welcome 1/4: %s", phone[-4:])
     # 2-4. следующие стадии — по возрасту отметки welcome1
     with db.get_conn() as conn:
