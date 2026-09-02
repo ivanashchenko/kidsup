@@ -1491,7 +1491,9 @@ def welcome_series(mk: MoyklassClient) -> None:
             older = [1]          # не смогли проверить — молчим, это безопаснее
         if any((o.get("summa") or 0) > 0 for o in older if isinstance(o, dict)):
             continue
-        if not _mark("welcome1", f"{uid}:{today.isoformat()}"):
+        # отметку ставим только после успешной отправки: _wa молчит, когда семья
+        # ждёт ответа админа или наступила ночь, и тогда серию надо повторить позже
+        if _seen("welcome1", f"{uid}:{today.isoformat()}"):
             continue
         try:
             user = mk.get(f"/v1/company/users/{uid}")
@@ -1512,6 +1514,7 @@ def welcome_series(mk: MoyklassClient) -> None:
         lines.append("Сохраните, пожалуйста, наш контакт, чтобы не терять сообщения. "
                      "Любые вопросы — прямо сюда 💛")
         if _wa(phone, "\n".join(lines), kind="welcome"):
+            _mark("welcome1", f"{uid}:{today.isoformat()}")
             log.info("welcome 1/4: %s", phone[-4:])
     # 2-4. следующие стадии — по возрасту отметки welcome1
     with db.get_conn() as conn:
@@ -1529,7 +1532,7 @@ def welcome_series(mk: MoyklassClient) -> None:
             continue
         age = (today - paid).days
         stage = 2 if age == 0 else (3 if age == 1 else (4 if age >= 7 else 0))
-        if not stage or not _mark(f"welcome{stage}", f"{uid}:{day}"):
+        if not stage or _seen(f"welcome{stage}", f"{uid}:{day}"):
             continue
         try:
             user = mk.get(f"/v1/company/users/{uid}")
@@ -1565,6 +1568,7 @@ def welcome_series(mk: MoyklassClient) -> None:
                     "Нам важно в самом начале понять, комфортно ли ребёнку, "
                     "и вовремя что-то поправить.")
         if _wa(phone, text, kind="welcome"):
+            _mark(f"welcome{stage}", f"{uid}:{day}")
             log.info("welcome %d/4: %s", stage, phone[-4:])
 
 
