@@ -174,7 +174,7 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
           <li>Английский 2 раза в неделю</li>
           <li>Видеотрансляция для родителей</li>
         </ul>
-        <div class="price">от 19 800 ₽ в месяц</div>
+        <div class="price">от 19 600 ₽ в месяц</div>
       </div>
       <div class="c c4">
         <div class="ic">🎓</div>
@@ -186,7 +186,7 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
           <li>Английский 2 раза в неделю</li>
           <li>2–5 дней на выбор</li>
         </ul>
-        <div class="price">от 26 800 ₽ в месяц</div>
+        <div class="price">от 26 600 ₽ в месяц</div>
       </div>
     </div>
 
