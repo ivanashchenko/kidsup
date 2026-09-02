@@ -1961,9 +1961,13 @@ def confirm_joins(mk: MoyklassClient) -> None:
     first_day: dict = {}
     if by_user:
         try:
+            # Первое занятие — ближайшее БУДУЩЕЕ, а не первое в учебном году:
+            # 02.09 подтверждения уходили с «первое занятие — во вторник
+            # 1 сентября», и родители переспрашивали «сегодня же второе».
+            _from = _today().isoformat()
+            _to = (_today() + timedelta(days=14)).isoformat()
             for l in sorted(mk.fetch_all("/v1/company/lessons", ["lessons"],
-                                         params={"date": ["2026-08-31",
-                                                          "2026-09-14"]}) or [],
+                                         params={"date": [_from, _to]}) or [],
                             key=lambda x: str(x.get("date"))):
                 cid = l.get("classId")
                 if cid and cid not in first_day:
@@ -2015,7 +2019,7 @@ def confirm_joins(mk: MoyklassClient) -> None:
             f"что-то поменяется, просто ответьте здесь."
             if cont else
             f"{when_start} Адрес: б-р Маршала "
-            f"Рокоссовского, 6к1В (напротив ТЦ «Янтарь»), 2 минуты "
+            f"Рокоссовского, 6к1В (напротив ТЦ «Янтарь»), 5 минут "
             f"от метро Бульвар Рокоссовского. Первое занятие "
             f"условно-бесплатное, и на нём же бесплатная диагностика — "
             f"педагог посмотрит уровень и подберёт ступень. Если "
