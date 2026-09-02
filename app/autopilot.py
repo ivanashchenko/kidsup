@@ -1479,6 +1479,18 @@ def welcome_series(mk: MoyklassClient) -> None:
         uid = p.get("userId")
         if not uid or p.get("optype") != "income" or (p.get("summa") or 0) <= 0:
             continue
+        # только первая оплата: продлившему абонемент «спасибо, что выбрали нас,
+        # место закреплено» читается так, будто мы его впервые видим — ровно та
+        # ошибка, что 20.08 ушла маме, которая ходит к нам год
+        try:
+            older = mk.get("/v1/company/payments", params={
+                "userId": uid, "limit": 5,
+                "date": ["2020-01-01", (today - timedelta(days=1)).isoformat()]})
+            older = (older.get("payments") if isinstance(older, dict) else older) or []
+        except Exception:
+            older = [1]          # не смогли проверить — молчим, это безопаснее
+        if any((o.get("summa") or 0) > 0 for o in older if isinstance(o, dict)):
+            continue
         if not _mark("welcome1", f"{uid}:{today.isoformat()}"):
             continue
         try:
