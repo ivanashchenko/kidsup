@@ -2160,6 +2160,33 @@ def izvinenie_0109() -> dict:
     return {"отправлено": sent, "оставлено_админу": waiting, "повтор": skipped}
 
 
+def _converted_since(phone: str, since: str) -> str:
+    """Что произошло с семьёй ПОСЛЕ недозвона: оплата или приход на занятие.
+
+    02.09 разовый догон за 31.08–01.09 ушёл 46 семьям, и шестеро из них к тому
+    моменту уже были у нас: четверо оплатили, двое приходили на пробное. Мама
+    Жамовой Арины позвонила встревоженная: «мне пришло, что со мной пытаются
+    связаться, мы же вроде оплатили». Недозвон говорит только о телефоне; о том,
+    что человек пришёл и заплатил, он ничего не знает."""
+    p10 = phone[-10:]
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM payments p JOIN users u ON u.id = p.user_id "
+            "WHERE substr(u.phone,-10)=? AND p.summa > 0 AND p.date >= ? LIMIT 1",
+            (p10, since)).fetchone()
+        if row:
+            return "оплатил"
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM lesson_records r JOIN users u ON u.id = r.user_id "
+                "JOIN lessons l ON l.id = r.lesson_id "
+                "WHERE substr(u.phone,-10)=? AND r.visit = 1 AND l.date >= ? LIMIT 1",
+                (p10, since)).fetchone()
+        except Exception:
+            row = None
+        return "был на занятии" if row else ""
+
+
 def missed_calls(days: list[str] | None = None) -> None:
     """Догон недозвонов. days=None — за сегодня (часовой тик); список дат —
     разовый догон за прошедшие дни (окно часа пролетало 29.08, 31.08,
@@ -2174,6 +2201,12 @@ def missed_calls(days: list[str] | None = None) -> None:
             # 01.09 в отчёте Манго попался 10-значный «8906002687» — обрубок
             # номера; писать по нему некуда, а 10 знаков через проверку проходили
             if len(phone) != 11 or not _mark("missed_wa", f"{today}:{phone}"):
+                continue
+            since = min(days) if days else _today().isoformat()
+            done = _converted_since(phone, since)
+            if done:
+                log.info("missed_calls: %s — %s после недозвона, догон не нужен",
+                         phone[-4:], done)
                 continue
             kind, child = _missed_kind(mk, phone)
             if kind == "team":
