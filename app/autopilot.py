@@ -1388,6 +1388,174 @@ def trial_reminder(mk: MoyklassClient) -> None:
         log.info("напоминание о пробном: %s на %s", phone[-4:], when)
 
 
+def _group_facts(mk: MoyklassClient, uid: int) -> dict:
+    """Что писать семье про её группу: направление, расписание, ближайшее занятие."""
+    out = {"course": "", "schedule": "", "next": "", "teacher": ""}
+    try:
+        joins = mk.get("/v1/company/joins", params={"userId": uid}) or {}
+        joins = (joins.get("joins") if isinstance(joins, dict) else joins) or []
+    except Exception:
+        return out
+    live = [j for j in joins if j.get("statusId") in (2, 58131, 58132)]
+    if not live:
+        return out
+    try:
+        cls = mk.get(f"/v1/company/classes/{live[-1]['classId']}") or {}
+    except Exception:
+        return out
+    name = re.sub(r"^\d+_", "", cls.get("name") or "")
+    parts = name.split("_")
+    # «2627_ПШ_вт-чт_18:00_4-7 лет_ПШ1 нечитающие (Гр14)» → направление, дни, время
+    head = parts[0] if parts else ""
+    out["course"] = {"ПШ": "Подготовка к школе", "АЯ": "Английский язык",
+                     "ИЗО": "ИЗО-студия", "МА": "Ментальная арифметика",
+                     "ШАХ": "Шахматы", "ЛГ": "Логопед"}.get(head.split()[0] if head else "", head)
+    if head.startswith("РР"):
+        out["course"] = "Раннее развитие"
+    if "Мини-сад" in name:
+        out["course"] = "Мини-сад"
+    if "Нулевой" in name:
+        out["course"] = "Нулевой класс"
+    days = next((p for p in parts if re.search(r"(пн|вт|ср|чт|пт|сб|вс)", p)), "")
+    tm = next((p for p in parts if re.fullmatch(r"\d{1,2}:\d{2}", p)), "")
+    out["schedule"] = " ".join(x for x in (re.sub(r"\s*-\s*", "–", days), tm) if x)
+    for teacher in ("Марина", "Елена", "Ирина", "Татьяна", "Виктория"):
+        if teacher in name:
+            out["teacher"] = teacher
+    try:
+        today = _today().isoformat()
+        end = (_today() + timedelta(days=14)).isoformat()
+        recs = mk.get("/v1/company/lessonRecords", params={
+            "userId": uid, "date": [today, end], "includeLessons": "true", "limit": 30})
+        rows = (recs.get("lessonRecords") if isinstance(recs, dict) else recs) or []
+        now_hm = _now().strftime("%H:%M")
+        dates = sorted(((r.get("lesson") or {}).get("date"),
+                        ((r.get("lesson") or {}).get("beginTime") or "")[:5]) for r in rows
+                       if (r.get("lesson") or {}).get("date"))
+        # занятие, которое уже началось, «ближайшим» называть нельзя
+        dates = [(d, t) for d, t in dates if d > today or (d == today and t > now_hm)]
+        if dates:
+            d, t = dates[0]
+            out["next"] = f"{int(d[8:10])} {MONTHS_GEN[int(d[5:7])]}" + (f" в {t}" if t else "")
+    except Exception:
+        pass
+    return out
+
+
+MONTHS_GEN = {1: "января", 2: "февраля", 3: "марта", 4: "апреля", 5: "мая", 6: "июня",
+              7: "июля", 8: "августа", 9: "сентября", 10: "октября", 11: "ноября",
+              12: "декабря"}
+
+# Что взять на занятие — по направлениям. Урок 8 интенсива «Система набора
+# групп»: семья, оставшаяся после оплаты один на один с вопросами, приходит
+# на первое занятие тревожной, а половина вопросов админу — как раз про это.
+WELCOME_KIT = {
+    "Подготовка к школе": ("сменная обувь; рабочие тетради по чтению, письму и счёту — "
+                           "три штуки по 500 ₽, выдаём на занятии"),
+    "Мини-сад": ("сменная обувь, сменный комплект одежды, если нужно — подгузники и салфетки; "
+                 "обед и перекус наши"),
+    "Нулевой класс": ("сменная обувь и рабочие тетради — выдаём на занятии; "
+                      "обед и перекус наши"),
+    "ИЗО-студия": "сменная обувь и одежда, которую не жалко испачкать; фартук дадим",
+}
+
+
+def welcome_series(mk: MoyklassClient) -> None:
+    """Четыре сообщения после оплаты: место закреплено → что взять → куда писать →
+    через неделю «как первые занятия».
+
+    Урок 8 интенсива «Работа во время и после мероприятия»: точка, где семья
+    либо чувствует заботу, либо остаётся одна со своими вопросами. До 02.09.2026
+    после оплаты не уходило ничего."""
+    today = _today()
+    # 1. новые оплаты за сегодня — первое сообщение
+    try:
+        pays = mk.fetch_all("/v1/company/payments", ["payments"],
+                            params={"date": [today.isoformat(), today.isoformat()]})
+    except Exception:
+        log.exception("welcome_series: не получить оплаты")
+        pays = []
+    for p in pays:
+        uid = p.get("userId")
+        if not uid or p.get("optype") != "income" or (p.get("summa") or 0) <= 0:
+            continue
+        if not _mark("welcome1", f"{uid}:{today.isoformat()}"):
+            continue
+        try:
+            user = mk.get(f"/v1/company/users/{uid}")
+        except Exception:
+            continue
+        phone = user.get("phone") or ""
+        child = _child_name(user.get("name") or "") or "ребёнка"
+        f = _group_facts(mk, uid)
+        lines = [f"Спасибо, что выбрали KidsUP 🌿",
+                 f"Место {_genitive(child)} в группе "
+                 f"«{f['course'] or 'занятия'}» закреплено."]
+        if f["schedule"]:
+            lines.append(f"📅 Занятия: {f['schedule']}")
+        if f["next"]:
+            lines.append(f"📍 Ближайшее занятие: {f['next']}")
+        lines.append("Сейчас пришлю ещё пару коротких сообщений — что взять с собой "
+                     "и куда писать по разным вопросам.")
+        lines.append("Сохраните, пожалуйста, наш контакт, чтобы не терять сообщения. "
+                     "Любые вопросы — прямо сюда 💛")
+        if _wa(phone, "\n".join(lines), kind="welcome"):
+            log.info("welcome 1/4: %s", phone[-4:])
+    # 2-4. следующие стадии — по возрасту отметки welcome1
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                "SELECT key FROM autopilot_state WHERE kind='welcome1'").fetchall()
+        except Exception:
+            rows = []
+    for r in rows:
+        try:
+            uid_s, day = r["key"].split(":")
+            uid = int(uid_s)
+            paid = date.fromisoformat(day)
+        except Exception:
+            continue
+        age = (today - paid).days
+        stage = 2 if age == 0 else (3 if age == 1 else (4 if age >= 7 else 0))
+        if not stage or not _mark(f"welcome{stage}", f"{uid}:{day}"):
+            continue
+        try:
+            user = mk.get(f"/v1/company/users/{uid}")
+        except Exception:
+            continue
+        phone = user.get("phone") or ""
+        child = _child_name(user.get("name") or "") or "ребёнка"
+        f = _group_facts(mk, uid)
+        if stage == 2:
+            kit = WELCOME_KIT.get(f["course"], "сменная обувь — всё остальное наше")
+            text = (f"Что взять с собой на занятия {_genitive(child)}:\n"
+                    f"🎒 {kit}.\n"
+                    "Всё остальное — пособия, материалы, канцелярия — наше.\n"
+                    "📚 Педагог ведёт прогресс каждого ребёнка: в течение года будут "
+                    "диагностики, по их итогам вы получите обратную связь и рекомендации.\n"
+                    "Приходите за 10 минут до начала — спокойно переодеться "
+                    "и познакомиться с педагогом.")
+        elif stage == 3:
+            text = ("Ещё пара вещей, чтобы вам было легко у нас ориентироваться 🌿\n"
+                    "💬 Расписание, переносы, пропуски, оплата — пишите сюда, в этот чат.\n"
+                    "👩‍🏫 Вопросы по занятиям — тоже сюда: передадим педагогу "
+                    "и вернёмся с ответом.\n"
+                    "📱 Расписание и цены — kidsup.ru, телефон +7 (495) 120-90-24.\n"
+                    "В течение года у нас открытые уроки, праздники и мастер-классы — "
+                    "про них рассказываем здесь же.\n"
+                    "Если что-то непонятно — спрашивайте, нам важно, чтобы было "
+                    "комфортно не только на занятиях.")
+        else:
+            text = (f"Здравствуйте! Как первые занятия у {_genitive(child)}? 🌿\n"
+                    "Расскажите, пожалуйста, ваши впечатления: что говорит дома, "
+                    "с каким настроением идёт, есть ли вопросы или что-то, "
+                    "на что нам стоит обратить внимание?\n"
+                    "Нам важно в самом начале понять, комфортно ли ребёнку, "
+                    "и вовремя что-то поправить.")
+        if _wa(phone, text, kind="welcome"):
+            log.info("welcome %d/4: %s", stage, phone[-4:])
+
+
 def booking_summary(mk: MoyklassClient) -> None:
     """Резюме сразу после записи на пробное: дата, время, адрес, что взять.
 
@@ -3531,6 +3699,10 @@ def _loop() -> None:
                         no_show(mk)
                         after_trial(mk)
                         booking_summary(mk)
+                        try:
+                            welcome_series(mk)
+                        except Exception:
+                            log.exception("welcome_series упал — остальное продолжаем")
                     # напоминание о завтрашнем пробном — раз в день вечером,
                     # когда родитель уже дома и может ответить на вопрос
                     if now.hour == 18 and _mark("trial_reminder_day", str(_today())):

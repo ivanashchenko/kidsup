@@ -2578,7 +2578,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-02.12"
+APP_VERSION = "2026-09-02.13"
 
 
 @app.get("/api/net")
@@ -4599,6 +4599,18 @@ def _days_param(days: str) -> list[str] | None:
     for d in out:
         datetime.strptime(d, "%Y-%m-%d")
     return out or None
+
+
+@app.post("/api/autopilot/welcome-now", dependencies=AUTH)
+def api_welcome_now():
+    """Прогнать серию приветственных сообщений вручную (обычно раз в час сама)."""
+    from . import autopilot
+    mk = autopilot._client()
+    try:
+        autopilot.welcome_series(mk)
+    finally:
+        mk.close()
+    return {"ok": True}
 
 
 @app.post("/api/autopilot/izvinenie-now", dependencies=AUTH)
