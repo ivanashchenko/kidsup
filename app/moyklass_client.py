@@ -142,6 +142,20 @@ class MoyklassClient:
 
     def post(self, path: str, body: dict | None = None, retries: int = 4):
         """POST с телом JSON (создание задач, комментариев, смена статусов)."""
+        # 03.09 владелец: задач в МойКлассе быть не должно — единственный список
+        # дел — страница плана дня. Ловим ВСЕ пути создания задач (autopilot,
+        # ankety, callmark, imena, nadezhda, sverka, разовые скрипты) в одной точке.
+        if path.rstrip("/") == "/v1/company/tasks":
+            try:
+                from . import db as _db
+                if _db.get_setting("crm_tasks_off", "0") == "1":
+                    import logging
+                    logging.getLogger(__name__).info(
+                        "задача в CRM не создана (crm_tasks_off): %s",
+                        str((body or {}).get("body") or "")[:80])
+                    return {"id": None, "skipped": "crm_tasks_off"}
+            except Exception:
+                pass
         if not self._token:
             self.authenticate()
         last_error = None
