@@ -1395,8 +1395,9 @@ def base_doc(slug: str):
     m = re.match(r"plan_(\d{2})([a-z]{3})", slug)
     if m:
         # страница плана дня: живой блок «Появилось за день» сразу под шапкой
-        mon = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8,
-               "sep": 9, "oct": 10, "nov": 11, "dec": 12}.get(m.group(2))
+        # слаги у нас русской транслитерацией: plan_03sen, plan_30avg, plan_12okt
+        mon = {"yan": 1, "fev": 2, "mar": 3, "apr": 4, "may": 5, "iyn": 6, "iyl": 7, "avg": 8,
+               "sen": 9, "okt": 10, "noy": 11, "dek": 12, "aug": 8, "sep": 9}.get(m.group(2))
         if mon:
             day = f"2026-{mon:02d}-{int(m.group(1)):02d}"
             i = page.find("</div>", page.find("class='hero'"))
@@ -2593,7 +2594,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-03.8"
+APP_VERSION = "2026-09-03.9"
 
 
 @app.get("/api/net")
