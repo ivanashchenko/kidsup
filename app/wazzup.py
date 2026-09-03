@@ -222,6 +222,22 @@ def guard(phone: str, text: str, kind: str = "",
         except Exception:
             pass
     now = _msk()
+    # Напоминание о пробном — только тем, у кого в CRM есть запись на занятие
+    # ЗАВТРА (правило владельца 03.09). Смотрим по локальной копии базы;
+    # если копия пуста — не блокируем, чтобы синк не глушил напоминания.
+    if kind == "trial_reminder":
+        try:
+            tomorrow = (now.date() + __import__("datetime").timedelta(days=1)).isoformat()
+            with db.get_conn() as conn:
+                total = conn.execute("SELECT COUNT(*) FROM lessons WHERE date=?", (tomorrow,)).fetchone()[0]
+                mine = conn.execute(
+                    "SELECT 1 FROM lesson_records r JOIN lessons l ON l.id=r.lesson_id "
+                    "JOIN users u ON u.id=r.user_id WHERE substr(u.phone,-10)=? AND l.date=? LIMIT 1",
+                    (p, tomorrow)).fetchone()
+            if total and not mine:
+                return "напоминание о пробном без записи на завтра — по составу группы не шлём"
+        except Exception:
+            pass
     if kind not in ("reply", "owner"):
         today = now.date().isoformat()
         # без учёта регистра: в одной кампании «день открытых дверей»,

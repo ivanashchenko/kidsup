@@ -1394,6 +1394,33 @@ def trial_reminder(mk: MoyklassClient) -> None:
         log.info("напоминание о пробном: %s на %s", phone[-4:], when)
 
 
+def _next_lesson(mk: MoyklassClient, uid: int, days: int = 21) -> str:
+    """Ближайшее БУДУЩЕЕ занятие, на которое записан именно этот ребёнок:
+    «7 сентября в 18:00». Пусто — записи на конкретное занятие нет.
+
+    Правило владельца 03.09: любое «ждём вас», «первое занятие» и «напоминаем»
+    считается только по записям ребёнка на занятия (lessonRecords), никогда —
+    по составу группы или расписанию класса. 01.09 напоминание ушло 22 семьям,
+    у которых занятие было в другой день; 02.09 подтверждение сказало Королевой
+    «первое занятие 1 сентября», хотя она записана с 15-го."""
+    try:
+        today = _today().isoformat()
+        end = (_today() + timedelta(days=days)).isoformat()
+        recs = mk.get("/v1/company/lessonRecords", params={
+            "userId": uid, "date": [today, end], "includeLessons": "true", "limit": 40})
+        rows = (recs.get("lessonRecords") if isinstance(recs, dict) else recs) or []
+    except Exception:
+        return ""
+    now_hm = _now().strftime("%H:%M")
+    dates = sorted(((r.get("lesson") or {}).get("date"), ((r.get("lesson") or {}).get("beginTime") or "")[:5])
+                   for r in rows if (r.get("lesson") or {}).get("date"))
+    dates = [(d, t) for d, t in dates if d > today or (d == today and t > now_hm)]
+    if not dates:
+        return ""
+    d, t = dates[0]
+    return f"{int(d[8:10])} {MONTHS_GEN[int(d[5:7])]}" + (f" в {t}" if t else "")
+
+
 def _group_facts(mk: MoyklassClient, uid: int) -> dict:
     """Что писать семье про её группу: направление, расписание, ближайшее занятие."""
     out = {"course": "", "schedule": "", "next": "", "teacher": ""}
@@ -1621,8 +1648,14 @@ def booking_summary(mk: MoyklassClient) -> None:
         child = _accusative(nm) if nm else "вашего ребёнка"
         parts = (cls.get("name") or "").split("_")
         when = " · ".join(p for p in parts[1:3] if p) or "время уточним"
+        first = _next_lesson(mk, j.get("userId"))
+        if not first:
+            # запись в группу есть, а на конкретное занятие — нет: слать
+            # «записали, ждём» некуда, это и есть источник ложных напоминаний
+            log.info("booking_summary: %s — записи на занятие нет, молчим", str(phone)[-4:])
+            continue
         _wa(phone, f"Записали {child} — подтверждаем 🌿\n"
-                   f"Занятие: {when}.\n"
+                   f"Занятие: {when}. Первое занятие — {first}.\n"
                    f"Адрес: б-р Маршала Рокоссовского, 6 к1В, 7-й подъезд, 2 этаж "
                    f"(напротив ТЦ «Янтарь»).\n"
                    f"Ориентир — магазин «Дикси», от него по лестнице наверх.\n"
@@ -2018,15 +2051,15 @@ def confirm_joins(mk: MoyklassClient) -> None:
         for fuid in fam["uids"]:
             mine += past.get(fuid, [])
         cont = all(_continuing(mine, cls, cid) for cid in fam["cids"])
-        starts = sorted({first_day[c] for c in fam["cids"] if c in first_day})
-        if starts:
-            d0 = starts[0]
-            when_start = (f"Первое занятие — "
-                          f"{_ru_date(d0)}." if len(starts) == 1 else
-                          f"Первые занятия — с {_ru_date(d0)}, "
-                          f"по каждой группе напомним отдельно.")
+        # дата — по записям КАЖДОГО ребёнка семьи на занятия, не по группе
+        firsts = [f for f in (_next_lesson(mk, fuid) for fuid in fam["uids"]) if f]
+        if len(set(firsts)) == 1:
+            when_start = f"Первое занятие — {firsts[0]}."
+        elif firsts:
+            when_start = ("Первые занятия — " + ", ".join(dict.fromkeys(firsts)) +
+                          "; накануне каждого напомним.")
         else:
-            when_start = "Учебный год начинается 31 августа."
+            when_start = "Дату первого занятия уточнит администратор."
         ok = _wa(phone, f"Здравствуйте! {what}\n\n" + (
             f"{when_start} Всё как обычно — б-р Маршала "
             f"Рокоссовского, 6к1В. Рады, что продолжаете с нами. Если "

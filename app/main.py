@@ -1391,7 +1391,18 @@ def base_doc(slug: str):
         '<div style="position:absolute;left:0;right:0;bottom:-1px;height:3px;'
         'background:linear-gradient(90deg,#2AA7DE,#5FB53B 34%,#F5A81C 67%,#E5232A)">'
         '</div></div>')
-    return HTMLResponse(back + f.read_text(encoding="utf-8"))
+    page = f.read_text(encoding="utf-8")
+    m = re.match(r"plan_(\d{2})([a-z]{3})", slug)
+    if m:
+        # страница плана дня: живой блок «Появилось за день» сразу под шапкой
+        mon = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8,
+               "sep": 9, "oct": 10, "nov": 11, "dec": 12}.get(m.group(2))
+        if mon:
+            day = f"2026-{mon:02d}-{int(m.group(1)):02d}"
+            i = page.find("</div>", page.find("class='hero'"))
+            if i > 0:
+                page = page[:i + 6] + _inbox_block(day) + page[i + 6:]
+    return HTMLResponse(back + page)
 
 
 @app.get("/callaudit", response_class=HTMLResponse, dependencies=AUTH)
@@ -2582,7 +2593,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-03.7"
+APP_VERSION = "2026-09-03.8"
 
 
 @app.get("/api/net")
@@ -4603,6 +4614,72 @@ def _days_param(days: str) -> list[str] | None:
     for d in out:
         datetime.strptime(d, "%Y-%m-%d")
     return out or None
+
+
+def _inbox_init(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS plan_inbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT, who TEXT,
+        text TEXT, phone TEXT, source TEXT, done INTEGER DEFAULT 0)""")
+
+
+@app.post("/api/plan/inbox", dependencies=AUTH)
+def api_plan_inbox_add(payload: dict = Body(...)):
+    """«Появилось за день»: дело для админа без задачи в МойКлассе.
+
+    Решение владельца 03.09: задачи в CRM удалены, единственный список дел —
+    страница плана дня. Разборы звонков и переписок кладут сюда всё, что
+    требует действия; суть разговора остаётся в комментарии карточки."""
+    from . import autopilot
+    now = autopilot._now()
+    with db.get_conn() as conn:
+        _inbox_init(conn)
+        conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) VALUES (?,?,?,?,?,?)",
+                     (str(payload.get("day") or now.date().isoformat()), now.isoformat(timespec="minutes"),
+                      str(payload.get("who") or "Аня")[:20], str(payload.get("text") or "")[:400],
+                      str(payload.get("phone") or "")[:20], str(payload.get("source") or "")[:40]))
+    return {"ok": True}
+
+
+@app.get("/api/plan/inbox", dependencies=AUTH)
+def api_plan_inbox_list(day: str = ""):
+    from . import autopilot
+    d = day or autopilot._today().isoformat()
+    with db.get_conn() as conn:
+        _inbox_init(conn)
+        rows = conn.execute("SELECT id, ts, who, text, phone, source, done FROM plan_inbox "
+                            "WHERE day=? ORDER BY done, id", (d,)).fetchall()
+    return {"day": d, "items": [dict(r) for r in rows]}
+
+
+@app.post("/api/plan/inbox/done", dependencies=AUTH)
+def api_plan_inbox_done(payload: dict = Body(...)):
+    with db.get_conn() as conn:
+        _inbox_init(conn)
+        conn.execute("UPDATE plan_inbox SET done=? WHERE id=?",
+                     (1 if payload.get("done", True) else 0, int(payload.get("id") or 0)))
+    return {"ok": True}
+
+
+def _inbox_block(day: str) -> str:
+    """HTML-блок «Появилось за день» для страниц плана. Галочка — fetch на /done."""
+    with db.get_conn() as conn:
+        _inbox_init(conn)
+        rows = conn.execute("SELECT id, ts, who, text, phone, done FROM plan_inbox "
+                            "WHERE day=? ORDER BY done, id", (day,)).fetchall()
+    col = {"Лена": "#7DB928", "Аня": "#F59C00", "Ира": "#F59C00", "Лиза": "#1DA7E0", "Борис": "#312783"}
+    items = []
+    for r in rows:
+        c = col.get(r["who"], "#6c6a86")
+        items.append(
+            f"<li data-id='{r['id']}' style='margin:6px 0;{'opacity:.45;text-decoration:line-through' if r['done'] else ''}'>"
+            f"<input type='checkbox' {'checked' if r['done'] else ''} onchange=\"fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{r['id']},done:this.checked}})}}).then(()=>location.reload())\"> "
+            f"<span style='display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:800;color:#fff;background:{c}'>{html.escape(r['who'])}</span> "
+            f"<span style='color:#6c6a86;font-size:12px'>{html.escape(r['ts'][11:16])}</span> "
+            f"{html.escape(r['text'])}" + (f" <span style='white-space:nowrap;color:#6c6a86'>{html.escape(r['phone'])}</span>" if r['phone'] else "") + "</li>")
+    body = "".join(items) or "<li style='color:#6c6a86'>пока пусто — сюда падает всё, что появилось из звонков и переписки за день</li>"
+    return (f"<div class='card' style='border-left:4px solid #312783;margin:14px 0'>"
+            f"<b style='display:block;font-size:17px;margin-bottom:6px'>Появилось за день ({len(rows)})</b>"
+            f"<ul style='list-style:none;padding:0;margin:0;font-size:14px'>{body}</ul></div>")
 
 
 @app.post("/api/autopilot/mark", dependencies=AUTH)
