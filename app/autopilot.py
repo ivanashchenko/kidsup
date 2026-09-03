@@ -999,6 +999,12 @@ OWNER_ONLY = re.compile(
 
 def _task(mk: MoyklassClient, manager_id: int, user_id: int | None,
           body: str, day: date | None = None) -> None:
+    # 03.09 владелец удалил все 807 открытых задач: работа идёт по страницам
+    # плана дня. Настройка crm_tasks_off=1 останавливает автосоздание задач,
+    # оставляя комментарии в карточках; по умолчанию поведение прежнее.
+    if db.get_setting("crm_tasks_off", "0") == "1":
+        log.info("задача не создана (crm_tasks_off): %s", (body or "")[:60])
+        return
     if manager_id == OWNER_ID and not OWNER_ONLY.search(body or ""):
         alt = (_admins_today() or _admins())
         if alt:
