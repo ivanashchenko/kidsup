@@ -2582,7 +2582,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-03.2"
+APP_VERSION = "2026-09-03.3"
 
 
 @app.get("/api/net")
@@ -4606,7 +4606,7 @@ def _days_param(days: str) -> list[str] | None:
 
 
 @app.post("/api/autopilot/mark", dependencies=AUTH)
-def api_autopilot_mark(payload: list):
+def api_autopilot_mark(payload: list = Body(...)):
     """Поставить отметки autopilot_state снаружи: [{kind, key}, ...].
 
     03.09 приветственная серия была запущена с рабочего контейнера, где
