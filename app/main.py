@@ -2582,7 +2582,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-03.1"
+APP_VERSION = "2026-09-03.2"
 
 
 @app.get("/api/net")
@@ -4603,6 +4603,22 @@ def _days_param(days: str) -> list[str] | None:
     for d in out:
         datetime.strptime(d, "%Y-%m-%d")
     return out or None
+
+
+@app.post("/api/autopilot/mark", dependencies=AUTH)
+def api_autopilot_mark(payload: list):
+    """Поставить отметки autopilot_state снаружи: [{kind, key}, ...].
+
+    03.09 приветственная серия была запущена с рабочего контейнера, где
+    локальная копия базы оказалась с wazzup_dry_run=0: 40 сообщений ушли
+    по-настоящему, а отметки легли в локальную базу. Без переноса сервер
+    отправил бы их второй раз в ближайший часовой тик."""
+    from . import autopilot
+    n = 0
+    for m in payload or []:
+        if autopilot._mark(str(m.get("kind") or ""), str(m.get("key") or "")):
+            n += 1
+    return {"ok": True, "новых": n, "всего": len(payload or [])}
 
 
 @app.post("/api/autopilot/welcome-now", dependencies=AUTH)

@@ -1537,8 +1537,16 @@ def welcome_series(mk: MoyklassClient) -> None:
         except Exception:
             continue
         age = (today - paid).days
-        stage = 2 if age == 0 else (3 if age == 1 else (4 if age >= 7 else 0))
-        if not stage or _seen(f"welcome{stage}", f"{uid}:{day}"):
+        # Стадии идут строго по порядку и не больше одной за прогон: 03.09
+        # девять семей получили третье сообщение раньше второго — календарь
+        # сказал «прошёл день», а второе ещё не уходило.
+        if not _seen("welcome2", f"{uid}:{day}"):
+            stage = 2                       # первая же возможность после первого
+        elif not _seen("welcome3", f"{uid}:{day}") and age >= 1:
+            stage = 3
+        elif not _seen("welcome4", f"{uid}:{day}") and age >= 7:
+            stage = 4
+        else:
             continue
         try:
             user = mk.get(f"/v1/company/users/{uid}")
