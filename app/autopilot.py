@@ -3736,13 +3736,14 @@ def _loop() -> None:
                     if _mark("slot_q15_inbound", _q15):      # каждые 15 минут
                         unanswered_inbound(mk)
                     if 9 <= now.hour <= 20 and _mark("slot_hourly", _hour):  # раз в час
-                        no_show(mk)
-                        after_trial(mk)
-                        booking_summary(mk)
-                        try:
-                            welcome_series(mk)
-                        except Exception:
-                            log.exception("welcome_series упал — остальное продолжаем")
+                        # Каждый сценарий — в своём try: 03.09 отметка часа
+                        # ставилась, один из первых трёх падал, и приветственная
+                        # серия не запускалась ни разу за день — только вручную.
+                        for _fn in (no_show, after_trial, booking_summary, welcome_series):
+                            try:
+                                _fn(mk)
+                            except Exception:
+                                log.exception("%s упал — остальные сценарии часа продолжаем", _fn.__name__)
                     # напоминание о завтрашнем пробном — раз в день вечером,
                     # когда родитель уже дома и может ответить на вопрос
                     if now.hour == 18 and _mark("trial_reminder_day", str(_today())):
