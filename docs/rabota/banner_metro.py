@@ -117,7 +117,7 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
 .foot .l span{display:block;margin-top:16px;font-size:44px;font-weight:600}
 .foot .r{margin-left:auto;text-align:right}
 .foot .r b{display:block;font-size:76px;font-weight:800;line-height:1.05}
-.foot .r span{display:block;margin-top:14px;font-size:42px;line-height:1.15;font-weight:600;white-space:nowrap}
+.foot .r span{display:block;margin-top:14px;font-size:44px;line-height:1.2;font-weight:600;white-space:nowrap}
 .foot img{height:240px;width:240px;border-radius:28px;background:#fff;padding:12px;flex:none}
 /* сноска и возрастная категория рекламы */
 .note{height:64px;display:flex;align-items:center;justify-content:space-between;color:#C9C4F0;font-size:40px;font-weight:600}
@@ -135,7 +135,7 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
       <div class="m">
         <div class="ya"><i>★★★★★</i><b>5,0</b><em>на Яндекс Картах</em></div>
         <span class="hm">«Хорошее место 2026»</span>
-        <b class="d">5 минут от метро</b><span>б-р Маршала Рокоссовского, 6к1В · напротив ТЦ «Янтарь»</span>
+        <b class="d">5 минут пешком от метро</b><span>б-р Маршала Рокоссовского, 6к1В · напротив ТЦ «Янтарь»</span>
       </div>
     </div>
 
@@ -153,12 +153,12 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
         <div class="price">от 5 000 ₽ в месяц</div>
       </div>
       <div class="c c2">
-        <div class="ic">🇬🇧</div>
+        <div class="ic">🗣️</div>
         <h2>Английский<br>язык</h2>
         <span class="age">3–12 лет</span>
         <div class="win">Заговорит<br>за первый год</div>
         <ul>
-          <li>Уровни Cambridge</li>
+          <li>Уровни Cambridge**</li>
           <li>300 слов и 40 фраз за год</li>
           <li>Говорит с первого дня</li>
         </ul>
@@ -193,10 +193,9 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
     <div class="foot">
       <div class="l"><b>Первое занятие — условно-бесплатное, с диагностикой</b>
         <span>Покажем, где ребёнок сейчас и что подтянуть · Не понравится — платить не нужно</span></div>
-      <div class="r"><b>kidsup.ru</b><span>запись на сайте<br>и по QR-коду</span></div>
-      <img src="__QR__">
+      <div class="r"><b>kidsup.ru</b><span>+7 (495) 120-90-24<br>запись на сайте и по телефону</span></div>
     </div>
-    <div class="note"><span>* KidsUP. Best for our kids — КидсАП. Лучшее нашим детям</span><span class="age0">0+</span></div>
+    <div class="note"><span>* KidsUP. Best for our kids — КидсАП. Лучшее нашим детям &nbsp;·&nbsp; ** Cambridge (Кембридж) — международная шкала уровней английского языка</span><span class="age0">0+</span></div>
     __GUIDE__
   </div>
 </div>"""
@@ -204,7 +203,7 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
 def build_html(guide=False):
     g = '<div class="guide"><span>поле значимой информации 1670×1170 мм · дальше рамка короба</span></div>' if guide else ""
     return (HTML.replace("__FONTS__", FONTS).replace("__LOGO__", LOGO)
-            .replace("__QR__", qr_png()).replace("__GUIDE__", g))
+            .replace("__GUIDE__", g))
 
 def shot(html, scale, path):
     with sync_playwright() as p:
