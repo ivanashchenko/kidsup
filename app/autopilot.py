@@ -1648,6 +1648,10 @@ def booking_summary(mk: MoyklassClient) -> None:
         child = _accusative(nm) if nm else "вашего ребёнка"
         parts = (cls.get("name") or "").split("_")
         when = " · ".join(p for p in parts[1:3] if p) or "время уточним"
+        # 03.09 Архангельская получила три подтверждения подряд: ручное от админа,
+        # booking_summary и confirm_joins. Одна семья — одно автоподтверждение в день.
+        if _seen("confirm_family", f"{today}:{str(phone)[-10:]}"):
+            continue
         first = _next_lesson(mk, j.get("userId"))
         if not first:
             # запись в группу есть, а на конкретное занятие — нет: слать
@@ -1664,6 +1668,7 @@ def booking_summary(mk: MoyklassClient) -> None:
                    f"Первое занятие условно-бесплатное: не понравится — платить не нужно, "
                    f"понравится — войдёт в первый абонемент.\n"
                    f"Сохраните сообщение, накануне напомним 😊", kind="booking")
+        _mark("confirm_family", f"{today}:{str(phone)[-10:]}")
         log.info("booking_summary: %s → %s", str(phone)[-4:], when)
 
 
@@ -2060,6 +2065,9 @@ def confirm_joins(mk: MoyklassClient) -> None:
                           "; накануне каждого напомним.")
         else:
             when_start = "Дату первого занятия уточнит администратор."
+        if _seen("confirm_family", f"{today}:{str(phone)[-10:]}"):
+            log.info("confirm_joins: %s — сегодня уже подтверждали, не дублируем", str(phone)[-4:])
+            continue
         ok = _wa(phone, f"Здравствуйте! {what}\n\n" + (
             f"{when_start} Всё как обычно — б-р Маршала "
             f"Рокоссовского, 6к1В. Рады, что продолжаете с нами. Если "
@@ -2071,6 +2079,8 @@ def confirm_joins(mk: MoyklassClient) -> None:
             f"условно-бесплатное, и на нём же бесплатная диагностика — "
             f"педагог посмотрит уровень и подберёт ступень. Если "
             f"что-то поменяется, просто ответьте здесь."), kind="confirm")
+        if ok:
+            _mark("confirm_family", f"{today}:{str(phone)[-10:]}")
         short = ", ".join(t[:34] for t in titles)
         status_note = ("отправлено" if ok else
                        "каналы не приняли, поставлена задача подтвердить голосом")
