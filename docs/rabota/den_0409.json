@@ -1,0 +1,5801 @@
+{
+ "recs": [
+  {
+   "day": "2026-08-31",
+   "time": "10:00",
+   "classId": 727718,
+   "group": "2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "uid": 9856211,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "10:00",
+   "classId": 727718,
+   "group": "2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "uid": 10520536,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "10:00",
+   "classId": 727718,
+   "group": "2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "uid": 10790241,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "11:00",
+   "classId": 727719,
+   "group": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "uid": 9098053,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "11:00",
+   "classId": 727719,
+   "group": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "uid": 9236184,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "11:00",
+   "classId": 727719,
+   "group": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "uid": 9354850,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "11:00",
+   "classId": 727719,
+   "group": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "uid": 9606986,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "11:00",
+   "classId": 727719,
+   "group": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "uid": 10235414,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "12:00",
+   "classId": 727720,
+   "group": "2627_РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3",
+   "subject": "раннее развитие",
+   "uid": 7182535,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "12:00",
+   "classId": 727720,
+   "group": "2627_РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3",
+   "subject": "раннее развитие",
+   "uid": 8281008,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "12:00",
+   "classId": 727720,
+   "group": "2627_РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3",
+   "subject": "раннее развитие",
+   "uid": 9392041,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "12:00",
+   "classId": 727720,
+   "group": "2627_РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3",
+   "subject": "раннее развитие",
+   "uid": 10834660,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 2969099,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 6234565,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 6484822,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 7505482,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 8756746,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 8861077,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 9959588,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 3320401,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 4457716,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 6179399,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 10515082,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 10801968,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "16:00",
+   "classId": 727731,
+   "group": "2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)",
+   "subject": "подготовка к школе",
+   "uid": 3038728,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "16:00",
+   "classId": 727731,
+   "group": "2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)",
+   "subject": "подготовка к школе",
+   "uid": 3303447,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "19:00",
+   "classId": 727732,
+   "group": "2627_ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)",
+   "subject": "подготовка к школе",
+   "uid": 10797590,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "19:00",
+   "classId": 727732,
+   "group": "2627_ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)",
+   "subject": "подготовка к школе",
+   "uid": 10811449,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "18:00",
+   "classId": 727733,
+   "group": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "uid": 3281932,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "18:00",
+   "classId": 727733,
+   "group": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "uid": 5463325,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "18:00",
+   "classId": 727733,
+   "group": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "uid": 5704843,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "18:00",
+   "classId": 727733,
+   "group": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "uid": 6352375,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "18:00",
+   "classId": 727733,
+   "group": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "uid": 8145893,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "18:00",
+   "classId": 727733,
+   "group": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "uid": 9366638,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "18:00",
+   "classId": 727733,
+   "group": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "uid": 9396084,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "17:00",
+   "classId": 727734,
+   "group": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "uid": 4300951,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "17:00",
+   "classId": 727734,
+   "group": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "uid": 4317095,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "17:00",
+   "classId": 727734,
+   "group": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "uid": 7149410,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "17:00",
+   "classId": 727734,
+   "group": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "uid": 9084828,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "17:00",
+   "classId": 727734,
+   "group": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "uid": 10690925,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "18:00",
+   "classId": 727749,
+   "group": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "uid": 3232550,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "18:00",
+   "classId": 727749,
+   "group": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "uid": 10795444,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "18:00",
+   "classId": 727749,
+   "group": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "uid": 10924567,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "17:00",
+   "classId": 727750,
+   "group": "2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)",
+   "subject": "английский",
+   "uid": 9366638,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "17:00",
+   "classId": 727750,
+   "group": "2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)",
+   "subject": "английский",
+   "uid": 9396084,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "19:00",
+   "classId": 727755,
+   "group": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "uid": 2728348,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "19:00",
+   "classId": 727755,
+   "group": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "uid": 2806692,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "19:00",
+   "classId": 727755,
+   "group": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "uid": 2968588,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "19:00",
+   "classId": 727755,
+   "group": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "uid": 9117888,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "16:00",
+   "classId": 727759,
+   "group": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "uid": 10831844,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "16:00",
+   "classId": 727759,
+   "group": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "uid": 10849548,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-08-31",
+   "time": "16:00",
+   "classId": 727759,
+   "group": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "uid": 10908252,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "17:40",
+   "classId": 727703,
+   "group": "2627_ЛГ Марина_Вт_17:40",
+   "subject": "логопед",
+   "uid": 3117999,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "18:30",
+   "classId": 727704,
+   "group": "2627_ЛГ Марина_Вт_18:30",
+   "subject": "логопед",
+   "uid": 6826713,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727724,
+   "group": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "uid": 10003931,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727724,
+   "group": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "uid": 10829925,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727724,
+   "group": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "uid": 10877013,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727724,
+   "group": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "uid": 10905500,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727724,
+   "group": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "uid": 10913617,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "11:00",
+   "classId": 727725,
+   "group": "2627_РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года",
+   "subject": "раннее развитие",
+   "uid": 10910554,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "12:00",
+   "classId": 727726,
+   "group": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "uid": 8736372,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 2969099,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 6219935,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 6234565,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 7505482,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 7507921,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 8861077,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 3320401,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 4457716,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 6179399,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 10351131,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 10515082,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 10900916,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "19:00",
+   "classId": 727739,
+   "group": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "uid": 3232550,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "19:00",
+   "classId": 727739,
+   "group": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "uid": 8711590,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "19:00",
+   "classId": 727739,
+   "group": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "uid": 8935961,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "18:00",
+   "classId": 727740,
+   "group": "2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)",
+   "subject": "подготовка к школе",
+   "uid": 2948770,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "17:00",
+   "classId": 727741,
+   "group": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "uid": 6502162,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "17:00",
+   "classId": 727741,
+   "group": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "uid": 10794024,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "17:00",
+   "classId": 727741,
+   "group": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "uid": 10823183,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "17:00",
+   "classId": 727741,
+   "group": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "uid": 10849528,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "17:00",
+   "classId": 727741,
+   "group": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "uid": 10885274,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "18:00",
+   "classId": 727742,
+   "group": "2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)",
+   "subject": "английский",
+   "uid": 4352746,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "18:00",
+   "classId": 727742,
+   "group": "2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)",
+   "subject": "английский",
+   "uid": 5780263,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "18:00",
+   "classId": 727742,
+   "group": "2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)",
+   "subject": "английский",
+   "uid": 6053061,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "19:00",
+   "classId": 727743,
+   "group": "2627_АЯ_вт-чт_19:00_5-8 лет_A1 Movers (Гр8)",
+   "subject": "английский",
+   "uid": 10893783,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "16:00",
+   "classId": 727751,
+   "group": "2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)",
+   "subject": "подготовка к школе",
+   "uid": 10811884,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "16:00",
+   "classId": 727751,
+   "group": "2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)",
+   "subject": "подготовка к школе",
+   "uid": 10894743,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "17:00",
+   "classId": 727752,
+   "group": "2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)",
+   "subject": "подготовка к школе",
+   "uid": 3272560,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "18:00",
+   "classId": 727753,
+   "group": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "uid": 2907607,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "18:00",
+   "classId": 727753,
+   "group": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "uid": 6212353,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "18:00",
+   "classId": 727753,
+   "group": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "uid": 10823183,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "19:00",
+   "classId": 727754,
+   "group": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "uid": 10797530,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "19:00",
+   "classId": 727754,
+   "group": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "uid": 10811449,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "19:00",
+   "classId": 727754,
+   "group": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "uid": 10928469,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "16:00",
+   "classId": 727760,
+   "group": "2627_АЯ_вт-чт_16:00_8-12 лет_Pre-A1 Starters (Гр5)",
+   "subject": "английский",
+   "uid": 10921856,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-01",
+   "time": "16:00",
+   "classId": 727760,
+   "group": "2627_АЯ_вт-чт_16:00_8-12 лет_Pre-A1 Starters (Гр5)",
+   "subject": "английский",
+   "uid": 10921932,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "09:45",
+   "classId": 727721,
+   "group": "2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "uid": 9856211,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "09:45",
+   "classId": 727721,
+   "group": "2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "uid": 10003931,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "09:45",
+   "classId": 727721,
+   "group": "2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "uid": 10520536,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "09:45",
+   "classId": 727721,
+   "group": "2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "uid": 10905430,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "10:45",
+   "classId": 727722,
+   "group": "2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2",
+   "subject": "раннее развитие",
+   "uid": 9323473,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "10:45",
+   "classId": 727722,
+   "group": "2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2",
+   "subject": "раннее развитие",
+   "uid": 9603273,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "10:45",
+   "classId": 727722,
+   "group": "2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2",
+   "subject": "раннее развитие",
+   "uid": 9866902,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "10:45",
+   "classId": 727722,
+   "group": "2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2",
+   "subject": "раннее развитие",
+   "uid": 10376797,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "11:45",
+   "classId": 727723,
+   "group": "2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3",
+   "subject": "раннее развитие",
+   "uid": 7958837,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "11:45",
+   "classId": 727723,
+   "group": "2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3",
+   "subject": "раннее развитие",
+   "uid": 8977941,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "11:45",
+   "classId": 727723,
+   "group": "2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3",
+   "subject": "раннее развитие",
+   "uid": 9224788,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "11:45",
+   "classId": 727723,
+   "group": "2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3",
+   "subject": "раннее развитие",
+   "uid": 9232493,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "11:45",
+   "classId": 727723,
+   "group": "2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3",
+   "subject": "раннее развитие",
+   "uid": 10123706,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 2969099,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 6219935,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 6234565,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 6484822,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 7507921,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 8861077,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 3320401,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 4457716,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 6179399,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 10515082,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "16:00",
+   "classId": 727744,
+   "group": "2627_ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины великих художников",
+   "subject": "ИЗО",
+   "uid": 10924567,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727745,
+   "group": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "uid": 2728337,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727745,
+   "group": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "uid": 3231080,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727745,
+   "group": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "uid": 4171716,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727745,
+   "group": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "uid": 8953197,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727745,
+   "group": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "uid": 10871475,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727745,
+   "group": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "uid": 10900916,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "17:00",
+   "classId": 727746,
+   "group": "2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка",
+   "subject": "ИЗО",
+   "uid": 2728337,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "17:00",
+   "classId": 727746,
+   "group": "2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка",
+   "subject": "ИЗО",
+   "uid": 8145893,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "17:00",
+   "classId": 727746,
+   "group": "2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка",
+   "subject": "ИЗО",
+   "uid": 10900916,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "19:00",
+   "classId": 727747,
+   "group": "2627_ИЗО_Группа 4_пн - ср_19:00_4 - 7 лет_Алфавитная живопись",
+   "subject": "ИЗО",
+   "uid": 10797523,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727749,
+   "group": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "uid": 3232550,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727749,
+   "group": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "uid": 8145893,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727749,
+   "group": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "uid": 10794043,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727749,
+   "group": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "uid": 10794070,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727749,
+   "group": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "uid": 10795444,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727749,
+   "group": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "uid": 10913568,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 727749,
+   "group": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "uid": 10924567,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "17:00",
+   "classId": 727750,
+   "group": "2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)",
+   "subject": "английский",
+   "uid": 3038728,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "17:00",
+   "classId": 727750,
+   "group": "2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)",
+   "subject": "английский",
+   "uid": 9366638,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "17:00",
+   "classId": 727750,
+   "group": "2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)",
+   "subject": "английский",
+   "uid": 9396084,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "17:00",
+   "classId": 727758,
+   "group": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "uid": 4350893,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "17:00",
+   "classId": 727758,
+   "group": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "uid": 5780263,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "17:00",
+   "classId": 727758,
+   "group": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "uid": 6660021,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "16:00",
+   "classId": 727759,
+   "group": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "uid": 10905397,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "16:00",
+   "classId": 727759,
+   "group": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "uid": 10908252,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "19:00",
+   "classId": 727755,
+   "group": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "uid": 2728329,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "19:00",
+   "classId": 727755,
+   "group": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "uid": 2752850,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "19:00",
+   "classId": 727755,
+   "group": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "uid": 2968588,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "19:00",
+   "classId": 727755,
+   "group": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "uid": 9117888,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "19:00",
+   "classId": 727755,
+   "group": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "uid": 10950154,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "16:00",
+   "classId": 731647,
+   "group": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "uid": 7582026,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "16:00",
+   "classId": 731647,
+   "group": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "uid": 7989031,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "16:00",
+   "classId": 731647,
+   "group": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "uid": 10876086,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "16:00",
+   "classId": 731647,
+   "group": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "uid": 10928469,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "18:00",
+   "classId": 731648,
+   "group": "2627_ПШ_ср-пт_18:00_4-5 лет_ПШ1 нечитающие (Гр14)",
+   "subject": "подготовка к школе",
+   "uid": 9849905,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "19:00",
+   "classId": 731649,
+   "group": "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)",
+   "subject": "подготовка к школе",
+   "uid": 4338449,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "19:00",
+   "classId": 731649,
+   "group": "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)",
+   "subject": "подготовка к школе",
+   "uid": 10799051,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-02",
+   "time": "19:00",
+   "classId": 731649,
+   "group": "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)",
+   "subject": "подготовка к школе",
+   "uid": 10847403,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "16:00",
+   "classId": 727706,
+   "group": "2627_ЛГ Марина_Чт_16:00",
+   "subject": "логопед",
+   "uid": 10081835,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "16:50",
+   "classId": 727707,
+   "group": "2627_ЛГ Марина_Чт_16:50",
+   "subject": "логопед",
+   "uid": 10812437,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:40",
+   "classId": 727708,
+   "group": "2627_ЛГ Марина_Чт_17:40",
+   "subject": "логопед",
+   "uid": 8905198,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "18:30",
+   "classId": 727709,
+   "group": "2627_ЛГ Марина_Чт_18:30",
+   "subject": "логопед",
+   "uid": 10905430,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "10:00",
+   "classId": 727724,
+   "group": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "uid": 10003931,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "10:00",
+   "classId": 727724,
+   "group": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "uid": 10877013,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "10:00",
+   "classId": 727724,
+   "group": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "uid": 10905500,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "11:00",
+   "classId": 727725,
+   "group": "2627_РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года",
+   "subject": "раннее развитие",
+   "uid": 10910554,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "12:00",
+   "classId": 727726,
+   "group": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "uid": 8634892,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "12:00",
+   "classId": 727726,
+   "group": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "uid": 8736372,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "12:00",
+   "classId": 727726,
+   "group": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "uid": 9329474,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "12:00",
+   "classId": 727726,
+   "group": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "uid": 10905396,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "12:00",
+   "classId": 727726,
+   "group": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "uid": 10946892,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 2969099,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 6219935,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 6234565,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 7505482,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "09:00",
+   "classId": 727729,
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "uid": 8861077,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 3320401,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 6179399,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 10351131,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 10515082,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "10:00",
+   "classId": 727730,
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "uid": 10900916,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "16:00",
+   "classId": 727731,
+   "group": "2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)",
+   "subject": "подготовка к школе",
+   "uid": 3038728,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "16:00",
+   "classId": 727731,
+   "group": "2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)",
+   "subject": "подготовка к школе",
+   "uid": 3303447,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "18:00",
+   "classId": 727733,
+   "group": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "uid": 3281932,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "18:00",
+   "classId": 727733,
+   "group": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "uid": 5704843,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "18:00",
+   "classId": 727733,
+   "group": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "uid": 8145893,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:00",
+   "classId": 727734,
+   "group": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "uid": 4317095,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:00",
+   "classId": 727734,
+   "group": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "uid": 7149410,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:00",
+   "classId": 727734,
+   "group": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "uid": 9084828,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:00",
+   "classId": 727734,
+   "group": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "uid": 10690925,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "19:00",
+   "classId": 727738,
+   "group": "2627_ПШ_чт 19:00 + сб 11:00_5-7 лет_ПШ1 нечитающие (Гр13)",
+   "subject": "подготовка к школе",
+   "uid": 4352746,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:00",
+   "classId": 727741,
+   "group": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "uid": 6384209,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:00",
+   "classId": 727741,
+   "group": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "uid": 6502162,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:00",
+   "classId": 727741,
+   "group": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "uid": 8542588,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:00",
+   "classId": 727741,
+   "group": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "uid": 10885274,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "18:00",
+   "classId": 727742,
+   "group": "2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)",
+   "subject": "английский",
+   "uid": 4352746,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "19:00",
+   "classId": 727743,
+   "group": "2627_АЯ_вт-чт_19:00_5-8 лет_A1 Movers (Гр8)",
+   "subject": "английский",
+   "uid": 10893783,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "16:00",
+   "classId": 727751,
+   "group": "2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)",
+   "subject": "подготовка к школе",
+   "uid": 10811884,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "16:00",
+   "classId": 727751,
+   "group": "2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)",
+   "subject": "подготовка к школе",
+   "uid": 10894743,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:00",
+   "classId": 727752,
+   "group": "2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)",
+   "subject": "подготовка к школе",
+   "uid": 3272560,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "17:00",
+   "classId": 727752,
+   "group": "2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)",
+   "subject": "подготовка к школе",
+   "uid": 10928586,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "18:00",
+   "classId": 727753,
+   "group": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "uid": 2833747,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "18:00",
+   "classId": 727753,
+   "group": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "uid": 2907607,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "18:00",
+   "classId": 727753,
+   "group": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "uid": 6212353,
+   "test": false,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "19:00",
+   "classId": 727754,
+   "group": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "uid": 2878746,
+   "test": false,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "19:00",
+   "classId": 727754,
+   "group": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "uid": 4407236,
+   "test": true,
+   "visit": false,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "19:00",
+   "classId": 727754,
+   "group": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "uid": 10339875,
+   "test": true,
+   "visit": true,
+   "skip": false
+  },
+  {
+   "day": "2026-09-03",
+   "time": "19:00",
+   "classId": 727754,
+   "group": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "uid": 10943772,
+   "test": false,
+   "visit": true,
+   "skip": false
+  }
+ ],
+ "pays": {
+  "6502162": [
+   {
+    "date": "2026-08-30",
+    "summa": 8712.76,
+    "comment": "Английский язык - 2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)"
+   }
+  ],
+  "6179399": [
+   {
+    "date": "2026-08-30",
+    "summa": 10228.38,
+    "comment": "Английский детский сад - 2627_Нулевой класс_10:00-14:00"
+   }
+  ],
+  "9620934": [
+   {
+    "date": "2026-08-30",
+    "summa": 8200,
+    "comment": "Ментальная арифметика - 2627_МА_вс_12:30_4-7 лет"
+   }
+  ],
+  "6484822": [
+   {
+    "date": "2026-08-31",
+    "summa": 23750,
+    "comment": "Английский детский сад - 2627_Мини-сад_9:00-13:00"
+   }
+  ],
+  "4457716": [
+   {
+    "date": "2026-08-31",
+    "summa": 34000,
+    "comment": "Английский детский сад - 2627_Нулевой класс_10:00-14:00"
+   }
+  ],
+  "9856211": [
+   {
+    "date": "2026-08-31",
+    "summa": 922.5,
+    "comment": "Раннее развитие - МсМ_Группа 4_пн - пт_10:00_1,3 - 1,8"
+   },
+   {
+    "date": "2026-08-31",
+    "summa": 8200,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8"
+   },
+   {
+    "date": "2026-08-31",
+    "summa": 5625,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8"
+   }
+  ],
+  "9606986": [
+   {
+    "date": "2026-08-31",
+    "summa": 5000,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2"
+   }
+  ],
+  "10834660": [
+   {
+    "date": "2026-08-31",
+    "summa": 6750,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3"
+   }
+  ],
+  "10908252": [
+   {
+    "date": "2026-08-31",
+    "summa": 9225,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)"
+   }
+  ],
+  "9084828": [
+   {
+    "date": "2026-08-31",
+    "summa": 8302.5,
+    "comment": "Подготовка к школе - 2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)"
+   },
+   {
+    "date": "2026-08-31",
+    "summa": 1500,
+    "comment": "Словесное чтение (Продажа №612306), Линии и штриховки. Часть 2 (Продажа №612307), Интеллектуальный тренинг. Уровень I (Продажа №612308)"
+   }
+  ],
+  "10690925": [
+   {
+    "date": "2026-08-31",
+    "summa": 8302.5,
+    "comment": "Подготовка к школе - 2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)"
+   },
+   {
+    "date": "2026-08-31",
+    "summa": 1500,
+    "comment": "Линии и штриховки. Часть 2 (Продажа №612321), Интеллектуальный тренинг. Уровень I (Продажа №612322), Смысловое чтение (Продажа №612323)"
+   }
+  ],
+  "7149410": [
+   {
+    "date": "2026-08-31",
+    "summa": 8302.5,
+    "comment": "Подготовка к школе - 2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)"
+   },
+   {
+    "date": "2026-08-31",
+    "summa": 1500,
+    "comment": "На баланс"
+   }
+  ],
+  "4317095": [
+   {
+    "date": "2026-08-31",
+    "summa": 3690,
+    "comment": "Подготовка к школе - 2627_ПШ_ср-пт_18:00_4-5 лет_ПШ1 нечитающие (Гр14)"
+   },
+   {
+    "date": "2026-08-31",
+    "summa": 2767.5,
+    "comment": "Подготовка к школе - 2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)"
+   },
+   {
+    "date": "2026-08-31",
+    "summa": 1500,
+    "comment": "Смысловое чтение (Продажа №612397), Интеллектуальный тренинг. Уровень I (Продажа №612398), Линии и штриховки. Часть 2 (Продажа №612399)"
+   }
+  ],
+  "8145893": [
+   {
+    "date": "2026-08-31",
+    "summa": 8302.5,
+    "comment": "Подготовка к школе - 2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)"
+   },
+   {
+    "date": "2026-08-31",
+    "summa": 5400,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)"
+   },
+   {
+    "date": "2026-08-31",
+    "summa": 6885,
+    "comment": "ИЗО-студия - 2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка"
+   }
+  ],
+  "10924567": [
+   {
+    "date": "2026-08-31",
+    "summa": 9225,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 5512.5,
+    "comment": "ИЗО-студия - 2627_ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины великих художников"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 8505,
+    "comment": "Подготовка к школе - 2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)"
+   }
+  ],
+  "3232550": [
+   {
+    "date": "2026-08-31",
+    "summa": 9225,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 7380,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 922.5,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)"
+   }
+  ],
+  "10795444": [
+   {
+    "date": "2026-08-31",
+    "summa": 9225,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)"
+   }
+  ],
+  "10797590": [
+   {
+    "date": "2026-08-31",
+    "summa": 8302.5,
+    "comment": "Подготовка к школе - 2627_ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)"
+   }
+  ],
+  "9117888": [
+   {
+    "date": "2026-08-31",
+    "summa": 9225,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)"
+   }
+  ],
+  "10515082": [
+   {
+    "date": "2026-08-31",
+    "summa": 31050,
+    "comment": "На баланс"
+   },
+   {
+    "date": "2026-09-01",
+    "summa": 4657.5,
+    "comment": "Английский детский сад - 2627_Нулевой класс_10:00-14:00"
+   }
+  ],
+  "10811449": [
+   {
+    "date": "2026-08-31",
+    "summa": 8302.5,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)"
+   }
+  ],
+  "2968588": [
+   {
+    "date": "2026-08-31",
+    "summa": 9225,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)"
+   }
+  ],
+  "7507921": [
+   {
+    "date": "2026-09-01",
+    "summa": 30000,
+    "comment": "На баланс. на баланс 30 000 р. (не было сдачи)"
+   }
+  ],
+  "10877013": [
+   {
+    "date": "2026-09-01",
+    "summa": 1600,
+    "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года"
+   },
+   {
+    "date": "2026-09-03",
+    "summa": 1600,
+    "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года"
+   }
+  ],
+  "2969099": [
+   {
+    "date": "2026-09-01",
+    "summa": 37125,
+    "comment": "Английский детский сад - 2627_Мини-сад_9:00-13:00"
+   }
+  ],
+  "10910554": [
+   {
+    "date": "2026-09-01",
+    "summa": 7897.5,
+    "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года"
+   }
+  ],
+  "8861077": [
+   {
+    "date": "2026-09-01",
+    "summa": 37125,
+    "comment": "Английский детский сад - 2627_Мини-сад_9:00-13:00"
+   }
+  ],
+  "10790241": [
+   {
+    "date": "2026-09-01",
+    "summa": 922.5,
+    "comment": "Раннее развитие - МсМ_Группа 4_пн - пт_10:00_1,3 - 1,8"
+   },
+   {
+    "date": "2026-09-01",
+    "summa": 7740,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8"
+   }
+  ],
+  "8736372": [
+   {
+    "date": "2026-09-01",
+    "summa": 7897.5,
+    "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года"
+   }
+  ],
+  "7505482": [
+   {
+    "date": "2026-09-01",
+    "summa": 17150,
+    "comment": "Английский детский сад - 2627_Мини-сад_9:00-13:00"
+   }
+  ],
+  "10351131": [
+   {
+    "date": "2026-09-01",
+    "summa": 19845,
+    "comment": "Английский детский сад - 2627_Нулевой класс_10:00-14:00"
+   }
+  ],
+  "10894743": [
+   {
+    "date": "2026-09-01",
+    "summa": 8505,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)"
+   },
+   {
+    "date": "2026-09-03",
+    "summa": 1500,
+    "comment": "На баланс"
+   }
+  ],
+  "10811884": [
+   {
+    "date": "2026-09-01",
+    "summa": 8505,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)"
+   },
+   {
+    "date": "2026-09-03",
+    "summa": 1500,
+    "comment": "Смысловое чтение (Продажа №614481), Интеллектуальный тренинг. Уровень I (Продажа №614482), Линии и штриховки. Часть 2 (Продажа №614483)"
+   }
+  ],
+  "4352746": [
+   {
+    "date": "2026-09-01",
+    "summa": 6615,
+    "comment": "Английский язык - 2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)"
+   },
+   {
+    "date": "2026-09-01",
+    "summa": 5670,
+    "comment": "Подготовка к школе - 2627_ПШ_чт 19:00 + сб 11:00_5-7 лет_ПШ1 нечитающие (Гр13)"
+   }
+  ],
+  "10885274": [
+   {
+    "date": "2026-09-01",
+    "summa": 8505,
+    "comment": "Английский язык - 2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)"
+   }
+  ],
+  "3272560": [
+   {
+    "date": "2026-09-01",
+    "summa": 8505,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)"
+   }
+  ],
+  "2948770": [
+   {
+    "date": "2026-09-01",
+    "summa": 8505,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)"
+   },
+   {
+    "date": "2026-09-01",
+    "summa": 8505,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)"
+   },
+   {
+    "date": "2026-09-01",
+    "summa": 7560,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)"
+   },
+   {
+    "date": "2026-09-01",
+    "summa": 8505,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)"
+   },
+   {
+    "date": "2026-09-03",
+    "summa": 1500,
+    "comment": "На баланс"
+   }
+  ],
+  "2907607": [
+   {
+    "date": "2026-09-01",
+    "summa": 8505,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)"
+   }
+  ],
+  "10928469": [
+   {
+    "date": "2026-09-01",
+    "summa": 1600,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 8505,
+    "comment": "Раннее развитие - 2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)"
+   }
+  ],
+  "10893783": [
+   {
+    "date": "2026-09-01",
+    "summa": 68985,
+    "comment": "Английский язык - 2627_АЯ_вт-чт_19:00_5-8 лет_A1 Movers (Гр8)"
+   }
+  ],
+  "2728389": [
+   {
+    "date": "2026-09-01",
+    "summa": 1,
+    "comment": "На баланс"
+   }
+  ],
+  "4171716": [
+   {
+    "date": "2026-09-02",
+    "summa": 7650,
+    "comment": "ИЗО-студия - 2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись"
+   }
+  ],
+  "9323473": [
+   {
+    "date": "2026-09-02",
+    "summa": 6500,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2"
+   }
+  ],
+  "10003931": [
+   {
+    "date": "2026-09-02",
+    "summa": 8707.5,
+    "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года"
+   }
+  ],
+  "10905430": [
+   {
+    "date": "2026-09-02",
+    "summa": 9225,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8"
+   }
+  ],
+  "9232493": [
+   {
+    "date": "2026-09-02",
+    "summa": 3750,
+    "comment": "Раннее развитие - МсМ_Группа 3_ср - сб_11:45_2,2 - 3"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 6500,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3"
+   }
+  ],
+  "9603273": [
+   {
+    "date": "2026-09-02",
+    "summa": 9675,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2"
+   }
+  ],
+  "6219935": [
+   {
+    "date": "2026-09-02",
+    "summa": 28816.7,
+    "comment": "Английский детский сад - 2627_Мини-сад_9:00-13:00"
+   }
+  ],
+  "7958837": [
+   {
+    "date": "2026-08-31",
+    "summa": 5000,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3"
+   }
+  ],
+  "10905397": [
+   {
+    "date": "2026-09-02",
+    "summa": 8505,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)"
+   }
+  ],
+  "10876086": [
+   {
+    "date": "2026-09-02",
+    "summa": 8505,
+    "comment": "Раннее развитие - 2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)"
+   }
+  ],
+  "8935961": [
+   {
+    "date": "2026-09-02",
+    "summa": 8600,
+    "comment": "Ментальная арифметика - 2627_МА_вс_12:30_4-7 лет"
+   }
+  ],
+  "7582026": [
+   {
+    "date": "2026-09-02",
+    "summa": 7897.5,
+    "comment": "Раннее развитие - 2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)"
+   }
+  ],
+  "6660021": [
+   {
+    "date": "2026-09-02",
+    "summa": 5625,
+    "comment": "Раннее развитие - 2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)"
+   }
+  ],
+  "7989031": [
+   {
+    "date": "2026-09-02",
+    "summa": 7897.5,
+    "comment": "Раннее развитие - 2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)"
+   }
+  ],
+  "3038728": [
+   {
+    "date": "2026-09-02",
+    "summa": 8505,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 1500,
+    "comment": "Линии и штриховки. Часть 2 (Продажа №613700), Интеллектуальный тренинг. Уровень I (Продажа №613701), Смысловое чтение (Продажа №613702)"
+   }
+  ],
+  "10799051": [
+   {
+    "date": "2026-09-02",
+    "summa": 5625,
+    "comment": "Подготовка к школе - 2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 1500,
+    "comment": "Смысловое чтение (Продажа №613769), Линии и штриховки. Часть 2 (Продажа №613770), Интеллектуальный тренинг. Уровень I (Продажа №613771)"
+   }
+  ],
+  "10913568": [
+   {
+    "date": "2026-09-02",
+    "summa": 8505,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)"
+   }
+  ],
+  "10871475": [
+   {
+    "date": "2026-09-02",
+    "summa": 7087.5,
+    "comment": "ИЗО-студия - 2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись"
+   }
+  ],
+  "10847403": [
+   {
+    "date": "2026-09-02",
+    "summa": 8505,
+    "comment": "Подготовка к школе - 2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 1500,
+    "comment": "Фразовое чтение (Продажа №613855), Линии и штриховки. Часть 2 (Продажа №613856), Интеллектуальный тренинг. Уровень I (Продажа №613857)"
+   }
+  ],
+  "10900916": [
+   {
+    "date": "2026-09-02",
+    "summa": 17640,
+    "comment": "Английский детский сад - 2627_Нулевой класс_10:00-14:00"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 5512.5,
+    "comment": "ИЗО-студия - 2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка"
+   },
+   {
+    "date": "2026-09-02",
+    "summa": 5512.5,
+    "comment": "ИЗО-студия - 2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись"
+   }
+  ],
+  "10950154": [
+   {
+    "date": "2026-09-02",
+    "summa": 8505,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)"
+   }
+  ],
+  "8977941": [
+   {
+    "date": "2026-09-02",
+    "summa": 8707.5,
+    "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3"
+   }
+  ],
+  "10905500": [
+   {
+    "date": "2026-09-03",
+    "summa": 7020,
+    "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года"
+   }
+  ],
+  "9329474": [
+   {
+    "date": "2026-09-03",
+    "summa": 5000,
+    "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года"
+   }
+  ],
+  "10081835": [
+   {
+    "date": "2026-09-03",
+    "summa": 2700,
+    "comment": "Логопед - 2627_ЛГ Марина_Чт_16:00"
+   }
+  ],
+  "10812437": [
+   {
+    "date": "2026-09-03",
+    "summa": 2700,
+    "comment": "Логопед - 2627_ЛГ Марина_Чт_16:50"
+   }
+  ],
+  "10928586": [
+   {
+    "date": "2026-09-03",
+    "summa": 7560,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)"
+   }
+  ],
+  "5704843": [
+   {
+    "date": "2026-09-03",
+    "summa": 1000,
+    "comment": "Смысловое чтение (Продажа №614851), Интеллектуальный тренинг. Уровень III (Продажа №614852)"
+   },
+   {
+    "date": "2026-09-03",
+    "summa": 1000,
+    "comment": "Сложение и вычитание в пределах 10. Часть 1 (Продажа №614855), Печатные буквы (Продажа №614856)"
+   }
+  ],
+  "8905198": [
+   {
+    "date": "2026-09-03",
+    "summa": 2700,
+    "comment": "Логопед - 2627_ЛГ Марина_Чт_19:20"
+   }
+  ],
+  "2878746": [
+   {
+    "date": "2026-09-03",
+    "summa": 7560,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)"
+   },
+   {
+    "date": "2026-09-03",
+    "summa": 1500,
+    "comment": "Фразовое чтение (Продажа №614978), Интеллектуальный тренинг. Уровень I (Продажа №614979), Линии и штриховки. Часть 2 (Продажа №614980)"
+   }
+  ],
+  "9366638": [
+   {
+    "date": "2026-09-03",
+    "summa": 5625,
+    "comment": "Подготовка к школе - 2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)"
+   },
+   {
+    "date": "2026-09-03",
+    "summa": 9450,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)"
+   }
+  ],
+  "9396084": [
+   {
+    "date": "2026-09-03",
+    "summa": 5625,
+    "comment": "Подготовка к школе - 2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)"
+   },
+   {
+    "date": "2026-09-03",
+    "summa": 10500,
+    "comment": "Английский язык - 2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)"
+   }
+  ],
+  "10943772": [
+   {
+    "date": "2026-09-03",
+    "summa": 7560,
+    "comment": "Подготовка к школе - 2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)"
+   },
+   {
+    "date": "2026-09-03",
+    "summa": 1500,
+    "comment": "Фразовое чтение (Продажа №614988), Интеллектуальный тренинг. Уровень I (Продажа №614989), Линии и штриховки. Часть 2 (Продажа №614990)"
+   }
+  ]
+ },
+ "users": {
+  "2728329": {
+   "name": "Гайдуков Мирон",
+   "phone": "79032981323",
+   "state": 146950,
+   "created": "2022-08-15",
+   "age": 9.2,
+   "next": null,
+   "paid": []
+  },
+  "2728348": {
+   "name": "Сорокина Полина",
+   "phone": "79055389799",
+   "state": 125953,
+   "created": "2022-08-15",
+   "age": 8.9,
+   "next": null,
+   "paid": []
+  },
+  "2752850": {
+   "name": "Головлёв Даниил",
+   "phone": "79161879763",
+   "state": 125952,
+   "created": "2022-08-21",
+   "age": 8.4,
+   "next": null,
+   "paid": []
+  },
+  "2948770": {
+   "name": "Бернард Михаил",
+   "phone": "79096821229",
+   "state": 125955,
+   "created": "2022-09-27",
+   "age": 5.8,
+   "next": "2026-09-04",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 8505,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)"
+    },
+    {
+     "date": "2026-09-01",
+     "summa": 8505,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)"
+    },
+    {
+     "date": "2026-09-01",
+     "summa": 7560,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)"
+    },
+    {
+     "date": "2026-09-01",
+     "summa": 8505,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)"
+    },
+    {
+     "date": "2026-09-03",
+     "summa": 1500,
+     "comment": "На баланс"
+    }
+   ]
+  },
+  "2968588": {
+   "name": "Романова Милана (скидка 10% многодет.)",
+   "phone": "79629025003",
+   "state": 125953,
+   "created": "2022-10-03",
+   "age": 10.2,
+   "next": "2026-09-07",
+   "paid": [
+    {
+     "date": "2026-08-31",
+     "summa": 9225,
+     "comment": "Английский язык - 2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)"
+    }
+   ]
+  },
+  "2969099": {
+   "name": "Маринин Михаил",
+   "phone": "79169212510",
+   "state": 125955,
+   "created": "2022-10-03",
+   "age": 4.1,
+   "next": "2026-09-07",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 37125,
+     "comment": "Английский детский сад - 2627_Мини-сад_9:00-13:00"
+    }
+   ]
+  },
+  "3038728": {
+   "name": "Смирнов Роман",
+   "phone": "79852280602",
+   "state": 125953,
+   "created": "2022-10-19",
+   "age": 5.0,
+   "next": "2026-09-07",
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 8505,
+     "comment": "Английский язык - 2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)"
+    },
+    {
+     "date": "2026-09-02",
+     "summa": 1500,
+     "comment": "Линии и штриховки. Часть 2 (Продажа №613700), Интеллектуальный тренинг. Уровень I (Продажа №613701), Смысловое чтение (Продажа №613702)"
+    }
+   ]
+  },
+  "3232550": {
+   "name": "Гетман Василиса",
+   "phone": "79653669529",
+   "state": 125955,
+   "created": "2022-12-21",
+   "age": 6.1,
+   "next": "2026-09-04",
+   "paid": [
+    {
+     "date": "2026-08-31",
+     "summa": 9225,
+     "comment": "Английский язык - 2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)"
+    },
+    {
+     "date": "2026-09-02",
+     "summa": 7380,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)"
+    },
+    {
+     "date": "2026-09-02",
+     "summa": 922.5,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)"
+    }
+   ]
+  },
+  "3272560": {
+   "name": "Садофьев Вова",
+   "phone": "79067230054",
+   "state": 125955,
+   "created": "2023-01-07",
+   "age": 4.9,
+   "next": "2026-09-08",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 8505,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)"
+    }
+   ]
+  },
+  "4300951": {
+   "name": "Бутовка Варвара",
+   "phone": "79166596886",
+   "state": 125952,
+   "created": "2023-09-14",
+   "age": 4.2,
+   "next": null,
+   "paid": []
+  },
+  "4338449": {
+   "name": "Горбунова Софья",
+   "phone": "79855130500",
+   "state": 125955,
+   "created": "2023-09-20",
+   "age": 5.0,
+   "next": "2026-09-04",
+   "paid": []
+  },
+  "4350893": {
+   "name": "Соколов Михаил",
+   "phone": "79266748866",
+   "state": 125952,
+   "created": "2023-09-21",
+   "age": 3.5,
+   "next": null,
+   "paid": []
+  },
+  "4352746": {
+   "name": "Параскив Мария",
+   "phone": "79277195664",
+   "state": 125955,
+   "created": "2023-09-21",
+   "age": 4.5,
+   "next": "2026-09-05",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 6615,
+     "comment": "Английский язык - 2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)"
+    },
+    {
+     "date": "2026-09-01",
+     "summa": 5670,
+     "comment": "Подготовка к школе - 2627_ПШ_чт 19:00 + сб 11:00_5-7 лет_ПШ1 нечитающие (Гр13)"
+    }
+   ]
+  },
+  "4407236": {
+   "name": "Лагутина София",
+   "phone": "79264126957",
+   "state": 125952,
+   "created": "2023-09-29",
+   "age": 5.0,
+   "next": null,
+   "paid": []
+  },
+  "5780263": {
+   "name": "Цуцкова Елизавета",
+   "phone": "79851362008",
+   "state": 125953,
+   "created": "2024-07-15",
+   "age": 3.8,
+   "next": null,
+   "paid": []
+  },
+  "6053061": {
+   "name": "Лоева Ирина",
+   "phone": "79031241673",
+   "state": 125953,
+   "created": "2024-08-29",
+   "age": 3.5,
+   "next": "2026-09-07",
+   "paid": []
+  },
+  "6219935": {
+   "name": "Мухаметшин Даниэль",
+   "phone": "79175686599",
+   "state": 125955,
+   "created": "2024-09-17",
+   "age": 3.1,
+   "next": "2026-09-04",
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 28816.7,
+     "comment": "Английский детский сад - 2627_Мини-сад_9:00-13:00"
+    }
+   ]
+  },
+  "6384209": {
+   "name": "Коненков Михаил",
+   "phone": "79223018862",
+   "state": 125952,
+   "created": "2024-10-07",
+   "age": 7.3,
+   "next": null,
+   "paid": []
+  },
+  "6660021": {
+   "name": "Боликова Варвара",
+   "phone": "79268160624",
+   "state": 125953,
+   "created": "2024-11-14",
+   "age": 3.0,
+   "next": "2026-09-09",
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 5625,
+     "comment": "Раннее развитие - 2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)"
+    }
+   ]
+  },
+  "7507921": {
+   "name": "Асманкин Арсений (телеграмм)",
+   "phone": "79154727129",
+   "state": 125953,
+   "created": "2025-04-02",
+   "age": 2.9,
+   "next": "2026-09-04",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 30000,
+     "comment": "На баланс. на баланс 30 000 р. (не было сдачи)"
+    }
+   ]
+  },
+  "8542588": {
+   "name": "Сильченко Александра",
+   "phone": "79055889998",
+   "state": 125952,
+   "created": "2025-08-15",
+   "age": 8.1,
+   "next": "2026-09-07",
+   "paid": []
+  },
+  "8634892": {
+   "name": "Экимашев Савелий",
+   "phone": "79505905394",
+   "state": 125953,
+   "created": "2025-08-28",
+   "age": 2.1,
+   "next": "2026-09-10",
+   "paid": []
+  },
+  "8711590": {
+   "name": "Чемоданова Аделина",
+   "phone": "79778676814",
+   "state": 146950,
+   "created": "2025-09-05",
+   "age": 6.0,
+   "next": null,
+   "paid": []
+  },
+  "8736372": {
+   "name": "Малинина Александра",
+   "phone": "79966933333",
+   "state": 125955,
+   "created": "2025-09-08",
+   "age": 2.8,
+   "next": "2026-09-08",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 7897.5,
+     "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года"
+    }
+   ]
+  },
+  "8756746": {
+   "name": "Михайлова Апполинария",
+   "phone": "79036426463",
+   "state": 125953,
+   "created": "2025-09-10",
+   "age": 2.8,
+   "next": null,
+   "paid": []
+  },
+  "8905198": {
+   "name": "Яфясов Матвей",
+   "phone": "79923384769",
+   "state": 125953,
+   "created": "2025-09-27",
+   "age": 2.9,
+   "next": "2026-09-10",
+   "paid": [
+    {
+     "date": "2026-09-03",
+     "summa": 2700,
+     "comment": "Логопед - 2627_ЛГ Марина_Чт_19:20"
+    }
+   ]
+  },
+  "8953197": {
+   "name": "Судакова Александра (скидка 10% многодет.)",
+   "phone": "79263255865",
+   "state": 125952,
+   "created": "2025-10-02",
+   "age": 6.9,
+   "next": null,
+   "paid": []
+  },
+  "8977941": {
+   "name": "Леть Илья",
+   "phone": "79154294474",
+   "state": 125955,
+   "created": "2025-10-04",
+   "age": 2.6,
+   "next": "2026-09-05",
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 8707.5,
+     "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3"
+    }
+   ]
+  },
+  "9117888": {
+   "name": "Попов Егор",
+   "phone": "79165300132",
+   "state": 125953,
+   "created": "2025-10-21",
+   "age": 10.2,
+   "next": "2026-09-07",
+   "paid": [
+    {
+     "date": "2026-08-31",
+     "summa": 9225,
+     "comment": "Английский язык - 2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)"
+    }
+   ]
+  },
+  "9329474": {
+   "name": "Евтюхина Есения",
+   "phone": "79268884662",
+   "state": 125953,
+   "created": "2025-11-21",
+   "age": 2.5,
+   "next": "2026-09-10",
+   "paid": [
+    {
+     "date": "2026-09-03",
+     "summa": 5000,
+     "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года"
+    }
+   ]
+  },
+  "9366638": {
+   "name": "Шиш Сергей",
+   "phone": "79037972191",
+   "state": 125955,
+   "created": "2025-11-27",
+   "age": 5.9,
+   "next": "2026-09-07",
+   "paid": [
+    {
+     "date": "2026-09-03",
+     "summa": 5625,
+     "comment": "Подготовка к школе - 2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)"
+    },
+    {
+     "date": "2026-09-03",
+     "summa": 9450,
+     "comment": "Английский язык - 2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)"
+    }
+   ]
+  },
+  "9392041": {
+   "name": "Литовченко Ева",
+   "phone": "79850037212",
+   "state": 125952,
+   "created": "2025-12-02",
+   "age": 2.1,
+   "next": null,
+   "paid": []
+  },
+  "9396084": {
+   "name": "Шиш Савелий (телеграмм)",
+   "phone": "79037972191",
+   "state": 125955,
+   "created": "2025-12-02",
+   "age": 5.9,
+   "next": "2026-09-07",
+   "paid": [
+    {
+     "date": "2026-09-03",
+     "summa": 5625,
+     "comment": "Подготовка к школе - 2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)"
+    },
+    {
+     "date": "2026-09-03",
+     "summa": 10500,
+     "comment": "Английский язык - 2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)"
+    }
+   ]
+  },
+  "10003931": {
+   "name": "Демьяненко Вероника",
+   "phone": "79096634334",
+   "state": 125955,
+   "created": "2026-03-23",
+   "age": 1.3,
+   "next": null,
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 8707.5,
+     "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года"
+    }
+   ]
+  },
+  "10339875": {
+   "name": "Козлова Екатерина",
+   "phone": "79261349724",
+   "state": 125953,
+   "created": "2026-05-29",
+   "age": 6.1,
+   "next": null,
+   "paid": []
+  },
+  "10351131": {
+   "name": "Лобань Сладислава",
+   "phone": "79381085400",
+   "state": 125955,
+   "created": "2026-06-01",
+   "age": 3.6,
+   "next": "2026-09-08",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 19845,
+     "comment": "Английский детский сад - 2627_Нулевой класс_10:00-14:00"
+    }
+   ]
+  },
+  "10515082": {
+   "name": "Иванова Милана",
+   "phone": "79057511557",
+   "state": 125955,
+   "created": "2026-06-27",
+   "age": 6.3,
+   "next": "2026-09-04",
+   "paid": [
+    {
+     "date": "2026-08-31",
+     "summa": 31050,
+     "comment": "На баланс"
+    },
+    {
+     "date": "2026-09-01",
+     "summa": 4657.5,
+     "comment": "Английский детский сад - 2627_Нулевой класс_10:00-14:00"
+    }
+   ]
+  },
+  "10794024": {
+   "name": "Андрей",
+   "phone": "79996730390",
+   "state": 125952,
+   "created": "2026-08-17",
+   "age": 7.1,
+   "next": null,
+   "paid": []
+  },
+  "10794043": {
+   "name": "Алексей",
+   "phone": "79814320709",
+   "state": 125952,
+   "created": "2026-08-17",
+   "age": 6.8,
+   "next": "2026-09-07",
+   "paid": []
+  },
+  "10794070": {
+   "name": "Мирослав",
+   "phone": "79035159107",
+   "state": 125952,
+   "created": "2026-08-17",
+   "age": 7.1,
+   "next": null,
+   "paid": []
+  },
+  "10795444": {
+   "name": "Родионова Анна",
+   "phone": "79654089675",
+   "state": 125953,
+   "created": "2026-08-17",
+   "age": 6.8,
+   "next": "2026-09-07",
+   "paid": [
+    {
+     "date": "2026-08-31",
+     "summa": 9225,
+     "comment": "Английский язык - 2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)"
+    }
+   ]
+  },
+  "10797523": {
+   "name": "Кирилл",
+   "phone": "79672066432",
+   "state": 125953,
+   "created": "2026-08-18",
+   "age": 4.3,
+   "next": null,
+   "paid": []
+  },
+  "10797530": {
+   "name": "София",
+   "phone": "79264173797",
+   "state": 125952,
+   "created": "2026-08-18",
+   "age": 5.0,
+   "next": null,
+   "paid": []
+  },
+  "10797590": {
+   "name": "Шамраев Лев (писать в макс)",
+   "phone": "79645631947",
+   "state": 125955,
+   "created": "2026-08-18",
+   "age": 6.3,
+   "next": "2026-09-05",
+   "paid": [
+    {
+     "date": "2026-08-31",
+     "summa": 8302.5,
+     "comment": "Подготовка к школе - 2627_ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)"
+    }
+   ]
+  },
+  "10801968": {
+   "name": "Кутищев Григорий",
+   "phone": "79772878821",
+   "state": 125952,
+   "created": "2026-08-18",
+   "age": 4.5,
+   "next": null,
+   "paid": []
+  },
+  "10811449": {
+   "name": "Красильников Ярослав",
+   "phone": "79165162495",
+   "state": 125955,
+   "created": "2026-08-19",
+   "age": 6.2,
+   "next": null,
+   "paid": [
+    {
+     "date": "2026-08-31",
+     "summa": 8302.5,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)"
+    }
+   ]
+  },
+  "10811884": {
+   "name": "Сидиков Мухамед Али",
+   "phone": "79999876316",
+   "state": 125955,
+   "created": "2026-08-19",
+   "age": 5.2,
+   "next": "2026-09-08",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 8505,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)"
+    },
+    {
+     "date": "2026-09-03",
+     "summa": 1500,
+     "comment": "Смысловое чтение (Продажа №614481), Интеллектуальный тренинг. Уровень I (Продажа №614482), Линии и штриховки. Часть 2 (Продажа №614483)"
+    }
+   ]
+  },
+  "10823183": {
+   "name": "Купцов Матвей",
+   "phone": "79689581744",
+   "state": 125952,
+   "created": "2026-08-20",
+   "age": 6.0,
+   "next": null,
+   "paid": []
+  },
+  "10829925": {
+   "name": "79175670024",
+   "phone": "79175670024",
+   "state": 125952,
+   "created": "2026-08-20",
+   "age": null,
+   "next": null,
+   "paid": []
+  },
+  "10831844": {
+   "name": "Венера (девочке 10, промо Маша)",
+   "phone": "79772886696",
+   "state": 125952,
+   "created": "2026-08-21",
+   "age": null,
+   "next": null,
+   "paid": []
+  },
+  "10847403": {
+   "name": "Комаров Илья",
+   "phone": "79997878536",
+   "state": 125955,
+   "created": "2026-08-23",
+   "age": 5.4,
+   "next": null,
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 8505,
+     "comment": "Подготовка к школе - 2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)"
+    },
+    {
+     "date": "2026-09-02",
+     "summa": 1500,
+     "comment": "Фразовое чтение (Продажа №613855), Линии и штриховки. Часть 2 (Продажа №613856), Интеллектуальный тренинг. Уровень I (Продажа №613857)"
+    }
+   ]
+  },
+  "10849528": {
+   "name": "полина",
+   "phone": "79775770478",
+   "state": 125952,
+   "created": "2026-08-23",
+   "age": 5.0,
+   "next": null,
+   "paid": []
+  },
+  "10849548": {
+   "name": "виктория",
+   "phone": "79615496108",
+   "state": 125957,
+   "created": "2026-08-23",
+   "age": 8.0,
+   "next": null,
+   "paid": []
+  },
+  "10876086": {
+   "name": "Лемиш Марк",
+   "phone": "79851612035",
+   "state": 125955,
+   "created": "2026-08-25",
+   "age": 3.9,
+   "next": null,
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 8505,
+     "comment": "Раннее развитие - 2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)"
+    }
+   ]
+  },
+  "10885274": {
+   "name": "Жамова Арина",
+   "phone": "79778857001",
+   "state": 125955,
+   "created": "2026-08-26",
+   "age": 5.7,
+   "next": "2026-09-08",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 8505,
+     "comment": "Английский язык - 2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)"
+    }
+   ]
+  },
+  "10893783": {
+   "name": "Козловский Глеб",
+   "phone": "79252259553",
+   "state": 125955,
+   "created": "2026-08-27",
+   "age": 6.7,
+   "next": "2026-09-08",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 68985,
+     "comment": "Английский язык - 2627_АЯ_вт-чт_19:00_5-8 лет_A1 Movers (Гр8)"
+    }
+   ]
+  },
+  "10894743": {
+   "name": "Кийко Анна (писать в макс)",
+   "phone": "79175431661",
+   "state": 125955,
+   "created": "2026-08-27",
+   "age": 4.6,
+   "next": "2026-09-08",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 8505,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)"
+    },
+    {
+     "date": "2026-09-03",
+     "summa": 1500,
+     "comment": "На баланс"
+    }
+   ]
+  },
+  "10900916": {
+   "name": "Димитров Александр (скидка 10% инвал.)",
+   "phone": "79169996780",
+   "state": 125953,
+   "created": "2026-08-28",
+   "age": 6.0,
+   "next": "2026-09-07",
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 17640,
+     "comment": "Английский детский сад - 2627_Нулевой класс_10:00-14:00"
+    },
+    {
+     "date": "2026-09-02",
+     "summa": 5512.5,
+     "comment": "ИЗО-студия - 2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка"
+    },
+    {
+     "date": "2026-09-02",
+     "summa": 5512.5,
+     "comment": "ИЗО-студия - 2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись"
+    }
+   ]
+  },
+  "10905396": {
+   "name": "Хромова Мария",
+   "phone": "79515680897",
+   "state": 125955,
+   "created": "2026-08-28",
+   "age": null,
+   "next": "2026-09-10",
+   "paid": []
+  },
+  "10905397": {
+   "name": "Исаев Федор",
+   "phone": "79263936933",
+   "state": 125953,
+   "created": "2026-08-28",
+   "age": 8.4,
+   "next": null,
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 8505,
+     "comment": "Английский язык - 2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)"
+    }
+   ]
+  },
+  "10905430": {
+   "name": "Костанян Марк",
+   "phone": "79956840945",
+   "state": 125953,
+   "created": "2026-08-28",
+   "age": 1.9,
+   "next": "2026-09-05",
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 9225,
+     "comment": "Раннее развитие - 2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8"
+    }
+   ]
+  },
+  "10905500": {
+   "name": "Алимов Максим",
+   "phone": "79653549344",
+   "state": 125955,
+   "created": "2026-08-28",
+   "age": 1.6,
+   "next": "2026-09-08",
+   "paid": [
+    {
+     "date": "2026-09-03",
+     "summa": 7020,
+     "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года"
+    }
+   ]
+  },
+  "10908252": {
+   "name": "Шведова Василиса",
+   "phone": "79261877068",
+   "state": 125955,
+   "created": "2026-08-28",
+   "age": 7.8,
+   "next": "2026-09-07",
+   "paid": [
+    {
+     "date": "2026-08-31",
+     "summa": 9225,
+     "comment": "Английский язык - 2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)"
+    }
+   ]
+  },
+  "10910554": {
+   "name": "Юдина Варвара",
+   "phone": "79037749728",
+   "state": 125955,
+   "created": "2026-08-29",
+   "age": 1.7,
+   "next": "2026-09-07",
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 7897.5,
+     "comment": "Раннее развитие - 2627_РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года"
+    }
+   ]
+  },
+  "10913568": {
+   "name": "Бахтимиров Кирилл",
+   "phone": "79032126589",
+   "state": 125953,
+   "created": "2026-08-29",
+   "age": null,
+   "next": null,
+   "paid": [
+    {
+     "date": "2026-09-02",
+     "summa": 8505,
+     "comment": "Английский язык - 2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)"
+    }
+   ]
+  },
+  "10913617": {
+   "name": "Астраханцев Филипп",
+   "phone": "79683280360",
+   "state": 125952,
+   "created": "2026-08-29",
+   "age": null,
+   "next": "2026-09-08",
+   "paid": []
+  },
+  "10921856": {
+   "name": "Михавилов Семен",
+   "phone": "79164713342",
+   "state": 125953,
+   "created": "2026-08-31",
+   "age": 9.6,
+   "next": null,
+   "paid": []
+  },
+  "10921932": {
+   "name": "Михавилова Алиса",
+   "phone": "79164713342",
+   "state": 125953,
+   "created": "2026-08-31",
+   "age": 12.9,
+   "next": null,
+   "paid": []
+  },
+  "10928469": {
+   "name": "Красильникова Милана",
+   "phone": "79165162495",
+   "state": 125955,
+   "created": "2026-08-31",
+   "age": 4.0,
+   "next": null,
+   "paid": [
+    {
+     "date": "2026-09-01",
+     "summa": 1600,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)"
+    },
+    {
+     "date": "2026-09-02",
+     "summa": 8505,
+     "comment": "Раннее развитие - 2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)"
+    }
+   ]
+  },
+  "10928586": {
+   "name": "Романова Дарина (скидка 10% многодет.)",
+   "phone": "79629025003",
+   "state": 125953,
+   "created": "2026-08-31",
+   "age": 5.9,
+   "next": "2026-09-08",
+   "paid": [
+    {
+     "date": "2026-09-03",
+     "summa": 7560,
+     "comment": "Подготовка к школе - 2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)"
+    }
+   ]
+  },
+  "10946892": {
+   "name": "Смотрицкая Софья (скидка 10% многодет.) (телеграмм)",
+   "phone": "79104255162",
+   "state": 125953,
+   "created": "2026-09-02",
+   "age": 2.4,
+   "next": "2026-09-10",
+   "paid": []
+  }
+ },
+ "lessons": [
+  {
+   "lessonId": 86957393,
+   "classId": 727729,
+   "time": "09:00",
+   "group": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Мухаметшин Даниэль",
+     "phone": "79175686599",
+     "state": 125955,
+     "created": "2024-09-17",
+     "age": 3.1,
+     "uid": 6219935,
+     "test": false
+    },
+    {
+     "name": "Рощепкин Владислав",
+     "phone": "79153422366",
+     "state": 125955,
+     "created": "2025-04-01",
+     "age": 4.4,
+     "uid": 7505482,
+     "test": false
+    },
+    {
+     "name": "Асманкин Арсений (телеграмм)",
+     "phone": "79154727129",
+     "state": 125953,
+     "created": "2025-04-02",
+     "age": 2.9,
+     "uid": 7507921,
+     "test": false
+    },
+    {
+     "name": "Дубинина Василиса",
+     "phone": "79687681832",
+     "state": 125955,
+     "created": "2025-09-22",
+     "age": null,
+     "uid": 8861077,
+     "test": false
+    }
+   ]
+  },
+  {
+   "lessonId": 86956458,
+   "classId": 727718,
+   "time": "10:00",
+   "group": "2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Самчук Егор",
+     "phone": "79858190030",
+     "state": 125955,
+     "created": "2026-03-03",
+     "age": 1.3,
+     "uid": 9856211,
+     "test": false
+    },
+    {
+     "name": "Николаев Виктор",
+     "phone": "79165125200",
+     "state": 125955,
+     "created": "2026-06-29",
+     "age": null,
+     "uid": 10520536,
+     "test": false
+    },
+    {
+     "name": "Мартынова Аглая",
+     "phone": "79855308853",
+     "state": 125955,
+     "created": "2026-07-08",
+     "age": 1.7,
+     "uid": 10580177,
+     "test": false
+    },
+    {
+     "name": "Дубинина Варвара",
+     "phone": "79687681832",
+     "state": 125955,
+     "created": "2026-08-17",
+     "age": 1.3,
+     "uid": 10790241,
+     "test": false
+    }
+   ]
+  },
+  {
+   "lessonId": 86957595,
+   "classId": 727730,
+   "time": "10:00",
+   "group": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Даскалова София",
+     "phone": "79990025612",
+     "state": 125955,
+     "created": "2023-01-18",
+     "age": 6.5,
+     "uid": 3320401,
+     "test": false
+    },
+    {
+     "name": "Новиков Лев (телеграмм)",
+     "phone": "79037219422",
+     "state": 125955,
+     "created": "2023-10-09",
+     "age": 4.6,
+     "uid": 4457716,
+     "test": false
+    },
+    {
+     "name": "Епифанов Мирон",
+     "phone": "79653018671",
+     "state": 125955,
+     "created": "2024-09-12",
+     "age": 6.0,
+     "uid": 6179399,
+     "test": false
+    },
+    {
+     "name": "Иванова Милана",
+     "phone": "79057511557",
+     "state": 125955,
+     "created": "2026-06-27",
+     "age": 6.3,
+     "uid": 10515082,
+     "test": false
+    }
+   ]
+  },
+  {
+   "lessonId": 86956554,
+   "classId": 727719,
+   "time": "11:00",
+   "group": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Аванян Вероника",
+     "phone": "79153293981",
+     "state": 125955,
+     "created": "2025-10-18",
+     "age": 2.0,
+     "uid": 9098053,
+     "test": false
+    },
+    {
+     "name": "Синько София",
+     "phone": "79890917076",
+     "state": 125955,
+     "created": "2025-11-26",
+     "age": 2.0,
+     "uid": 9354850,
+     "test": false
+    },
+    {
+     "name": "Гололобова Нелли",
+     "phone": "79017987678",
+     "state": 125955,
+     "created": "2026-01-19",
+     "age": 2.1,
+     "uid": 9606986,
+     "test": false
+    },
+    {
+     "name": "Карандеева Мария",
+     "phone": "79190146711",
+     "state": 125955,
+     "created": "2026-03-02",
+     "age": 2.1,
+     "uid": 9845717,
+     "test": false
+    },
+    {
+     "name": "Петрова Вера",
+     "phone": "79091689293",
+     "state": 125955,
+     "created": "2026-05-07",
+     "age": 2.1,
+     "uid": 10235414,
+     "test": false
+    },
+    {
+     "name": "Романенко София",
+     "phone": "79104248499",
+     "state": 125955,
+     "created": "2026-08-17",
+     "age": 1.9,
+     "uid": 10795600,
+     "test": false
+    }
+   ]
+  },
+  {
+   "lessonId": 86956654,
+   "classId": 727720,
+   "time": "12:00",
+   "group": "2627_РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3",
+   "subject": "раннее развитие",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Маша",
+     "phone": "79190291413",
+     "state": 125952,
+     "created": "2022-09-16",
+     "age": 11.0,
+     "uid": 2891569,
+     "test": true
+    },
+    {
+     "name": "Егоров Лука",
+     "phone": "79151019030",
+     "state": 125955,
+     "created": "2025-02-07",
+     "age": 2.5,
+     "uid": 7182535,
+     "test": false
+    },
+    {
+     "name": "Шангареева Ева",
+     "phone": "79064194668",
+     "state": 125955,
+     "created": "2025-06-26",
+     "age": null,
+     "uid": 8281008,
+     "test": false
+    },
+    {
+     "name": "Кузнецов Леонид",
+     "phone": "79162113614",
+     "state": 125955,
+     "created": "2025-10-31",
+     "age": null,
+     "uid": 9202832,
+     "test": false
+    },
+    {
+     "name": "Нистратова Агата",
+     "phone": "79015187892",
+     "state": 125955,
+     "created": "2026-04-15",
+     "age": 2.7,
+     "uid": 10123706,
+     "test": false
+    }
+   ]
+  },
+  {
+   "lessonId": 86958103,
+   "classId": 727735,
+   "time": "16:00",
+   "group": "2627_ПШ_вт-пт_16:00_4-5 лет_ПШ1 нечитающие (Гр8)",
+   "subject": "подготовка к школе",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Валиуллин Раян",
+     "phone": "79777407607",
+     "state": 125952,
+     "created": "2023-01-17",
+     "age": 5.0,
+     "uid": 3310550,
+     "test": true
+    }
+   ]
+  },
+  {
+   "lessonId": 86961173,
+   "classId": 727782,
+   "time": "16:00",
+   "group": "2627_ЛГ Елена_Пт_16:00",
+   "subject": "логопед",
+   "status": 0,
+   "kids": []
+  },
+  {
+   "lessonId": 87444208,
+   "classId": 731647,
+   "time": "16:00",
+   "group": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Сергеева Анна (скидка 10% многодет.)",
+     "phone": "79853871777",
+     "state": 125955,
+     "created": "2025-04-10",
+     "age": 4.4,
+     "uid": 7582026,
+     "test": false
+    },
+    {
+     "name": "Петуховская Вероника",
+     "phone": "79776343904",
+     "state": 125955,
+     "created": "2025-05-07",
+     "age": 3.5,
+     "uid": 7989031,
+     "test": false
+    }
+   ]
+  },
+  {
+   "lessonId": 86958187,
+   "classId": 727737,
+   "time": "17:00",
+   "group": "2627_ПШ_вт-пт_17:00_5-7 лет_ПШ1 нечитающие (Гр9)",
+   "subject": "подготовка к школе",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Скворцов Данила",
+     "phone": "79266859170",
+     "state": 125952,
+     "created": "2026-08-19",
+     "age": 5.9,
+     "uid": 10815735,
+     "test": true
+    }
+   ]
+  },
+  {
+   "lessonId": 86960002,
+   "classId": 727758,
+   "time": "17:00",
+   "group": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Калмыкова Анастасия (МсМ",
+     "phone": "79165787716",
+     "state": 125952,
+     "created": "2024-11-18",
+     "age": 3.2,
+     "uid": 6686010,
+     "test": false
+    },
+    {
+     "name": "Кадацкий Марк",
+     "phone": "79055359134",
+     "state": 125952,
+     "created": "2026-08-28",
+     "age": null,
+     "uid": 10905505,
+     "test": true
+    },
+    {
+     "name": "79197665786",
+     "phone": "79197665786",
+     "state": 125952,
+     "created": "2026-09-01",
+     "age": null,
+     "uid": 10939000,
+     "test": true
+    }
+   ]
+  },
+  {
+   "lessonId": 87444474,
+   "classId": 731651,
+   "time": "17:00",
+   "group": "2627_ЛГ Елена_Пт_17:00",
+   "subject": "логопед",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Мотягин Алексей",
+     "phone": "79265917103",
+     "state": 125952,
+     "created": "2022-08-15",
+     "age": 8.4,
+     "uid": 2728584,
+     "test": false
+    }
+   ]
+  },
+  {
+   "lessonId": 86958436,
+   "classId": 727740,
+   "time": "18:00",
+   "group": "2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)",
+   "subject": "подготовка к школе",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Козлова Ангелина",
+     "phone": "79687111684",
+     "state": 125952,
+     "created": "2022-08-15",
+     "age": 5.7,
+     "uid": 2728677,
+     "test": true
+    },
+    {
+     "name": "Бернард Михаил",
+     "phone": "79096821229",
+     "state": 125955,
+     "created": "2022-09-27",
+     "age": 5.8,
+     "uid": 2948770,
+     "test": false
+    },
+    {
+     "name": "Юрченко Полина",
+     "phone": "79851971456",
+     "state": 125955,
+     "created": "2025-09-30",
+     "age": 4.9,
+     "uid": 8935961,
+     "test": false
+    }
+   ]
+  },
+  {
+   "lessonId": 86959923,
+   "classId": 727757,
+   "time": "18:00",
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "subject": "шахматы",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Прокопович Георгий",
+     "phone": "79296423960",
+     "state": 125952,
+     "created": "2022-08-15",
+     "age": 11.4,
+     "uid": 2728621,
+     "test": true
+    },
+    {
+     "name": "Гасанова Айлин",
+     "phone": "79257242175",
+     "state": 125955,
+     "created": "2023-11-22",
+     "age": 7.2,
+     "uid": 4687846,
+     "test": false
+    },
+    {
+     "name": "Кузина Агата",
+     "phone": "79165066662",
+     "state": 125952,
+     "created": "2025-12-30",
+     "age": 6.8,
+     "uid": 9523397,
+     "test": true
+    },
+    {
+     "name": "Боброва Анна",
+     "phone": "79261317505",
+     "state": 125952,
+     "created": "2026-08-29",
+     "age": 10.0,
+     "uid": 10913605,
+     "test": true
+    }
+   ]
+  },
+  {
+   "lessonId": 86960794,
+   "classId": 727772,
+   "time": "18:00",
+   "group": "2627_ЛГ Елена_Пт_18:00",
+   "subject": "логопед",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Нариманлы Селин",
+     "phone": "79013412303",
+     "state": 125955,
+     "created": "2025-02-04",
+     "age": 4.7,
+     "uid": 7149410,
+     "test": false
+    }
+   ]
+  },
+  {
+   "lessonId": 87444284,
+   "classId": 731648,
+   "time": "18:00",
+   "group": "2627_ПШ_ср-пт_18:00_4-5 лет_ПШ1 нечитающие (Гр14)",
+   "subject": "подготовка к школе",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Мукабенов Матвей",
+     "phone": "79636362728",
+     "state": 125955,
+     "created": "2026-03-02",
+     "age": 5.1,
+     "uid": 9849905,
+     "test": false
+    }
+   ]
+  },
+  {
+   "lessonId": 86958359,
+   "classId": 727739,
+   "time": "19:00",
+   "group": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Гетман Василиса",
+     "phone": "79653669529",
+     "state": 125955,
+     "created": "2022-12-21",
+     "age": 6.1,
+     "uid": 3232550,
+     "test": true
+    },
+    {
+     "name": "Панкратова Александра (max)",
+     "phone": "79265978327",
+     "state": 125955,
+     "created": "2024-05-13",
+     "age": 6.1,
+     "uid": 5463325,
+     "test": false
+    },
+    {
+     "name": "Шальнев Дмитрий",
+     "phone": "79119232802",
+     "state": 125952,
+     "created": "2025-09-04",
+     "age": 6.2,
+     "uid": 8694679,
+     "test": true
+    },
+    {
+     "name": "Кузина Агата",
+     "phone": "79165066662",
+     "state": 125952,
+     "created": "2025-12-30",
+     "age": 6.8,
+     "uid": 9523397,
+     "test": true
+    }
+   ]
+  },
+  {
+   "lessonId": 86959330,
+   "classId": 727748,
+   "time": "19:00",
+   "group": "2627_ШАХ_Группа 2_пт 19:00 + вс 12:00_6-12 начинающие",
+   "subject": "шахматы",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Прокопович Владимир",
+     "phone": "79261160071",
+     "state": 125952,
+     "created": "2024-02-12",
+     "age": 8.1,
+     "uid": 5033227,
+     "test": true
+    }
+   ]
+  },
+  {
+   "lessonId": 86960953,
+   "classId": 727776,
+   "time": "19:00",
+   "group": "2627_ЛГ Елена_Пт_19:00",
+   "subject": "логопед",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Даня",
+     "phone": "79014096419",
+     "state": 125952,
+     "created": "2026-08-18",
+     "age": 2.0,
+     "uid": 10798813,
+     "test": true
+    }
+   ]
+  },
+  {
+   "lessonId": 87444360,
+   "classId": 731649,
+   "time": "19:00",
+   "group": "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)",
+   "subject": "подготовка к школе",
+   "status": 0,
+   "kids": [
+    {
+     "name": "Горбунова Софья",
+     "phone": "79855130500",
+     "state": 125955,
+     "created": "2023-09-20",
+     "age": 5.0,
+     "uid": 4338449,
+     "test": false
+    },
+    {
+     "name": "Малакеева Ева",
+     "phone": "79854247674",
+     "state": 125955,
+     "created": "2026-08-18",
+     "age": 6.0,
+     "uid": 10799051,
+     "test": false
+    }
+   ]
+  }
+ ],
+ "robo": [
+  {
+   "name": "Бугаков Тимофей",
+   "phone": "79252026779",
+   "state": 345759,
+   "created": "2022-10-11",
+   "age": 4.9,
+   "uid": 3004656,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Красильников Ярослав",
+   "phone": "79165162495",
+   "state": 125955,
+   "created": "2026-08-19",
+   "age": 6.2,
+   "uid": 10811449,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Кычанов Андрей",
+   "phone": "79037945955",
+   "state": 146950,
+   "created": "2022-08-19",
+   "age": 10.1,
+   "uid": 2745623,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Кузнецов Федор",
+   "phone": "79637766599",
+   "state": 345768,
+   "created": "2023-09-12",
+   "age": 7.9,
+   "uid": 4288248,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Червоный Руслан",
+   "phone": "79265672402",
+   "state": 345759,
+   "created": "2022-09-16",
+   "age": 11.4,
+   "uid": 2892680,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Горин Федор",
+   "phone": "79263646859",
+   "state": 125952,
+   "created": "2024-10-01",
+   "age": null,
+   "uid": 6352375,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": "Интересна"
+  },
+  {
+   "name": "Мальков Алексей",
+   "phone": "79035014475",
+   "state": 146950,
+   "created": "2022-09-16",
+   "age": 8.4,
+   "uid": 2891860,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": "хотят ходить, сообщить когда будет известно точное время занятий"
+  },
+  {
+   "name": "Лукьянец Алексей (писать в Телеграмм)",
+   "phone": "79035394798",
+   "state": 125955,
+   "created": "2023-08-30",
+   "age": 5.0,
+   "uid": 4171716,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Новиков Лев (телеграмм)",
+   "phone": "79037219422",
+   "state": 125955,
+   "created": "2023-10-09",
+   "age": 4.6,
+   "uid": 4457716,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Селезнева Алиса",
+   "phone": "79262151015",
+   "state": 146950,
+   "created": "2023-02-28",
+   "age": 5.8,
+   "uid": 3497530,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Смирнов Роман",
+   "phone": "79852280602",
+   "state": 125953,
+   "created": "2022-10-19",
+   "age": 5.0,
+   "uid": 3038728,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Авраменко Макар",
+   "phone": "79995196451",
+   "state": 125955,
+   "created": "2023-11-10",
+   "age": 4.8,
+   "uid": 4625201,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Бахтимиров Кирилл",
+   "phone": "79032126589",
+   "state": 125953,
+   "created": "2026-08-29",
+   "age": null,
+   "uid": 10913568,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Алексей 3",
+   "phone": "79031235856",
+   "state": 146950,
+   "created": "2022-10-24",
+   "age": null,
+   "uid": 3060194,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  },
+  {
+   "name": "Епифанов Мирон",
+   "phone": "79653018671",
+   "state": 125955,
+   "created": "2024-09-12",
+   "age": 6.0,
+   "uid": 6179399,
+   "status": 50509,
+   "group": "2627_Заявки_Робототехника",
+   "comment": ""
+  }
+ ],
+ "chess": [
+  {
+   "name": "Селезнева Дарья",
+   "phone": "79262151015",
+   "state": 125952,
+   "created": "2025-08-27",
+   "age": null,
+   "uid": 8626711,
+   "status": 58132,
+   "group": "2627_ШАХ_Группа 2_пт 19:00 + вс 12:00_6-12 начинающие"
+  },
+  {
+   "name": "Прокопович Владимир",
+   "phone": "79261160071",
+   "state": 125952,
+   "created": "2024-02-12",
+   "age": 8.1,
+   "uid": 5033227,
+   "status": 58132,
+   "group": "2627_ШАХ_Группа 2_пт 19:00 + вс 12:00_6-12 начинающие"
+  },
+  {
+   "name": "Прокопович Владимир",
+   "phone": "79261160071",
+   "state": 125952,
+   "created": "2024-02-12",
+   "age": 8.1,
+   "uid": 5033227,
+   "status": "record",
+   "group": "2627_ШАХ_Группа 2_пт 19:00 + вс 12:00_6-12 начинающие",
+   "date": "2026-09-04",
+   "time": "19:00"
+  },
+  {
+   "name": "Гасанова Айлин",
+   "phone": "79257242175",
+   "state": 125955,
+   "created": "2023-11-22",
+   "age": 7.2,
+   "uid": 4687846,
+   "status": 2,
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие"
+  },
+  {
+   "name": "Кузина Агата",
+   "phone": "79165066662",
+   "state": 125952,
+   "created": "2025-12-30",
+   "age": 6.8,
+   "uid": 9523397,
+   "status": 58132,
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие"
+  },
+  {
+   "name": "Боброва Анна",
+   "phone": "79261317505",
+   "state": 125952,
+   "created": "2026-08-29",
+   "age": 10.0,
+   "uid": 10913605,
+   "status": 58132,
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие"
+  },
+  {
+   "name": "Прокопович Георгий",
+   "phone": "79296423960",
+   "state": 125952,
+   "created": "2022-08-15",
+   "age": 11.4,
+   "uid": 2728621,
+   "status": 58132,
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие"
+  },
+  {
+   "name": "Гасанова Айлин",
+   "phone": "79257242175",
+   "state": 125955,
+   "created": "2023-11-22",
+   "age": 7.2,
+   "uid": 4687846,
+   "status": "record",
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "date": "2026-09-04",
+   "time": "18:00"
+  },
+  {
+   "name": "Гасанова Айлин",
+   "phone": "79257242175",
+   "state": 125955,
+   "created": "2023-11-22",
+   "age": 7.2,
+   "uid": 4687846,
+   "status": "record",
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "date": "2026-09-11",
+   "time": "18:00"
+  },
+  {
+   "name": "Гасанова Айлин",
+   "phone": "79257242175",
+   "state": 125955,
+   "created": "2023-11-22",
+   "age": 7.2,
+   "uid": 4687846,
+   "status": "record",
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "date": "2026-09-06",
+   "time": "11:00"
+  },
+  {
+   "name": "Гасанова Айлин",
+   "phone": "79257242175",
+   "state": 125955,
+   "created": "2023-11-22",
+   "age": 7.2,
+   "uid": 4687846,
+   "status": "record",
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "date": "2026-09-13",
+   "time": "11:00"
+  },
+  {
+   "name": "Кузина Агата",
+   "phone": "79165066662",
+   "state": 125952,
+   "created": "2025-12-30",
+   "age": 6.8,
+   "uid": 9523397,
+   "status": "record",
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "date": "2026-09-04",
+   "time": "18:00"
+  },
+  {
+   "name": "Боброва Анна",
+   "phone": "79261317505",
+   "state": 125952,
+   "created": "2026-08-29",
+   "age": 10.0,
+   "uid": 10913605,
+   "status": "record",
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "date": "2026-09-04",
+   "time": "18:00"
+  },
+  {
+   "name": "Прокопович Георгий",
+   "phone": "79296423960",
+   "state": 125952,
+   "created": "2022-08-15",
+   "age": 11.4,
+   "uid": 2728621,
+   "status": "record",
+   "group": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "date": "2026-09-04",
+   "time": "18:00"
+  },
+  {
+   "name": "Лукьянец Алексей (писать в Телеграмм)",
+   "phone": "79035394798",
+   "state": 125955,
+   "created": "2023-08-30",
+   "age": 5.0,
+   "uid": 4171716,
+   "status": 50509,
+   "group": "2627_ШАХ_Заявки"
+  },
+  {
+   "name": "Мурашов Юрий",
+   "phone": "79161077729",
+   "state": 146950,
+   "created": "2022-08-21",
+   "age": 9.0,
+   "uid": 2752842,
+   "status": 50509,
+   "group": "2627_ШАХ_Заявки"
+  },
+  {
+   "name": "Козловский Глеб",
+   "phone": "79252259553",
+   "state": 125955,
+   "created": "2026-08-27",
+   "age": 6.7,
+   "uid": 10893783,
+   "status": 50509,
+   "group": "2627_ШАХ_Заявки"
+  }
+ ],
+ "groups": [
+  {
+   "id": 727701,
+   "name": "2627_ЛГ Марина_Вт_16:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727702,
+   "name": "2627_ЛГ Марина_Вт_16:50",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727703,
+   "name": "2627_ЛГ Марина_Вт_17:40",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727704,
+   "name": "2627_ЛГ Марина_Вт_18:30",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727705,
+   "name": "2627_ЛГ Марина_Вт_19:20",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 0,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727706,
+   "name": "2627_ЛГ Марина_Чт_16:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727707,
+   "name": "2627_ЛГ Марина_Чт_16:50",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727708,
+   "name": "2627_ЛГ Марина_Чт_17:40",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 1,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727709,
+   "name": "2627_ЛГ Марина_Чт_18:30",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 0,
+   "посетил": 1,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727710,
+   "name": "2627_ЛГ Марина_Чт_19:20",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727711,
+   "name": "2627_ЛГ Марина_Сб_10:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727712,
+   "name": "2627_ЛГ Марина_Сб_10:50",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727714,
+   "name": "2627_ЛГ Марина_Сб_11:40",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727715,
+   "name": "2627_ЛГ Марина_Сб_13:20",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727716,
+   "name": "2627_ЛГ Марина_Сб_12:30",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727717,
+   "name": "2627_ЛГ Марина_Сб_14:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727718,
+   "name": "2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "max": 7,
+   "учится": 4,
+   "посетил": 0,
+   "записался": 2,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727719,
+   "name": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "max": 7,
+   "учится": 7,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727720,
+   "name": "2627_РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3",
+   "subject": "раннее развитие",
+   "max": 7,
+   "учится": 4,
+   "посетил": 0,
+   "записался": 2,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727721,
+   "name": "2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "max": 7,
+   "учится": 3,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727722,
+   "name": "2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2",
+   "subject": "раннее развитие",
+   "max": 7,
+   "учится": 7,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727723,
+   "name": "2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3",
+   "subject": "раннее развитие",
+   "max": 7,
+   "учится": 9,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727724,
+   "name": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "max": 6,
+   "учится": 3,
+   "посетил": 0,
+   "записался": 5,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727725,
+   "name": "2627_РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года",
+   "subject": "раннее развитие",
+   "max": 6,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727726,
+   "name": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "max": 6,
+   "учится": 2,
+   "посетил": 3,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727727,
+   "name": "2627_РР.Первая школа_Группа 4_вс_10:00_1,5 - 2 года",
+   "subject": "раннее развитие",
+   "max": 6,
+   "учится": 0,
+   "посетил": 0,
+   "записался": 2,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727728,
+   "name": "2627_РР.Первая школа_Группа 5_вс_11:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "max": 6,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727729,
+   "name": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "max": 15,
+   "учится": 5,
+   "посетил": 2,
+   "записался": 1,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727730,
+   "name": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "max": 15,
+   "учится": 6,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727731,
+   "name": "2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 2,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727732,
+   "name": "2627_ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 2,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727733,
+   "name": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 6,
+   "посетил": 0,
+   "записался": 3,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727734,
+   "name": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 4,
+   "посетил": 0,
+   "записался": 2,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727735,
+   "name": "2627_ПШ_вт-пт_16:00_4-5 лет_ПШ1 нечитающие (Гр8)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 0,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727737,
+   "name": "2627_ПШ_вт-пт_17:00_5-7 лет_ПШ1 нечитающие (Гр9)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 0,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727738,
+   "name": "2627_ПШ_чт 19:00 + сб 11:00_5-7 лет_ПШ1 нечитающие (Гр13)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 2,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727739,
+   "name": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 2,
+   "посетил": 0,
+   "записался": 3,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727740,
+   "name": "2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 2,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727741,
+   "name": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "max": 8,
+   "учится": 3,
+   "посетил": 0,
+   "записался": 5,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727742,
+   "name": "2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)",
+   "subject": "английский",
+   "max": 8,
+   "учится": 1,
+   "посетил": 2,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727743,
+   "name": "2627_АЯ_вт-чт_19:00_5-8 лет_A1 Movers (Гр8)",
+   "subject": "английский",
+   "max": 8,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727744,
+   "name": "2627_ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины великих художников",
+   "subject": "ИЗО",
+   "max": 8,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727745,
+   "name": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "max": 10,
+   "учится": 6,
+   "посетил": 1,
+   "записался": 2,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727746,
+   "name": "2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка",
+   "subject": "ИЗО",
+   "max": 8,
+   "учится": 4,
+   "посетил": 1,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727747,
+   "name": "2627_ИЗО_Группа 4_пн - ср_19:00_4 - 7 лет_Алфавитная живопись",
+   "subject": "ИЗО",
+   "max": 8,
+   "учится": 0,
+   "посетил": 1,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727748,
+   "name": "2627_ШАХ_Группа 2_пт 19:00 + вс 12:00_6-12 начинающие",
+   "subject": "шахматы",
+   "max": 8,
+   "учится": 0,
+   "посетил": 0,
+   "записался": 2,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727749,
+   "name": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "max": 8,
+   "учится": 3,
+   "посетил": 2,
+   "записался": 4,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727750,
+   "name": "2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)",
+   "subject": "английский",
+   "max": 8,
+   "учится": 2,
+   "посетил": 1,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727751,
+   "name": "2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 2,
+   "посетил": 0,
+   "записался": 2,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727752,
+   "name": "2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 1,
+   "посетил": 1,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727753,
+   "name": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 5,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727754,
+   "name": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 3,
+   "посетил": 1,
+   "записался": 3,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727755,
+   "name": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "max": 8,
+   "учится": 1,
+   "посетил": 3,
+   "записался": 4,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727757,
+   "name": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "subject": "шахматы",
+   "max": 8,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 3,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727758,
+   "name": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "max": 8,
+   "учится": 0,
+   "посетил": 1,
+   "записался": 7,
+   "заявка": 0,
+   "не_пришёл": 1
+  },
+  {
+   "id": 727759,
+   "name": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "max": 8,
+   "учится": 1,
+   "посетил": 1,
+   "записался": 4,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727760,
+   "name": "2627_АЯ_вт-чт_16:00_8-12 лет_Pre-A1 Starters (Гр5)",
+   "subject": "английский",
+   "max": 8,
+   "учится": 0,
+   "посетил": 2,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727763,
+   "name": "2627_ЛГ Елена_Пн_9:30",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727764,
+   "name": "2627_ЛГ Елена_Пн_10:30",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727765,
+   "name": "2627_ЛГ Елена_Пн_18:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 0,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727766,
+   "name": "2627_ЛГ Елена_Ср_19:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727767,
+   "name": "2627_МА_вс_12:30_4-7 лет",
+   "subject": "ментальная арифметика",
+   "max": 6,
+   "учится": 2,
+   "посетил": 0,
+   "записался": 3,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727768,
+   "name": "2627_МА_вс_14:00_7-12 лет",
+   "subject": "ментальная арифметика",
+   "max": 8,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 2,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727769,
+   "name": "2627_ЛГ Елена_Пн_17:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727770,
+   "name": "2627_ЛГ Елена_Пн_19:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727771,
+   "name": "2627_ЛГ Елена_Ср_18:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727772,
+   "name": "2627_ЛГ Елена_Пт_18:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 0,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 1,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727776,
+   "name": "2627_ЛГ Елена_Пт_19:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 0,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727777,
+   "name": "2627_ЛГ Елена_Ср_16:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727778,
+   "name": "2627_ЛГ Елена_Ср_10:30",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727779,
+   "name": "2627_ЛГ Елена_Ср_09:30",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727780,
+   "name": "2627_ЛГ Елена_Пн_16:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 727782,
+   "name": "2627_ЛГ Елена_Пт_16:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 0,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 731647,
+   "name": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "max": 8,
+   "учится": 4,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 731648,
+   "name": "2627_ПШ_ср-пт_18:00_4-5 лет_ПШ1 нечитающие (Гр14)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 2,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 731649,
+   "name": "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)",
+   "subject": "подготовка к школе",
+   "max": 8,
+   "учится": 3,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 731650,
+   "name": "2627_ЛГ Елена_Ср_17:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 731651,
+   "name": "2627_ЛГ Елена_Пт_17:00",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 0,
+   "посетил": 0,
+   "записался": 1,
+   "заявка": 0,
+   "не_пришёл": 0
+  },
+  {
+   "id": 741998,
+   "name": "2627_ЛГ Марина_Сб_09:10",
+   "subject": "логопед",
+   "max": 1,
+   "учится": 1,
+   "посетил": 0,
+   "записался": 0,
+   "заявка": 0,
+   "не_пришёл": 0
+  }
+ ]
+}
