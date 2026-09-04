@@ -193,7 +193,7 @@ display:flex;align-items:center;gap:60px;color:#1C3D00}
     <div class="foot">
       <div class="l"><b>Первое занятие — условно-бесплатное, с диагностикой</b>
         <span>Покажем, где ребёнок сейчас и что подтянуть · Не понравится — платить не нужно</span></div>
-      <div class="r"><b>kidsup.ru</b><span>+7 (495) 120-90-24<br>запись на сайте и по телефону</span></div>
+      <div class="r"><b>KidsUPstart.ru</b><span>+7 (499) 111-38-40<br>запись на сайте и по телефону</span></div>
     </div>
     <div class="note"><span>* KidsUP. Best for our kids — КидсАП. Лучшее нашим детям &nbsp;·&nbsp; ** Cambridge (Кембридж) — международная шкала уровней английского языка</span><span class="age0">0+</span></div>
     __GUIDE__
