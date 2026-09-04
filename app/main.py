@@ -771,10 +771,18 @@ def _enrollment_groups() -> list[dict]:
             "age": (f"{age_lo:g}–{age_hi:g} лет" if age_lo else "—"),
             "enrolled": enrolled, "capacity": cap,
             "free": 0 if buffer else max(0, cap - enrolled),
-            "price_new": pr["lines"][0][2] if pr else None,
-            "price_label": pr["lines"][0][0] if pr else None,
+            "price_new": _price_line(pr, name)[2] if pr else None,
+            "price_label": _price_line(pr, name)[0] if pr else None,
         })
     return out
+
+
+def _price_line(pr, name):
+    """Строка прайса для группы: у нулевого класса — своя, не «Мини-сад, 20 посещений»."""
+    lines = pr["lines"]
+    if "Нулевой" in (name or ""):
+        lines = [l for l in lines if "Нулевой" in l[0]] or lines
+    return lines[0]
 
 
 # --- план обзвона: кого перезаписать на 2026/27 ---------------------------
@@ -2597,7 +2605,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-04.2"
+APP_VERSION = "2026-09-04.3"
 
 
 @app.get("/api/net")
