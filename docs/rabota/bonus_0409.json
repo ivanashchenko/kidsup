@@ -1,0 +1,5200 @@
+{
+ "joins": [
+  {
+   "uid": 8005347,
+   "cid": 727701,
+   "cls": "2627_ЛГ Марина_Вт_16:00",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10081835,
+   "cid": 727702,
+   "cls": "2627_ЛГ Марина_Вт_16:50",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-19",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10813464,
+   "cid": 727702,
+   "cls": "2627_ЛГ Марина_Вт_16:50",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10811449,
+   "cid": 727703,
+   "cls": "2627_ЛГ Марина_Вт_17:40",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3117999,
+   "cid": 727703,
+   "cls": "2627_ЛГ Марина_Вт_17:40",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-09-01",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6826713,
+   "cid": 727704,
+   "cls": "2627_ЛГ Марина_Вт_18:30",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10081835,
+   "cid": 727706,
+   "cls": "2627_ЛГ Марина_Чт_16:00",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3117999,
+   "cid": 727706,
+   "cls": "2627_ЛГ Марина_Чт_16:00",
+   "subject": "логопед",
+   "who": "Аня",
+   "created": "2026-08-23",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10812437,
+   "cid": 727707,
+   "cls": "2627_ЛГ Марина_Чт_16:50",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10813464,
+   "cid": 727708,
+   "cls": "2627_ЛГ Марина_Чт_17:40",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8905198,
+   "cid": 727708,
+   "cls": "2627_ЛГ Марина_Чт_17:40",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-09-01",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-03"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10877115,
+   "cid": 727709,
+   "cls": "2627_ЛГ Марина_Чт_18:30",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10905430,
+   "cid": 727709,
+   "cls": "2627_ЛГ Марина_Чт_18:30",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-03"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3117999,
+   "cid": 727710,
+   "cls": "2627_ЛГ Марина_Чт_19:20",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-30",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8905198,
+   "cid": 727710,
+   "cls": "2627_ЛГ Марина_Чт_19:20",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2728587,
+   "cid": 727711,
+   "cls": "2627_ЛГ Марина_Сб_10:00",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8984135,
+   "cid": 727712,
+   "cls": "2627_ЛГ Марина_Сб_10:50",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6826713,
+   "cid": 727714,
+   "cls": "2627_ЛГ Марина_Сб_11:40",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10813464,
+   "cid": 727715,
+   "cls": "2627_ЛГ Марина_Сб_13:20",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-05"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 3306274,
+   "cid": 727715,
+   "cls": "2627_ЛГ Марина_Сб_13:20",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8005347,
+   "cid": 727716,
+   "cls": "2627_ЛГ Марина_Сб_12:30",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3306274,
+   "cid": 727717,
+   "cls": "2627_ЛГ Марина_Сб_14:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-05"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 6066544,
+   "cid": 727717,
+   "cls": "2627_ЛГ Марина_Сб_14:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10520536,
+   "cid": 727718,
+   "cls": "2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9354850,
+   "cid": 727718,
+   "cls": "2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10790241,
+   "cid": 727718,
+   "cls": "2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9856211,
+   "cid": 727718,
+   "cls": "2627_РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9098053,
+   "cid": 727719,
+   "cls": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9845717,
+   "cid": 727719,
+   "cls": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9606986,
+   "cid": 727719,
+   "cls": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9354850,
+   "cid": 727719,
+   "cls": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10910554,
+   "cid": 727719,
+   "cls": "2627_РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-07"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 9392041,
+   "cid": 727720,
+   "cls": "2627_РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-29",
+   "status": 58132,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 2891569,
+   "cid": 727720,
+   "cls": "2627_РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-09-03",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 7018178,
+   "cid": 727720,
+   "cls": "2627_РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-09-04",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10863058,
+   "cid": 727721,
+   "cls": "2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-24",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10382003,
+   "cid": 727721,
+   "cls": "2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-24",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9856211,
+   "cid": 727721,
+   "cls": "2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10905430,
+   "cid": 727721,
+   "cls": "2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10003931,
+   "cid": 727721,
+   "cls": "2627_РР.Музыка и речь_Группа 1_ср - сб_09:45_1,3 - 1,8",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 4,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10580178,
+   "cid": 727722,
+   "cls": "2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9603273,
+   "cid": 727722,
+   "cls": "2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-26",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9848858,
+   "cid": 727722,
+   "cls": "2627_РР.Музыка и речь_Группа 2_ср - сб_10:45_1,8 - 2,2",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9654125,
+   "cid": 727723,
+   "cls": "2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8977941,
+   "cid": 727723,
+   "cls": "2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-24",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9224788,
+   "cid": 727723,
+   "cls": "2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9176661,
+   "cid": 727723,
+   "cls": "2627_РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10820207,
+   "cid": 727724,
+   "cls": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-20",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10829925,
+   "cid": 727724,
+   "cls": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-23",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10877013,
+   "cid": 727724,
+   "cls": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10905500,
+   "cid": 727724,
+   "cls": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-29",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01",
+    "2026-09-03"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10913617,
+   "cid": 727724,
+   "cls": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-30",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-01",
+    "2026-09-08"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 10003931,
+   "cid": 727724,
+   "cls": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10953051,
+   "cid": 727724,
+   "cls": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-08"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 10518881,
+   "cid": 727724,
+   "cls": "2627_РР.Первая школа_Группа 1_вт - чт_10:00_1,3 - 1,6 года",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-15"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 10910554,
+   "cid": 727725,
+   "cls": "2627_РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-29",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10943569,
+   "cid": 727725,
+   "cls": "2627_РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 50509,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10965633,
+   "cid": 727725,
+   "cls": "2627_РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-08"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 9284810,
+   "cid": 727725,
+   "cls": "2627_РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-09-04",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-08"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 8634892,
+   "cid": 727726,
+   "cls": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-20",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-03"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8736372,
+   "cid": 727726,
+   "cls": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9329474,
+   "cid": 727726,
+   "cls": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-03"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10905396,
+   "cid": 727726,
+   "cls": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-29",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-03"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10946892,
+   "cid": 727726,
+   "cls": "2627_РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-03"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10897314,
+   "cid": 727727,
+   "cls": "2627_РР.Первая школа_Группа 4_вс_10:00_1,5 - 2 года",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-27",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-06"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 10946373,
+   "cid": 727727,
+   "cls": "2627_РР.Первая школа_Группа 4_вс_10:00_1,5 - 2 года",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10952312,
+   "cid": 727727,
+   "cls": "2627_РР.Первая школа_Группа 4_вс_10:00_1,5 - 2 года",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 50509,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9375707,
+   "cid": 727728,
+   "cls": "2627_РР.Первая школа_Группа 5_вс_11:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6778204,
+   "cid": 727728,
+   "cls": "2627_РР.Первая школа_Группа 5_вс_11:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 50509,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8654115,
+   "cid": 727728,
+   "cls": "2627_РР.Первая школа_Группа 5_вс_11:00_2 - 3 года",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-09-04",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7505482,
+   "cid": 727729,
+   "cls": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "who": "Лена",
+   "created": "2026-08-20",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6484822,
+   "cid": 727729,
+   "cls": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "who": "Лена",
+   "created": "2026-08-24",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7507921,
+   "cid": 727729,
+   "cls": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8756746,
+   "cid": 727729,
+   "cls": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "who": "Ира",
+   "created": "2026-08-27",
+   "status": 58131,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6219935,
+   "cid": 727729,
+   "cls": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "who": "Лена",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2969099,
+   "cid": 727729,
+   "cls": "2627_Мини-сад_9:00-13:00",
+   "subject": "мини-сад",
+   "who": "Аня",
+   "created": "2026-08-30",
+   "status": 2,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10801968,
+   "cid": 727730,
+   "cls": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "who": "Лена",
+   "created": "2026-08-18",
+   "status": 58132,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 3320401,
+   "cid": 727730,
+   "cls": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "who": "Аня",
+   "created": "2026-08-23",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4457716,
+   "cid": 727730,
+   "cls": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10351131,
+   "cid": 727730,
+   "cls": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10900916,
+   "cid": 727730,
+   "cls": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6179399,
+   "cid": 727730,
+   "cls": "2627_Нулевой класс_10:00-14:00",
+   "subject": "нулевой класс",
+   "who": "Лена",
+   "created": "2026-08-30",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3038728,
+   "cid": 727731,
+   "cls": "2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-20",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3303447,
+   "cid": 727731,
+   "cls": "2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6026677,
+   "cid": 727731,
+   "cls": "2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-30",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10924567,
+   "cid": 727731,
+   "cls": "2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7211676,
+   "cid": 727731,
+   "cls": "2627_ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-09-03",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10794096,
+   "cid": 727732,
+   "cls": "2627_ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-18",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-05"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 10811449,
+   "cid": 727732,
+   "cls": "2627_ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 4,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10870941,
+   "cid": 727732,
+   "cls": "2627_ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10797590,
+   "cid": 727732,
+   "cls": "2627_ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8145893,
+   "cid": 727733,
+   "cls": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-24",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3281932,
+   "cid": 727733,
+   "cls": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-24",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9396084,
+   "cid": 727733,
+   "cls": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9366638,
+   "cid": 727733,
+   "cls": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6352375,
+   "cid": 727733,
+   "cls": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 5463325,
+   "cid": 727733,
+   "cls": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 5704843,
+   "cid": 727733,
+   "cls": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4172271,
+   "cid": 727733,
+   "cls": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-28",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-07"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 8639373,
+   "cid": 727733,
+   "cls": "2627_ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-07"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 4300951,
+   "cid": 727734,
+   "cls": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-19",
+   "status": 58132,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 9084828,
+   "cid": 727734,
+   "cls": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6071084,
+   "cid": 727734,
+   "cls": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-20",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4352746,
+   "cid": 727734,
+   "cls": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7149410,
+   "cid": 727734,
+   "cls": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4317095,
+   "cid": 727734,
+   "cls": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4920359,
+   "cid": 727734,
+   "cls": "2627_ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-09-02",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-07"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 3310550,
+   "cid": 727735,
+   "cls": "2627_ПШ_вт-пт_16:00_4-5 лет_ПШ1 нечитающие (Гр8)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-29",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10815735,
+   "cid": 727737,
+   "cls": "2627_ПШ_вт-пт_17:00_5-7 лет_ПШ1 нечитающие (Гр9)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 4352746,
+   "cid": 727738,
+   "cls": "2627_ПШ_чт 19:00 + сб 11:00_5-7 лет_ПШ1 нечитающие (Гр13)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-09-01",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 5714571,
+   "cid": 727738,
+   "cls": "2627_ПШ_чт 19:00 + сб 11:00_5-7 лет_ПШ1 нечитающие (Гр13)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10797590,
+   "cid": 727739,
+   "cls": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-19",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3232550,
+   "cid": 727739,
+   "cls": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-23",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8935961,
+   "cid": 727739,
+   "cls": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9396084,
+   "cid": 727739,
+   "cls": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9366638,
+   "cid": 727739,
+   "cls": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10797530,
+   "cid": 727739,
+   "cls": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-26",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8711590,
+   "cid": 727739,
+   "cls": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 5463325,
+   "cid": 727739,
+   "cls": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8694679,
+   "cid": 727739,
+   "cls": "2627_ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-09-01",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 2948770,
+   "cid": 727740,
+   "cls": "2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-29",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2728677,
+   "cid": 727740,
+   "cls": "2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 8935961,
+   "cid": 727740,
+   "cls": "2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4871961,
+   "cid": 727740,
+   "cls": "2627_ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-09-04",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10794024,
+   "cid": 727741,
+   "cls": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-19",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 6502162,
+   "cid": 727741,
+   "cls": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8542588,
+   "cid": 727741,
+   "cls": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-22",
+   "status": 4,
+   "trial_dates": [
+    "2026-09-03"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 9366638,
+   "cid": 727741,
+   "cls": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-22",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10849528,
+   "cid": 727741,
+   "cls": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-23",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10885274,
+   "cid": 727741,
+   "cls": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6384209,
+   "cid": 727741,
+   "cls": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-28",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-03"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10823183,
+   "cid": 727741,
+   "cls": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-30",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 8639779,
+   "cid": 727741,
+   "cls": "2627_АЯ_вт-чт_17:00_5-8 лет_Pre-A1 Starters (Гр6)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6053061,
+   "cid": 727742,
+   "cls": "2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-20",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 5780263,
+   "cid": 727742,
+   "cls": "2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8942176,
+   "cid": 727742,
+   "cls": "2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-27",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-08"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 4352746,
+   "cid": 727742,
+   "cls": "2627_АЯ_вт-чт_18:00_3-5 лет_Pre-A1 Starters (Гр7)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-09-01",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10893783,
+   "cid": 727743,
+   "cls": "2627_АЯ_вт-чт_19:00_5-8 лет_A1 Movers (Гр8)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2728489,
+   "cid": 727744,
+   "cls": "2627_ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины великих художников",
+   "subject": "ИЗО",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10924567,
+   "cid": 727744,
+   "cls": "2627_ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины великих художников",
+   "subject": "ИЗО",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6360019,
+   "cid": 727745,
+   "cls": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3231080,
+   "cid": 727745,
+   "cls": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "who": "Аня",
+   "created": "2026-08-24",
+   "status": 50509,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10871475,
+   "cid": 727745,
+   "cls": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10900916,
+   "cid": 727745,
+   "cls": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4171716,
+   "cid": 727745,
+   "cls": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "who": "Лена",
+   "created": "2026-08-30",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8639779,
+   "cid": 727745,
+   "cls": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8953197,
+   "cid": 727745,
+   "cls": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "who": "Лена",
+   "created": "2026-09-02",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 4172271,
+   "cid": 727745,
+   "cls": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3168440,
+   "cid": 727745,
+   "cls": "2627_ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись",
+   "subject": "ИЗО",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-07"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 8145893,
+   "cid": 727746,
+   "cls": "2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка",
+   "subject": "ИЗО",
+   "who": "Лена",
+   "created": "2026-08-24",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10900916,
+   "cid": 727746,
+   "cls": "2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка",
+   "subject": "ИЗО",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4172271,
+   "cid": 727746,
+   "cls": "2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка",
+   "subject": "ИЗО",
+   "who": "Аня",
+   "created": "2026-08-28",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-07"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 8639779,
+   "cid": 727746,
+   "cls": "2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка",
+   "subject": "ИЗО",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10871475,
+   "cid": 727746,
+   "cls": "2627_ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка",
+   "subject": "ИЗО",
+   "who": "Аня",
+   "created": "2026-09-04",
+   "status": 5,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10797523,
+   "cid": 727747,
+   "cls": "2627_ИЗО_Группа 4_пн - ср_19:00_4 - 7 лет_Алфавитная живопись",
+   "subject": "ИЗО",
+   "who": "Ира",
+   "created": "2026-08-19",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 6053061,
+   "cid": 727747,
+   "cls": "2627_ИЗО_Группа 4_пн - ср_19:00_4 - 7 лет_Алфавитная живопись",
+   "subject": "ИЗО",
+   "who": "Ира",
+   "created": "2026-08-20",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8626711,
+   "cid": 727748,
+   "cls": "2627_ШАХ_Группа 2_пт 19:00 + вс 12:00_6-12 начинающие",
+   "subject": "шахматы",
+   "who": "Лена",
+   "created": "2026-08-30",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-27"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 5033227,
+   "cid": 727748,
+   "cls": "2627_ШАХ_Группа 2_пт 19:00 + вс 12:00_6-12 начинающие",
+   "subject": "шахматы",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10794070,
+   "cid": 727749,
+   "cls": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-19",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10794080,
+   "cid": 727749,
+   "cls": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-20",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10794043,
+   "cid": 727749,
+   "cls": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-20",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-02",
+    "2026-09-07"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 3232550,
+   "cid": 727749,
+   "cls": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-23",
+   "status": 2,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7211676,
+   "cid": 727749,
+   "cls": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-24",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10795444,
+   "cid": 727749,
+   "cls": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-30",
+   "status": 58131,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10924567,
+   "cid": 727749,
+   "cls": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10913568,
+   "cid": 727749,
+   "cls": "2627_АЯ_пн-ср_18:00_5-8 лет_Pre-A1 Starters (Гр3)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-09-01",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9396084,
+   "cid": 727750,
+   "cls": "2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)",
+   "subject": "английский",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9366638,
+   "cid": 727750,
+   "cls": "2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)",
+   "subject": "английский",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3038728,
+   "cid": 727750,
+   "cls": "2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)",
+   "subject": "английский",
+   "who": "Лена",
+   "created": "2026-09-01",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10973580,
+   "cid": 727750,
+   "cls": "2627_АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-09-04",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-07"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 10811884,
+   "cid": 727751,
+   "cls": "2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10894743,
+   "cid": 727751,
+   "cls": "2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10948694,
+   "cid": 727751,
+   "cls": "2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10948746,
+   "cid": 727751,
+   "cls": "2627_ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7211676,
+   "cid": 727752,
+   "cls": "2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-24",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3272560,
+   "cid": 727752,
+   "cls": "2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10594722,
+   "cid": 727752,
+   "cls": "2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-26",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10928586,
+   "cid": 727752,
+   "cls": "2627_ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-31",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-03"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8639373,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-22",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9366638,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-22",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3281932,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-24",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6212353,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 50509,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2728372,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2833747,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4002394,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2907607,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4920359,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-28",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10823183,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-30",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 8639779,
+   "cid": 727753,
+   "cls": "2627_ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10799051,
+   "cid": 727754,
+   "cls": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-20",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10797530,
+   "cid": 727754,
+   "cls": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-26",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10811449,
+   "cid": 727754,
+   "cls": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-31",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10928469,
+   "cid": 727754,
+   "cls": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-09-01",
+   "status": 4,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2878746,
+   "cid": 727754,
+   "cls": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10943772,
+   "cid": 727754,
+   "cls": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-03",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10594722,
+   "cid": 727754,
+   "cls": "2627_ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-08"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 2806692,
+   "cid": 727755,
+   "cls": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-21",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2968588,
+   "cid": 727755,
+   "cls": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-24",
+   "status": 58131,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9117888,
+   "cid": 727755,
+   "cls": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-26",
+   "status": 58131,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2752850,
+   "cid": 727755,
+   "cls": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-26",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 2728348,
+   "cid": 727755,
+   "cls": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-26",
+   "status": 58131,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2728329,
+   "cid": 727755,
+   "cls": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-28",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10500487,
+   "cid": 727755,
+   "cls": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-28",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10905397,
+   "cid": 727755,
+   "cls": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-29",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10950154,
+   "cid": 727755,
+   "cls": "2627_АЯ_пн-ср_19:00_8-12 лет_A1-A2 Movers-Flyers (Гр4)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4687846,
+   "cid": 727757,
+   "cls": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "subject": "шахматы",
+   "who": "Ира",
+   "created": "2026-08-20",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9523397,
+   "cid": 727757,
+   "cls": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "subject": "шахматы",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10913605,
+   "cid": 727757,
+   "cls": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "subject": "шахматы",
+   "who": "Лена",
+   "created": "2026-08-30",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 2728621,
+   "cid": 727757,
+   "cls": "2627_ШАХ_Группа 1_пт 18:00 + вс 11:00_6-12 продолжающие",
+   "subject": "шахматы",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 5974504,
+   "cid": 727758,
+   "cls": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-18",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-18"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 6650056,
+   "cid": 727758,
+   "cls": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-18"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 8699611,
+   "cid": 727758,
+   "cls": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-23",
+   "status": 99336,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6686010,
+   "cid": 727758,
+   "cls": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-27",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6660021,
+   "cid": 727758,
+   "cls": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-27",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6778204,
+   "cid": 727758,
+   "cls": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10905505,
+   "cid": 727758,
+   "cls": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-29",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 4350893,
+   "cid": 727758,
+   "cls": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-29",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10939000,
+   "cid": 727758,
+   "cls": "2627_РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-09-01",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10831844,
+   "cid": 727759,
+   "cls": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-22",
+   "status": 58132,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 10905397,
+   "cid": 727759,
+   "cls": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-29",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10908252,
+   "cid": 727759,
+   "cls": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-08-30",
+   "status": 2,
+   "trial_dates": [
+    "2026-08-31"
+   ],
+   "attended": true,
+   "first_visit": "2026-08-31",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2728361,
+   "cid": 727759,
+   "cls": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "who": "Лена",
+   "created": "2026-08-30",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3168440,
+   "cid": 727759,
+   "cls": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-07"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 8542588,
+   "cid": 727759,
+   "cls": "2627_АЯ_пн-ср_16:00_8-12 лет_Pre-A1 Starters (Гр1)",
+   "subject": "английский",
+   "who": "Лена",
+   "created": "2026-09-03",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-07"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 2728361,
+   "cid": 727760,
+   "cls": "2627_АЯ_вт-чт_16:00_8-12 лет_Pre-A1 Starters (Гр5)",
+   "subject": "английский",
+   "who": "Лена",
+   "created": "2026-08-30",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10921856,
+   "cid": 727760,
+   "cls": "2627_АЯ_вт-чт_16:00_8-12 лет_Pre-A1 Starters (Гр5)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10921932,
+   "cid": 727760,
+   "cls": "2627_АЯ_вт-чт_16:00_8-12 лет_Pre-A1 Starters (Гр5)",
+   "subject": "английский",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 58131,
+   "trial_dates": [
+    "2026-09-01"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-01",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10939730,
+   "cid": 727760,
+   "cls": "2627_АЯ_вт-чт_16:00_8-12 лет_Pre-A1 Starters (Гр5)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-09-01",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-08"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 2728348,
+   "cid": 727760,
+   "cls": "2627_АЯ_вт-чт_16:00_8-12 лет_Pre-A1 Starters (Гр5)",
+   "subject": "английский",
+   "who": "Аня",
+   "created": "2026-09-04",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-08"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 7005162,
+   "cid": 727763,
+   "cls": "2627_ЛГ Елена_Пн_9:30",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7505482,
+   "cid": 727764,
+   "cls": "2627_ЛГ Елена_Пн_10:30",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-20",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7149410,
+   "cid": 727765,
+   "cls": "2627_ЛГ Елена_Пн_18:00",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 50509,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10605983,
+   "cid": 727766,
+   "cls": "2627_ЛГ Елена_Ср_19:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8079654,
+   "cid": 727766,
+   "cls": "2627_ЛГ Елена_Ср_19:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9620934,
+   "cid": 727767,
+   "cls": "2627_МА_вс_12:30_4-7 лет",
+   "subject": "ментальная арифметика",
+   "who": "Ира",
+   "created": "2026-08-20",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8935961,
+   "cid": 727767,
+   "cls": "2627_МА_вс_12:30_4-7 лет",
+   "subject": "ментальная арифметика",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10327647,
+   "cid": 727767,
+   "cls": "2627_МА_вс_12:30_4-7 лет",
+   "subject": "ментальная арифметика",
+   "who": "Лена",
+   "created": "2026-08-26",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-06"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 10948694,
+   "cid": 727767,
+   "cls": "2627_МА_вс_12:30_4-7 лет",
+   "subject": "ментальная арифметика",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 50509,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10948746,
+   "cid": 727767,
+   "cls": "2627_МА_вс_12:30_4-7 лет",
+   "subject": "ментальная арифметика",
+   "who": "Ира",
+   "created": "2026-09-02",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10797642,
+   "cid": 727768,
+   "cls": "2627_МА_вс_14:00_7-12 лет",
+   "subject": "ментальная арифметика",
+   "who": "Лена",
+   "created": "2026-08-18",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-06"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 10794015,
+   "cid": 727768,
+   "cls": "2627_МА_вс_14:00_7-12 лет",
+   "subject": "ментальная арифметика",
+   "who": "Аня",
+   "created": "2026-08-19",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-06"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 9736902,
+   "cid": 727768,
+   "cls": "2627_МА_вс_14:00_7-12 лет",
+   "subject": "ментальная арифметика",
+   "who": "Ира",
+   "created": "2026-08-27",
+   "status": 50509,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 3062320,
+   "cid": 727768,
+   "cls": "2627_МА_вс_14:00_7-12 лет",
+   "subject": "ментальная арифметика",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 5885329,
+   "cid": 727769,
+   "cls": "2627_ЛГ Елена_Пн_17:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10798448,
+   "cid": 727770,
+   "cls": "2627_ЛГ Елена_Пн_19:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-24",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 8079654,
+   "cid": 727770,
+   "cls": "2627_ЛГ Елена_Пн_19:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9084828,
+   "cid": 727771,
+   "cls": "2627_ЛГ Елена_Ср_18:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7149410,
+   "cid": 727772,
+   "cls": "2627_ЛГ Елена_Пт_18:00",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 50509,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10798813,
+   "cid": 727776,
+   "cls": "2627_ЛГ Елена_Пт_19:00",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-20",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-04"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": true
+  },
+  {
+   "uid": 9391889,
+   "cid": 727777,
+   "cls": "2627_ЛГ Елена_Ср_16:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7505482,
+   "cid": 727778,
+   "cls": "2627_ЛГ Елена_Ср_10:30",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-20",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7005162,
+   "cid": 727779,
+   "cls": "2627_ЛГ Елена_Ср_09:30",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9391889,
+   "cid": 727780,
+   "cls": "2627_ЛГ Елена_Пн_16:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10798448,
+   "cid": 727782,
+   "cls": "2627_ЛГ Елена_Пт_16:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-18"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 7989031,
+   "cid": 731647,
+   "cls": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-18",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 6203632,
+   "cid": 731647,
+   "cls": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "who": "Аня",
+   "created": "2026-08-23",
+   "status": 58132,
+   "trial_dates": [
+    "2026-09-18"
+   ],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": true,
+   "past_noshow": false
+  },
+  {
+   "uid": 10876086,
+   "cid": 731647,
+   "cls": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-25",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 7582026,
+   "cid": 731647,
+   "cls": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10928469,
+   "cid": 731647,
+   "cls": "2627_РР.Лицей_ср-пт_16:00_3-4 года_Лицей для малышей (Гр1)",
+   "subject": "раннее развитие",
+   "who": "Лена",
+   "created": "2026-08-31",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 9849905,
+   "cid": 731648,
+   "cls": "2627_ПШ_ср-пт_18:00_4-5 лет_ПШ1 нечитающие (Гр14)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-20",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4317095,
+   "cid": 731648,
+   "cls": "2627_ПШ_ср-пт_18:00_4-5 лет_ПШ1 нечитающие (Гр14)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-27",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10847403,
+   "cid": 731649,
+   "cls": "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)",
+   "subject": "подготовка к школе",
+   "who": "Аня",
+   "created": "2026-08-23",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 4338449,
+   "cid": 731649,
+   "cls": "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-24",
+   "status": 2,
+   "trial_dates": [
+    "2026-09-02"
+   ],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10799051,
+   "cid": 731649,
+   "cls": "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)",
+   "subject": "подготовка к школе",
+   "who": "Лена",
+   "created": "2026-08-24",
+   "status": 2,
+   "trial_dates": [],
+   "attended": true,
+   "first_visit": "2026-09-02",
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10900576,
+   "cid": 731649,
+   "cls": "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-28",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10924567,
+   "cid": 731649,
+   "cls": "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)",
+   "subject": "подготовка к школе",
+   "who": "Ира",
+   "created": "2026-08-31",
+   "status": 4,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 5885329,
+   "cid": 731650,
+   "cls": "2627_ЛГ Елена_Ср_17:00",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-19",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 2728584,
+   "cid": 731651,
+   "cls": "2627_ЛГ Елена_Пт_17:00",
+   "subject": "логопед",
+   "who": "Ира",
+   "created": "2026-08-25",
+   "status": 58132,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  },
+  {
+   "uid": 10915580,
+   "cid": 741998,
+   "cls": "2627_ЛГ Марина_Сб_09:10",
+   "subject": "логопед",
+   "who": "Лена",
+   "created": "2026-08-30",
+   "status": 2,
+   "trial_dates": [],
+   "attended": false,
+   "first_visit": null,
+   "upcoming": false,
+   "past_noshow": false
+  }
+ ],
+ "fam": [
+  {
+   "uid": 8443547,
+   "who": "Аня",
+   "sum": 16400,
+   "dates": [
+    "2026-08-17"
+   ],
+   "kind": "продление",
+   "name": "Смирнов Артем"
+  },
+  {
+   "uid": 10790241,
+   "who": "Аня",
+   "sum": 3690,
+   "dates": [
+    "2026-08-17"
+   ],
+   "kind": "новый",
+   "name": "Дубинина Варвара"
+  },
+  {
+   "uid": 5885329,
+   "who": "Лена",
+   "sum": 8800,
+   "dates": [
+    "2026-08-17",
+    "2026-08-17",
+    "2026-08-24",
+    "2026-08-26"
+   ],
+   "kind": "продление",
+   "name": "Апсатарова Дания"
+  },
+  {
+   "uid": 9084828,
+   "who": "Лена",
+   "sum": 16402.5,
+   "dates": [
+    "2026-08-17",
+    "2026-08-19",
+    "2026-08-26",
+    "2026-08-31",
+    "2026-08-31"
+   ],
+   "kind": "продление",
+   "name": "Кульков Максим"
+  },
+  {
+   "uid": 8079654,
+   "who": "Лена",
+   "sum": 4400,
+   "dates": [
+    "2026-08-17",
+    "2026-08-19"
+   ],
+   "kind": "продление",
+   "name": "Саркулова Камила"
+  },
+  {
+   "uid": 3810408,
+   "who": "Лена",
+   "sum": 11000,
+   "dates": [
+    "2026-08-18"
+   ],
+   "kind": "возврат спящего",
+   "name": "Королев Денис"
+  },
+  {
+   "uid": 10293675,
+   "who": "Лена",
+   "sum": 15800,
+   "dates": [
+    "2026-08-18"
+   ],
+   "kind": "новый",
+   "name": "Зиганшина Екатерина"
+  },
+  {
+   "uid": 7505482,
+   "who": "Лена",
+   "sum": 21550,
+   "dates": [
+    "2026-08-18",
+    "2026-08-25",
+    "2026-09-01"
+   ],
+   "kind": "продление",
+   "name": "Рощепкин Владислав"
+  },
+  {
+   "uid": 10500487,
+   "who": "Лена",
+   "sum": 21070,
+   "dates": [
+    "2026-08-19"
+   ],
+   "kind": "продление",
+   "name": "Исайкин Денис"
+  },
+  {
+   "uid": 10114706,
+   "who": "Лена",
+   "sum": 5125,
+   "dates": [
+    "2026-08-19"
+   ],
+   "kind": "продление",
+   "name": "Слатин Ярослав"
+  },
+  {
+   "uid": 10605983,
+   "who": "Лена",
+   "sum": 4400,
+   "dates": [
+    "2026-08-19",
+    "2026-08-17"
+   ],
+   "kind": "продление",
+   "name": "Таланов Максим"
+  },
+  {
+   "uid": 9391889,
+   "who": "Лена",
+   "sum": 6600,
+   "dates": [
+    "2026-08-19",
+    "2026-08-24",
+    "2026-08-26"
+   ],
+   "kind": "продление",
+   "name": "Зиньковская Дарья"
+  },
+  {
+   "uid": 7005162,
+   "who": "Лена",
+   "sum": 6600,
+   "dates": [
+    "2026-08-19",
+    "2026-08-24",
+    "2026-08-26"
+   ],
+   "kind": "продление",
+   "name": "Зиньковская Виктория"
+  },
+  {
+   "uid": 8694679,
+   "who": "Ира",
+   "sum": 500,
+   "dates": [
+    "2026-08-21"
+   ],
+   "kind": "возврат спящего",
+   "name": "Шальнев Дмитрий"
+  },
+  {
+   "uid": 7018178,
+   "who": "Лена",
+   "sum": 1600,
+   "dates": [
+    "2026-08-24"
+   ],
+   "kind": "продление",
+   "name": "Юмашева Валерия"
+  },
+  {
+   "uid": 7635518,
+   "who": "Лена",
+   "sum": 20700,
+   "dates": [
+    "2026-08-24"
+   ],
+   "kind": "возврат спящего",
+   "name": "Устименко Дарья"
+  },
+  {
+   "uid": 9224788,
+   "who": "Лена",
+   "sum": 11275,
+   "dates": [
+    "2026-08-26",
+    "2026-08-26"
+   ],
+   "kind": "продление",
+   "name": "Казанбаев Амир"
+  },
+  {
+   "uid": 6179399,
+   "who": "Лена",
+   "sum": 10228.38,
+   "dates": [
+    "2026-08-30"
+   ],
+   "kind": "возврат спящего",
+   "name": "Епифанов Мирон"
+  },
+  {
+   "uid": 6484822,
+   "who": "Лена",
+   "sum": 23750,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "возврат спящего",
+   "name": "Киреев Андрей"
+  },
+  {
+   "uid": 4457716,
+   "who": "Лена",
+   "sum": 34000,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "продление",
+   "name": "Новиков Лев (телеграмм)"
+  },
+  {
+   "uid": 9856211,
+   "who": "Лена",
+   "sum": 922.5,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "новый",
+   "name": "Самчук Егор"
+  },
+  {
+   "uid": 9856211,
+   "who": "Ира",
+   "sum": 13825,
+   "dates": [
+    "2026-08-31",
+    "2026-08-31"
+   ],
+   "kind": "новый",
+   "name": "Самчук Егор"
+  },
+  {
+   "uid": 9606986,
+   "who": "Лена",
+   "sum": 5000,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "продление",
+   "name": "Гололобова Нелли"
+  },
+  {
+   "uid": 10834660,
+   "who": "Лена",
+   "sum": 6750,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "новый",
+   "name": "Пиунова Алиса"
+  },
+  {
+   "uid": 10908252,
+   "who": "Ира",
+   "sum": 9225,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "новый",
+   "name": "Шведова Василиса"
+  },
+  {
+   "uid": 10690925,
+   "who": "Ира",
+   "sum": 9802.5,
+   "dates": [
+    "2026-08-31",
+    "2026-08-31"
+   ],
+   "kind": "новый",
+   "name": "Бердюгин Федор"
+  },
+  {
+   "uid": 7149410,
+   "who": "Лена",
+   "sum": 8302.5,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "продление",
+   "name": "Нариманлы Селин"
+  },
+  {
+   "uid": 4317095,
+   "who": "Лена",
+   "sum": 7957.5,
+   "dates": [
+    "2026-08-31",
+    "2026-08-31",
+    "2026-08-31"
+   ],
+   "kind": "возврат спящего",
+   "name": "Волгина София"
+  },
+  {
+   "uid": 8145893,
+   "who": "Лена",
+   "sum": 20587.5,
+   "dates": [
+    "2026-08-31",
+    "2026-08-31",
+    "2026-08-31"
+   ],
+   "kind": "продление",
+   "name": "Макшанов Иван"
+  },
+  {
+   "uid": 10924567,
+   "who": "Ира",
+   "sum": 23242.5,
+   "dates": [
+    "2026-08-31",
+    "2026-09-02",
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Романова Софья"
+  },
+  {
+   "uid": 3232550,
+   "who": "Ира",
+   "sum": 9225,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "возврат спящего",
+   "name": "Гетман Василиса"
+  },
+  {
+   "uid": 10795444,
+   "who": "Лена",
+   "sum": 9225,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "новый",
+   "name": "Родионова Анна"
+  },
+  {
+   "uid": 10797590,
+   "who": "Лена",
+   "sum": 8302.5,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "новый",
+   "name": "Шамраев Лев (писать в макс)"
+  },
+  {
+   "uid": 9117888,
+   "who": "Ира",
+   "sum": 9225,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "продление",
+   "name": "Попов Егор"
+  },
+  {
+   "uid": 10811449,
+   "who": "Ира",
+   "sum": 8302.5,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "новый",
+   "name": "Красильников Ярослав"
+  },
+  {
+   "uid": 2968588,
+   "who": "Лена",
+   "sum": 9225,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "возврат спящего",
+   "name": "Романова Милана (скидка 10% многодет.)"
+  },
+  {
+   "uid": 7507921,
+   "who": "Лена",
+   "sum": 30000,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Асманкин Арсений (телеграмм)"
+  },
+  {
+   "uid": 10877013,
+   "who": "Лена",
+   "sum": 3200,
+   "dates": [
+    "2026-09-01",
+    "2026-09-03"
+   ],
+   "kind": "новый",
+   "name": "Птичкин Борис"
+  },
+  {
+   "uid": 2969099,
+   "who": "Лена",
+   "sum": 37125,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Маринин Михаил"
+  },
+  {
+   "uid": 10910554,
+   "who": "Аня",
+   "sum": 7897.5,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Юдина Варвара"
+  },
+  {
+   "uid": 8861077,
+   "who": "Лена",
+   "sum": 37125,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "продление",
+   "name": "Дубинина Василиса"
+  },
+  {
+   "uid": 10790241,
+   "who": "Лена",
+   "sum": 8662.5,
+   "dates": [
+    "2026-09-01",
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Дубинина Варвара"
+  },
+  {
+   "uid": 8736372,
+   "who": "Лена",
+   "sum": 7897.5,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Малинина Александра"
+  },
+  {
+   "uid": 10351131,
+   "who": "Лена",
+   "sum": 19845,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Лобань Сладислава"
+  },
+  {
+   "uid": 10894743,
+   "who": "Лена",
+   "sum": 8505,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Кийко Анна (писать в макс)"
+  },
+  {
+   "uid": 10811884,
+   "who": "Аня",
+   "sum": 8505,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Сидиков Мухамед Али"
+  },
+  {
+   "uid": 4352746,
+   "who": "Аня",
+   "sum": 12285,
+   "dates": [
+    "2026-09-01",
+    "2026-09-01"
+   ],
+   "kind": "возврат спящего",
+   "name": "Параскив Мария"
+  },
+  {
+   "uid": 10885274,
+   "who": "Аня",
+   "sum": 8505,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Жамова Арина"
+  },
+  {
+   "uid": 3272560,
+   "who": "Аня",
+   "sum": 8505,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "продление",
+   "name": "Садофьев Вова"
+  },
+  {
+   "uid": 2948770,
+   "who": "Лена",
+   "sum": 8505,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Бернард Михаил"
+  },
+  {
+   "uid": 2907607,
+   "who": "Аня",
+   "sum": 8505,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "возврат спящего",
+   "name": "Степанян Даниелла"
+  },
+  {
+   "uid": 10928469,
+   "who": "Лена",
+   "sum": 1600,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Красильникова Милана"
+  },
+  {
+   "uid": 10893783,
+   "who": "Лена",
+   "sum": 68985,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "новый",
+   "name": "Козловский Глеб"
+  },
+  {
+   "uid": 2728389,
+   "who": "Лена",
+   "sum": 1,
+   "dates": [
+    "2026-09-01"
+   ],
+   "kind": "возврат спящего",
+   "name": "Иванащенко Виктория"
+  },
+  {
+   "uid": 9323473,
+   "who": "Лена",
+   "sum": 6500,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "продление",
+   "name": "Головин Матвей"
+  },
+  {
+   "uid": 10003931,
+   "who": "Лена",
+   "sum": 8707.5,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Демьяненко Вероника"
+  },
+  {
+   "uid": 10905430,
+   "who": "Ира",
+   "sum": 9225,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Костанян Марк"
+  },
+  {
+   "uid": 9232493,
+   "who": "Лена",
+   "sum": 10250,
+   "dates": [
+    "2026-09-02",
+    "2026-09-02"
+   ],
+   "kind": "продление",
+   "name": "Шелудько Михаил"
+  },
+  {
+   "uid": 9603273,
+   "who": "Лена",
+   "sum": 9675,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "возврат спящего",
+   "name": "Хохлов Родион"
+  },
+  {
+   "uid": 7958837,
+   "who": "Лена",
+   "sum": 5000,
+   "dates": [
+    "2026-08-31"
+   ],
+   "kind": "продление",
+   "name": "Афанасьева Милица"
+  },
+  {
+   "uid": 10928469,
+   "who": "Ира",
+   "sum": 8505,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Красильникова Милана"
+  },
+  {
+   "uid": 10905397,
+   "who": "Ира",
+   "sum": 8505,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Исаев Федор"
+  },
+  {
+   "uid": 10876086,
+   "who": "Ира",
+   "sum": 8505,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Лемиш Марк"
+  },
+  {
+   "uid": 7582026,
+   "who": "Лена",
+   "sum": 7897.5,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "продление",
+   "name": "Сергеева Анна (скидка 10% многодет.)"
+  },
+  {
+   "uid": 6660021,
+   "who": "Лена",
+   "sum": 5625,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "возврат спящего",
+   "name": "Боликова Варвара"
+  },
+  {
+   "uid": 7989031,
+   "who": "Ира",
+   "sum": 7897.5,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "возврат спящего",
+   "name": "Петуховская Вероника"
+  },
+  {
+   "uid": 3232550,
+   "who": "Лена",
+   "sum": 8302.5,
+   "dates": [
+    "2026-09-02",
+    "2026-09-02"
+   ],
+   "kind": "возврат спящего",
+   "name": "Гетман Василиса"
+  },
+  {
+   "uid": 3038728,
+   "who": "Ира",
+   "sum": 10005,
+   "dates": [
+    "2026-09-02",
+    "2026-09-02"
+   ],
+   "kind": "возврат спящего",
+   "name": "Смирнов Роман"
+  },
+  {
+   "uid": 10799051,
+   "who": "Лена",
+   "sum": 5625,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Малакеева Ева"
+  },
+  {
+   "uid": 10799051,
+   "who": "Ира",
+   "sum": 1500,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Малакеева Ева"
+  },
+  {
+   "uid": 10913568,
+   "who": "Ира",
+   "sum": 8505,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Бахтимиров Кирилл"
+  },
+  {
+   "uid": 10871475,
+   "who": "Ира",
+   "sum": 7087.5,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Бугрова Златослава"
+  },
+  {
+   "uid": 10847403,
+   "who": "Ира",
+   "sum": 10005,
+   "dates": [
+    "2026-09-02",
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Комаров Илья"
+  },
+  {
+   "uid": 10900916,
+   "who": "Лена",
+   "sum": 28665.0,
+   "dates": [
+    "2026-09-02",
+    "2026-09-02",
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Димитров Александр (скидка 10% инвал.)"
+  },
+  {
+   "uid": 10950154,
+   "who": "Ира",
+   "sum": 8505,
+   "dates": [
+    "2026-09-02"
+   ],
+   "kind": "новый",
+   "name": "Исаев Тимур"
+  },
+  {
+   "uid": 10905500,
+   "who": "Лена",
+   "sum": 7020,
+   "dates": [
+    "2026-09-03"
+   ],
+   "kind": "новый",
+   "name": "Алимов Максим"
+  },
+  {
+   "uid": 9329474,
+   "who": "Лена",
+   "sum": 5000,
+   "dates": [
+    "2026-09-03"
+   ],
+   "kind": "продление",
+   "name": "Евтюхина Есения"
+  },
+  {
+   "uid": 10811884,
+   "who": "Лена",
+   "sum": 1500,
+   "dates": [
+    "2026-09-03"
+   ],
+   "kind": "новый",
+   "name": "Сидиков Мухамед Али"
+  },
+  {
+   "uid": 10081835,
+   "who": "Лена",
+   "sum": 2700,
+   "dates": [
+    "2026-09-03"
+   ],
+   "kind": "продление",
+   "name": "Васенкова Александра"
+  },
+  {
+   "uid": 10812437,
+   "who": "Лена",
+   "sum": 2700,
+   "dates": [
+    "2026-09-03"
+   ],
+   "kind": "новый",
+   "name": "Васенкова Афина"
+  },
+  {
+   "uid": 10928586,
+   "who": "Аня",
+   "sum": 7560,
+   "dates": [
+    "2026-09-03"
+   ],
+   "kind": "новый",
+   "name": "Романова Дарина (скидка 10% многодет.)"
+  },
+  {
+   "uid": 5704843,
+   "who": "Лена",
+   "sum": 2000,
+   "dates": [
+    "2026-09-03",
+    "2026-09-03"
+   ],
+   "kind": "продление",
+   "name": "Новикова София"
+  },
+  {
+   "uid": 8905198,
+   "who": "Лена",
+   "sum": 2700,
+   "dates": [
+    "2026-09-03"
+   ],
+   "kind": "возврат спящего",
+   "name": "Яфясов Матвей"
+  },
+  {
+   "uid": 2878746,
+   "who": "Лена",
+   "sum": 9060,
+   "dates": [
+    "2026-09-03",
+    "2026-09-03"
+   ],
+   "kind": "новый",
+   "name": "Завалова Милана"
+  },
+  {
+   "uid": 10943772,
+   "who": "Лена",
+   "sum": 9060,
+   "dates": [
+    "2026-09-03",
+    "2026-09-03"
+   ],
+   "kind": "новый",
+   "name": "Селезнев Сергей"
+  },
+  {
+   "uid": 7018178,
+   "who": "Ира",
+   "sum": 1600,
+   "dates": [
+    "2026-09-04"
+   ],
+   "kind": "продление",
+   "name": "Юмашева Валерия"
+  },
+  {
+   "uid": 2891569,
+   "who": "Ира",
+   "sum": 5850,
+   "dates": [
+    "2026-09-04"
+   ],
+   "kind": "новый",
+   "name": "Степанов Михаил"
+  }
+ ],
+ "second": [
+  {
+   "uid": 9084828,
+   "name": "Кульков Максим",
+   "who": "Лена",
+   "subject": "подготовка к школе"
+  },
+  {
+   "uid": 7505482,
+   "name": "Рощепкин Владислав",
+   "who": "Лена",
+   "subject": "логопед"
+  },
+  {
+   "uid": 8145893,
+   "name": "Макшанов Иван",
+   "who": "Лена",
+   "subject": "ИЗО"
+  },
+  {
+   "uid": 10924567,
+   "name": "Романова Софья",
+   "who": "Ира",
+   "subject": "ИЗО"
+  },
+  {
+   "uid": 3232550,
+   "name": "Гетман Василиса",
+   "who": "Аня",
+   "subject": "английский"
+  },
+  {
+   "uid": 4352746,
+   "name": "Параскив Мария",
+   "who": "Аня",
+   "subject": "подготовка к школе"
+  },
+  {
+   "uid": 3232550,
+   "name": "Гетман Василиса",
+   "who": "Аня",
+   "subject": "английский"
+  }
+ ],
+ "calls": [
+  [
+   "12",
+   "2026-08-17",
+   17
+  ],
+  [
+   "20",
+   "2026-08-17",
+   3
+  ],
+  [
+   "10",
+   "2026-08-17",
+   11
+  ],
+  [
+   "12",
+   "2026-08-18",
+   14
+  ],
+  [
+   "20",
+   "2026-08-18",
+   13
+  ],
+  [
+   "21",
+   "2026-08-18",
+   4
+  ],
+  [
+   "10",
+   "2026-08-18",
+   5
+  ],
+  [
+   "12",
+   "2026-08-19",
+   16
+  ],
+  [
+   "10",
+   "2026-08-19",
+   16
+  ],
+  [
+   "15",
+   "2026-08-19",
+   2
+  ],
+  [
+   "20",
+   "2026-08-19",
+   3
+  ],
+  [
+   "15",
+   "2026-08-20",
+   11
+  ],
+  [
+   "10",
+   "2026-08-20",
+   12
+  ],
+  [
+   "12",
+   "2026-08-20",
+   7
+  ],
+  [
+   "21",
+   "2026-08-20",
+   1
+  ],
+  [
+   "12",
+   "2026-08-21",
+   14
+  ],
+  [
+   "12",
+   "2026-08-22",
+   13
+  ],
+  [
+   "12",
+   "2026-08-23",
+   29
+  ],
+  [
+   "10",
+   "2026-08-24",
+   25
+  ],
+  [
+   "12",
+   "2026-08-24",
+   15
+  ],
+  [
+   "15",
+   "2026-08-24",
+   16
+  ],
+  [
+   "21",
+   "2026-08-24",
+   2
+  ],
+  [
+   "20",
+   "2026-08-24",
+   13
+  ],
+  [
+   "12",
+   "2026-08-25",
+   21
+  ],
+  [
+   "10",
+   "2026-08-25",
+   21
+  ],
+  [
+   "20",
+   "2026-08-25",
+   6
+  ],
+  [
+   "21",
+   "2026-08-25",
+   1
+  ],
+  [
+   "12",
+   "2026-08-26",
+   16
+  ],
+  [
+   "15",
+   "2026-08-26",
+   10
+  ],
+  [
+   "10",
+   "2026-08-26",
+   1
+  ],
+  [
+   "12",
+   "2026-08-27",
+   19
+  ],
+  [
+   "10",
+   "2026-08-27",
+   12
+  ],
+  [
+   "20",
+   "2026-08-27",
+   1
+  ],
+  [
+   "21",
+   "2026-08-27",
+   1
+  ],
+  [
+   "12",
+   "2026-08-28",
+   4
+  ],
+  [
+   "15",
+   "2026-08-28",
+   12
+  ],
+  [
+   "10",
+   "2026-08-28",
+   3
+  ],
+  [
+   "10",
+   "2026-08-29",
+   3
+  ],
+  [
+   "15",
+   "2026-08-29",
+   15
+  ],
+  [
+   "21",
+   "2026-08-29",
+   1
+  ],
+  [
+   "20",
+   "2026-08-29",
+   1
+  ],
+  [
+   "15",
+   "2026-08-30",
+   2
+  ],
+  [
+   "12",
+   "2026-08-30",
+   12
+  ],
+  [
+   "10",
+   "2026-08-30",
+   3
+  ],
+  [
+   "21",
+   "2026-08-30",
+   2
+  ],
+  [
+   "10",
+   "2026-08-31",
+   7
+  ],
+  [
+   "21",
+   "2026-08-31",
+   3
+  ],
+  [
+   "12",
+   "2026-08-31",
+   14
+  ],
+  [
+   "20",
+   "2026-08-31",
+   2
+  ]
+ ]
+}
