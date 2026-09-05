@@ -5,7 +5,7 @@ import re, json, html as H, collections, urllib.request, base64
 B = "/home/user/kidsup"
 esc = lambda x: H.escape(str(x or ""))
 p05 = open(f"{B}/docs/plan_05sen.html", encoding="utf-8").read()
-p06 = open(f"{B}/docs/plan_06sen.html", encoding="utf-8").read()
+p06 = open(f"{B}/docs/rabota/plan_06sen_orig.html", encoding="utf-8").read()
 CSS = re.search(r"<style>.*?</style>", p05, re.S).group(0).replace("</style>", ".w-i{background:#E30613}.pill{white-space:nowrap}.fact td{font-size:14px}</style>")
 A_ = "<span class='w w-a'>Аня</span>"; I_ = "<span class='w w-i'>Ира</span>"; B_ = "<span class='w w-b'>Борис</span>"; L_ = "<span class='w w-l'>Лиза</span>"
 
