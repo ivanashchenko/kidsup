@@ -2639,7 +2639,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-05.19"
+APP_VERSION = "2026-09-05.20"
 
 
 @app.get("/api/net")

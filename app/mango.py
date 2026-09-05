@@ -145,7 +145,7 @@ def report(day: str | None = None, rows: list[dict] | None = None) -> list[dict]
             continue
         ext = r.get("ext") or r["from_ext"]
         s = stats.setdefault(ext, {
-            "admin": names.get(ext, f"доб. {ext}"), "attempts": 0, "answered": 0,
+            "admin": names.get(ext, f"доб. {ext}"), "ext": ext, "attempts": 0, "answered": 0,
             "talk_sec": 0, "numbers": set()})
         s["attempts"] += 1
         s["numbers"].add(r["to_num"])

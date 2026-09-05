@@ -135,6 +135,15 @@ class MoyklassClient:
                 # (29.08.2026: карточка 8030380 с пустым «Телефон 2»), поэтому
                 # пустые значения просто не переотправляем — они и так пусты.
                 attrs.append({"attributeId": a["attributeId"], "value": a["value"]})
+        # attributes в fields — это ДОПОЛНЕНИЕ, а не замена: иначе одна дата
+        # рождения из заявки затирает родителя, второй телефон и остальное
+        # (05.09.2026: так пропадали поля у карточек после заявок с сайта).
+        new_attrs = fields.pop("attributes", None)
+        if new_attrs:
+            by_id = {a["attributeId"]: a for a in attrs}
+            for a in new_attrs:
+                by_id[a["attributeId"]] = a
+            attrs = list(by_id.values())
         if attrs:
             body["attributes"] = attrs
         body.update(fields)

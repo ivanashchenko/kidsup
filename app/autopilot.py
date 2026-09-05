@@ -1659,6 +1659,9 @@ def booking_summary(mk: MoyklassClient) -> None:
     except Exception:
         log.exception("booking_summary: не удалось получить записи")
         return
+    # 03.09 Лебедевой ушли два подтверждения подряд, и во втором стояло время
+    # первой группы. Теперь: одна семья — одно сообщение, у каждой группы своя дата.
+    fam: dict[str, list] = {}
     for j in joins:
         if not _mark("booking_summary", str(j.get("id"))):
             continue
@@ -1670,22 +1673,29 @@ def booking_summary(mk: MoyklassClient) -> None:
         phone = user.get("phone")
         if not phone:
             continue
+        fam.setdefault(str(phone), []).append((j, user, cls))
+    for phone, items in fam.items():
+        today_key = f"{today}:{str(phone)[-10:]}"
+        if _seen("confirm_family", today_key):
+            continue
+        j0, user, _ = items[0]
         nm = _child_name(user.get("name") or "")
         child = _accusative(nm) if nm else "вашего ребёнка"
-        parts = (cls.get("name") or "").split("_")
-        when = " · ".join(p for p in parts[1:3] if p) or "время уточним"
-        # 03.09 Архангельская получила три подтверждения подряд: ручное от админа,
-        # booking_summary и confirm_joins. Одна семья — одно автоподтверждение в день.
-        if _seen("confirm_family", f"{today}:{str(phone)[-10:]}"):
-            continue
-        first = _next_lesson(mk, j.get("userId"), class_id=j.get("classId"))
-        if not first:
+        lines = []
+        for j, u, cls in items:
+            parts = (cls.get("name") or "").split("_")
+            when = " · ".join(p for p in parts[1:3] if p) or "время уточним"
+            first = _next_lesson(mk, j.get("userId"), class_id=j.get("classId"))
+            if first:
+                lines.append(f"{when} — первое занятие {first}")
+        if not lines:
             # запись в группу есть, а на конкретное занятие — нет: слать
             # «записали, ждём» некуда, это и есть источник ложных напоминаний
             log.info("booking_summary: %s — записи на занятие нет, молчим", str(phone)[-4:])
             continue
+        what = ("Занятие: " + lines[0] + ".") if len(lines) == 1 else ("Занятия:\n" + "\n".join("• " + l for l in lines))
         _wa(phone, f"Записали {child} — подтверждаем 🌿\n"
-                   f"Занятие: {when}. Первое занятие — {first}.\n"
+                   f"{what}\n"
                    f"Адрес: б-р Маршала Рокоссовского, 6 к1В, 7-й подъезд, 2 этаж "
                    f"(напротив ТЦ «Янтарь»).\n"
                    f"Ориентир — магазин «Дикси», от него по лестнице наверх.\n"
@@ -1694,8 +1704,8 @@ def booking_summary(mk: MoyklassClient) -> None:
                    f"Первое занятие условно-бесплатное: не понравится — платить не нужно, "
                    f"понравится — войдёт в первый абонемент.\n"
                    f"Сохраните сообщение, накануне напомним 😊", kind="booking")
-        _mark("confirm_family", f"{today}:{str(phone)[-10:]}")
-        log.info("booking_summary: %s → %s", str(phone)[-4:], when)
+        _mark("confirm_family", today_key)
+        log.info("booking_summary: %s → %d групп", str(phone)[-4:], len(lines))
 
 
 def after_trial(mk: MoyklassClient) -> None:
@@ -2318,6 +2328,15 @@ def evening_digest(mk: MoyklassClient) -> None:
     lines = [f"KidsUP · сводка за {_today().strftime('%d.%m')}"]
     try:
         rep = mango.report()
+        # 05.09: доб. 12 подписан «Лена», а в субботу с него звонила Ира.
+        # Имя из карты добавочных оставляем, только если этот человек сегодня
+        # в смене; иначе подписываем добавочным и тем, кто в смене без трубки.
+        duty_names = {_MGR_NAMES.get(a.get("managerId"), "") for a in (_admins_today() or [])}
+        used = {r["admin"] for r in rep}
+        free = [n for n in duty_names if n and n not in used]
+        for r in rep:
+            if duty_names and r["admin"] not in duty_names and not str(r["admin"]).startswith("доб."):
+                r["admin"] = f"доб. {r.get('ext', '')} ({free.pop(0) if free else 'кто-то не из смены'})".replace("доб.  ", "доб. ")
         lines.append("\nЗВОНКИ:")
         for r in rep:
             lines.append(f"• {r['admin']}: набрано {r['attempts']}, дозвон "

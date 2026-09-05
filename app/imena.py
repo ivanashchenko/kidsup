@@ -179,10 +179,17 @@ def watch(mk, days: int = 1) -> int:
     body = (f"В именах карточек снова служебные пометки ({len(fresh)}): {names}. "
             f"Имя — только имя и фамилия ребёнка. Канал общения виден в Wazzup, "
             f"возраст — в дате рождения, скидка и «не звонить» — теги.")
-    mk.post("/v1/company/tasks", {
-        "managerIds": [154181], "categoryId": 104578,
-        "beginDate": f"{date.today()}T06:00:00+00:00",
-        "endDate": f"{date.today()}T17:00:00+00:00", "body": body[:250]})
+    # Решение владельца 03.09: задач в МойКлассе не создаём — пункт в инбокс плана дня.
+    try:
+        from . import db as _db
+        from datetime import datetime as _dt
+        with _db.get_conn() as conn:
+            conn.execute("""CREATE TABLE IF NOT EXISTS plan_inbox (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT,
+                            who TEXT, text TEXT, phone TEXT, source TEXT, done INTEGER DEFAULT 0)""")
+            conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) VALUES (?,?,?,?,?,?)",
+                         (date.today().isoformat(), _dt.now().isoformat(timespec="minutes"), "Лиза", body[:400], "", "сторож имён"))
+    except Exception as e:
+        log.warning("сторож имён: инбокс недоступен: %s", str(e)[:80])
     log.info("сторож имён: %d новых засорённых", len(fresh))
     return len(fresh)
 
