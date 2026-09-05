@@ -21,9 +21,24 @@ _DAY_RE = re.compile(r"(?<![а-яa-z])(пн|вт|ср|чт|пт|сб|вс)(?![а
 
 def _name_days(name: str) -> list[str]:
     """«пн-чт», «ср - сб», «пт 18:00 + вс 11:00», «пн - пт» → дни занятий.
-    Дефис у нас означает ДВА дня в неделю (пн и чт), а не диапазон."""
+    Дефис у нас означает ДВА дня в неделю (пн и чт), а не диапазон.
+    Сад и нулевой класс без дней в имени — ежедневно по будням."""
     low = (name or "").lower()
-    return list(dict.fromkeys(m.group(1) for m in _DAY_RE.finditer(low)))
+    found = list(dict.fromkeys(m.group(1) for m in _DAY_RE.finditer(low)))
+    if not found and ("мини-сад" in low or "нулевой" in low):
+        return DAY_ORDER[:5]
+    return found
+
+
+def _time_for(name: str, day: str) -> str:
+    """Время занятия в конкретный день: «пт 18:00 + вс 11:00» → вс = 11:00;
+    «пн-чт_18:00» → 18:00 для обоих; сад «9:00-13:00» → 9:00."""
+    low = (name or "").lower()
+    m = re.search(day + r"[^0-9]{0,6}(\d{1,2}:\d{2})", low)
+    if m:
+        return m.group(1).zfill(5)
+    t = _TIME_RE.findall(low)
+    return t[0].zfill(5) if t else "99:99"
 
 
 LIVE = (2, 58131, 58132)            # учится · посетил пробное · записан на пробное
@@ -118,18 +133,21 @@ def build(day: str | None = None, subject: str | None = None) -> dict:
                     k["money"], k["cls"] = "оплаты с 01.08 нет", "debt"
             key = re.sub(r"_\d{1,2}:\d{2}.*$", "", name.replace("2627_", ""))   # «ЛГ Марина_Сб»
             m = merged.setdefault(key, {"id": c["id"], "name": key, "short": key.replace("_", " · "), "course": course, "days": days, "times": "по слотам",
-                                        "gdays": gdays, "cap": 0, "live": 0, "paid": 0, "trial": 0, "debt": 0, "kids": [], "lg": True})
+                                        "gdays": gdays, "tday": {d: _time_for(name, d) for d in gdays}, "cap": 0, "live": 0, "paid": 0, "trial": 0, "debt": 0, "kids": [], "lg": True})
             m["cap"] += max(cap, len(kids)); m["live"] += len(kids); m["kids"] += kids
             m["paid"] += sum(1 for k in kids if k["cls"] == "ok"); m["trial"] += sum(1 for k in kids if k["cls"] == "trial"); m["debt"] += sum(1 for k in kids if k["cls"] == "debt")
             continue
         out.append({"id": c["id"], "name": name, "short": name.replace("2627_", ""), "course": course, "days": days, "times": times,
-                    "gdays": gdays, "cap": cap, "live": len(kids), "paid": sum(1 for k in kids if k["cls"] == "ok"),
+                    "gdays": gdays, "tday": {d: _time_for(name, d) for d in gdays}, "cap": cap, "live": len(kids), "paid": sum(1 for k in kids if k["cls"] == "ok"),
                     "trial": sum(1 for k in kids if k["cls"] == "trial"), "debt": sum(1 for k in kids if k["cls"] == "debt"),
                     "kids": kids})
     for m in merged.values():
         m["kids"].sort(key=lambda k: k.get("slot", ""))
         out.append(m)
-    out.sort(key=lambda g: (g["course"], DAY_ORDER.index(g["gdays"][0]) if g["gdays"] else 9, g["times"]))
+    if day:
+        out.sort(key=lambda g: (g["tday"].get(day, "99:99"), g["course"], g["short"]))
+    else:
+        out.sort(key=lambda g: (DAY_ORDER.index(g["gdays"][0]) if g["gdays"] else 9, g["tday"].get(g["gdays"][0], "99:99") if g["gdays"] else "99:99", g["course"]))
     return {"groups": out, "synced": db.get_state("last_light_sync") or db.get_state("last_sync"),
             "built": dt.datetime.now().strftime("%H:%M")}
 
@@ -169,7 +187,28 @@ def page(day: str | None, subject: str | None, print_mode: bool) -> str:
          f"<div class='sum'>Групп {len(G)} · мест {tot_cap} · живых записей <b>{tot_live}</b> · оплачено <b style='color:#3d6e0e'>{tot_paid}</b> · не оплатили <b style='color:#a30d15'>{tot_debt}</b> · "
          f"<span class='pill ok'>оплачено</span> <span class='pill trial'>записан на пробное</span> <span class='pill debt'>был / учится без оплаты — дожать</span></div>",
          "<div class='wrap'>"]
-    for g in G:
+    def card(g, dsel):
+        klass = "full" if g["live"] >= g["cap"] else ("thin" if g["live"] <= 2 else "")
+        when = f"{DAY_LABEL[dsel]} {g['tday'].get(dsel, '')}" if dsel else f"{g['days']} · {g['times']}"
+        return (f"<div class='g {klass}'><h3>{esc(g['short'])}</h3><div class='m'><span><b>{esc(when)}</b>{(' · все дни: ' + esc(g['days']) + ' ' + esc(g['times'])) if dsel and len(g['gdays']) > 1 else ''}</span><span>мест <b>{g['cap']}</b></span><span>живых <b>{g['live']}</b></span><span>оплачено <b>{g['paid']}</b></span><span>пробных <b>{g['trial']}</b></span><span>дожать <b>{g['debt']}</b></span></div><table>"
+                + "".join(f"<tr><td class='n'>{esc(k.get('slot')) if g.get('lg') else i}</td><td class='chk'><span></span></td><td><b>{esc(k['name'])}</b><br><span style='color:#777;font-size:11px'>{esc(k['status'])}{(' · был ' + k['last']) if k['last'] else ''}</span></td><td class='ph'>{esc(k['phone'])}</td><td><span class='pill {k['cls']}'>{esc(k['money'])}</span></td></tr>" for i, k in enumerate(g["kids"], 1))
+                + "".join(f"<tr class='empty'><td class='n'>{i}</td><td class='chk'><span></span></td><td></td><td></td><td></td></tr>" for i in range(len(g["kids"]) + 1, max(g["cap"], len(g["kids"])) + 1))
+                + "</table></div>")
+    if day:
+        for g in G:
+            h.append(card(g, day))
+    else:
+        h.pop()   # вместо одной сетки — секция на каждый день недели, группы по времени
+        for dsel in DAY_ORDER:
+            todays = sorted([g for g in G if dsel in g["gdays"]], key=lambda g: (g["tday"].get(dsel, "99:99"), g["course"]))
+            if not todays:
+                continue
+            h.append(f"<h2 style='margin:18px 16px 0;color:#312783'>{ {'пн':'Понедельник','вт':'Вторник','ср':'Среда','чт':'Четверг','пт':'Пятница','сб':'Суббота','вс':'Воскресенье'}[dsel] } — {len(todays)} групп</h2><div class='wrap'>")
+            for g in todays:
+                h.append(card(g, dsel))
+            h.append("</div>")
+        h.append("<div style='display:none'>")
+    for g in []:
         klass = "full" if g["live"] >= g["cap"] else ("thin" if g["live"] <= 2 else "")
         h.append(f"<div class='g {klass}'><h3>{esc(g['short'])}</h3><div class='m'><span>{esc(g['days'])} · {esc(g['times'])}</span><span>мест <b>{g['cap']}</b></span><span>живых <b>{g['live']}</b></span><span>оплачено <b>{g['paid']}</b></span><span>пробных <b>{g['trial']}</b></span><span>дожать <b>{g['debt']}</b></span></div><table>")
         for i, k in enumerate(g["kids"], 1):
