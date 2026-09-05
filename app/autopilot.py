@@ -1415,7 +1415,7 @@ def trial_reminder(mk: MoyklassClient) -> None:
         log.info("напоминание о пробном: %s на %s", phone[-4:], when)
 
 
-def _next_lesson(mk: MoyklassClient, uid: int, days: int = 21) -> str:
+def _next_lesson(mk: MoyklassClient, uid: int, days: int = 21, class_id: int | None = None) -> str:
     """Ближайшее БУДУЩЕЕ занятие, на которое записан именно этот ребёнок:
     «7 сентября в 18:00». Пусто — записи на конкретное занятие нет.
 
@@ -1433,6 +1433,11 @@ def _next_lesson(mk: MoyklassClient, uid: int, days: int = 21) -> str:
     except Exception:
         return ""
     now_hm = _now().strftime("%H:%M")
+    # 05.09 Русанову ушло «МА · вс. Первое занятие — 11 сентября в 19:00»: группа
+    # из одной записи, дата из другой (шахматы). Когда известна группа — дата
+    # берётся только из занятий этой группы.
+    if class_id:
+        rows = [r for r in rows if (r.get("lesson") or {}).get("classId") == class_id] or rows
     dates = sorted(((r.get("lesson") or {}).get("date"), ((r.get("lesson") or {}).get("beginTime") or "")[:5])
                    for r in rows if (r.get("lesson") or {}).get("date"))
     dates = [(d, t) for d, t in dates if d > today or (d == today and t > now_hm)]
@@ -1673,7 +1678,7 @@ def booking_summary(mk: MoyklassClient) -> None:
         # booking_summary и confirm_joins. Одна семья — одно автоподтверждение в день.
         if _seen("confirm_family", f"{today}:{str(phone)[-10:]}"):
             continue
-        first = _next_lesson(mk, j.get("userId"))
+        first = _next_lesson(mk, j.get("userId"), class_id=j.get("classId"))
         if not first:
             # запись в группу есть, а на конкретное занятие — нет: слать
             # «записали, ждём» некуда, это и есть источник ложных напоминаний
@@ -2435,6 +2440,21 @@ def izvinenie_0109() -> dict:
     return {"отправлено": sent, "оставлено_админу": waiting, "повтор": skipped}
 
 
+def _recent_out(phone: str, hours: int = 3) -> bool:
+    """Мы (админ или робот) писали этому номеру за последние hours часов.
+    05.09 Шамановой в 13:04 ушёл догон «звонили — не дозвонились», когда
+    админ уже десять минут переписывался с ней о Лицее."""
+    p = "".join(ch for ch in str(phone or "") if ch.isdigit())[-10:]
+    since = (_now() - timedelta(hours=hours)).isoformat()
+    try:
+        with db.get_conn() as conn:
+            row = conn.execute("SELECT 1 FROM wazzup_outbox WHERE substr(phone,-10)=? AND ts>=? LIMIT 1",
+                               (p, since)).fetchone()
+        return bool(row)
+    except Exception:
+        return False
+
+
 def _converted_since(phone: str, since: str) -> str:
     """Что произошло с семьёй ПОСЛЕ недозвона: оплата или приход на занятие.
 
@@ -2482,6 +2502,9 @@ def missed_calls(days: list[str] | None = None) -> None:
             if done:
                 log.info("missed_calls: %s — %s после недозвона, догон не нужен",
                          phone[-4:], done)
+                continue
+            if _recent_out(phone, 3):
+                log.info("missed_calls: %s — с семьёй переписывались за последние 3 ч, догон не нужен", phone[-4:])
                 continue
             kind, child = _missed_kind(mk, phone)
             if kind == "team":
