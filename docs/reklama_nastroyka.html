@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Запуск рекламы: Директ и VK</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .4rem;text-wrap:balance}
+h3{font-size:1.03rem;font-weight:730;margin:1.6rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+code{background:var(--fill);padding:.1rem .35rem;border-radius:5px;font-size:.88em;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+.step{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:1rem 1.15rem;margin:.75rem 0;display:grid;grid-template-columns:2.1rem 1fr;gap:.85rem;align-items:start}
+.step .num{font-size:1.3rem;font-weight:800;color:var(--indigo);line-height:1.2;font-variant-numeric:tabular-nums}
+.step b{display:block;font-weight:740;margin-bottom:.25rem;font-size:1.01rem}
+.step p{margin:.3rem 0;font-size:.93rem}
+.step ul{margin:.4rem 0;padding-left:1.15rem;font-size:.93rem} .step li{margin:.25rem 0}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.35rem 0}
+.tpl{background:var(--fill);border:1px solid var(--line);border-radius:9px;
+  padding:.7rem .9rem;margin:.55rem 0;font-size:.92rem;max-width:47rem}
+.tpl em{display:block;font-style:normal;font-size:.74rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.25rem}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} }
+
+.chk{display:grid;grid-template-columns:1.6rem 1fr;gap:.6rem;align-items:start;padding:.55rem 0;border-bottom:1px solid var(--line)}
+.chk input{width:1.15rem;height:1.15rem;margin-top:.15rem;cursor:pointer}
+.chk.done label{color:var(--muted);text-decoration:line-through}
+.chk label{cursor:pointer;font-size:.95rem} .chk .me{display:block;color:var(--sky);font-size:.85rem;margin-top:.15rem}
+.who{font-size:.7rem;font-weight:750;letter-spacing:.07em;text-transform:uppercase;padding:.12rem .5rem;border-radius:999px;background:var(--indigo-soft);color:var(--indigo);margin-right:.4rem}
+.ad{background:var(--fill);border-radius:9px;padding:.7rem .9rem;margin:.5rem 0;font-size:.92rem} .ad b{display:block;color:var(--indigo)} .ad small{color:var(--muted)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}
+</style>
+<div class='wrap'>
+<div class='kicker'>Реклама · сентябрь 2026</div><h1>Запуск рекламы: Директ и VK</h1>
+<p class='sub'>Что делаешь ты (галочки сохраняются в браузере) и что после каждого шага делаю я. Ниже — готовая структура кампаний: как получу токены, запуск займёт один день.</p>
+<section><div class='seclabel'>Шаги</div><h2>Яндекс Директ и Метрика — 7 шагов</h2><div class='tpl'><div class='chk' data-k='d1'><input type='checkbox' id='cd1'><label for='cd1'><span class='who'>Борис</span>Выбрать логин Яндекса для рекламного кабинета (лучше отдельный рабочий, не личный). Зайти на direct.yandex.ru под ним, принять оферту.</label></div><div class='chk' data-k='d2'><input type='checkbox' id='cd2'><label for='cd2'><span class='who'>Борис</span>В Директе заполнить данные рекламодателя для маркировки: ИНН, форма (ИП/ООО), юридический адрес. Меню «Настройки» → «Данные рекламодателя». Без этого объявления не пройдут модерацию.</label></div><div class='chk' data-k='d3'><input type='checkbox' id='cd3'><label for='cd3'><span class='who'>Борис</span>На oauth.yandex.ru → «Создать приложение»: название «KidsUP реклама», платформа «Веб-сервисы», Redirect URI <code>https://oauth.yandex.ru/verification_code</code>. Права: «Яндекс Директ — использование API», «Яндекс Метрика — получение статистики, чтение параметров счётчиков» и «управление счётчиками». Прислать мне ClientID.<span class=me>→ Клод: собираю ссылку авторизации и присылаю тебе</span></label></div><div class='chk' data-k='d4'><input type='checkbox' id='cd4'><label for='cd4'><span class='who'>Борис</span>В Директе: «Инструменты» → «API» → «Подать заявку на доступ», вариант «самостоятельная работа с API». Ответ обычно за рабочий день.<span class=me>→ Клод: проверяю доступ, готовлю кампании в черновиках</span></label></div><div class='chk' data-k='d5'><input type='checkbox' id='cd5'><label for='cd5'><span class='who'>Борис</span>Открыть мою ссылку под тем же логином, нажать «Разрешить», прислать мне токен лично, не в чат админов. Токен даёт право тратить бюджет.<span class=me>→ Клод: кладу в настройки сервера, доступа у админов нет</span></label></div><div class='chk' data-k='d6'><input type='checkbox' id='cd6'><label for='cd6'><span class='who'>Борис</span>Пополнить счёт Директа: 30 000 ₽ на две недели (2 000 ₽ в день). Оплата с расчётного счёта или картой из кабинета.<span class=me>→ Клод: включаю кампании в тот же день, отчёт в плане дня</span></label></div><div class='chk' data-k='d7'><input type='checkbox' id='cd7'><label for='cd7'><span class='who'>Борис</span>Метрика: counter 69569509 → «Настройка» → «Доступ» → добавить тот же логин с правом «Редактирование».<span class=me>→ Клод: настраиваю цели «заявка», «звонок Roistat», «клик WhatsApp», связываю с Директом</span></label></div></div>
+<h2>VK Реклама и сообщество — 5 шагов</h2><div class='tpl'><div class='chk' data-k='v1'><input type='checkbox' id='cv1'><label for='cv1'><span class='who'>Борис</span>Зайти на ads.vk.com под своим VK ID, создать рекламный кабинет «KidsUP». Заполнить данные рекламодателя (ИНН) для маркировки.</label></div><div class='chk' data-k='v2'><input type='checkbox' id='cv2'><label for='cv2'><span class='who'>Борис</span>В кабинете: «Настройки» → «Доступ к API» → создать приложение, прислать мне client_id и client_secret лично.<span class=me>→ Клод: подключаюсь, создаю кампании в черновиках</span></label></div><div class='chk' data-k='v3'><input type='checkbox' id='cv3'><label for='cv3'><span class='who'>Борис</span>Пополнить счёт VK Реклама: 20 000 ₽ на две недели (1 000–1 500 ₽ в день).<span class=me>→ Клод: запуск в тот же день</span></label></div><div class='chk' data-k='v4'><input type='checkbox' id='cv4'><label for='cv4'><span class='who'>Борис</span>Сообщество KidsUP ВКонтакте (vk.com/club220359229): «Управление» → «Работа с API» → «Ключи доступа» → создать ключ с правами «стена», «сообщения сообщества», «фотографии», «документы». Прислать мне.<span class=me>→ Клод: публикую посты, отвечаю на сообщения сообщества, веду лид-формы</span></label></div><div class='chk' data-k='v5'><input type='checkbox' id='cv5'><label for='cv5'><span class='who'>Борис</span>В сообществе включить «Сообщения сообщества» и приложение «Заявки» (лид-формы).<span class=me>→ Клод: лид-формы уходят в CRM как заявки с источником «VK»</span></label></div></div>
+<p class='note'>Ключи храню только в настройках сервера (settings: yandex_direct_token, yandex_metrika_token, vk_ads_client, vk_group_token). В общую страницу паролей админов они не попадают.</p></section>
+<section><div class='seclabel'>Что запускаем</div><h2>Директ — 4 кампании, 2 000 ₽ в день</h2>
+<div class='tbl'><table><tr><th>Кампания</th><th>Тип</th><th>Бюджет/день</th><th>Гео</th><th>Ключевые фразы (ядро)</th><th>Куда ведём</th></tr><tr><td>ПШ · подготовка к школе</td><td>Поиск</td><td>700 ₽</td><td>Богородское, Метрогородок, Преображенское, Гольяново; радиус 3 км от центра</td><td class='small'>подготовка к школе бульвар рокоссовского · подготовка к школе богородское · подготовка к школе метрогородок · научить ребёнка читать 5 лет · курсы подготовки к школе вао · подготовка к школе 6 лет рядом</td><td>kidsup.ru/#psh</td></tr><tr><td>АЯ · английский детям</td><td>Поиск</td><td>500 ₽</td><td>те же</td><td class='small'>английский для детей богородское · английский для детей бульвар рокоссовского · английский для дошкольников вао · английский язык для детей 7 лет метрогородок · cambridge english kids москва восток</td><td>kidsup.ru/#english</td></tr><tr><td>Центр · РР, сад, логопед</td><td>Поиск</td><td>400 ₽</td><td>те же</td><td class='small'>детский центр бульвар рокоссовского · развивающие занятия 2 года богородское · мини сад богородское · логопед богородское · детский развивающий центр метрогородок · шахматы для детей вао · ментальная арифметика детям вао</td><td>kidsup.ru</td></tr><tr><td>РСЯ · ретаргет + гео</td><td>Сети</td><td>400 ₽</td><td>радиус 3 км + посетители сайта 30 дней</td><td class='small'>аудитории: посетители kidsup.ru без заявки; интересы «дошкольное образование», «детские кружки»; родители детей 2–10</td><td>kidsup.ru с UTM</td></tr></table></div><p class='small'><b>Минус-слова:</b> бесплатно скачать, вакансии, работа, зарплата, онлайн курсы, для взрослых, реферат, презентация, конспект, программа фгос, купить книгу, тетрадь, распечатать, видео уроки, репетитор на дом. <b>Стратегия:</b> ручные ставки с оптимизацией конверсий по цели «заявка», ограничение недельного бюджета. <b>Время показа:</b> 8:00–22:00, в выходные тоже. <b>Стоп-правило:</b> стоимость заявки выше 1 500 ₽ три дня подряд — кампания на паузу и переработка.</p>
+<h3>Тексты объявлений (заголовок ≤ 56, текст ≤ 81)</h3><div class='two'><div class='ad'><b>Подготовка к школе у м. Бульвар Рокоссовского</b>Читаем за 3 месяца. Группы 6–8 детей, будни и суббота. Первое занятие условно-бесплатное.<small>уточнения: 5 минут от метро · педагоги с опытом 10+ лет · диагностика чтения</small></div><div class='ad'><b>Английский для детей 3–12 лет — Cambridge</b>Говорят с первого занятия. Уровни Starters, Movers, Flyers. Первое занятие условно-бесплатное.<small>быстрые ссылки: расписание · педагоги · цены · записаться</small></div><div class='ad'><b>Детский центр KidsUP — Богородское</b>Раннее развитие с 1,3 года, мини-сад, логопед, ИЗО, шахматы. Запись на первое занятие.<small>адрес в объявлении: б-р Маршала Рокоссовского, 6к1В</small></div><div class='ad'><b>Мини-сад с английским, 9:00–13:00</b>Группа до 8 детей, педагог и английский каждый день. Бесплатный пробный день.<small>только для сада и нулевого класса допустимо «бесплатный пробный день»</small></div></div>
+<h2>VK Реклама — 2 кампании, 1 000–1 500 ₽ в день</h2><div class='tbl'><table><tr><th>Кампания</th><th>Цель</th><th>Аудитория</th><th>Формат</th><th>Бюджет/день</th></tr><tr><td>Лид-форма · первое занятие</td><td>Заявки в лид-форму</td><td>родители детей 2–10 лет, гео радиус 3 км от б-р Рокоссовского 6к1В, интересы «дети», «образование», «семья»; исключить подписчиков</td><td>Универсальная запись с фото педагога + кнопка «Записаться»</td><td>800 ₽</td></tr><tr><td>Ретаргет · сайт и подписчики</td><td>Переходы на сайт</td><td>пиксель VK-RTRG-401784-8crag (посетители 30 дней) + подписчики сообщества и их друзья с детьми</td><td>Карусель направлений (ПШ, АЯ, РР, шахматы, МА, робототехника)</td><td>400 ₽</td></tr></table></div><p class='small'>Креативы делаю из макетов (/makety): фото педагогов с сайта, фирменные цвета, без «бесплатно» и без процентов. Лид-форма: имя ребёнка, возраст, телефон, направление; заявка падает в CRM как «новый лид» с источником VK, дежурная перезванивает за 30 минут по правилу мгновенного перезвона.</p>
+<h2>Разметка и учёт</h2><div class='tpl'><p class='small'><b>UTM:</b> utm_source=yandex|vk · utm_medium=cpc · utm_campaign=psh|aya|centr|rsya|vk_lead|vk_retarget · utm_content=номер объявления · utm_term={{keyword}}. Форма сайта уже сохраняет UTM и roistat_visit в заявку, Roistat подменяет номер на +7 (499) 877-54-09 для звонков с рекламы.</p><p class='small'><b>Цели Метрики:</b> «заявка» (отправка формы), «звонок» (Roistat), «клик WhatsApp», «просмотр расписания». <b>Отчёт:</b> каждый день в плане дня строка «реклама: расход / заявки / стоимость заявки / записей на первое занятие» по каждому каналу; в воскресенье — итог недели.</p><p class='small'><b>Что считаем успехом за две недели:</b> 60 заявок, стоимость заявки до 800 ₽, 30 первых занятий, 15 абонементов — это окупает бюджет 50 000 ₽ с первого месяца.</p></div></section>
+</div>
+<script>
+(function(){var KEY='reklama_nastroyka_v1',st={};try{st=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
+document.querySelectorAll('.chk').forEach(function(d){var k=d.dataset.k,i=d.querySelector('input');if(st[k]){i.checked=true;d.classList.add('done')}
+i.addEventListener('change',function(){st[k]=i.checked;d.classList.toggle('done',i.checked);try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}})});})();
+</script>
+</body></html>
