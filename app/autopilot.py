@@ -1062,13 +1062,20 @@ def _wa_unanswered(phone: str) -> bool:
 # стоит в одной точке — через _wa проходят все автосообщения, и добавить
 # новый сценарий в обход рабочего дня теперь нельзя.
 WA_HOUR_FROM, WA_HOUR_TO = 9, 20
+# По выходным центр открывается в 10:00 (решение владельца 05.09): сообщение
+# в 9:03 субботы «уже перезваниваем» никто не подкрепит звонком ещё час.
+WA_HOUR_FROM_WEEKEND = 10
+
+
+def _wa_hour_from() -> int:
+    return WA_HOUR_FROM_WEEKEND if _now().weekday() >= 5 else WA_HOUR_FROM
 
 
 def _wa(phone: str, text: str, mode: str = "broadcast",
         kind: str = "") -> bool | None:
     """broadcast — во все мессенджеры (WhatsApp+Telegram+MAX): у кого какой есть."""
     hour = _now().hour
-    if not (WA_HOUR_FROM <= hour < WA_HOUR_TO) \
+    if not (_wa_hour_from() <= hour < WA_HOUR_TO) \
             and phone != (db.get_setting("digest_phone") or ""):
         log.info("wazzup: %s — сейчас %d:00 МСК, вне рабочих часов, не пишем",
                  phone[-4:], hour)
