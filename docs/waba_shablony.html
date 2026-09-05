@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Шаблоны WABA после отказа 04.09</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .4rem;text-wrap:balance}
+h3{font-size:1.03rem;font-weight:730;margin:1.6rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+code{background:var(--fill);padding:.1rem .35rem;border-radius:5px;font-size:.88em;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+.step{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:1rem 1.15rem;margin:.75rem 0;display:grid;grid-template-columns:2.1rem 1fr;gap:.85rem;align-items:start}
+.step .num{font-size:1.3rem;font-weight:800;color:var(--indigo);line-height:1.2;font-variant-numeric:tabular-nums}
+.step b{display:block;font-weight:740;margin-bottom:.25rem;font-size:1.01rem}
+.step p{margin:.3rem 0;font-size:.93rem}
+.step ul{margin:.4rem 0;padding-left:1.15rem;font-size:.93rem} .step li{margin:.25rem 0}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.35rem 0}
+.tpl{background:var(--fill);border:1px solid var(--line);border-radius:9px;
+  padding:.7rem .9rem;margin:.55rem 0;font-size:.92rem;max-width:47rem}
+.tpl em{display:block;font-style:normal;font-size:.74rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.25rem}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} }
+
+.tpl{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem 1.15rem;margin:.9rem 0}
+.tpl .hd{display:flex;flex-wrap:wrap;gap:.5rem .8rem;align-items:baseline;margin-bottom:.5rem}
+.tpl .hd b{font-size:1.02rem}
+.tag{font-size:.7rem;font-weight:750;letter-spacing:.07em;text-transform:uppercase;padding:.15rem .5rem;border-radius:999px;background:var(--fill);color:var(--muted)}
+.tag.m{background:var(--indigo-soft);color:var(--indigo)} .tag.u{background:var(--green-soft);color:var(--green)} .tag.r{background:var(--amber-soft);color:var(--amber)}
+.body{white-space:pre-wrap;background:var(--fill);border-radius:9px;padding:.8rem .95rem;font-size:.95rem;line-height:1.5;max-width:none}
+.meta{font-size:.86rem;color:var(--muted);margin-top:.55rem} .meta b{color:var(--ink);font-weight:650}
+.btns{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+.btns span{border:1px solid var(--sky);color:var(--sky);border-radius:999px;padding:.15rem .7rem;font-size:.85rem}
+.btns span.off{border-color:var(--line);color:var(--muted)}
+.copy{float:right;font:inherit;font-size:.8rem;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:.25rem .6rem;cursor:pointer}
+.copy:hover{border-color:var(--sky)}
+.why{background:var(--amber-soft);border-radius:12px;padding:1rem 1.15rem;margin:1rem 0}
+.why ol{margin:.4rem 0;padding-left:1.2rem} .why li{margin:.35rem 0;font-size:.95rem}
+.ok{background:var(--green-soft);border-radius:12px;padding:1rem 1.15rem;margin:1rem 0}
+.ok ol{margin:.4rem 0;padding-left:1.2rem} .ok li{margin:.35rem 0;font-size:.95rem}
+.note{font-size:.9rem;color:var(--muted)}
+</style>
+<div class='wrap'>
+<div class='kicker'>WABA · номер 79199683507 · после отказа Meta 04.09</div>
+<h1>Шаблоны WhatsApp, которые должны пройти модерацию</h1>
+<p class='sub'>Пять маркетинговых текстов на выбор и четыре сервисных для записавшихся. Каждый без списка групп, без дат, без слов «бесплатно», «скидка», «гарантия», без ссылок в теле. Подаём по одному, старые версии удаляем.</p>
+<div class='why'><b>Почему отклонили все версии 1–5 (integrity)</b><ol><li>Один и тот же текст подавался 3–4 раза с новым суффиксом (_3, _4, _v2_2). Повторную подачу почти того же текста Meta считает попыткой обойти модерацию и режет автоматически, репутация номера падает.</li><li>Длинный список предложений с днями и часами читается как рекламная рассылка. Wazzup советует то же: убрать список групп.</li><li>«Ваш ребёнок ({{1}})» + возраст + время + адрес: текст про детей с именем ребёнка в переменной цепляет фильтр детской безопасности. Самая вероятная причина именно «integrity».</li><li>Даты 29–31 августа уже прошли: на 4 сентября шаблон устарел, а устаревшее обещание для Meta «misleading».</li><li>Номер новый, бизнес не верифицирован, проверка строже. Апелляция по старым текстам смысла не имеет: причина не названа, тексты всё равно устарели.</li></ol></div>
+<div class='ok'><b>Порядок подачи</b><ol><li>Удалить в кабинете Wazzup все версии nabor_1_3_goda … nabor_bez_vozrasta и их копии, а также prazdnik_dod_nou.</li><li>Подать <b>один</b> маркетинговый шаблон: <code>nabor_korotkiy</code>. Больше ничего одновременно. Ответ обычно за 1–60 минут, редко до суток.</li><li>Отклонили — подать следующий по списку (без переменных → вопрос → заявка). Один и тот же текст второй раз не подавать.</li><li>Параллельно можно подать сервисные шаблоны (категория Utility): они про конкретную запись и проходят почти всегда, а нам они нужны для подтверждений и напоминаний.</li><li>Когда первый маркетинговый одобрен, ничего делать не нужно: сервер проверяет статусы каждые 5 минут и включает рассылку по базе. Полные тексты про группы по возрастам уходят уже обычным сообщением в ответ на «Да, расскажите».</li></ol><p class='note'>«Универсальный шаблон 2/3» из невидимых символов в кабинете — обходной трюк Wazzup: пустой шаблон, весь текст в переменной. Один уже failed. Если второй одобрят, слать им только тёплую базу малыми партиями: жалобы уронят номер.</p></div>
+<section><div class='seclabel'>Маркетинг · для бывших клиентов и заявок</div><h2>Пять вариантов, от самого безопасного к более смелому</h2>
+<div class='tpl' id='nabor_korotkiy'><button class='copy' data-t='nabor_korotkiy'>Скопировать текст</button>
+<div class='hd'><b>Короткое приглашение с именем ребёнка</b><code>nabor_korotkiy</code><span class='tag m'>Маркетинг</span><span class='tag r'>ПОДАВАТЬ ПЕРВЫМ</span></div>
+<div class='body' data-body='nabor_korotkiy'>Здравствуйте! Это KidsUP, детский центр на бульваре Рокоссовского. Вы занимались у нас с {{1}}, поэтому пишем первыми: расписание на новый учебный год готово, и в нескольких группах ещё есть места. Подобрать удобное время и рассказать подробнее?</div>
+<div class='meta'>245 символов из 1024 · примеры для модерации: <b>{{1}}</b> → Александрой · риск отказа: <b>низкий</b></div>
+<div class='btns'><span class=''>Да, расскажите</span><span class='off'>Не присылать больше</span></div></div>
+<div class='tpl' id='nabor_korotkiy_bez_imeni'><button class='copy' data-t='nabor_korotkiy_bez_imeni'>Скопировать текст</button>
+<div class='hd'><b>То же без переменных</b><code>nabor_korotkiy_bez_imeni</code><span class='tag m'>Маркетинг</span><span class='tag r'>если первый не пройдёт</span></div>
+<div class='body' data-body='nabor_korotkiy_bez_imeni'>Здравствуйте! Это KidsUP, детский центр на бульваре Рокоссовского. Вы раньше приходили к нам на занятия, поэтому пишем первыми: расписание на новый учебный год готово, и в нескольких группах ещё есть места. Подобрать удобное время и рассказать подробнее?</div>
+<div class='meta'>254 символов из 1024 · примеры для модерации: переменных нет · риск отказа: <b>минимальный</b></div>
+<div class='btns'><span class=''>Да, расскажите</span><span class='off'>Не присылать больше</span></div></div>
+<div class='tpl' id='nabor_vopros'><button class='copy' data-t='nabor_vopros'>Скопировать текст</button>
+<div class='hd'><b>Вопрос вместо предложения</b><code>nabor_vopros</code><span class='tag m'>Маркетинг</span><span class='tag r'>мягкий вариант</span></div>
+<div class='body' data-body='nabor_vopros'>Здравствуйте! Это KidsUP на бульваре Рокоссовского. Составляем расписание групп на учебный год и хотим учесть семьи, которые уже занимались у нас. Планируете ли вы занятия для {{1}} в этом году? Одного ответа достаточно, мы всё подберём сами.</div>
+<div class='meta'>242 символов из 1024 · примеры для модерации: <b>{{1}}</b> → Максима · риск отказа: <b>низкий</b></div>
+<div class='btns'><span class=''>Да, планируем</span><span class=''>Пока нет</span><span class='off'>Не присылать больше</span></div></div>
+<div class='tpl' id='nabor_vybor_predmeta'><button class='copy' data-t='nabor_vybor_predmeta'>Скопировать текст</button>
+<div class='hd'><b>Выбор направления кнопками</b><code>nabor_vybor_predmeta</code><span class='tag m'>Маркетинг</span><span class='tag r'>риск выше: список</span></div>
+<div class='body' data-body='nabor_vybor_predmeta'>Здравствуйте! Это KidsUP на бульваре Рокоссовского, вы занимались у нас с {{1}}. В новом учебном году идут группы подготовки к школе, английского, раннего развития, шахмат и ментальной арифметики. Что из этого интересно сейчас? Нажмите кнопку, и мы предложим время.</div>
+<div class='meta'>265 символов из 1024 · примеры для модерации: <b>{{1}}</b> → Софией · риск отказа: <b>средний</b></div>
+<div class='btns'><span class=''>Подготовка к школе</span><span class=''>Английский</span><span class=''>Другое</span><span class='off'>Не присылать больше</span></div></div>
+<div class='tpl' id='zayavka_nedozvon'><button class='copy' data-t='zayavka_nedozvon'>Скопировать текст</button>
+<div class='hd'><b>Заявка с сайта, не дозвонились</b><code>zayavka_nedozvon</code><span class='tag m'>Маркетинг</span><span class='tag r'>для лидов, не клиентов</span></div>
+<div class='body' data-body='zayavka_nedozvon'>Здравствуйте! Это KidsUP, детский центр на бульваре Рокоссовского. Вы оставляли заявку на занятия для {{1}}, а мы не смогли до вас дозвониться. Подскажите, когда удобно поговорить, или напишите здесь: подберём группу и время в переписке.</div>
+<div class='meta'>237 символов из 1024 · примеры для модерации: <b>{{1}}</b> → Артёма · риск отказа: <b>низкий</b></div>
+<div class='btns'><span class=''>Напишите мне здесь</span><span class=''>Перезвоните мне</span><span class='off'>Не присылать больше</span></div></div>
+</section><section><div class='seclabel'>Utility · для тех, кто уже записан</div><h2>Сервисные шаблоны: запись, напоминание, после занятия</h2><p class='sub'>Категория «Utility» (Сервисные). Их можно слать и вне окна 24 часов тем, у кого есть запись в CRM. Напоминания уходят только по записи конкретного ребёнка на конкретную дату.</p>
+<div class='tpl' id='zapis_podtverzhdenie'><button class='copy' data-t='zapis_podtverzhdenie'>Скопировать текст</button>
+<div class='hd'><b>Подтверждение записи на первое занятие</b><code>zapis_podtverzhdenie</code><span class='tag u'>Utility</span></div>
+<div class='body' data-body='zapis_podtverzhdenie'>Здравствуйте! {{1}} записан(а) на первое занятие в KidsUP: {{2}}, направление «{{3}}». Адрес: б-р Маршала Рокоссовского, 6 к1В, 7-й подъезд, домофон 12, 2 этаж. Приходите за 10 минут, чтобы познакомиться с педагогом. Если планы меняются, ответьте на это сообщение.</div>
+<div class='meta'>264 символов из 1024 · примеры для модерации: <b>{{1}}</b> → Александра · <b>{{2}}</b> → понедельник 7 сентября, 18:00 · <b>{{3}}</b> → Подготовка к школе</div>
+<div class='btns'><span class=''>Будем</span><span class=''>Нужно перенести</span></div></div>
+<div class='tpl' id='napominanie_zavtra'><button class='copy' data-t='napominanie_zavtra'>Скопировать текст</button>
+<div class='hd'><b>Напоминание накануне</b><code>napominanie_zavtra</code><span class='tag u'>Utility</span></div>
+<div class='body' data-body='napominanie_zavtra'>Здравствуйте! Напоминаем: завтра, {{1}}, ждём {{2}} на занятие в KidsUP, направление «{{3}}». Адрес: б-р Маршала Рокоссовского, 6 к1В, 2 этаж. Подтвердите, пожалуйста, что будете, или напишите, если нужно перенести.</div>
+<div class='meta'>215 символов из 1024 · примеры для модерации: <b>{{1}}</b> → во вторник в 17:00 · <b>{{2}}</b> → Максима · <b>{{3}}</b> → Английский</div>
+<div class='btns'><span class=''>Будем</span><span class=''>Перенести</span></div></div>
+<div class='tpl' id='posle_zanyatiya'><button class='copy' data-t='posle_zanyatiya'>Скопировать текст</button>
+<div class='hd'><b>После первого занятия</b><code>posle_zanyatiya</code><span class='tag u'>Utility</span></div>
+<div class='body' data-body='posle_zanyatiya'>Здравствуйте! Сегодня {{1}} был(а) на первом занятии в KidsUP. Как впечатления? Педагог передал заметки по занятию, готовы рассказать и предложить расписание группы на месяц. Напишите, когда удобно обсудить: сегодня или завтра.</div>
+<div class='meta'>227 символов из 1024 · примеры для модерации: <b>{{1}}</b> → София</div>
+<div class='btns'><span class=''>Расскажите</span><span class=''>Позвоните мне</span></div></div>
+<div class='tpl' id='zapis_nedozvon'><button class='copy' data-t='zapis_nedozvon'>Скопировать текст</button>
+<div class='hd'><b>Не дозвонились по записи</b><code>zapis_nedozvon</code><span class='tag u'>Utility</span></div>
+<div class='body' data-body='zapis_nedozvon'>Здравствуйте! Это KidsUP. Звонили вам по записи {{1}} на занятие и не дозвонились. Напишите, когда удобно поговорить, или ответьте здесь: вопрос по расписанию решим в переписке.</div>
+<div class='meta'>177 символов из 1024 · примеры для модерации: <b>{{1}}</b> → Артёма</div>
+<div class='btns'><span class=''>Напишите здесь</span><span class=''>Перезвоните мне</span></div></div>
+</section><section><div class='seclabel'>Настройки при подаче</div><h2>Одинаково для всех шаблонов</h2>
+<div class='tbl'><table>
+<tr><th>Поле</th><th>Значение</th></tr>
+<tr><td>Канал</td><td>79199683507 (WABA «Kids Up»)</td></tr>
+<tr><td>Язык</td><td>Русский (ru)</td></tr>
+<tr><td>Категория</td><td>Маркетинг для nabor_* и zayavka_*; Сервисные (Utility) для zapis_*, napominanie_*, posle_*</td></tr>
+<tr><td>Заголовок</td><td>выключен</td></tr>
+<tr><td>Подпись (footer)</td><td>KidsUP · б-р Маршала Рокоссовского, 6к1В</td></tr>
+<tr><td>Кнопки</td><td>быстрые ответы как указано под текстом; в маркетинговых последняя всегда «Не присылать больше»</td></tr>
+<tr><td>Примеры переменных</td><td>обязательны, указаны под каждым текстом; имя в нужном падеже</td></tr>
+<tr><td>Ссылки</td><td>в теле нет; сайт остаётся в разговоре после ответа</td></tr>
+</table></div>
+<p class='note'>Имена шаблонов оставляем латиницей как на странице: сервер узнаёт их по имени и сам решает, кому какой уходит.</p></section>
+</div>
+<script>
+document.querySelectorAll('.copy').forEach(function(b){b.addEventListener('click',function(){
+  var t=document.querySelector('[data-body="'+b.dataset.t+'"]').textContent;
+  navigator.clipboard.writeText(t).then(function(){b.textContent='Скопировано';setTimeout(function(){b.textContent='Скопировать текст';},1500);});
+});});
+</script>
+</body></html>
