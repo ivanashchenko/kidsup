@@ -626,8 +626,12 @@ def _template_for(phone: str, campaign: str) -> str | None:
     name = "nabor_bez_vozrasta"
     if age is not None:
         name = next(n for lim, n in AGE_TEMPLATES if age < lim)
+    # После отказа Meta 04.09 возрастные тексты ушли в ответ на «Да,
+    # расскажите», а на модерацию подан один короткий шаблон — он и
+    # идёт всем, пока возрастных нет.
     return tpls.get(name) or tpls.get("nabor_bez_vozrasta") \
-        or tpls.get("nabor_5_7_let") or db.get_setting("waba_template_id") or None
+        or tpls.get("nabor_5_7_let") or tpls.get("nabor_korotkiy") \
+        or tpls.get("nabor_korotkiy_bez_imeni") or db.get_setting("waba_template_id") or None
 
 
 def _age_by_phone(phone: str) -> float | None:
@@ -834,6 +838,16 @@ def _broadcast_tick() -> None:
             # идут только подстановки. Переменная одна: имя ребёнка
             vals = [_child_name(child) or "ваш ребёнок"] if tr == "wapi" else None
             tid = _template_for(phone, campaign or "") if tr == "wapi" else None
+            if tr == "wapi":
+                # Короткий шаблон без переменных: имени ребёнка нет в
+                # карточке — «Вы занимались у нас с ваш ребёнок» не пишем
+                try:
+                    _tp = json.loads(db.get_setting("waba_templates", "") or "{}")
+                except ValueError:
+                    _tp = {}
+                noname = _tp.get("nabor_korotkiy_bez_imeni")
+                if noname and (not _child_name(child) or tid == noname):
+                    tid, vals = noname, []
             # Телеграму нужен id карточки: у telegram-чата нет телефона,
             # и отправка «на номер» возвращает BAD_CONTACT
             ok = wazzup.send_via(tr, phone, msg, dry_run=dry, sender=snd,
