@@ -188,6 +188,17 @@ def light_sync() -> None:
         db.save_users(client.fetch_all(
             "/v1/company/users", ["users"],
             params={"updatedAt[]": [since, _dt.date.today().isoformat()]}))
+        # оплаты и абонементы за последние три дня — чтобы /spiski показывал
+        # «оплачено» через 5 минут после кассы, а не после утреннего полного синка
+        since3 = (_dt.date.today() - _dt.timedelta(days=3)).isoformat()
+        today = _dt.date.today().isoformat()
+        try:
+            db.save_payments(client.fetch_all("/v1/company/payments", ["payments"],
+                                              params={"date": [since3, today]}))
+            db.save_user_subscriptions(client.fetch_all("/v1/company/userSubscriptions", ["subscriptions"],
+                                                        params={"sellDate": [since3, today]}))
+        except Exception:
+            log.exception("лёгкий синк: оплаты/абонементы не обновились")
         db.set_state("last_light_sync", __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     finally:
         client.close()

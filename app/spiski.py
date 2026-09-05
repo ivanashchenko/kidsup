@@ -1,289 +1,181 @@
-"""Списки обзвона по категориям A, B, C — взамен задач в CRM.
+# -*- coding: utf-8 -*-
+"""Списки по группам для стойки: кто записан, кто оплатил, кто на пробном.
 
-Зачем так. Массовый обзвон жил в задачах МойКласса: 122 штуки, размазанные
-по четырём администраторам. В задачах это работает плохо — они тонут среди
-срочных, у Ани их скопилось 208 штук, и человек не видит ни объёма работы,
-ни своего продвижения. 26.08 владелец решил вернуть обзвон в списки,
-но с полной картиной по каждому: что человек посещал в последний раз,
-когда перестал ходить и что ему предлагать.
-
-Категории (по дате последней оплаты — она надёжнее записей):
-  A — ходили этим летом 2026;
-  B — ходили в учебном году 2025/26;
-  C — 2024/25 и лето 2025.
-
-Кого не берём: записанных на новый сезон, «не писать», отказ,
-некачественных, и тех, кому уже звонили с 17 августа.
-
-Запуск:
-    python -m app.spiski            — сколько в каждой категории
-    python -m app.spiski build      — собрать docs/spisok_a|b|c.html
-"""
-
+Просьба Иры 05.09: бумажные листы по группам устаревают за час, а подготовку
+к школе и английский она не видит в свои смены. Страница /spiski строится из
+локальной базы (лёгкий синк каждые 5 минут: группы, записи, изменённые карточки,
+оплаты и абонементы за последние дни) и сама перезагружается раз в 5 минут.
+Печатается как раздаточные листы: одна группа — одна карточка, пустые строки
+до вместимости оставлены под ручку."""
 from __future__ import annotations
+import json, re, datetime as dt
+from . import db
 
-import html as _html
-import logging
-import re
-from collections import defaultdict
-from datetime import date, datetime, timedelta
-
-from . import sync, taskguard
-from .moyklass_client import MoyklassClient
-
-log = logging.getLogger("kidsup.spiski")
-
-SEASON = date(2026, 9, 1)
-ACTIVE_JOIN = {2, 50509, 58131, 58132, 83760}
-SKIP_STATE = {146328, 125954, 125957}
-# Граница «ему уже звонили». Была 17 августа — по началу нынешнего обзвона,
-# но это была наша внутренняя дата, а не факт: 26.08 проверка показала, что
-# тринадцать человек в списках получали звонок в начале августа, и для них
-# «ни разу не звонили» звучало неправдой. Считаем по всему месяцу.
-CALLED_SINCE = date(2026, 8, 1)
-
-_SUBJ = (("_ПШ_", "подготовка к школе"), ("_АЯ_", "английский"),
-         ("Первая школа", "раннее развитие"), ("Музыка и речь", "музыка и речь"),
-         ("Лицей", "лицей для малышей"), ("ини-сад", "мини-сад"),
-         ("_НК_", "нулевой класс"), ("нулев", "нулевой класс"),
-         ("ИЗО", "ИЗО"), ("ШАХ", "шахматы"), ("_МА_", "ментальная арифметика"),
-         ("ЛГ", "логопед"), ("ЛК", "летний клуб"), ("агер", "летний клуб"),
-         ("СБТ", "робототехника"), ("Танц", "танцы"))
+# Парсеры имён групп дублируем здесь намеренно: импорт app.main поднимает
+# автопилот, а этот модуль должен быть безопасен для локального запуска.
+DAY_ORDER = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+DAY_LABEL = dict(zip(DAY_ORDER, ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]))
+_TIME_RE = re.compile(r"\d{1,2}:\d{2}")
+_DAY_RE = re.compile(r"(?<![а-яa-z])(пн|вт|ср|чт|пт|сб|вс)(?![а-яa-z])", re.I)
 
 
-def subject(name: str) -> str:
-    for key, label in _SUBJ:
-        if key.lower() in (name or "").lower():
-            return label
-    return "занятия"
+def _name_days(name: str) -> list[str]:
+    """«пн-чт», «ср - сб», «пт 18:00 + вс 11:00», «пн - пт» → дни занятий.
+    Дефис у нас означает ДВА дня в неделю (пн и чт), а не диапазон."""
+    low = (name or "").lower()
+    return list(dict.fromkeys(m.group(1) for m in _DAY_RE.finditer(low)))
 
 
-def offer(age: float | None, was: set) -> str:
-    """Что предлагать. Сначала то же, чем занимался, — возвращаться легче
-    туда, где уже знаешь педагога и порядки. Потом то, что подходит
-    по возрасту и где у нас пустые места."""
-    same = [w for w in was if w not in ("летний клуб", "занятия")]
-    if age is None:
-        return (", ".join(same[:2]) or "подобрать по возрасту") + " — уточнить возраст"
-    if age < 3:
-        add = "раннее развитие, мини-сад"
-    elif age < 5:
-        add = "«Лицей для малышей», подготовка с 4 лет, английский"
-    elif age < 7.5:
-        add = "подготовка к школе, английский, шахматы"
-    elif age <= 12.5:
-        add = "английский Cambridge, шахматы, ИЗО, ментальная арифметика"
-    else:
-        add = "английский для старших"
-    return (f"вернуть в {', '.join(same[:2])}" if same else "новое: ") + f" · {add}"
+LIVE = (2, 58131, 58132)            # учится · посетил пробное · записан на пробное
+LABEL = {2: "учится", 58131: "был на пробном", 58132: "записан на пробное"}
+PAID_SINCE = "2026-08-01"   # предоплата за сентябрь шла и в начале августа
 
 
-def collect() -> dict:
-    from . import mango
-    mk = MoyklassClient(sync.get_api_key())
-    try:
-        users = taskguard.pull_all(mk, "/v1/company/users", "users", cache_hours=2)
-        joins = taskguard.pull_all(mk, "/v1/company/joins", "joins")
-        pays = mk.fetch_all("/v1/company/payments", ["payments"],
-                            params={"date": ["2024-09-01", "2026-08-26"]}) or []
-        rc = mk.get("/v1/company/classes", {"limit": 500})
-        cls = {c["id"]: (c.get("name") or "")
-               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
-    finally:
-        mk.close()
+def _days_times(name: str) -> tuple[str, str]:
+    days = " · ".join(DAY_LABEL[d] for d in _name_days(name)) or "—"
+    times = " / ".join(_TIME_RE.findall(name)[:2]) or "—"
+    return days, times
 
-    last_pay: dict = {}
-    for p in pays:
-        d = str(p.get("date") or "")[:10]
-        uid = p.get("userId")
+
+def build(day: str | None = None, subject: str | None = None) -> dict:
+    """Группы 2026/27 (открытые, без буферов «Заявки») со списком детей."""
+    today = dt.date.today().isoformat()
+    with db.get_conn() as conn:
+        classes = conn.execute("""SELECT cl.id, cl.name, cl.max_students, co.name course
+                                  FROM classes cl LEFT JOIN courses co ON co.id = cl.course_id
+                                  WHERE cl.name LIKE '2627%' AND cl.status = 'opened'
+                                  ORDER BY cl.name""").fetchall()
+        joins = conn.execute("""SELECT j.user_id, j.class_id, j.status_id, j.created_at, j.raw,
+                                       u.name, u.phone
+                                FROM joins j LEFT JOIN users u ON u.id = j.user_id
+                                WHERE j.status_id IN (2, 58131, 58132)""").fetchall()
+        paid_rows = conn.execute("SELECT DISTINCT user_id FROM payments WHERE optype='income' AND summa > 0 AND date >= ?",
+                                 (PAID_SINCE,)).fetchall()
+        subs = conn.execute("""SELECT user_id, raw FROM user_subscriptions
+                               WHERE end_date >= ? AND begin_date <= ?""", (today, (dt.date.today() + dt.timedelta(days=14)).isoformat())).fetchall()
+    paid_users = {r["user_id"] for r in paid_rows}
+    sub_ok: dict[int, str] = {}      # user_id -> «абонемент до ДД.ММ» если оплачен
+    sub_debt: dict[int, str] = {}    # user_id -> «абонемент создан, не оплачен»
+    for r in subs:
         try:
-            s = float(p.get("summa") or 0)
-        except (TypeError, ValueError):
-            s = 0
-        if uid and d and s > 0 and d > last_pay.get(uid, ""):
-            last_pay[uid] = d
-
-    booked, hist = set(), defaultdict(list)
-    lager26, uchgod = set(), set()
-    for j in joins:
-        nm = cls.get(j.get("classId"), "")
-        if not nm or "аявк" in nm.lower():
-            continue
-        if nm.startswith("2627") and j.get("statusId") in ACTIVE_JOIN:
-            booked.add(j["userId"])
-        hist[j["userId"]].append((str(j.get("createdAt") or "")[:10], nm))
-        # Сегмент — по факту посещений, не по дате платежа: за лагерь-2026
-        # платили ещё в мае, и «летний клуб» проваливался в список
-        # учебного года (замечание владельца 27.08).
-        if j.get("statusId") != 1:
-            if nm.startswith("2526_ЛК"):
-                lager26.add(j["userId"])
-            elif not nm.startswith(("2627", "2526", "2024", "OLD", "АРХИВ"))                     and "ТЕСТ" not in nm.upper():
-                uchgod.add(j["userId"])
-
-    # {телефон: дата последнего звонка} — дату показываем в листе: знать,
-    # что человеку уже звонили и когда, важнее, чем просто выкинуть его.
-    called: dict = {}
-    for dd in range((date.today() - CALLED_SINCE).days + 1):
-        day = CALLED_SINCE + timedelta(days=dd)
-        try:
-            rows = mango.calls(datetime.combine(day, datetime.min.time()),
-                               datetime.combine(day, datetime.max.time()))
+            j = json.loads(r["raw"] or "{}")
         except Exception:
             continue
-        for r in rows:
-            n = (r.get("to_num") if r.get("from_ext") else r.get("from_num")) or ""
-            x = "".join(c for c in str(n) if c.isdigit())[-10:]
-            if len(x) == 10:
-                called[x] = day.isoformat()
-
-    out = {"A": [], "B": [], "C": []}
-    for u in users:
-        uid = u["id"]
-        d = last_pay.get(uid)
-        if not d or uid in booked or u.get("clientStateId") in SKIP_STATE:
+        price, payed = float(j.get("price") or 0), float(j.get("payed") or 0)
+        end = (j.get("endDate") or "")[5:10].replace("-", ".")
+        if price and payed >= price - 1:
+            sub_ok[r["user_id"]] = f"абонемент до {end[3:]}.{end[:2]}" if end else "абонемент оплачен"
+        elif price:
+            sub_debt[r["user_id"]] = f"абонемент {int(price):,} ₽ не оплачен".replace(",", " ")
+    by_class: dict[int, list] = {}
+    for r in joins:
+        by_class.setdefault(r["class_id"], []).append(r)
+    out = []
+    merged: dict[str, dict] = {}     # логопед: «ЛГ Марина · Сб» → одна карточка со слотами
+    for c in classes:
+        name = c["name"] or ""
+        if "аявк" in name or name.startswith("OLD_") or "ТЕСТ" in name.upper():
             continue
-        phone = "".join(c for c in str(u.get("phone") or "") if c.isdigit())[-10:]
-        if len(phone) != 10 or phone in called:
-            continue          # в этом месяце уже звонили — в список не берём
-        if uid in lager26:
-            cat = "A"
-        elif uid in uchgod:
-            cat = "B"
-        else:
-            cat = "B" if d >= "2025-09-01" else "C"
-        bd = next((a.get("value") for a in (u.get("attributes") or [])
-                   if a.get("attributeAlias") == "birthday"), None)
-        age = None
-        if bd:
+        days, times = _days_times(name)
+        gdays = _name_days(name)
+        course = c["course"] or "?"
+        is_lg = name.startswith("2627_ЛГ")
+        if day and day not in gdays:
+            continue
+        if subject and subject.lower() not in (course or "").lower():
+            continue
+        kids = []
+        seen = set()
+        for r in sorted(by_class.get(c["id"], []), key=lambda r: (r["status_id"] != 2, r["name"] or "")):
+            if r["user_id"] in seen:
+                continue
+            seen.add(r["user_id"])
             try:
-                age = round((SEASON - date.fromisoformat(bd[:10])).days / 365.25, 1)
-            except ValueError:
-                pass
-        # чем занимался в последний раз: берём записи, ближайшие к последней оплате
-        recent = sorted(hist.get(uid, []), reverse=True)[:4]
-        was = {subject(nm) for _, nm in recent}
-        was.discard("занятия")
-        out[cat].append({
-            "name": (u.get("name") or "").strip()[:30], "phone": phone, "age": age,
-            "was": ", ".join(sorted(was)[:3]) or "—", "last": d,
-            "offer": offer(age, was)})
-    for k in out:
-        out[k].sort(key=lambda r: (r["last"], r["age"] is None, r["age"] or 99),
-                    reverse=True)
-    return out
+                st = (json.loads(r["raw"] or "{}").get("stats") or {})
+            except Exception:
+                st = {}
+            nxt = st.get("nextRecord") or ""
+            paid = r["user_id"] in paid_users or r["user_id"] in sub_ok
+            if paid:
+                money = sub_ok.get(r["user_id"], "оплачено")
+                cls = "ok"
+            elif r["user_id"] in sub_debt:
+                money, cls = sub_debt[r["user_id"]], "debt"
+            elif r["status_id"] == 58132:
+                money, cls = ("пробное " + nxt[8:10] + "." + nxt[5:7]) if nxt else "пробное, дата не стоит", "trial"
+            elif r["status_id"] == 58131:
+                money, cls = "был, не оплатил — дожать", "debt"
+            else:
+                money, cls = "учится, оплаты нет — дожать", "debt"
+            kids.append({"uid": r["user_id"], "name": r["name"] or str(r["user_id"]), "phone": r["phone"] or "",
+                         "status": LABEL.get(r["status_id"], str(r["status_id"])), "money": money, "cls": cls,
+                         "next": nxt[5:10].replace("-", ".") if nxt else "", "last": (st.get("lastVisit") or "")[5:10].replace("-", ".")})
+        cap = c["max_students"] or 8
+        if is_lg:
+            for k in kids:
+                k["slot"] = times
+                if k["cls"] == "debt":
+                    k["money"], k["cls"] = "оплаты с 01.08 нет", "debt"
+            key = re.sub(r"_\d{1,2}:\d{2}.*$", "", name.replace("2627_", ""))   # «ЛГ Марина_Сб»
+            m = merged.setdefault(key, {"id": c["id"], "name": key, "short": key.replace("_", " · "), "course": course, "days": days, "times": "по слотам",
+                                        "gdays": gdays, "cap": 0, "live": 0, "paid": 0, "trial": 0, "debt": 0, "kids": [], "lg": True})
+            m["cap"] += max(cap, len(kids)); m["live"] += len(kids); m["kids"] += kids
+            m["paid"] += sum(1 for k in kids if k["cls"] == "ok"); m["trial"] += sum(1 for k in kids if k["cls"] == "trial"); m["debt"] += sum(1 for k in kids if k["cls"] == "debt")
+            continue
+        out.append({"id": c["id"], "name": name, "short": name.replace("2627_", ""), "course": course, "days": days, "times": times,
+                    "gdays": gdays, "cap": cap, "live": len(kids), "paid": sum(1 for k in kids if k["cls"] == "ok"),
+                    "trial": sum(1 for k in kids if k["cls"] == "trial"), "debt": sum(1 for k in kids if k["cls"] == "debt"),
+                    "kids": kids})
+    for m in merged.values():
+        m["kids"].sort(key=lambda k: k.get("slot", ""))
+        out.append(m)
+    out.sort(key=lambda g: (g["course"], DAY_ORDER.index(g["gdays"][0]) if g["gdays"] else 9, g["times"]))
+    return {"groups": out, "synced": db.get_state("last_light_sync") or db.get_state("last_sync"),
+            "built": dt.datetime.now().strftime("%H:%M")}
 
 
-CSS = """
-body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:12px;color:#222}
-h1{font-size:19px;margin:0 0 3px} .sub{color:#666;font-size:12px;margin-bottom:9px}
-table{border-collapse:collapse;width:100%} thead{display:table-header-group}
-th{background:#312783;color:#fff;font-size:11px;padding:5px 4px;text-align:left}
-td{border-bottom:1px solid #ddd;padding:6px 4px;font-size:11pt;vertical-align:top}
-.ph{font-size:12.5pt;font-weight:600;white-space:nowrap}
-.ag{text-align:center;font-weight:600} .of{color:#1a6b1a}
-.res{width:150px;border-bottom:1px solid #999}
-.old{color:#B26F00}
-@media print{body{margin:6px}}
-"""
-
-TITLES = {
-    "A": ("A — лагерь-2026", "Ходили в наш летний лагерь этого года — самые "
-          "свежие контакты, помнят педагогов и атмосферу. Разговор: «как вам "
-          "лагерь? теперь набираем группы на учебный год»."),
-    "B": ("B — учебный год 2025/26", "Занимались у нас весь прошлый учебный "
-          "год и просто не продлили. Разговор простой: «продолжаем?» "
-          "Конверсия вдвое выше холодных."),
-    "C": ("C — 2024/25 и раньше", "Год и больше не были. Нужен повод "
-          "вернуться: новый педагог, новое направление, расписание."),
-}
-
-
-def page(cat: str, rows: list) -> str:
-    title, why = TITLES[cat]
-    out = [f"<style>{CSS}</style>", f"<h1>{title}</h1>",
-           f"<div class=sub>{len(rows)} семей. {why} Здесь только те, кому "
-           f"НЕ звонили с 17 августа и кто не записан на новый год. "
-           f"Свежие сверху. Печатать в альбомной.</div>",
-           "<table><thead><tr><th>Фамилия Имя</th><th>Возраст<br>на 1.09</th>"
-           "<th>Что посещал</th><th>Перестал ходить</th><th>Телефон</th>"
-           "<th>Что предлагаем</th><th>Итог разговора</th></tr></thead><tbody>"]
-    for r in rows:
-        age = ("%g" % r["age"]).replace(".", ",") if r["age"] is not None else "—"
-        d = r["last"]
-        out.append(f"<tr><td>{_html.escape(r['name'] or '—')}</td>"
-                   f"<td class=ag>{age}</td>"
-                   f"<td>{_html.escape(r['was'])}</td>"
-                   f"<td class=old>{d[8:10]}.{d[5:7]}.{d[2:4]}</td>"
-                   f"<td class=ph>+7{r['phone']}</td>"
-                   f"<td class=of>{_html.escape(r['offer'])}</td>"
-                   f"<td class=res></td></tr>")
-    out.append("</tbody></table>")
-    return "\n".join(out)
-
-
-def _table(rows: list) -> str:
-    out = ["<table><thead><tr><th>Фамилия Имя</th><th>Возраст<br>на 1.09</th>"
-           "<th>Что посещал</th><th>Перестал ходить</th><th>Телефон</th>"
-           "<th>Что предлагаем</th><th>Итог разговора</th></tr></thead><tbody>"]
-    for r in rows:
-        age = ("%g" % r["age"]).replace(".", ",") if r["age"] is not None else "—"
-        d = r["last"]
-        out.append(f"<tr><td>{_html.escape(r['name'] or '—')}</td>"
-                   f"<td class=ag>{age}</td>"
-                   f"<td>{_html.escape(r['was'])}</td>"
-                   f"<td class=old>{d[8:10]}.{d[5:7]}.{d[2:4]}</td>"
-                   f"<td class=ph>+7{r['phone']}</td>"
-                   f"<td class=of>{_html.escape(r['offer'])}</td>"
-                   f"<td class=res></td></tr>")
-    out.append("</tbody></table>")
-    return "\n".join(out)
-
-
-def personal(admin: str, lager_rows: list, uch_rows: list) -> str:
-    """Личный лист администратора на день.
-
-    Схема владельца 27.08: лагерь-2026 целиком у Иры (самые свежие),
-    учебный год 2025/26 делится пополам; Лена идёт только по учебному
-    году. Пустой первый блок просто не печатается."""
-    total = len(lager_rows) + len(uch_rows)
-    out = [f"<style>{CSS}</style>",
-           f"<h1>📞 {admin} — список на сегодня: {total} семей</h1>",
-           "<div class=sub><b>В каждом звонке:</b> праздник 29-го в «Янтарной "
-           "горке» · День открытых дверей 30-го · до 31.08 — цены прошлого "
-           "года · в день пробного −10% на первый абонемент. "
-           "Список живой: дозвонились — семья исчезает сама.</div>"]
-    if lager_rows:
-        out += [f"<h2 style='color:#E30613'>Сначала: лагерь-2026 "
-                f"({len(lager_rows)})</h2>",
-                "<div class=sub>Были у нас этим летом, помнят педагогов и "
-                "атмосферу. Разговор: «как вам лагерь? теперь набираем "
-                "группы на учебный год».</div>",
-                _table(lager_rows)]
-    if uch_rows:
-        out += [f"<h2 style='color:#1DA7E0;margin-top:26px'>"
-                f"{'Затем' if lager_rows else 'Сегодня'}: учебный год "
-                f"2025/26 ({len(uch_rows)})</h2>",
-                "<div class=sub>Занимались весь прошлый год и просто не "
-                "продлили. Разговор: «продолжаем?»</div>",
-                _table(uch_rows)]
-    return "\n".join(out)
-
-
-def main():
-    import sys
-    from pathlib import Path
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-    data = collect()
-    for k in ("A", "B", "C"):
-        print(f"   {TITLES[k][0]:44} {len(data[k])}")
-    if "build" in sys.argv:
-        docs = Path(__file__).resolve().parent.parent / "docs"
-        for k in ("A", "B", "C"):
-            p = docs / f"spisok_{k.lower()}.html"
-            p.write_text(page(k, data[k]), encoding="utf-8")
-            print(p)
-
-
-if __name__ == "__main__":
-    main()
+def page(day: str | None, subject: str | None, print_mode: bool) -> str:
+    import html as H
+    esc = lambda x: H.escape(str(x or ""))
+    d = build(day, subject)
+    G = d["groups"]
+    courses = sorted({g["course"] for g in build()["groups"]})
+    tot_live = sum(g["live"] for g in G); tot_cap = sum(g["cap"] for g in G); tot_paid = sum(g["paid"] for g in G); tot_debt = sum(g["debt"] for g in G)
+    css = """<style>
+    body{font:14px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#1d1d3a;background:#f4f5fb;margin:0}
+    .top{position:sticky;top:0;background:#312783;color:#fff;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;z-index:2}
+    .top b{font-size:16px}.top a{color:#fff;text-decoration:none;background:rgba(255,255,255,.14);padding:4px 10px;border-radius:999px;font-size:13px}
+    .top a.on{background:#7DB928}.top .st{margin-left:auto;font-size:12px;opacity:.85}
+    .wrap{padding:14px;display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(420px,1fr))}
+    .g{background:#fff;border-radius:12px;box-shadow:0 2px 10px rgba(49,39,131,.08);padding:12px 14px;break-inside:avoid;page-break-inside:avoid}
+    .g h3{margin:0;font-size:15px;color:#312783}.g .m{color:#666;font-size:12px;margin:2px 0 8px;display:flex;gap:10px;flex-wrap:wrap}
+    .g .m b{color:#1d1d3a}
+    table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px solid #e6e8f2;vertical-align:top;font-size:13px}
+    td.n{width:22px;color:#999;text-align:right}td.ph{white-space:nowrap;font-variant-numeric:tabular-nums;color:#444}
+    td.chk{width:26px}td.chk span{display:inline-block;width:16px;height:16px;border:1.5px solid #999;border-radius:4px}
+    .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
+    .ok{background:#e4f4d3;color:#3d6e0e}.debt{background:#fde3e3;color:#a30d15}.trial{background:#fff0d1;color:#8a5a00}
+    tr.empty td{height:22px;border-bottom:1px dashed #cfd3e6}
+    .sum{padding:6px 16px 0;color:#444;font-size:13px}
+    .full{border-top:4px solid #7DB928}.thin{border-top:4px solid #E30613}
+    @media print{.top,.sum{display:none}body{background:#fff}.wrap{display:block;padding:0}.g{box-shadow:none;border:1px solid #bbb;margin:0 0 10px;border-radius:6px}}
+    </style>"""
+    from urllib.parse import quote
+    nav = "".join(f"<a class='{'on' if day == k else ''}' href='/spiski?day={quote(k)}{'&subject=' + quote(subject) if subject else ''}'>{DAY_LABEL[k]}</a>" for k in DAY_ORDER)
+    subj = "".join(f"<a class='{'on' if subject == c else ''}' href='/spiski?subject={quote(c)}{'&day=' + quote(day) if day else ''}'>{esc(c)}</a>" for c in courses)
+    h = [f"<!doctype html><html lang='ru'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='300'><title>Списки по группам — KidsUP</title>{css}</head><body>",
+         f"<div class='top'><b>Списки по группам</b><a class='{'on' if not day and not subject else ''}' href='/spiski'>Все</a>{nav}<span style='opacity:.5'>|</span>{subj}<a href='javascript:print()'>🖨 Печать</a>"
+         f"<span class='st'>данные CRM на {esc(d['synced'])} · страница обновляется сама каждые 5 минут · собрано {d['built']}</span></div>",
+         f"<div class='sum'>Групп {len(G)} · мест {tot_cap} · живых записей <b>{tot_live}</b> · оплачено <b style='color:#3d6e0e'>{tot_paid}</b> · не оплатили <b style='color:#a30d15'>{tot_debt}</b> · "
+         f"<span class='pill ok'>оплачено</span> <span class='pill trial'>записан на пробное</span> <span class='pill debt'>был / учится без оплаты — дожать</span></div>",
+         "<div class='wrap'>"]
+    for g in G:
+        klass = "full" if g["live"] >= g["cap"] else ("thin" if g["live"] <= 2 else "")
+        h.append(f"<div class='g {klass}'><h3>{esc(g['short'])}</h3><div class='m'><span>{esc(g['days'])} · {esc(g['times'])}</span><span>мест <b>{g['cap']}</b></span><span>живых <b>{g['live']}</b></span><span>оплачено <b>{g['paid']}</b></span><span>пробных <b>{g['trial']}</b></span><span>дожать <b>{g['debt']}</b></span></div><table>")
+        for i, k in enumerate(g["kids"], 1):
+            h.append(f"<tr><td class='n'>{esc(k.get('slot')) if g.get('lg') else i}</td><td class='chk'><span></span></td><td><b>{esc(k['name'])}</b><br><span style='color:#777;font-size:11px'>{esc(k['status'])}{(' · был ' + k['last']) if k['last'] else ''}</span></td><td class='ph'>{esc(k['phone'])}</td><td><span class='pill {k['cls']}'>{esc(k['money'])}</span></td></tr>")
+        for i in range(len(g["kids"]) + 1, max(g["cap"], len(g["kids"])) + 1):
+            h.append(f"<tr class='empty'><td class='n'>{i}</td><td class='chk'><span></span></td><td></td><td></td><td></td></tr>")
+        h.append("</table></div>")
+    h.append("</div></body></html>")
+    return "".join(h)

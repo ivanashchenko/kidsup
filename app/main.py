@@ -973,6 +973,8 @@ DOC_GROUPS = [
          "Подготовка, английский, мини-сад и нулевой класс. Превью с рамкой короба: пунктир — поле значимой информации 1670×1170 по ТТ метрополитена"),
         ("__url:/static/banner_metro_1900x1400.tif", "🖨 БАННЕР В МЕТРО — файл в типографию (TIFF CMYK, 86 МБ)",
          "Полотно 1900×1400 мм 1:1, 72 dpi, CMYK без сжатия, без альфа-каналов — по ТТ. Отправлять этот файл, не PNG"),
+        ("__url:/spiski", "📋 СПИСКИ ПО ГРУППАМ — живые, обновляются каждые 5 минут, печатаются",
+         "Для стойки: по каждой группе — кто записан, кто оплатил (зелёным), кто на пробном и когда (жёлтым), кого дожать (красным), телефоны, пустые строки под ручку. Фильтр по дню недели и предмету, кнопка печати"),
         ("plan_05sen", "🎯 СУББОТА 05.09 — тактика Ане и Ире 10:00–18:00: дожим 118 неоплативших, окно базы, явка",
          "Аня — деньги: оплаты на выходе утренних групп, 16 «были и не оплатили» + 50 «занятие в пн-ср без оплаты», подтверждение воскресенья. Ира — явка, 25 хвостов инбокса, робототехника, окно базы 40 наборов (семьи 81–120). Цели дня в цифрах"),
         ("plan_06sen", "🎯 ВОСКРЕСЕНЬЕ 06.09 — тактика Ане и Ире: первые занятия МА и РР, подтверждение 13 первых занятий понедельника, экскурсии в сад",
@@ -2189,6 +2191,20 @@ def _suggest_by_age(age: float | None) -> str:
     return "13+ — не наш возраст"
 
 
+@app.get("/spiski", response_class=HTMLResponse, dependencies=AUTH)
+def spiski_page(day: str = "", subject: str = "", print: int = 0):
+    """Списки по группам для стойки (просьба Иры 05.09): кто записан, оплатил, на пробном.
+    Сам обновляется каждые 5 минут вслед за лёгким синком."""
+    from . import spiski
+    return HTMLResponse(spiski.page(day or None, subject or None, bool(print)))
+
+
+@app.get("/api/spiski", dependencies=AUTH)
+def api_spiski(day: str = "", subject: str = ""):
+    from . import spiski
+    return spiski.build(day or None, subject or None)
+
+
 @app.get("/grid", response_class=HTMLResponse, dependencies=AUTH)
 def grid_page(request: Request, course: int = 0, all: int = 0):
     from . import grid
@@ -2611,7 +2627,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-05.1"
+APP_VERSION = "2026-09-05.3"
 
 
 @app.get("/api/net")
