@@ -43,7 +43,7 @@ def split(rs):
     nd = [r for r in rs if phone(r) not in dialed]; nt = [r for r in rs if phone(r) in dialed and phone(r) not in talked]; t = [r for r in rs if phone(r) in talked]
     return nd, nt, t
 h_nd, h_nt, h_t = split(hot_rows); b_nd, b_nt, b_t = split(base_rows)
-paid_sum = f"{sum(v[2] for v in pays.values()):,}".replace(",", " ")
+paid_sum = f"{int(sum(p['summa'] for p in crm['pays'])):,}".replace(",", " "); n_pays = len(crm["pays"])
 
 h = [CSS, "<div class='wrap'>",
      "<div class='hero'><h1>Воскресенье 6 сентября — Аня и Ира, 10:00–18:00</h1>"
@@ -57,7 +57,7 @@ h.append("<div class='card alarm'><b>Суббота по фактам — пла
          f"<tr><td>Наборов с трубки (доб. 12)</td><td class='num'>80</td><td class='num'>{by_ext['12']['n']}</td><td class='small'>первый звонок {by_ext['12']['first']}, последний {by_ext['12']['last']}; разговоров ≥30 с — {by_ext['12']['talks']}, {by_ext['12']['min']} мин</td></tr>"
          f"<tr><td>Дожим «записаны и не оплатили»</td><td class='num'>{len(hot_rows)} семей</td><td class='num'>{len(hot_rows)-len(h_nd)} набрано, {len(h_t)} разговоров</td><td class='small'>{len(h_nd)} семей не набирали вовсе; список набирал ноутбук, а не трубка</td></tr>"
          f"<tr><td>База 81–160</td><td class='num'>{len(base_rows)}</td><td class='num'>{len(base_rows)-len(b_nd)} набрано, {len(b_t)} разговоров</td><td class='small'>{len(b_nd)} не набраны, {len(b_nt)} недозвон — догон ушёл автоматически</td></tr>"
-         f"<tr><td>Оплаты</td><td class='num'>10 · 80 000 ₽</td><td class='num'>{len(pays)} · {paid_sum} ₽</td><td class='small'>почти всё — разовые оплаты логопеда и абонементы РР у тех, кто пришёл на занятие (Карюков 7 560, Колесникова, Спицын, Слатин по 5 200). Из списка дожима по телефону — только Панкратова 2 000</td></tr>"
+         f"<tr><td>Оплаты</td><td class='num'>10 · 80 000 ₽</td><td class='num'>{n_pays} · {paid_sum} ₽</td><td class='small'>почти всё — разовые оплаты логопеда и абонементы РР у тех, кто пришёл на занятие (Карюков 7 560, Колесникова, Спицын, Слатин по 5 200). Из списка дожима по телефону — только Панкратова 2 000</td></tr>"
          f"<tr><td>Явка в CRM</td><td class='num'>26 отметок</td><td class='num'>0</td><td class='small'>ни одна из 26 записей субботы не отмечена «пришёл/пропуск» — пробные Ситковского, Гунта и Анисенковой без визита, дожим после пробного не запустится</td></tr>"
          f"<tr><td>Инбокс закрыт к 18:00</td><td class='num'>все</td><td class='num'>{len([x for x in ib if x.get('done')])} из {len(ib)}</td><td class='small'>{len(open_ib)} пунктов открыты, часть — обещания клиентам «пришлём ссылку сейчас»</td></tr>"
          "<tr><td>Чаты без ответа</td><td class='num'>0</td><td class='num'>3</td><td class='small'>Карюков «Оплатила, спасибо» (13:08), 79137115595 «Да, напишите» (13:31), 1325431252 «Да, пожалуйста» на перенос (10:38)</td></tr>"
