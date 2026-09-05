@@ -1422,6 +1422,12 @@ def base_doc(slug: str):
             i = page.find("</div>", page.find("class='hero'"))
             if i > 0:
                 page = page[:i + 6] + _inbox_block(day) + page[i + 6:]
+        # план дня меняется в течение смены (инбокс, правки Клода) — вкладка
+        # у админа перезагружается сама каждые 5 минут, как /spiski
+        back = ('<meta http-equiv="refresh" content="300">'
+                + back.replace('<span style="color:#6B7A91;font-weight:500">KidsUP · база знаний</span>',
+                               '<span style="color:#6B7A91;font-weight:500">KidsUP · план дня · страница обновляется сама каждые 5 минут, '
+                               + f'открыта в {(datetime.utcnow() + timedelta(hours=3)).strftime("%H:%M")}</span>'))
     return HTMLResponse(back + page)
 
 
@@ -2627,7 +2633,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-05.5"
+APP_VERSION = "2026-09-05.6"
 
 
 @app.get("/api/net")
