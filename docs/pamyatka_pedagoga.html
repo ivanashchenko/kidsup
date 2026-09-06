@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Памятка педагогу</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .4rem;text-wrap:balance}
+h3{font-size:1.03rem;font-weight:730;margin:1.6rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+code{background:var(--fill);padding:.1rem .35rem;border-radius:5px;font-size:.88em;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+.step{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:1rem 1.15rem;margin:.75rem 0;display:grid;grid-template-columns:2.1rem 1fr;gap:.85rem;align-items:start}
+.step .num{font-size:1.3rem;font-weight:800;color:var(--indigo);line-height:1.2;font-variant-numeric:tabular-nums}
+.step b{display:block;font-weight:740;margin-bottom:.25rem;font-size:1.01rem}
+.step p{margin:.3rem 0;font-size:.93rem}
+.step ul{margin:.4rem 0;padding-left:1.15rem;font-size:.93rem} .step li{margin:.25rem 0}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.35rem 0}
+.tpl{background:var(--fill);border:1px solid var(--line);border-radius:9px;
+  padding:.7rem .9rem;margin:.55rem 0;font-size:.92rem;max-width:47rem}
+.tpl em{display:block;font-style:normal;font-size:.74rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.25rem}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} }
+.ex td{font-size:.9rem;vertical-align:top}.big{font-size:1.05rem}.link{background:var(--green-soft);border-radius:12px;padding:1rem 1.15rem;margin:1rem 0}</style><div class='wrap'><div class='kicker'>Педагогам · с 6 сентября</div><h1>Три строки после первого занятия</h1><p class='sub big'>По каждому ребёнку, который пришёл к вам на первое занятие, вы заполняете три строки и отмечаете явку. В течение 15 минут после занятия. Администратор собирает из этого «Карту развития» и отправляет маме в WhatsApp вместе со ссылкой на оплату, пока впечатление живое. Больше от вас ничего не нужно.</p><div class='link'><b>Куда заполнять:</b> страница педагога, ссылка ниже (открывается с телефона, без пароля). Выбираете себя, ребёнка, «Был» или «Не пришёл», три строки, «Сохранить». Под каждым полем есть пример по направлению, его можно вставить и поправить.<br><br><span id='lnk' class='note'>Ссылку с ключом выдаёт администратор. Ключ хранится в настройках сервера (pedagog_key): ссылка выглядит как app.kidsup.ru/pedagog?k=КЛЮЧ.</span></div><section><div class='seclabel'>Три строки</div><h2>Что писать</h2><div class='tbl'><table><tr><th>Строка</th><th>Что это</th><th>Правило</th></tr><tr><td><b>1 · Что уже умеет</b></td><td>1–2 предложения, только то, что видели на занятии</td><td>Про умения, не про пробелы. Без диагнозов и оценок: «слабый», «отстаёт» не пишем, это разговор с мамой отдельно</td></tr><tr><td><b>2 · Куда идём</b></td><td>Группа из расписания и над чем в ней работаем</td><td>Всегда с названием группы и временем: это и есть предложение остаться</td></tr><tr><td><b>3 · С чего начнём</b></td><td>Первые две недели и одна вещь для дома</td><td>Мама уходит с делом, а не с оценкой. Одна вещь, не список</td></tr></table></div><p class='note'>Простыми словами, как сказали бы маме у двери. Без методических терминов. Если ребёнок не пришёл, нажмите «Не пришёл», строки не нужны: администратор перезвонит семье.</p></section><section><div class='seclabel'>Примеры</div><h2>По направлениям</h2><div class='tbl'><table class='ex'><tr><th>Направление</th><th>1 · Что умеет</th><th>2 · Куда идём</th><th>3 · С чего начнём</th></tr><tr><td><b>Подготовка к школе</b></td><td>Знает все буквы, читает слоги и короткие слова, считает до 20, хорошо держит карандаш.</td><td>ПШ2 читающие, пн-чт 18:00: скорость чтения и пересказ.</td><td>Слоговые таблицы и печатные буквы; дома 10 минут в день читать вывески.</td></tr><tr><td><b>Английский</b></td><td>Понимает простые инструкции, знает цвета и счёт до 10, охотно повторяет за педагогом.</td><td>Pre-A1 Starters, вт-чт 17:00: говорим с первого занятия, тема «семья и дом».</td><td>Приветствие и знакомство по-английски; дома 3 фразы в день из карточки.</td></tr><tr><td><b>Логопед</b></td><td>Речь фразовая, С и З чистые, Р и Л пока заменяет; артикуляционные упражнения делает с интересом.</td><td>Индивидуально 2 раза в неделю, начинаем с постановки Р.</td><td>Артикуляционная гимнастика 5 минут утром и вечером по карточке.</td></tr><tr><td><b>Раннее развитие</b></td><td>Держит внимание 5–7 минут, повторяет движения, к концу занятия включилась в круг.</td><td>«Первая школа» вт-чт 12:00, группа 2–3 года.</td><td>Ритуалы начала и конца занятия; дома пальчиковая игра из занятия.</td></tr><tr><td><b>Ментальная арифметика</b></td><td>Считает до 20, быстро понял принцип абакуса, держит внимание всё занятие.</td><td>Начинающие, вс 12:30, 90 минут.</td><td>Счёт на абакусе до 10 двумя руками; дома 5 минут на тренажёре.</td></tr><tr><td><b>Шахматы</b></td><td>Знает ходы всех фигур, понимает шах, партию доигрывает до конца.</td><td>Продолжающие, пт 18:00 + вс 11:00: разбор партий и мини-турниры.</td><td>«Вилка» и «связка»; дома 2 задачи в день из тетради.</td></tr><tr><td><b>ИЗО</b></td><td>Уверенно смешивает цвета, держит кисть правильно, доводит работу до конца.</td><td>Группа 3, пн-ср 18:00, живопись.</td><td>Композиция и передний план; дома дорисовать фон.</td></tr><tr><td><b>Робототехника</b></td><td>Собрал модель по схеме сам, понял, как меняется скорость мотора, спрашивает «почему».</td><td>Младшая группа, пт 16:00 + вс 14:30.</td><td>Датчики и первая программа; дома придумать, что робот должен уметь.</td></tr><tr><td><b>Мини-сад · нулевой класс</b></td><td>Легко вошёл в группу, ест и одевается сам, на английские слова реагирует, повторяет.</td><td>Мини-сад 3 дня в неделю, пробная неделя с зачётом стоимости.</td><td>Ритуал утреннего прощания за 1 минуту; дома те же английские слова, что в саду.</td></tr></table></div></section><section><div class='seclabel'>Что дальше</div><h2>Куда это попадает</h2><ol class='small'><li>Строки сохраняются в карточку ребёнка в МойКлассе комментарием с вашим именем, там же отмечается явка.</li><li>Дежурный администратор получает сигнал «карта готова» и в течение часа отправляет маме карту развития с вашими строками и ссылкой на оплату.</li><li>Когда у вас появится вход в МойКласс, то же самое вы будете писать прямо в занятии, страница останется как быстрый вариант с телефона.</li></ol></section></div>
+</body></html>

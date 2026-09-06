@@ -973,6 +973,8 @@ DOC_GROUPS = [
          "Подготовка, английский, мини-сад и нулевой класс. Превью с рамкой короба: пунктир — поле значимой информации 1670×1170 по ТТ метрополитена"),
         ("__url:/static/banner_metro_1900x1400.tif", "🖨 БАННЕР В МЕТРО — файл в типографию (TIFF CMYK, 86 МБ)",
          "Полотно 1900×1400 мм 1:1, 72 dpi, CMYK без сжатия, без альфа-каналов — по ТТ. Отправлять этот файл, не PNG"),
+        ("pamyatka_pedagoga", "🧑‍🏫 Памятка педагогу: три строки после первого занятия",
+         "Что писать по каждому ребёнку, куда, примеры по девяти направлениям и ссылка на страницу педагога"),
         ("__url:/karta", "🗺 Карта развития — после первого занятия",
          "Выбрать ребёнка с сегодняшнего первого занятия, вписать три строки педагога (что умеет, куда идём, с чего начнём) — и отправить маме готовую карту в WhatsApp вместе со ссылкой на оплату"),
         ("__url:/spiski", "📋 СПИСКИ ПО ГРУППАМ — живые, обновляются каждые 5 минут, печатаются",
@@ -2207,6 +2209,19 @@ def _suggest_by_age(age: float | None) -> str:
     return "13+ — не наш возраст"
 
 
+@app.get("/pedagog", response_class=HTMLResponse)
+def pedagog_page(k: str = ""):
+    """Страница педагога без админского пароля: вход по ключу из ссылки (pedagog_key)."""
+    from . import pedagog
+    return HTMLResponse(pedagog.page(k))
+
+
+@app.post("/api/pedagog/save")
+def api_pedagog_save(payload: dict = Body(...)):
+    from . import pedagog
+    return pedagog.save(payload or {})
+
+
 @app.get("/karta", response_class=HTMLResponse, dependencies=AUTH)
 def karta_page():
     """«Карта развития» после первого занятия: три строки педагога → PNG маме в WhatsApp (06.09)."""
@@ -2656,7 +2671,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-06.1"
+APP_VERSION = "2026-09-06.2"
 
 
 @app.get("/api/net")
@@ -2698,7 +2713,7 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
             "anthropic_proxy_secret", "work_hours", "ext_by_day",
-            "vk_token", "vk_group_id", "tg_bot_token", "tg_channel", "mango_ext_admins",
+            "vk_token", "vk_group_id", "tg_bot_token", "tg_channel", "mango_ext_admins", "pedagog_key",
             "calls_parsed", "sms_on", "sms_sender_name", "lead_hook_key",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды

@@ -98,7 +98,14 @@ def page(prices: dict) -> str:
     fonts = {"bold": _b64(BASE / "static" / "fonts" / "Montserrat-Bold.ttf", "font/ttf"),
              "medium": _b64(BASE / "static" / "fonts" / "Montserrat-Medium.ttf", "font/ttf")}
     logo = _b64(BASE / "static" / "logo_white.png", "image/png")
-    cfg = {"kids": kids, "teachers": teachers, "prices": _prices(prices), "hints": COURSE_HINT,
+    notes = {}
+    try:
+        from . import pedagog
+        for n in reversed(pedagog.notes_for(days=3)):
+            notes[str(n["uid"])] = {"teacher": n["teacher"], "can": n["can"], "next_group": n["next_group"], "start": n["start"], "visit": n["visit"]}
+    except Exception as e:
+        log.warning("karta: заметки педагогов недоступны: %s", e)
+    cfg = {"kids": kids, "teachers": teachers, "prices": _prices(prices), "hints": COURSE_HINT, "notes": notes,
            "courses": list(_prices(prices).keys()), "fonts": fonts, "logo": logo,
            "dry": db.get_setting("wazzup_dry_run", "1") == "1"}
     return TEMPLATE.replace("__CFG__", json.dumps(cfg, ensure_ascii=False).replace("</", "<\\/"))
@@ -211,10 +218,12 @@ function fmtDate(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); co
 $('course').innerHTML = CFG.courses.map(c=>`<option>${esc(c)}</option>`).join('');
 $('teacher').innerHTML = '<option value="">—</option>'+CFG.teachers.map(t=>`<option>${esc(t)}</option>`).join('');
 $('date').value = new Date().toISOString().slice(0,10);
-$('kids').innerHTML = CFG.kids.length ? CFG.kids.map((k,i)=>`<div class="kidrow" data-i="${i}"><span><b>${esc(k.name)}</b> <span class="small">${esc(k.group)}</span></span><span class="t">${esc(k.date.slice(5).replace('-','.'))} ${esc(k.time)}</span></div>`).join('') : '<div class="small">первых занятий за два дня в CRM нет — заполните вручную</div>';
+$('kids').innerHTML = CFG.kids.length ? CFG.kids.map((k,i)=>`<div class="kidrow" data-i="${i}"><span><b>${esc(k.name)}</b> <span class="small">${esc(k.group)}</span></span><span class="t">${esc(k.date.slice(5).replace('-','.'))} ${esc(k.time)}${CFG.notes[String(k.uid)]?' · ✎ педагог':''}</span></div>`).join('') : '<div class="small">первых занятий за два дня в CRM нет — заполните вручную</div>';
 let cur = {};
 document.querySelectorAll('.kidrow').forEach(r=>r.addEventListener('click',()=>{ const k=CFG.kids[+r.dataset.i]; cur=k; $('child').value=firstName(k.name); $('phone').value=k.phone; $('group').value=k.group; $('date').value=k.date;
-  const opt=[...$('course').options].find(o=>k.course && (o.value===k.course || k.course.startsWith(o.value.slice(0,8)))); if(opt) $('course').value=opt.value; refresh(true); }));
+  const opt=[...$('course').options].find(o=>k.course && (o.value===k.course || k.course.startsWith(o.value.slice(0,8)))); if(opt) $('course').value=opt.value;
+  const n=CFG.notes[String(k.uid)]; if(n){ $('can').value=n.can||''; $('next_group').value=n.next_group||''; $('start').value=n.start||''; if(n.teacher) $('teacher').value=n.teacher; $('status').innerHTML='<span class=ok>Строки педагога '+esc(n.teacher)+' подставлены'+(n.visit===0?' — педагог отметил: НЕ пришёл':'')+'</span>'; } else { $('status').textContent='Заметок педагога по этому ребёнку ещё нет — впишите со слов педагога.'; }
+  refresh(true); }));
 function priceFor(){ return CFG.prices[$('course').value] || ''; }
 function composeText(){
   const c=$('child').value||'ребёнок', t=$('teacher').value, g=$('next_group').value.trim(), n=$('next').value.trim(), p=$('price').value.trim(), pay=$('pay').value.trim(), can=$('can').value.trim();
