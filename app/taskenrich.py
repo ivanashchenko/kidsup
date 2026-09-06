@@ -126,7 +126,7 @@ def build(c: dict, calls: dict, phone: str) -> str | None:
     else:
         tail = f"Говорили {max(x['day'] for x in talks)[5:]}."
     body = (f"📞 {head}. Предложить: {offer}. {tail} "
-            f"Зови на 29–30.08 и Неделю уроков 31.08–06.09.")
+            f"Зови на 29–30.08 и Неделю уроков 31.08–13.09.")
     return body[:250]
 
 
