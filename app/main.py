@@ -2781,7 +2781,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-06.31"
+APP_VERSION = "2026-09-06.32"
 
 
 @app.get("/api/net")
@@ -2823,7 +2823,7 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
             "anthropic_proxy_secret", "work_hours", "ext_by_day",
-            "vk_token", "vk_group_id", "vk_ads_client_id", "vk_ads_client_secret", "vk_ads_token", "tg_bot_token", "tg_channel", "mango_ext_admins", "pedagog_key",
+            "vk_token", "vk_group_id", "vk_ads_client_id", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "tg_bot_token", "tg_channel", "mango_ext_admins", "pedagog_key",
             "calls_parsed", "sms_on", "sms_sender_name", "lead_hook_key",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
@@ -2851,7 +2851,7 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
 # скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
 # страница настроек открыта всем, у кого есть пароль администратора.
 SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret",
-               "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token"}
+               "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token"}
 
 
 def _mask(key: str, value: str | None) -> str | None:
