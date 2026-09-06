@@ -110,8 +110,11 @@ for p, rs in byphone.items():
     head["ids"] = [r["id"] for r in rs]
     merged.append(head)
 merged.sort(key=lambda r: ("ABCD".index(r["seg"]), r["touched"]), reverse=False)
-for r in merged:
-    pass
+# 06.09 Борис: «поделить пополам» — внутри каждого сегмента строки чередуются между половинами,
+# чтобы у обеих было одинаково тёплых и холодных
+for s_ in "ABCD":
+    for i, r in enumerate([r for r in merged if r["seg"] == s_]):
+        r["half"] = 1 + i % 2
 
 SEG = {
     "A": ("Заявка на английский без записи", "Сами интересовались английским, но до пробного не дошли. Звонок: «вы спрашивали про английский — у Ильи вт-чт 18:00 группа 4–5 лет, есть 2 места, первое занятие условно-бесплатное, запишу на вторник 08.09 или четверг 10.09?»"),
@@ -130,7 +133,7 @@ def td(r):
     if r["zay"]:
         extra.append("заявка: " + "; ".join(r["zay"]))
     link = f"https://app.moyklass.com/user/{r['id']}"
-    return (f"<tr><td><a href='{link}' target='_blank'>{kids}</a></td>"
+    return (f"<tr class='h{r['half']}'><td><span class='hb'>{r['half']}</span> <a href='{link}' target='_blank'>{kids}</a></td>"
             f"<td class='num' style='white-space:nowrap'><a href='tel:+{r['phone']}'>+{r['phone']}</a></td>"
             f"<td style='font-size:12.5px'>{now}</td>"
             f"<td style='font-size:12.5px;color:#6c6a86'>{html.escape(' · '.join(extra)) or '—'}</td>"
@@ -145,7 +148,7 @@ for s in "ABCD":
         continue
     title, script = SEG[s]
     parts.append(f"<h2>{s}. {html.escape(title)} — {len(rs)}</h2><p style='font-size:14px'>{html.escape(script)}</p>"
-                 f"<div class='scroll'><table><tr><th>Ребёнок (возраст)</th><th>Телефон</th><th>Сейчас ходит</th><th>История</th><th>Статус</th><th>✓</th></tr>"
+                 f"<div class='scroll'><table><tr><th>½ · Ребёнок (возраст)</th><th>Телефон</th><th>Сейчас ходит</th><th>История</th><th>Статус</th><th>✓</th></tr>"
                  + "".join(td(r) for r in rs) + "</table></div>")
 
 total = len(merged)
@@ -160,16 +163,26 @@ h1{{color:#312783;font-size:26px;margin:0 0 6px}} h2{{color:#312783;font-size:19
 table{{border-collapse:collapse;width:100%;background:#fff;font-size:13.5px}} th,td{{padding:6px 8px;border-bottom:1px solid #e7e6f2;text-align:left;vertical-align:top}}
 th{{background:#eef3ff;color:#312783;font-size:12px;text-transform:uppercase;letter-spacing:.03em}} .num{{font-variant-numeric:tabular-nums}}
 .scroll{{overflow-x:auto}} a{{color:#1DA7E0}} .kpi{{display:flex;gap:14px;flex-wrap:wrap}} .kpi div{{background:#fff;border-radius:10px;padding:10px 14px;min-width:120px}}
-.kpi b{{display:block;font-size:24px;color:#312783}} .warn{{border-left:4px solid #F59C00}} .ok{{border-left:4px solid #7DB928}}
+.kpi b{{display:block;font-size:24px;color:#312783}} .hb{{display:inline-block;min-width:16px;text-align:center;border-radius:50%;background:#312783;color:#fff;font-size:11px;font-weight:700;padding:1px 4px}}
+tr.h2 .hb{{background:#1DA7E0}} button{{border:1px solid #c9c7e0;background:#fff;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:13px}} button.on{{background:#312783;color:#fff}} .warn{{border-left:4px solid #F59C00}} .ok{{border-left:4px solid #7DB928}}
 </style></head><body><div class="wrap">
 <h1>Обзвон: английский 4–5 лет, группа Ильи</h1>
 <div style="color:#6c6a86;font-size:13px">Собрано 06.09.2026 15:50 по базе МойКласса. Возраст 3 г 8 мес – 6 лет на сегодня. Исключены: кто уже в английском этого сезона, статус «не писать», отказавшиеся именно от английского в этом сезоне. Одна строка на семью.</div>
 <div class="kpi" style="margin:14px 0"><div><b>{total}</b>семей в списке</div><div><b>{counts['A']}</b>A · заявки на АЯ</div><div><b>{counts['B']}</b>B · наши клиенты</div><div><b>{counts['C']}</b>C · были на АЯ</div><div><b>{counts['D']}</b>D · лиды</div></div>
+<div class="card" style="border-left:4px solid #1DA7E0"><b>Список поделён пополам.</b> Половина <span class="hb">1</span> — Аня сегодня, Лена завтра; половина <span class="hb">2</span> — Ира. В каждом сегменте строки чередуются, тёплых поровну. Кнопки скрывают чужую половину:
+<span style="margin-left:8px"><button onclick="half(0)">Все</button> <button onclick="half(1)">Половина 1 — Аня / Лена</button> <button onclick="half(2)">Половина 2 — Ира</button></span></div>
 <div class="card ok"><b>Куда записываем.</b> Илья: <b>Гр7 вт-чт 18:00, 3–5 лет, Pre-A1 Starters</b> — живых записей 6 из 8, реально ходят меньше, поэтому звоним до заполнения списка, а не до «2 мест». Ближайшие первые занятия: вт 08.09 и чт 10.09 в 18:00.
 Если время вт-чт 18:00 не подходит — <b>Гр2 пн-ср 17:00, 3–5 лет</b> (4 из 8, Мария). Набрали больше 8 на вт-чт — это повод открыть Илье вторую группу 4–5 (например вт-чт 17:00 после слияния), список ожидания вести здесь же: ставьте ✓ и пишите «лист» в комментарий карточки.</div>
 <div class="card warn"><b>Порядок.</b> Сначала A (тёплые, сами спрашивали), потом B (свои клиенты — предлагаем −10% второй предмет), затем C, D — в свободное время. Каждый разговор — комментарий в карточку и статус (записался / думает / отказ с причиной). Первое занятие — «условно-бесплатное», не «бесплатное пробное». Скидка −15% на первый абонемент действует в день первого занятия. Звонить с 10:00 до 20:00; в выходной — не раньше 11:00.</div>
 {''.join(parts)}
 <p style="color:#6c6a86;font-size:12.5px;margin-top:24px">Страница статичная (срез на 06.09). Кто записался после звонка — исчезнет из списка при следующей пересборке; пока ставьте галочку.</p>
-</div></body></html>"""
+</div><script>
+function half(n){{document.querySelectorAll('tr.h1,tr.h2').forEach(function(t){{t.hidden = n && !t.classList.contains('h'+n);}});
+document.querySelectorAll('button').forEach(function(b,i){{b.classList.toggle('on', i===n);}});
+try{{localStorage.setItem('aya45half', n);}}catch(e){{}}
+document.querySelectorAll('h2').forEach(function(h){{var tb=h.nextElementSibling&&h.nextElementSibling.nextElementSibling; if(!tb) return; var vis=tb.querySelectorAll('tr.h1:not([hidden]),tr.h2:not([hidden])').length; h.textContent=h.textContent.replace(/ — \d+( · видно \d+)?$/, ' — '+h.dataset.n+(n?' · видно '+vis:''));}});}}
+document.querySelectorAll('h2').forEach(function(h){{var m=h.textContent.match(/ — (\d+)$/); if(m) h.dataset.n=m[1];}});
+try{{var v=parseInt(localStorage.getItem('aya45half')||'0'); if(v) half(v);}}catch(e){{}}
+</script></body></html>"""
 (ROOT / "docs/obzvon_aya_4_5.html").write_text(page, encoding="utf-8")
 print("итого семей", total, counts)
