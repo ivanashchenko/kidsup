@@ -3139,7 +3139,7 @@ def discipline_check() -> dict:
     worse = [(r, n, prev.get(r)) for r, n in stat.items()
              if prev.get(r) is not None and n >= prev[r] and n > 0]
     if worse and _mark("discipline_alert", _today().isoformat()):
-        lines = ["🤖 Клод: ошибки не исправляются второй день подряд.", ""]
+        lines = ["🤖 Клод: ошибки в CRM не исправляются второй день подряд (срез на утро).", ""]
         for rule, n, was in worse:
             title = next((t for k, t, _ in DISCIPLINE_RULES if k == rule), rule)
             why = next((w for k, _, w in DISCIPLINE_RULES if k == rule), "")
@@ -4080,7 +4080,8 @@ def _loop() -> None:
                     card_quality()
                 except Exception:
                     log.exception("проверка качества карточек не удалась")
-            if now.hour >= 19 and _mark("discipline_day", str(_today())):
+            # 06.09 Борис: разбор дисциплины CRM — утром владельцу (было вечером в 19:00)
+            if now.hour >= 9 and _mark("discipline_day", str(_today())):
                 try:
                     discipline_check()
                 except Exception:
