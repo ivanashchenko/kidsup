@@ -227,23 +227,25 @@ function tspans(lines, x, y, lh, cls){ return lines.map((l,i)=>`<text x="${x}" y
 function svg(){
   const child=$('child').value||'Имя', course=$('course').value, date=fmtDate($('date').value), teacher=$('teacher').value, group=$('group').value;
   const blocks=[['ЧТО УЖЕ УМЕЕТ',$('can').value,'#1DA7E0'],['КУДА ИДЁМ',$('next_group').value,'#7DB928'],['С ЧЕГО НАЧНЁМ',$('start').value,'#F59C00']];
-  let y=430, body='';
-  for(const [title,txt,color] of blocks){ const lines=wrap(txt||'—',46).slice(0,5); body+=`<rect x="80" y="${y-30}" width="10" height="${34+lines.length*42}" rx="5" fill="${color}"/><text x="112" y="${y}" class="lbl" fill="${color}">${title}</text>`+tspans(lines,112,y+48,42,'body'); y+=48+lines.length*42+56; }
+  const subLines=wrap(`Первое занятие · ${course}${group? ' · '+group:''}${teacher? ' · педагог '+teacher:''}`,62).slice(0,3);
+  let y=368+subLines.length*34+62, body='';
+  const avail=1090-y, cap=avail>=700?4:3;
+  for(const [title,txt,color] of blocks){ const lines=wrap(txt||'—',50).slice(0,cap); body+=`<rect x="80" y="${y-28}" width="10" height="${32+lines.length*38}" rx="5" fill="${color}"/><text x="112" y="${y}" class="lbl" fill="${color}">${title}</text>`+tspans(lines,112,y+44,38,'body'); y+=44+lines.length*38+44; }
   const next=$('next').value, price=$('price').value;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350"><defs><style>
 @font-face{font-family:M;font-weight:700;src:url(${CFG.fonts.bold}) format('truetype')}@font-face{font-family:M;font-weight:500;src:url(${CFG.fonts.medium}) format('truetype')}
 .h{font:700 44px M,Arial,sans-serif;fill:#fff;letter-spacing:.06em}.d{font:500 26px M,Arial,sans-serif;fill:#cfd9ff}.name{font:700 66px M,Arial,sans-serif;fill:#312783}.sub{font:500 27px M,Arial,sans-serif;fill:#6c6a86}
-.lbl{font:700 24px M,Arial,sans-serif;letter-spacing:.12em}.body{font:500 31px M,Arial,sans-serif;fill:#15132e}.f1{font:700 30px M,Arial,sans-serif;fill:#312783}.f2{font:500 25px M,Arial,sans-serif;fill:#15132e}.f3{font:500 21px M,Arial,sans-serif;fill:#6c6a86}</style></defs>
+.lbl{font:700 24px M,Arial,sans-serif;letter-spacing:.12em}.body{font:500 29px M,Arial,sans-serif;fill:#15132e}.f1{font:700 30px M,Arial,sans-serif;fill:#312783}.f2{font:500 25px M,Arial,sans-serif;fill:#15132e}.f3{font:500 21px M,Arial,sans-serif;fill:#6c6a86}</style></defs>
 <rect width="1080" height="1350" fill="#ffffff"/><rect width="1080" height="210" fill="#312783"/>
 <image href="${CFG.logo}" x="70" y="48" height="116"/>
 <text x="1010" y="110" text-anchor="end" class="h">КАРТА РАЗВИТИЯ</text><text x="1010" y="156" text-anchor="end" class="d">${esc(date)}</text>
 <text x="80" y="320" class="name">${esc(child)}</text>
-${tspans(wrap(`Первое занятие · ${course}${group? ' · '+group:''}${teacher? ' · педагог '+teacher:''}`,62),80,368,34,'sub')}
+${tspans(subLines,80,368,34,'sub')}
 ${body}
 <rect x="0" y="1130" width="1080" height="220" fill="#EAE8F5"/>
 <text x="80" y="1195" class="f1">${esc(next? 'Следующее занятие: '+next : 'Ждём на следующем занятии')}</text>
 ${tspans(wrap(price? 'Абонемент: '+price+' · при оплате в день первого занятия −10%, первое занятие входит' : '',70),80,1240,32,'f2')}
-<text x="80" y="1312" class="f3">KidsUP · б-р Маршала Рокоссовского, 6 к1В · 7-й подъезд, 2 этаж · +7 (495) 120-90-24 · kidsup.ru</text></svg>`;
+<text x="80" y="1312" class="f3">KidsUP · б-р Маршала Рокоссовского, 6к1В · +7 (495) 120-90-24 · kidsup.ru</text></svg>`;
 }
 function refresh(reprice){ if(reprice||!$('price').value) $('price').value=priceFor(); $('preview').innerHTML=svg(); if(!$('text').dataset.touched) $('text').value=composeText(); }
 ['child','phone','course','group','teacher','date','can','next_group','start','next','price','pay'].forEach(id=>$(id).addEventListener('input',()=>refresh(id==='course')));
