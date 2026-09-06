@@ -975,6 +975,8 @@ DOC_GROUPS = [
          "Полотно 1900×1400 мм 1:1, 72 dpi, CMYK без сжатия, без альфа-каналов — по ТТ. Отправлять этот файл, не PNG"),
         ("pamyatka_pedagoga", "🧑‍🏫 Памятка педагогу: три строки после первого занятия",
          "Что писать по каждому ребёнку, куда, примеры по девяти направлениям и ссылка на страницу педагога"),
+        ("__url:/pult", "🎛 ПУЛЬТ СМЕНЫ — одна ссылка на день: задачи тех, кто в смене, Лиза, Борис, цифры дня, инбокс, заявки, места",
+         "Колонки задач только для дежурных по графику, галочки видны всем, обновляется каждые 5 минут. Своя колонка: /pult?who=Аня"),
         ("__url:/karta", "🗺 Карта развития — после первого занятия",
          "Выбрать ребёнка с сегодняшнего первого занятия, вписать три строки педагога (что умеет, куда идём, с чего начнём) — и отправить маме готовую карту в WhatsApp вместе со ссылкой на оплату"),
         ("__url:/spiski", "📋 СПИСКИ ПО ГРУППАМ — живые, обновляются каждые 5 минут, печатаются",
@@ -2225,6 +2227,39 @@ def api_pedagog_save(payload: dict = Body(...)):
     return pedagog.save(payload or {})
 
 
+@app.get("/pult", response_class=HTMLResponse, dependencies=AUTH)
+def pult_page(day: str = "", who: str = ""):
+    """Пульт смены: задачи по тем, кто сегодня работает, + Лиза и Борис, живые блоки (06.09)."""
+    from . import pult
+    return HTMLResponse(pult.page(day, who))
+
+
+@app.get("/api/pult/tasks", dependencies=AUTH)
+def api_pult_tasks(day: str = ""):
+    from . import pult
+    d = day or pult.today()
+    return {"day": d, "duty": pult.duty(d), "tasks": pult.tasks(d), "kpi": pult.kpi(d)}
+
+
+@app.post("/api/pult/tasks", dependencies=AUTH)
+def api_pult_tasks_set(payload: dict = Body(...)):
+    """{"day": "2026-09-06", "who": "Аня", "items": [{"t": "11:00", "text": "…"}], "replace": true}.
+    Кладёт колонку задач на день; при replace сделанные галочки по тому же тексту сохраняются."""
+    from . import pult
+    d = str(payload.get("day") or pult.today())
+    who = str(payload.get("who") or "").strip()
+    if not who:
+        raise HTTPException(400, "who обязателен")
+    n = pult.set_tasks(d, who, payload.get("items") or [], bool(payload.get("replace", True)))
+    return {"ok": True, "day": d, "who": who, "задач": n}
+
+
+@app.post("/api/pult/done", dependencies=AUTH)
+def api_pult_done(payload: dict = Body(...)):
+    from . import pult
+    return {"ok": pult.mark(int(payload.get("id") or 0), bool(payload.get("done", True)))}
+
+
 @app.get("/karta", response_class=HTMLResponse, dependencies=AUTH)
 def karta_page():
     """«Карта развития» после первого занятия: три строки педагога → PNG маме в WhatsApp (06.09)."""
@@ -2674,7 +2709,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-06.9"
+APP_VERSION = "2026-09-06.10"
 
 
 @app.get("/api/net")
