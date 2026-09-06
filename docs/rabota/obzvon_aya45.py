@@ -11,7 +11,17 @@ ROOT = Path(__file__).resolve().parents[2]
 SCR = Path("/tmp/claude-0/-home-user-kidsup/f2c35386-c271-55ec-b217-3b85ac2d6607/scratchpad")
 TODAY = datetime.date(2026, 9, 6)
 LIVE = {2, 58132, 83760, 58131}
-BORN_FROM, BORN_TO = datetime.date(2020, 9, 1), datetime.date(2022, 12, 31)   # 3 г 8 мес … 6 лет
+BANDS = {  # 06.09 Ира: «максимально список — чаще 3–5 и 6–8»
+    "3–5": (datetime.date(2021, 1, 1), datetime.date(2023, 9, 6)),     # 3 г 0 мес … 5 л 8 мес
+    "6–8": (datetime.date(2017, 9, 7), datetime.date(2020, 12, 31)),   # 5 л 8 мес … 9 л
+}
+def band_of(b):
+    if b is None:
+        return None
+    for k, (a, z) in BANDS.items():
+        if a <= b <= z:
+            return k
+    return None
 NO_CALL_STATES = {146328}          # «не писать»
 REFUSED = {125957}
 STATE = {125951: "новый лид", 345768: "недозвон", 146950: "думает", 125952: "записался", 125955: "учится",
@@ -61,8 +71,7 @@ for u in users:
     if u["phone"].startswith("7777777") or "дубликат" in (u.get("name") or "").lower():
         continue
     b = bday(u)
-    if not b or not (BORN_FROM <= b <= BORN_TO):
-        continue
+    band = band_of(b)
     js = by_user.get(u["id"], [])
     aya_live = [c for c, st, _ in js if is_aya(c) and "Заявк" not in classes[c]["name"]
                 and classes[c]["name"].startswith("2627_") and st in LIVE]
@@ -76,21 +85,25 @@ for u in users:
     other_zayavka = [c for c, st, _ in js if not is_aya(c) and "Заявк" in classes[c]["name"] and st == 50509
                      and classes[c]["name"].startswith("2627_")]
     st = u.get("clientStateId")
-    if aya_zayavka:
+    if st in REFUSED and aya_refused:
+        continue                                   # отказались именно от АЯ в этом сезоне — не трогаем
+    if aya_zayavka and (band or not b):
         seg = "A"
+    elif aya_last and (band or not b):
+        seg = "C"
+    elif not band:
+        continue
     elif other_live:
         seg = "B"
-    elif aya_last:
-        seg = "C"
-    elif st in REFUSED and aya_refused:
-        continue                                   # отказались именно от АЯ в этом сезоне — не трогаем
     elif other_zayavka or st in (125951, 345768, 146950, 125952):
         seg = "D"
     else:
         continue
+    if not band:
+        band = "возраст уточнить"
     rows.append({
-        "seg": seg, "id": u["id"], "name": u.get("name") or "", "phone": u["phone"], "born": b,
-        "age": age_str(b), "state": STATE.get(st, str(st)),
+        "seg": seg, "band": band, "id": u["id"], "name": u.get("name") or "", "phone": u["phone"], "born": b,
+        "age": age_str(b) if b else "возраст?", "state": STATE.get(st, str(st)),
         "now": sorted(set(short(c) for c in other_live)),
         "last": sorted(set(short(c) for c in aya_last)),
         "zay": sorted(set(short(c) for c in (aya_zayavka + other_zayavka))),
@@ -109,18 +122,25 @@ for p, rs in byphone.items():
     head["kids"] = [f"{r['name']} ({r['age']})" for r in rs]
     head["ids"] = [r["id"] for r in rs]
     merged.append(head)
-merged.sort(key=lambda r: ("ABCD".index(r["seg"]), r["touched"]), reverse=False)
+BAND_ORDER = ["3–5", "6–8", "возраст уточнить"]
+merged.sort(key=lambda r: (BAND_ORDER.index(r["band"]), "ABCD".index(r["seg"]), r["touched"]))
 # 06.09 Борис: «поделить пополам» — внутри каждого сегмента строки чередуются между половинами,
 # чтобы у обеих было одинаково тёплых и холодных
-for s_ in "ABCD":
-    for i, r in enumerate([r for r in merged if r["seg"] == s_]):
-        r["half"] = 1 + i % 2
+for bnd in BAND_ORDER:
+    for s_ in "ABCD":
+        for i, r in enumerate([r for r in merged if r["seg"] == s_ and r["band"] == bnd]):
+            r["half"] = 1 + i % 2
 
 SEG = {
-    "A": ("Заявка на английский без записи", "Сами интересовались английским, но до пробного не дошли. Звонок: «вы спрашивали про английский — у Ильи вт-чт 18:00 группа 4–5 лет, есть 2 места, первое занятие условно-бесплатное, запишу на вторник 08.09 или четверг 10.09?»"),
-    "B": ("Наши клиенты 4–5 лет, ходят на другое", "Уже доверяют нам, знают адрес. Звонок: «Илья набирает английский для 4–5 лет вт-чт 18:00; второй предмет −10%, первое занятие условно-бесплатное. У вас как раз возраст, когда язык ложится на слух»."),
-    "C": ("Ходили на английский в прошлом сезоне, не продолжили", "Уже занимались, знают формат. Звонок: «в этом году английский 4–5 лет ведёт Илья Ярославцев (учитель первой категории, Cambridge). Вернётесь? Первое занятие бесплатно для своих»."),
-    "D": ("Лиды 4–5 лет из базы (заявки на другое / новые)", "Холоднее, звонить после сегментов A–C. Предлагать английский как второй вариант к тому, что спрашивали."),
+    "A": ("Заявка на английский без записи", "Сами интересовались английским, но до пробного не дошли. Звонок: «вы спрашивали про английский — предлагаю группу по возрасту и уровню, первое занятие условно-бесплатное, запишу на ближайшее?»"),
+    "B": ("Наши клиенты, ходят на другое", "Уже доверяют нам, знают адрес. Звонок: «набираем английский по уровням Cambridge; второй предмет −10%, первое занятие условно-бесплатное»."),
+    "C": ("Ходили на английский в прошлом сезоне, не продолжили", "Уже занимались, знают формат. Звонок: «в этом году английский ведут Илья Ярославцев (учитель первой категории) и Мария Колотушкина, группы по уровням Starters/Movers. Вернётесь? Первое занятие — для своих условно-бесплатное»."),
+    "D": ("Лиды из базы (заявки на другое / новые)", "Холоднее, звонить после сегментов A–C. Предлагать английский как второй вариант к тому, что спрашивали."),
+}
+BAND_TXT = {
+    "3–5": "Куда: <b>Гр7 вт-чт 18:00 (Илья, 6 из 8)</b> и <b>Гр2 пн-ср 17:00 (Мария, 4 из 8)</b>, обе Pre-A1 Starters. Первые занятия: пн 07.09 17:00, вт 08.09 18:00.",
+    "6–8": "Куда: продолжающие — <b>Гр8 вт-чт 19:00 A1 Movers (2 из 8!)</b>; начинающие 5–8 — Гр6 вт-чт 17:00 и Гр3 пн-ср 18:00 переполнены (10 и 9 из 8), поэтому новичков пишем в <b>лист новой группы Starters 5–8 вт-чт 16:00</b>: 8 имён в листе = открываем. Школьникам 8+ — Гр5 вт-чт 16:00 (4 из 8) и Гр1 пн-ср 16:00 (6 из 8).",
+    "возраст уточнить": "Даты рождения в карточке нет. Сначала спросить возраст и вписать в карточку, потом предлагать группу по таблице выше.",
 }
 
 
@@ -142,18 +162,24 @@ def td(r):
 
 
 parts = []
-for s in "ABCD":
-    rs = [r for r in merged if r["seg"] == s]
-    if not rs:
+for bnd in BAND_ORDER:
+    brs = [r for r in merged if r["band"] == bnd]
+    if not brs:
         continue
-    title, script = SEG[s]
-    parts.append(f"<h2>{s}. {html.escape(title)} — {len(rs)}</h2><p style='font-size:14px'>{html.escape(script)}</p>"
-                 f"<div class='scroll'><table><tr><th>½ · Ребёнок (возраст)</th><th>Телефон</th><th>Сейчас ходит</th><th>История</th><th>Статус</th><th>✓</th></tr>"
-                 + "".join(td(r) for r in rs) + "</table></div>")
+    parts.append(f"<h2 class='band' style='font-size:22px;margin-top:34px;border-top:3px solid #312783;padding-top:14px'>Возраст {html.escape(bnd)} — {len(brs)} семей</h2>"
+                 f"<div class='card' style='border-left:4px solid #1DA7E0'>{BAND_TXT[bnd]}</div>")
+    for s in "ABCD":
+        rs = [r for r in brs if r["seg"] == s]
+        if not rs:
+            continue
+        title, script = SEG[s]
+        parts.append(f"<h2>{s}. {html.escape(title)} — {len(rs)}</h2><p style='font-size:14px'>{html.escape(script)}</p>"
+                     f"<div class='scroll'><table><tr><th>½ · Ребёнок (возраст)</th><th>Телефон</th><th>Сейчас ходит</th><th>История</th><th>Статус</th><th>✓</th></tr>"
+                     + "".join(td(r) for r in rs) + "</table></div>")
 
 total = len(merged)
 counts = {s: len([r for r in merged if r["seg"] == s]) for s in "ABCD"}
-page = f"""<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Обзвон: английский 4–5 лет, группа Ильи</title>
+page = f"""<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Обзвон: английский 3–5 и 6–8 лет</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 body{{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f6f6fb;color:#1c1b2e;font-size:15px;line-height:1.45}}
@@ -166,9 +192,9 @@ th{{background:#eef3ff;color:#312783;font-size:12px;text-transform:uppercase;let
 .kpi b{{display:block;font-size:24px;color:#312783}} .hb{{display:inline-block;min-width:16px;text-align:center;border-radius:50%;background:#312783;color:#fff;font-size:11px;font-weight:700;padding:1px 4px}}
 tr.h2 .hb{{background:#1DA7E0}} button{{border:1px solid #c9c7e0;background:#fff;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:13px}} button.on{{background:#312783;color:#fff}} .warn{{border-left:4px solid #F59C00}} .ok{{border-left:4px solid #7DB928}}
 </style></head><body><div class="wrap">
-<h1>Обзвон: английский 4–5 лет, группа Ильи</h1>
-<div style="color:#6c6a86;font-size:13px">Собрано 06.09.2026 15:50 по базе МойКласса. Возраст 3 г 8 мес – 6 лет на сегодня. Исключены: кто уже в английском этого сезона, статус «не писать», отказавшиеся именно от английского в этом сезоне. Одна строка на семью.</div>
-<div class="kpi" style="margin:14px 0"><div><b>{total}</b>семей в списке</div><div><b>{counts['A']}</b>A · заявки на АЯ</div><div><b>{counts['B']}</b>B · наши клиенты</div><div><b>{counts['C']}</b>C · были на АЯ</div><div><b>{counts['D']}</b>D · лиды</div></div>
+<h1>Обзвон: английский 3–5 и 6–8 лет</h1>
+<div style="color:#6c6a86;font-size:13px">Собрано 06.09.2026 15:50 по базе МойКласса. Две полосы: 3–5 лет (3 г 0 мес – 5 л 8 мес) и 6–8 лет (5 л 8 мес – 9 л). Заявки на английский и прошлогодние ученики — и без даты рождения. Исключены: кто уже в английском этого сезона, статус «не писать», отказавшиеся именно от английского в этом сезоне. Одна строка на семью.</div>
+<div class="kpi" style="margin:14px 0"><div><b>{total}</b>семей в списке</div><div><b>{len([r for r in merged if r["band"]=="3–5"])}</b>3–5 лет</div><div><b>{len([r for r in merged if r["band"]=="6–8"])}</b>6–8 лет</div><div><b>{counts['A']}</b>A · заявки на АЯ</div><div><b>{counts['B']}</b>B · наши клиенты</div><div><b>{counts['C']}</b>C · были на АЯ</div><div><b>{counts['D']}</b>D · лиды</div></div>
 <div class="card" style="border-left:4px solid #1DA7E0"><b>Список поделён пополам.</b> Половина <span class="hb">1</span> — Аня сегодня, Лена завтра; половина <span class="hb">2</span> — Ира. В каждом сегменте строки чередуются, тёплых поровну. Кнопки скрывают чужую половину:
 <span style="margin-left:8px"><button onclick="half(0)">Все</button> <button onclick="half(1)">Половина 1 — Аня / Лена</button> <button onclick="half(2)">Половина 2 — Ира</button></span></div>
 <div class="card ok"><b>Куда записываем.</b> Илья: <b>Гр7 вт-чт 18:00, 3–5 лет, Pre-A1 Starters</b> — живых записей 6 из 8, реально ходят меньше, поэтому звоним до заполнения списка, а не до «2 мест». Ближайшие первые занятия: вт 08.09 и чт 10.09 в 18:00.
