@@ -1,379 +1,192 @@
-"""Обогащение карточек данными из выгрузки заявок с сайта 2018–2026.
+"""Необработанные заявки сезона — живой раздел на страницах плана дня.
 
-Что это. Владелец 25.08 выгрузил все заявки с сайта за восемь лет: 3128
-строк, 2219 уникальных телефонов. В них есть то, чего в CRM часто нет:
-дата рождения ребёнка (452 заявки), email (1025), имя ребёнка отдельно
-от имени родителя, интересующее направление.
+06.09 Борис: «почему в базе 374 заявки в статусе "Новая заявка"? кто они?
+когда их дожмут? они есть в планах?» Разбор показал: 248 — хвосты прошлых
+сезонов, 126 — заявки с 10.08, из которых по-настоящему не тронуты 12, а
+у остальных разговор был, но статус записи никто не сменил.
 
-Что делает модуль. Сопоставляет заявки с карточками по последним десяти
-цифрам телефона и дописывает недостающее — НЕ ЗАТИРАЯ существующее:
-дата рождения ставится, только если её нет; email — если пусто; имя
-ребёнка идёт в комментарий, а не в поле имени (там своя чистка).
+Здесь считаем это каждый раз заново по локальным таблицам сервера
+(joins/users/classes обновляются лёгким синком раз в 5 минут; звонки —
+mango_calls из вебхука; переписка — wazzup_inbox/outbox) и отдаём HTML-блок
+для plan_*.html. Никаких отправок, только чтение.
 
-Телефонов, которых в CRM нет вовсе, — отдельный список: это люди,
-оставлявшие заявку и потерявшиеся, по свежим из них имеет смысл звонить.
-
-Запуск:
-    python -m app.zayavki            — что найдено и что будет сделано
-    python -m app.zayavki apply      — дописать в CRM
-    python -m app.zayavki list       — собрать лист обзвона по лету 2026
+Правила отбора: записи в статусе «1. Новая заявка» (50509) с 10.08.2026,
+без промоутера (статус карточки 347075) и без летнего лагеря/клуба.
+«Не тронута» — ни звонка, ни сообщения в обе стороны, ни другой записи
+семьи в статусе «подтвердил/записался/посетил/учится/отработка».
 """
-
 from __future__ import annotations
 
-import csv
-import logging
+import html
+import json
 import re
-import time
-from datetime import date, datetime
+from datetime import datetime, timedelta
 
-from . import sync, taskguard
-from .moyklass_client import MoyklassClient
+from . import db
 
-log = logging.getLogger("kidsup.zayavki")
-
-CSV = ("/root/.claude/uploads/f2c35386-c271-55ec-b217-3b85ac2d6607/"
-       "5a2c8888-leads8481b83cb588886ed03c342005b394b2bd9b090ad2ba986f"
-       "7662cd22cdf1d065.csv")
-BIRTHDAY_ALIAS = "birthday"
-
-
-def phone10(raw: str) -> str | None:
-    d = "".join(c for c in (raw or "") if c.isdigit())[-10:]
-    return d if len(d) == 10 and d[0] == "9" else None
+SEASON_FROM = "2026-08-10"
+NEW_JOIN = 50509
+WORKING_JOIN = (83760, 58132, 58131, 2, 5)
+PROMOTER_STATE = 347075
+ROBOT_PHONES = {"9099301750", "9044500230"}   # автодозвонщики, не семьи
+JUNK_RE = re.compile(r"дубл|7777777777|тест|собеседован", re.I)
+CAMP_RE = re.compile(r"лагер|летн|_лк\b|клуб", re.I)
 
 
-def _date(raw: str) -> str | None:
-    """«14.05.2020» → «2020-05-14». Отсекаем явную ерунду: год до 2005
-    или в будущем — это не дата рождения ребёнка."""
-    raw = (raw or "").strip()
-    for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
-        try:
-            d = datetime.strptime(raw[:10], fmt).date()
-        except ValueError:
-            continue
-        if 2005 <= d.year <= date.today().year:
-            return d.isoformat()
-    return None
+_CALLS: dict = {"ts": None, "idx": {}}
 
 
-def load() -> dict[str, dict]:
-    """Заявки, свёрнутые по телефону: у одного человека их бывает пять,
-    берём самое полное и самое свежее."""
-    out: dict[str, dict] = {}
-    with open(CSV, encoding="utf-8-sig") as f:
-        for r in csv.DictReader(f, delimiter=";"):
-            p = phone10(r.get("Phone"))
-            if not p:
-                continue
-            cur = out.setdefault(p, {"phone": p, "dates": [], "forms": [],
-                                     "birthday": None, "email": None,
-                                     "child": None, "parent": None,
-                                     "interest": None, "note": None})
-            cur["dates"].append((r.get("Date") or "")[:10])
-            form = (r.get("formname") or r.get("Input") or "").strip()
-            if form:
-                cur["forms"].append(form)
-            bd = _date(r.get("Дата_рождения_ребенка"))
-            if bd and not cur["birthday"]:
-                cur["birthday"] = bd
-            em = (r.get("Email") or "").strip()
-            if em and "@" in em and not cur["email"]:
-                cur["email"] = em
-            ch = (r.get("Name_2") or "").strip()
-            if ch and not cur["child"]:
-                cur["child"] = ch
-            pa = (r.get("Name") or "").strip()
-            if pa and not cur["parent"]:
-                cur["parent"] = pa
-            it = (r.get("Интересующее_занятие") or "").strip()
-            if it and not cur["interest"]:
-                cur["interest"] = it
-            tx = (r.get("Textarea") or r.get("Дополнительные_комментарии") or "").strip()
-            if tx and not cur["note"]:
-                cur["note"] = tx[:180]
-    for v in out.values():
-        v["last"] = max(v["dates"]) if v["dates"] else ""
-        v["first"] = min(v["dates"]) if v["dates"] else ""
-        v["count"] = len(v["dates"])
-    return out
+def _calls_index() -> dict[str, list[tuple[str, bool]]]:
+    """Звонки Манго за сезон: phone10 -> [(ts_msk, разговор состоялся)]. Кэш 30 минут.
 
-
-def match(mk) -> tuple[list[dict], list[dict]]:
-    """(что дописать в существующие карточки, кого в CRM нет вовсе)."""
-    leads = load()
-    users = taskguard.pull_all(mk, "/v1/company/users", "users", cache_hours=2)
-    idx: dict[str, dict] = {}
-    for u in users:
-        p = phone10(u.get("phone"))
-        if p:
-            idx.setdefault(p, u)
-    to_fill, missing = [], []
-    for p, lead in leads.items():
-        u = idx.get(p)
-        if not u:
-            missing.append(lead)
-            continue
-        have_bd = any(a.get("attributeAlias") == BIRTHDAY_ALIAS and a.get("value")
-                      for a in (u.get("attributes") or []))
-        need = {}
-        if lead["birthday"] and not have_bd:
-            need["birthday"] = lead["birthday"]
-        if lead["email"] and not (u.get("email") or "").strip():
-            need["email"] = lead["email"]
-        if need or lead["child"] or lead["interest"]:
-            to_fill.append({"uid": u["id"], "user": u, "lead": lead, "need": need})
-    return to_fill, missing
-
-
-def _bd_attr_id(mk) -> int | None:
+    Таблица mango_calls на сервере пишется вебхуком и по факту почти пустая
+    (06.09: у 41 «нетронутой» заявки 0 звонков, хотя по журналу Манго админы
+    набирали большинство). Поэтому берём журнал через API статистики, как
+    /docs/rabota/zvonki_chas.py, но только читаем."""
+    now = datetime.now()
+    if _CALLS["ts"] and (now - _CALLS["ts"]) < timedelta(minutes=30):
+        return _CALLS["idx"]
+    idx: dict[str, list[tuple[str, bool]]] = {}
     try:
-        r = mk.get("/v1/company/userAttributes")
-        items = (r.get("userAttributes") if isinstance(r, dict) else r) or []
-        for a in items:
-            if a.get("alias") == BIRTHDAY_ALIAS:
-                return a["id"]
-    except Exception:
-        pass
-    return None
-
-
-def apply(dry: bool = True, limit: int = 0) -> dict:
-    mk = MoyklassClient(sync.get_api_key())
-    stat = {"карточек": 0, "др": 0, "email": 0, "комментариев": 0, "ошибок": 0}
-    try:
-        to_fill, missing = match(mk)
-        # Уже обогащённые пропускаем: match() каждый раз возвращает всех, у
-        # кого есть что добавить, и без этой проверки повторный запуск
-        # дописывал бы тот же комментарий второй раз.
-        done = set()
-        try:
-            cm = mk.get("/v1/company/userComments", {"limit": 500})
-            for x in ((cm.get("userComments") if isinstance(cm, dict) else cm) or []):
-                if str(x.get("comment") or "").startswith("Заявки с сайта ("):
-                    done.add(x.get("userId"))
-        except Exception:
-            pass
-        to_fill = [x for x in to_fill if x["uid"] not in done]
-        stat["карточек"] = len(to_fill)
-        stat["нет в CRM"] = len(missing)
-        stat["уже было"] = len(done)
-        if dry:
-            return stat
-        bd_id = _bd_attr_id(mk)
-        for it in (to_fill[:limit] if limit else to_fill):
-            uid, lead, need = it["uid"], it["lead"], it["need"]
-            try:
-                fields = {}
-                if need.get("email"):
-                    fields["email"] = need["email"]
-                if need.get("birthday") and bd_id:
-                    fields["attributes"] = [{"attributeId": bd_id,
-                                             "value": need["birthday"]}]
-                if fields:
-                    mk.safe_update_user(uid, **fields)
-                    stat["др"] += 1 if need.get("birthday") else 0
-                    stat["email"] += 1 if need.get("email") else 0
-                bits = []
-                if lead["child"]:
-                    bits.append(f"ребёнок: {lead['child']}")
-                if lead["parent"]:
-                    bits.append(f"родитель: {lead['parent']}")
-                if lead["interest"]:
-                    bits.append(f"интерес: {lead['interest']}")
-                if lead["forms"]:
-                    bits.append("формы: " + ", ".join(dict.fromkeys(lead["forms"]))[:120])
-                if lead["note"]:
-                    bits.append(f"комментарий: {lead['note']}")
-                if bits:
-                    mk.post("/v1/company/userComments", {
-                        "userId": uid, "showToUser": False,
-                        "comment": (f"Заявки с сайта ({lead['count']} шт., "
-                                    f"{lead['first']} — {lead['last']}). "
-                                    + "; ".join(bits))[:1000]})
-                    stat["комментариев"] += 1
-            except Exception as e:
-                stat["ошибок"] += 1
-                log.warning("uid=%s: %s", uid, str(e)[:80])
-            time.sleep(0.3)
-    finally:
-        mk.close()
-    return stat
-
-
-CSS = """
-body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:12px;color:#222}
-h1{font-size:19px;margin:0 0 3px} .sub{color:#666;font-size:12px;margin-bottom:9px}
-table{border-collapse:collapse;width:100%} thead{display:table-header-group}
-th{background:#312783;color:#fff;font-size:11px;padding:5px 4px;text-align:left}
-td{border-bottom:1px solid #ddd;padding:6px 4px;font-size:11pt;vertical-align:top}
-.ph{font-size:12.5pt;font-weight:600;white-space:nowrap}
-.res{width:170px;border-bottom:1px solid #999} .new{color:#B26F00;font-weight:600}
-@media print{body{margin:6px}}
-"""
-
-
-def build_list(since: str = "2026-06-01") -> int:
-    """Лист обзвона: заявки этого лета, где до сих пор нет записи на год."""
-    import html as _html
-    from pathlib import Path
-    mk = MoyklassClient(sync.get_api_key())
-    try:
-        leads = {p: v for p, v in load().items() if v["last"] >= since}
-        users = taskguard.pull_all(mk, "/v1/company/users", "users", cache_hours=2)
-        joins = taskguard.pull_all(mk, "/v1/company/joins", "joins")
-        rc = mk.get("/v1/company/classes", {"limit": 500})
-        cls = {c["id"]: (c.get("name") or "")
-               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
-    finally:
-        mk.close()
-    idx = {}
-    for u in users:
-        p = phone10(u.get("phone"))
-        if p:
-            idx.setdefault(p, u)
-    booked = {j["userId"] for j in joins
-              if cls.get(j.get("classId"), "").startswith("2627")
-              and j.get("statusId") in {2, 50509, 58131, 58132, 83760}}
-    rows = []
-    for p, lead in sorted(leads.items(), key=lambda x: -len(x[1]["dates"])):
-        u = idx.get(p)
-        if u and (u["id"] in booked or u.get("clientStateId") in
-                  (146328, 125954, 125957)):
-            continue
-        forms = ", ".join(dict.fromkeys(lead["forms"]))[:60]
-        rows.append(
-            f"<tr><td>{_html.escape((lead['child'] or lead['parent'] or '')[:28])}"
-            f"{'' if u else ' <span class=new>нет в CRM</span>'}</td>"
-            f"<td class=ph>+7{p}</td>"
-            f"<td>{_html.escape(forms)}</td><td>{lead['last']}</td>"
-            f"<td>{lead['count']}</td><td class=res></td></tr>")
-    body = (f"<style>{CSS}</style><h1>Заявки с сайта этим летом — обзвон</h1>"
-            f"<div class=sub>{len(rows)} человек: оставляли заявку с "
-            f"{since}, на 2026/27 не записаны. Кто «нет в CRM» — карточки "
-            f"не существует, завести при разговоре. Печатать в альбомной.</div>"
-            "<table><thead><tr><th>Кто</th><th>Телефон</th><th>Что оставляли</th>"
-            "<th>Последняя заявка</th><th>Заявок</th><th>Итог разговора</th>"
-            "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>")
-    p = Path(__file__).resolve().parent.parent / "docs" / "zayavki_leto.html"
-    p.write_text(body, encoding="utf-8")
-    log.info("%s: %d строк", p, len(rows))
-    return len(rows)
-
-
-def build_fresh(since: str = "2026-08-01") -> int:
-    """Свежие заявки с сайта, по которым мы так и не поговорили.
-
-    25.08 владелец попросил проверить, как отрабатываются заявки, и картина
-    оказалась плохой: из шестнадцати августовских одиннадцать никто не
-    набрал, а у пяти человек даже карточки в CRM нет. Причина системная —
-    заявки с сайта в CRM не попадали вовсе (в интеграцию Roistat приходят
-    только звонки), и увидеть их можно было лишь в выгрузке Тильды руками.
-
-    «Отработана» = есть запись на новый сезон ИЛИ состоялся разговор
-    дольше двадцати секунд. Недозвон отработкой не считается: человек
-    оставил заявку и остался без ответа.
-
-    Лагерь исключаем — сезон кончился, звать туда уже некуда."""
-    import html as _html
-    from datetime import date as _date, datetime as _dt, timedelta as _td
-    from pathlib import Path
-    from . import mango
-    mk = MoyklassClient(sync.get_api_key())
-    try:
-        leads = {p: v for p, v in load().items() if v["last"] >= since}
-        users = taskguard.pull_all(mk, "/v1/company/users", "users", cache_hours=2)
-        joins = taskguard.pull_all(mk, "/v1/company/joins", "joins")
-        rc = mk.get("/v1/company/classes", {"limit": 500})
-        cls = {c["id"]: (c.get("name") or "")
-               for c in (rc.get("classes") if isinstance(rc, dict) else rc)}
-    finally:
-        mk.close()
-    booked = {j["userId"] for j in joins
-              if cls.get(j.get("classId"), "").startswith("2627")
-              and j.get("statusId") in {2, 50509, 58131, 58132, 83760}
-              and "аявк" not in cls.get(j.get("classId"), "").lower()}
-    idx = {}
-    for u in users:
-        p = phone10(u.get("phone"))
-        if p:
-            idx.setdefault(p, u)
-    talked = set()
-    for dd in range(0, 25):
-        day = _date.today() - _td(days=dd)
-        try:
-            rows = mango.calls(_dt.combine(day, _dt.min.time()),
-                               _dt.combine(day, _dt.max.time()))
-        except Exception:
-            continue
+        from . import mango
+        rows = mango.calls(datetime.fromisoformat(SEASON_FROM), now + timedelta(hours=1))
         for r in rows:
-            n = (r.get("to_num") if r.get("from_ext") else r.get("from_num")) or ""
-            d = "".join(c for c in str(n) if c.isdigit())[-10:]
-            dur = (r["finish"] - r["answer"]) if r.get("answer") else 0
-            if len(d) == 10 and dur >= 20:
-                talked.add(d)
-    rows_out = []
-    for p, lead in sorted(leads.items(), key=lambda x: x[1]["last"], reverse=True):
-        forms = ", ".join(dict.fromkeys(lead["forms"]))
-        if "агер" in forms.lower():
-            continue                       # лагерь кончился
-        if any(t in forms.lower() for t in ("тест", "nест", "текст")):
-            continue                       # проверочные отправки формы
-        u = idx.get(p)
-        if u and (u["id"] in booked or u.get("clientStateId") in (146328, 125954, 125957)):
-            continue
-        if p in talked:
-            continue
-        kid = lead["child"] or ""
-        who = (kid or lead["parent"] or (u.get("name") if u else "") or "")[:26]
-        bd = lead["birthday"] or ""
-        age = ""
-        if bd:
+            ts = datetime.fromtimestamp(int(r.get("start") or 0)).isoformat(timespec="seconds")
+            ok = bool(r.get("answer"))
+            for num in (r.get("from_num") or "", r.get("to_num") or ""):
+                if len(num) >= 10 and not num.startswith("7495") and num[-10:] != "9165610077":
+                    idx.setdefault(num[-10:], []).append((ts, ok))
+        _CALLS.update(ts=now, idx=idx)
+    except Exception:
+        # без журнала Манго остаёмся на вебхучной таблице, кэш не трогаем
+        return _CALLS["idx"]
+    return idx
+
+
+def _table(conn, name: str) -> bool:
+    return bool(conn.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name=?", (name,)).fetchone()[0])
+
+
+def _msk(ts_utc: str) -> str:
+    """createdAt МойКласса приходит в UTC — приводим к МСК для сравнения с журналами."""
+    try:
+        d = datetime.fromisoformat(ts_utc.replace("Z", "+00:00"))
+        return (d + timedelta(hours=3)).replace(tzinfo=None).isoformat(timespec="seconds")
+    except Exception:
+        return ts_utc[:19]
+
+
+def collect() -> dict:
+    with db.get_conn() as conn:
+        has_calls = _table(conn, "mango_calls")
+        has_in, has_out = _table(conn, "wazzup_inbox"), _table(conn, "wazzup_outbox")
+        joins = conn.execute(
+            "SELECT id, user_id, class_id, created_at, raw FROM joins "
+            "WHERE status_id=? AND created_at >= ? ORDER BY created_at",
+            (NEW_JOIN, SEASON_FROM)).fetchall()
+        old_total = conn.execute(
+            "SELECT COUNT(*) FROM joins WHERE status_id=? AND created_at < ?",
+            (NEW_JOIN, SEASON_FROM)).fetchone()[0]
+        classes = {r["id"]: r["name"] or "" for r in conn.execute("SELECT id, name FROM classes")}
+        cidx = _calls_index()
+        out = {"untouched": [], "tried": [], "talked": [], "tail": [], "excluded": 0,
+               "old_total": old_total, "season_total": len(joins)}
+        for j in joins:
+            u = conn.execute("SELECT id, name, phone, client_state_id FROM users WHERE id=?",
+                             (j["user_id"],)).fetchone()
+            cname = classes.get(j["class_id"], "")
+            if not u or CAMP_RE.search(cname) or (u["client_state_id"] == PROMOTER_STATE) \
+                    or JUNK_RE.search(u["name"] or "") or (u["phone"] or "").endswith("7777777777") \
+                    or (u["phone"] or "")[-10:] in ROBOT_PHONES:
+                out["excluded"] += 1
+                continue
             try:
-                age = "%g" % round((_date(2026, 9, 1)
-                                    - _date.fromisoformat(bd)).days / 365.25, 1)
-                age = age.replace(".", ",")
+                raw = json.loads(j["raw"] or "{}")
             except ValueError:
-                pass
-        rows_out.append(
-            f"<tr><td>{_html.escape(who) or '—'}"
-            f"{'' if u else ' <span class=new>нет карточки</span>'}</td>"
-            f"<td class=ag>{age or '—'}</td>"
-            f"<td class=ph>+7{p}</td>"
-            f"<td>{_html.escape(forms[:46])}</td>"
-            f"<td>{lead['last'][8:10]}.{lead['last'][5:7]}</td>"
-            f"<td>{_html.escape((lead['interest'] or lead['note'] or '')[:44])}</td>"
-            f"<td class=res></td></tr>")
-    body = (f"<style>{CSS}</style>"
-            f"<h1>Заявки с сайта, по которым мы не поговорили</h1>"
-            f"<div class=sub>{len(rows_out)} человек оставили заявку с "
-            f"{since[8:10]}.{since[5:7]} и до сих пор не записаны, а разговора "
-            f"с ними не было — только недозвоны или вообще ничего. Лагерь "
-            f"и тестовые отправки формы исключены. Свежие сверху: заявке "
-            f"вчерашнего дня цена выше, чем трёхнедельной. У кого «нет "
-            f"карточки» — завести при разговоре. Печатать в альбомной.</div>"
-            "<table><thead><tr><th>Кто</th><th>Возраст<br>на 1.09</th>"
-            "<th>Телефон</th><th>Форма на сайте</th><th>Дата</th>"
-            "<th>Что просили</th><th>Итог разговора</th></tr></thead><tbody>"
-            + "".join(rows_out) + "</tbody></table>")
-    p_out = Path(__file__).resolve().parent.parent / "docs" / "zayavki_svezhie.html"
-    p_out.write_text(body, encoding="utf-8")
-    log.info("%s: %d строк", p_out, len(rows_out))
-    return len(rows_out)
+                raw = {}
+            comment = (raw.get("comment") or "").replace("Заявка с сайта: ", "")
+            p10 = (u["phone"] or "")[-10:]
+            since = _msk(j["created_at"])
+            other = conn.execute(
+                "SELECT COUNT(*) FROM joins WHERE user_id=? AND id<>? AND status_id IN (%s)"
+                % ",".join("?" * len(WORKING_JOIN)),
+                (u["id"], j["id"], *WORKING_JOIN)).fetchone()[0]
+            n_out = n_in = n_calls = n_talk = 0
+            if p10:
+                if has_out:
+                    n_out = conn.execute("SELECT COUNT(*) FROM wazzup_outbox WHERE substr(phone,-10)=? AND ts>=?",
+                                         (p10, since)).fetchone()[0]
+                if has_in:
+                    n_in = conn.execute("SELECT COUNT(*) FROM wazzup_inbox WHERE substr(phone,-10)=? AND ts>=?",
+                                        (p10, since)).fetchone()[0]
+                # звонок за час до заявки тоже считаем: заявка «Звонок от …» создаётся после звонка
+                since_call = (datetime.fromisoformat(since) - timedelta(hours=1)).isoformat(timespec="seconds")
+                hits = [ok for ts, ok in cidx.get(p10, []) if ts >= since_call]
+                n_calls, n_talk = len(hits), sum(1 for ok in hits if ok)
+                if not hits and has_calls:
+                    n_calls = conn.execute("SELECT COUNT(*) FROM mango_calls WHERE substr(phone,-10)=? AND ts>=?",
+                                           (p10, since)).fetchone()[0]
+                    n_talk = conn.execute("SELECT COUNT(*) FROM mango_calls WHERE substr(phone,-10)=? "
+                                          "AND ts>=? AND state='connected'", (p10, since)).fetchone()[0]
+            row = {"join": j["id"], "uid": u["id"], "name": u["name"] or "", "phone": p10,
+                   "class": re.sub(r"^2627_", "", cname), "comment": comment,
+                   "created": since[:10], "calls": n_calls, "out": n_out, "in": n_in,
+                   "days": (datetime.now().date() - datetime.fromisoformat(since).date()).days}
+            if other:
+                out["tail"].append(row)
+            elif n_talk or (n_out and n_in) or n_in:
+                out["talked"].append(row)
+            elif n_calls or n_out:
+                out["tried"].append(row)
+            else:
+                out["untouched"].append(row)
+        return out
 
 
-def main():
-    import sys
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-    if "apply" in sys.argv:
-        print(apply(dry=False))
-    elif "fresh" in sys.argv:
-        print("строк:", build_fresh())
-    elif "list" in sys.argv:
-        print("строк в листе:", build_list())
-    else:
-        print(apply(dry=True))
+def _li(r: dict, extra: str = "") -> str:
+    ask = r["comment"] or r["class"]
+    return (f"<li style='margin:6px 0'><a href='https://app.moyklass.com/client/{r['uid']}' target='_blank' "
+            f"style='font-weight:700;color:#312783'>{html.escape(r['name'] or r['phone'])}</a> "
+            f"<span style='white-space:nowrap;color:#6c6a86'>{html.escape(r['phone'])}</span> · "
+            f"{html.escape(ask[:60])} · <span style='color:#6c6a86'>{r['created'][8:]}.{r['created'][5:7]}, "
+            f"{r['days']} дн.</span>{extra}</li>")
 
 
-if __name__ == "__main__":
-    main()
+def block() -> str:
+    try:
+        d = collect()
+    except Exception as e:  # страница плана важнее блока
+        return (f"<div class='card' style='border-left:4px solid #E30613;margin:14px 0'>"
+                f"<b>Заявки сезона без обработки</b> — не посчитались: {html.escape(str(e))}</div>")
+    n_hot = len(d["untouched"]) + len(d["tried"])
+    parts = [f"<div class='card' style='border-left:4px solid #E30613;margin:14px 0'>"
+             f"<b style='display:block;font-size:17px;margin-bottom:4px'>Заявки с 10.08 без обработки ({n_hot})</b>"
+             f"<div style='font-size:12.5px;color:#6c6a86;margin-bottom:8px'>Сайт, мессенджеры, телефон; без промоутера и лагеря. "
+             f"Считается по CRM, звонкам и переписке при каждом открытии. Обработал — ставь статус записи "
+             f"(«Подтвердил», «Записался», «Отказался»), тогда строка исчезнет сама.</div>"]
+    if d["untouched"]:
+        parts.append("<div style='font-weight:700;color:#E30613;font-size:13px;margin-top:6px'>Не тронуты — ни звонка, ни сообщения. Первый набор дня</div>"
+                     "<ul style='list-style:none;padding:0;margin:0;font-size:14px'>"
+                     + "".join(_li(r) for r in d["untouched"]) + "</ul>")
+    if d["tried"]:
+        parts.append("<div style='font-weight:700;color:#F59C00;font-size:13px;margin-top:8px'>Пытались, не дошли — недозвон или сообщение без ответа</div>"
+                     "<ul style='list-style:none;padding:0;margin:0;font-size:14px'>"
+                     + "".join(_li(r, f" <span style='color:#6c6a86;font-size:12px'>зв. {r['calls']}, сообщ. {r['out']}</span>")
+                               for r in d["tried"]) + "</ul>")
+    if not n_hot:
+        parts.append("<div style='color:#7DB928;font-weight:700'>Все заявки сезона тронуты. Так держать.</div>")
+    talked = d["talked"]
+    if talked:
+        parts.append(f"<details style='margin-top:10px;font-size:13.5px'><summary style='cursor:pointer;font-weight:700'>"
+                     f"Разговор был, а заявка так и висит «новой» — {len(talked)}. Поставить статус записи по итогу разговора</summary>"
+                     "<ul style='list-style:none;padding:0;margin:6px 0 0'>"
+                     + "".join(_li(r) for r in talked) + "</ul></details>")
+    if d["tail"]:
+        parts.append(f"<details style='margin-top:6px;font-size:13.5px'><summary style='cursor:pointer;font-weight:700'>"
+                     f"Семья уже записана в другую группу, заявка-хвост — {len(d['tail'])}. Закрыть «Завершил / записан в другую группу»</summary>"
+                     "<ul style='list-style:none;padding:0;margin:6px 0 0'>"
+                     + "".join(_li(r) for r in d["tail"]) + "</ul></details>")
+    parts.append(f"<div style='font-size:12px;color:#6c6a86;margin-top:8px'>Всего «новых заявок» в CRM: {d['season_total'] + d['old_total']}, "
+                 f"из них {d['old_total']} — хвосты до 10.08.2026 (прошлые сезоны), закрываются массово по решению Бориса.</div></div>")
+    return "".join(parts)
