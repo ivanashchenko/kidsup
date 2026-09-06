@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import Body, Depends, FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, PlainTextResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -127,6 +127,36 @@ PUBLIC_HOSTS = {
     "kidsupday.ru": "day", "www.kidsupday.ru": "day",
     "kidsupweek.ru": "week", "www.kidsupweek.ru": "week",
 }
+
+
+@app.get("/price.yml")
+def price_yml():
+    """Прайс-лист для Яндекс Бизнеса (Карты) в формате YML — по ссылке, обновляется сам.
+
+    06.09 Борис: «мне нужно, чтобы ты поменял цены на Яндекс Картах». Карточку
+    организации API не правит, но Яндекс Бизнес умеет брать прайс по ссылке на
+    YML-фид и перечитывать его. Источник цен — PRICES, поэтому любая правка прайса
+    в коде через несколько часов оказывается и на Картах. Публичный адрес, без пароля."""
+    from xml.sax.saxutils import escape as _e
+    from . import autopilot as _ap
+    skip = ("Английский летний клуб",)
+    cats, offers = [], []
+    for ci, (course, pr) in enumerate((c, v) for c, v in PRICES.items() if c not in skip):
+        cats.append(f'<category id="{ci + 1}">{_e(course)}</category>')
+        for li, (title, _old, price) in enumerate(pr["lines"]):
+            oid = f"{ci + 1}-{li + 1}"
+            name = f"{course} · {title}"
+            desc = pr["title"]
+            offers.append(
+                f'<offer id="{_e(oid)}" available="true"><url>https://kidsup.ru/#courses</url>'
+                f"<price>{int(price)}</price><currencyId>RUR</currencyId><categoryId>{ci + 1}</categoryId>"
+                f"<name>{_e(name)}</name><description>{_e(desc)}</description></offer>")
+    body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            f'<yml_catalog date="{_ap._now().strftime("%Y-%m-%d %H:%M")}"><shop><name>KidsUP</name>'
+            "<company>Детский центр KidsUP</company><url>https://kidsup.ru</url>"
+            '<currencies><currency id="RUR" rate="1"/></currencies>'
+            f"<categories>{''.join(cats)}</categories><offers>{''.join(offers)}</offers></shop></yml_catalog>")
+    return Response(content=body, media_type="application/xml; charset=utf-8")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -2751,7 +2781,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-06.24"
+APP_VERSION = "2026-09-06.25"
 
 
 @app.get("/api/net")
