@@ -130,24 +130,67 @@ def kpi(day: str) -> dict:
             "firsts": firsts, "inbox": ib[0], "inbox_done": ib[1], "tasks": tk[0], "tasks_done": tk[1]}
 
 
-def _col(who: str, items: list[dict], onduty: bool) -> str:
+def _first_time(t: str) -> str:
+    """«12:00, 12:30» → «12:00»; «15:00–17:00» → «15:00»; «весь день» → ""."""
+    import re as _re
+    m = _re.search(r"\b(\d{1,2}):(\d{2})", t or "")
+    return f"{int(m.group(1)):02d}:{m.group(2)}" if m else ""
+
+
+def _inbox_open(day: str, who: str) -> int:
+    try:
+        with db.get_conn() as conn:
+            return conn.execute("SELECT COUNT(*) FROM plan_inbox WHERE day=? AND who=? AND done=0",
+                                (day, who)).fetchone()[0]
+    except Exception:
+        return 0
+
+
+def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str = "") -> str:
     c = COLOR.get(who, "#6c6a86")
     done_n = sum(1 for i in items if i["done"])
     lis = []
+    current_marked = False
     for it in items:
-        st = "opacity:.45;text-decoration:line-through" if it["done"] else ""
+        st = ""
+        badge = ""
+        if it["done"]:
+            st = "opacity:.45;text-decoration:line-through"
+        elif not current_marked:
+            current_marked = True
+            st = f"background:#f1effb;border-left:4px solid {c};border-radius:8px;padding:6px 8px;margin-left:-8px"
+            badge = f"<span style='display:inline-block;font-size:11px;font-weight:800;color:#fff;background:{c};border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>СЕЙЧАС</span>"
+        else:
+            ft = _first_time(it["t"])
+            if ft and now_hm and ft < now_hm:
+                badge = "<span style='display:inline-block;font-size:11px;font-weight:700;color:#a35f00;background:#fff1d6;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>время прошло</span>"
+            else:
+                st = "opacity:.8"
         lis.append(
             f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
             f"<input type='checkbox' {'checked' if it['done'] else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
             f"onchange=\"fetch('/api/pult/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
             f"body:JSON.stringify({{id:{it['id']},done:this.checked}})}}).then(()=>location.reload())\">"
-            f"<span>" + (f"<b>{html.escape(it['t'])}</b> — " if it["t"] else "") + f"{it['text']}</span></label></li>")
+            f"<span>{badge}" + (f"<b>{html.escape(it['t'])}</b> — " if it["t"] else "") + f"{it['text']}</span></label></li>")
     body = "".join(lis) or "<li style='color:#6c6a86'>задач пока нет — Клод положит к началу смены</li>"
-    badge = "" if onduty else " <span style='font-size:11px;color:#6c6a86;font-weight:500'>не в смене</span>"
-    return (f"<div class='wcard' style='border-top-color:{c}'><div class='nm'>{html.escape(who)}{badge} "
+    nb = "" if onduty else " <span style='font-size:11px;color:#6c6a86;font-weight:500'>не в смене</span>"
+    ib = _inbox_open(day, who) if day else 0
+    ib_html = (f"<a href='#inbox' style='font-size:12.5px;color:#E30613;font-weight:700'>в инбоксе на тебя {ib} несделанных ↓</a>"
+               if ib else "<span style='font-size:12.5px;color:#7DB928;font-weight:700'>инбокс на тебя чист</span>")
+    return (f"<div class='wcard' style='border-top-color:{c}'><div class='nm'>{html.escape(who)}{nb} "
             f"<span style='font-size:12px;color:#6c6a86;font-weight:600'>{done_n}/{len(items)}</span></div>"
-            f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · сверху вниз, галочка после каждого шага</div>"
+            f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · {ib_html}</div>"
             f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol></div>")
+
+
+HOWTO = ("<details class='card' style='border-left:4px solid #312783;margin:10px 0'><summary style='cursor:pointer;font-weight:800'>Как работать с пультом — 5 правил</summary>"
+         "<ol class='small' style='margin:8px 0 0;padding-left:20px'>"
+         "<li><b>Твоя колонка — сверху вниз.</b> Порядок уже по деньгам: сначала то, что даёт оплату сегодня, потом записи на неделю, потом база. Пункт с меткой <b>СЕЙЧАС</b> — это то, что ты делаешь в эту минуту. Сделал — галочка, метка сама переедет на следующий.</li>"
+         "<li><b>Пункты со временем не сдвигаем.</b> Дверь в 10:00, выход к группе в 12:30, подтверждения в 15:00 работают только в своё время. Если такой пункт подошёл — прерываешь список, делаешь, возвращаешься на ту же строку.</li>"
+         "<li><b>Входящий звонок и мама у двери важнее любого пункта.</b> Ответил, оформил в CRM, вернулся на ту же строку.</li>"
+         "<li><b>Инбокс «Появилось за день» — это обещания клиентам.</b> Пункты с твоим именем разбираешь в шаге «инбокс» утром, а новые — при каждой перезагрузке страницы (раз в 5 минут) между строками списка, пока горит красная цифра «в инбоксе на тебя».</li>"
+         "<li><b>«Время прошло» — не пропускаем, а делаем следующим</b> после текущего. Не успел до конца смены — пункт остаётся без галочки, в итоге дня пишешь причину, Клод переносит его на завтра.</li>"
+         "</ol></details>")
 
 
 def page(day: str = "", who: str = "") -> str:
@@ -164,9 +207,10 @@ def page(day: str = "", who: str = "") -> str:
     if who:
         order = [w for w in order + extra if w == who] or [who]
         extra = []
-    cols = "".join(_col(w, tk.get(w, []), w in on or w in ("Лиза", "Борис")) for w in order)
+    now_hm = datetime.now().strftime("%H:%M") if day == today() else ""
+    cols = "".join(_col(w, tk.get(w, []), w in on or w in ("Лиза", "Борис"), day, now_hm) for w in order)
     if extra:
-        cols += "".join(_col(w, tk.get(w, []), False) for w in extra)
+        cols += "".join(_col(w, tk.get(w, []), False, day, now_hm) for w in extra)
     slug = f"plan_{d.day:02d}{MON[d.month]}"
     ver = ""
     try:
@@ -208,9 +252,10 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 <p>Одна ссылка для всех: задачи по колонкам — только тем, кто сегодня работает, плюс Лиза и Борис. Галочка видна всем. Обновляется сама каждые 5 минут. Своя колонка: {filt}
 {"<a href='/pult'>все</a>" if who else ""}</p></div>
 <div class='kpis'>{kpi_html}</div>
+{HOWTO}
 <div class='who'>{cols}</div>
 <div class='links card'><b>Подробные списки дня:</b> <a href='/base/{slug}'>план и списки семей</a> · <a href='/spiski'>списки занятий</a> · <a href='/karta'>карта развития</a> · <a href='/base/gruppy_reshenia'>куда зовём, какие группы сливаем</a> · <a href='/base/skripty_v3'>скрипты</a> · <a href='/base'>вся база</a></div>
-{_inbox_block(day)}
+<div id='inbox'></div>{_inbox_block(day)}
 {zayavki.block()}
 {mesta.block()}
 <p style='color:#6c6a86;font-size:12px'>Пульт собран сервером {datetime.now().strftime('%H:%M')} · версия {ver}</p>
