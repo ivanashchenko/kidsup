@@ -1106,6 +1106,8 @@ DOC_GROUPS = [
          "Все дела команды с фильтрами по людям и срочности"),
         ("reklama_nastroyka", "📣 Запуск рекламы: Директ и VK",
          "Шаги Бориса с галочками и что после каждого делает Клод; готовая структура кампаний, ключевые фразы, тексты объявлений, аудитории VK, UTM, цели Метрики и стоп-правила"),
+        ("__url:/boris", "🎯 БОРИСУ — живой список решений: важно × срочно, польза в деньгах, статусы «сделано / ждём»",
+         "Клод обновляет пункты и приоритеты, вы ставите статус; сверху прогресс к 311 оплаченным и цифры дня"),
         ("boris_itog", "🎯 БОРИСУ: что сделать для полных групп и максимальной прибыли — итог 1.08–6.09",
          "26 пунктов по шести рычагам прибыли: что, сколько минут, какая польза в деньгах, срок; что уже сделано и работает без вас; что подтвердить"),
         ("it_zadachi_borisa", "🔑 ИТ-задачи владельца: доступы и решения",
@@ -2231,6 +2233,32 @@ def api_pedagog_save(payload: dict = Body(...)):
     return pedagog.save(payload or {})
 
 
+@app.get("/boris", response_class=HTMLResponse, dependencies=AUTH)
+def boris_page():
+    """Живой список решений владельца: важность × срочность, статусы, польза (06.09)."""
+    from . import boris
+    return HTMLResponse(boris.page())
+
+
+@app.get("/api/boris/tasks", dependencies=AUTH)
+def api_boris_tasks():
+    from . import boris
+    return boris.tasks()
+
+
+@app.post("/api/boris/tasks", dependencies=AUTH)
+def api_boris_tasks_set(payload: dict = Body(...)):
+    """{"items": [{key,title,detail,lever,imp,urg,deadline,minutes,benefit,why}]} — upsert по key."""
+    from . import boris
+    return {"ok": True, "задач": boris.upsert(payload.get("items") or [])}
+
+
+@app.post("/api/boris/status", dependencies=AUTH)
+def api_boris_status(payload: dict = Body(...)):
+    from . import boris
+    return {"ok": boris.set_status(int(payload.get("id") or 0), str(payload.get("status") or ""), str(payload.get("note") or ""))}
+
+
 @app.get("/pult", response_class=HTMLResponse, dependencies=AUTH)
 def pult_page(day: str = "", who: str = ""):
     """Пульт смены: задачи по тем, кто сегодня работает, + Лиза и Борис, живые блоки (06.09)."""
@@ -2717,7 +2745,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-06.14"
+APP_VERSION = "2026-09-06.15"
 
 
 @app.get("/api/net")
