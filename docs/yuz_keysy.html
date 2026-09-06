@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Юз-кейсы: истории семей</title>
+<style>
+:root{
+  --paper:#FCFBF7; --ink:#1B1D2B; --muted:#5F6478; --line:#E7E4DA; --card:#FFFFFF; --fill:#F3F1E9;
+  --indigo:#312783; --sky:#1DA7E0; --green:#5C8C1E; --amber:#B26F00; --red:#B4131C;
+  --indigo-soft:#EAE8F5; --sky-soft:#E4F2FB; --green-soft:#EDF4E1; --amber-soft:#FBF0DC; --red-soft:#FAE4E3;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#14151D; --ink:#E7E6EC; --muted:#9A9EAE; --line:#292B37; --card:#1B1D26; --fill:#20222C;
+    --indigo:#A79EEE; --sky:#5EC0EC; --green:#9FD055; --amber:#E5A63F; --red:#EC7C7C;
+    --indigo-soft:#201E38; --sky-soft:#13252F; --green-soft:#1C2416; --amber-soft:#2C2313; --red-soft:#2E1819; }
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);margin:0;
+  font:16px/1.62 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:60rem;margin:0 auto;padding:2.4rem 1.2rem 5rem}
+h1{font-size:2.1rem;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:.4rem 0 .5rem;text-wrap:balance}
+h2{font-size:1.38rem;font-weight:760;letter-spacing:-.015em;margin:0 0 .4rem;text-wrap:balance}
+h3{font-size:1.03rem;font-weight:730;margin:1.6rem 0 .45rem}
+p{margin:.55rem 0;max-width:47rem}
+code{background:var(--fill);padding:.1rem .35rem;border-radius:5px;font-size:.88em;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all}
+.kicker{font-size:.73rem;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--indigo)}
+.sub{color:var(--muted);max-width:47rem}
+section{margin-top:2.6rem;padding-top:1.7rem;border-top:1px solid var(--line)}
+.seclabel{font-size:.71rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:.45rem}
+
+.step{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:1rem 1.15rem;margin:.75rem 0;display:grid;grid-template-columns:2.1rem 1fr;gap:.85rem;align-items:start}
+.step .num{font-size:1.3rem;font-weight:800;color:var(--indigo);line-height:1.2;font-variant-numeric:tabular-nums}
+.step b{display:block;font-weight:740;margin-bottom:.25rem;font-size:1.01rem}
+.step p{margin:.3rem 0;font-size:.93rem}
+.step ul{margin:.4rem 0;padding-left:1.15rem;font-size:.93rem} .step li{margin:.25rem 0}
+
+.tbl{overflow-x:auto;margin:1rem 0;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:30rem}
+th{background:var(--fill);text-align:left;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:.55rem .8rem;white-space:nowrap}
+td{padding:.6rem .8rem;border-top:1px solid var(--line);vertical-align:top}
+td.w{white-space:nowrap;font-weight:680}
+
+.note{border-left:3px solid var(--indigo);background:var(--indigo-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.warn{border-left:3px solid var(--red);background:var(--red-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+.ok{border-left:3px solid var(--green);background:var(--green-soft);padding:.85rem 1.1rem;
+  border-radius:0 9px 9px 0;margin:1.1rem 0;max-width:47rem}
+ul.plain{margin:.5rem 0;padding-left:1.2rem;max-width:47rem} ul.plain li{margin:.35rem 0}
+.tpl{background:var(--fill);border:1px solid var(--line);border-radius:9px;
+  padding:.7rem .9rem;margin:.55rem 0;font-size:.92rem;max-width:47rem}
+.tpl em{display:block;font-style:normal;font-size:.74rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:.25rem}
+.foot{margin-top:3rem;padding-top:1.3rem;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem}
+@media print{ body{background:#fff} .wrap{padding:0} section{break-inside:avoid} }
+.q{background:var(--fill);border-radius:9px;padding:.8rem .95rem;font-size:.95rem;white-space:pre-wrap;margin:.5rem 0}.fam{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem 1.15rem;margin:.7rem 0}.fam b{font-size:1.02rem}.tag{font-size:.7rem;font-weight:750;letter-spacing:.07em;text-transform:uppercase;padding:.15rem .5rem;border-radius:999px;background:var(--indigo-soft);color:var(--indigo)}</style><div class='wrap'>
+<div class='kicker'>Контент · неделя 7–13 сентября</div><h1>Юз-кейсы: три истории семей до пятницы</h1>
+<p class='sub'>Отзыв «всё понравилось» не продаёт: новая мама в нём себя не узнаёт. Продаёт история: с чем пришли, чего боялись, что попробовали и что заметили через месяц. Три семьи, голосовое сообщение вместо текста, пишем сами, публикуем с согласия.</p>
+<section><div class='seclabel'>Кто</div><h2>Три семьи и почему именно они</h2>
+<div class='fam'><span class='tag'>1</span> <b>Панкратова Александра (Саша), 6 лет</b> · мама, 79265978327 · WhatsApp и MAX<br><span class='note'>Летний английский клуб 2024–2026, затем подготовка к школе ПШ2 (читающие). Ходит второй год. История: «пришли на лето, остались на год». Сильная сторона: видно прогресс чтения.</span></div>
+<div class='fam'><span class='tag'>2</span> <b>Блажевские Иван (8) и Агата (5)</b> · мама Юля, 79163303444<br><span class='note'>ИЗО-студия, ходили год, дочь просится на лепку. История: двое детей, ищут расписание под школу. Сильная сторона: картины, которые висят дома, и «ребёнок сам просится».</span></div>
+<div class='fam'><span class='tag'>3</span> <b>Ефимов Тимофей, 8 лет</b> · мама, 79663401384<br><span class='note'>Ходил на шахматы и английский, ушёл из-за смены педагога, вернулся к Илье. История: «вернулись, потому что…». Сильная сторона: честный кейс про выбор педагога, снимает страх новых родителей.</span></div>
+<p class='note'>Запасные: Карюкова Феликса (ПШ, оплатили после первого занятия), Слатин Ярослав (РР по субботам, ходят давно).</p></section>
+<section><div class='seclabel'>Как собираем</div><h2>Скрипт для Лизы</h2>
+<div class='q'>Здравствуйте, [имя мамы]! Это Лиза из KidsUP 🌿 Мы запускаем рубрику «Истории наших семей» и очень хотим рассказать про [имя ребёнка] — вы с нами уже [год / с лета], и это как раз та история, которая помогает другим родителям решиться.
+Займёт 5 минут: запишите, пожалуйста, голосовое (или напишите, как удобнее) по пяти вопросам:
+1. Что искали для [имя], когда пришли к нам? Что тогда беспокоило?
+2. Почему остались именно у нас после первого занятия?
+3. Что [имя] делает сейчас, чего не делал(а) раньше? Что вы заметили первой?
+4. Что для вас в занятиях самое ценное: педагог, атмосфера, результат, расписание?
+5. Одной фразой: что бы вы сказали маме, которая сейчас сомневается?
+Если найдутся 2–3 фото первых дней и сейчас — будет совсем здорово. Текст напишем сами, покажем вам на согласование, без вашего «да» ничего не публикуем.
+В благодарность [имя ребёнка] ждёт подарок на следующем занятии 🎁</div>
+<h3>Согласие (отправить вторым сообщением, ответ сохранить в карточке)</h3>
+<div class='q'>Подтвердите, пожалуйста, одним словом «согласна», что мы можем опубликовать историю с именем [имя ребёнка], возрастом и фото в группе ВКонтакте и на сайте kidsup.ru. Фамилию не публикуем. Удалим по первой просьбе.</div>
+<h3>Подарок</h3><p class='note'>Ребёнку — набор наклеек KidsUP и «монеты центра» на маленький приз со стойки. Не скидка: скидки у нас не суммируются, и обмен отзыва на деньги обесценивает историю.</p></section>
+<section><div class='seclabel'>Как пишем</div><h2>Структура текста, 700–1000 знаков</h2>
+<ol class='small'><li><b>Точка А</b> от первого лица мамы: возраст, что искали, что беспокоило. Одна честная деталь («боялась, что не пойдёт в группу без меня»).</li><li><b>Выбор</b>: как нашли, что решило после первого занятия. Имя педагога.</li><li><b>Путь</b>: сколько ходят, как выглядят занятия, одна сцена.</li><li><b>Точка Б</b>: что ребёнок делает теперь, что заметила мама, желательно с цифрой (читает слоги за 6 недель, здоровается по-английски сам).</li><li><b>Фраза сомневающейся маме</b> дословно из голосового.</li><li>Подпись: имя мамы, имя и возраст ребёнка, направление, педагог. Внизу: «Первое занятие условно-бесплатное, записаться: +7 (495) 120-90-24».</li></ol>
+<p class='note'>Без «бесплатного пробного», без обещаний результата за срок, без чужих имён брендов. Правки мамы принимаем любые, кроме придуманных фактов.</p></section>
+<section><div class='seclabel'>Сроки и роли</div><h2>План до пятницы</h2>
+<div class='tbl'><table><tr><th>День</th><th>Кто</th><th>Что</th></tr>
+<tr><td>Пн 7.09</td><td>Лиза</td><td>Написать трём мамам по скрипту, отметить в карточке «юз-кейс: предложено».</td></tr>
+<tr><td>Вт–ср</td><td>Лиза</td><td>Получить голосовые и фото, согласие текстом. Переслать Клоду (в инбокс: ссылка на чат и время сообщения).</td></tr>
+<tr><td>Чт 10.09</td><td>Клод</td><td>Три текста по структуре + макет карточки для ВК, на утверждение Борису и мамам.</td></tr>
+<tr><td>Пт 11.09</td><td>Борис · Клод</td><td>Публикация в ВК и на сайт в раздел отзывов, ссылка админам для отправки сомневающимся.</td></tr>
+<tr><td>Дальше</td><td>все</td><td>Одна история в неделю. Кандидатов даёт разбор оплат: семья, оплатившая третий месяц, — кандидат.</td></tr></table></div></section>
+</div>
+</body></html>

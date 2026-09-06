@@ -371,6 +371,24 @@ def send(phone: str, text: str, mode: str = "cascade", dry_run: bool = True,
 
 
 
+def send_media(phone: str, content_uri: str, transport: str = "whatsapp",
+               dry_run: bool = True, kind: str = "") -> list[str]:
+    """Картинка или файл по публичной ссылке — Wazzup v3 принимает contentUri
+    вместо text. Нужна «Карте развития» после первого занятия (06.09)."""
+    phone = _msisdn(phone)
+    log, chans = [], channels()
+    ch = _pick(chans, transport)
+    if not ch:
+        return [f"{transport}: активного канала нет"]
+    if dry_run:
+        return [f"[dry-run] {transport} ({ch['channelId'][:8]}…) → {phone}: файл {content_uri}"]
+    r = httpx.post(f"{API}/message", headers=_headers(), json={
+        "channelId": ch["channelId"], "chatType": CHAT_TYPE.get(transport, transport),
+        "chatId": phone, "contentUri": content_uri}, timeout=30)
+    if r.status_code in (200, 201):
+        _remember(r, transport, phone, None, kind)
+    log.append(f"{transport} → {phone}: HTTP {r.status_code} {r.text[:120]}")
+    return log
 
 def chat_id_for(transport: str, phone: str = "", uid: str | int | None = None) -> str:
     """Идентификатор чата для этого транспорта.
