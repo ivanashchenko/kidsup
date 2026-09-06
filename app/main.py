@@ -1435,8 +1435,8 @@ def base_doc(slug: str):
             day = f"2026-{mon:02d}-{int(m.group(1)):02d}"
             i = page.find("</div>", page.find("class='hero'"))
             if i > 0:
-                from . import zayavki
-                page = page[:i + 6] + _inbox_block(day) + zayavki.block() + page[i + 6:]
+                from . import zayavki, mesta
+                page = page[:i + 6] + _inbox_block(day) + zayavki.block() + mesta.block() + page[i + 6:]
         # план дня меняется в течение смены (инбокс, правки Клода) — вкладка
         # у админа перезагружается сама каждые 5 минут, как /spiski
         back = ('<meta http-equiv="refresh" content="300">'
@@ -2674,7 +2674,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-06.8"
+APP_VERSION = "2026-09-06.9"
 
 
 @app.get("/api/net")
@@ -4761,6 +4761,13 @@ def _inbox_block(day: str) -> str:
     return (f"<div class='card' style='border-left:4px solid #312783;margin:14px 0'>"
             f"<b style='display:block;font-size:17px;margin-bottom:6px'>Появилось за день ({len(rows)})</b>"
             f"<ul style='list-style:none;padding:0;margin:0;font-size:14px'>{body}</ul></div>")
+
+
+@app.get("/api/mesta", dependencies=AUTH)
+def api_mesta():
+    """Свободные места по группам сезона (см. app/mesta.py) — то же, что блок на плане дня."""
+    from . import mesta
+    return mesta.rows()
 
 
 @app.get("/api/zayavki", dependencies=AUTH)
