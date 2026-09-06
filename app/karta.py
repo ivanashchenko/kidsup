@@ -229,7 +229,7 @@ function composeText(){
   const c=$('child').value||'ребёнок', t=$('teacher').value, g=$('next_group').value.trim(), n=$('next').value.trim(), p=$('price').value.trim(), pay=$('pay').value.trim(), can=$('can').value.trim();
   return `Здравствуйте! Сегодня ${c} был(а) у нас на первом занятии — ${$('course').value.toLowerCase()}. ${t? 'Педагог '+t+' составил(а)':'Педагог составил(а)'} карту развития, она во вложении 🌿\n`+
     (can? `Коротко: ${can}\n`:'') + (g? `Рекомендуем: ${g}\n`:'') + (n? `Следующее занятие — ${n}.\n`:'') +
-    (p? `Абонемент — ${p}; при оплате в день первого занятия −10%, само занятие входит в абонемент.\n`:'') + (pay? `Оплатить: ${pay}\n`:'') + `Если есть вопросы — просто ответьте здесь.`;
+    (p? `Абонемент — ${p}; при оплате первого абонемента в день первого занятия −15%, само занятие входит в абонемент.\n`:'') + (pay? `Оплатить: ${pay}\n`:'') + `Если есть вопросы — просто ответьте здесь.`;
 }
 function wrap(text, max){ const out=[]; for(const para of String(text||'').split(/\n+/)){ let line=''; for(const w of para.split(/\s+/)){ if(!w) continue; if((line+' '+w).trim().length>max){ if(line) out.push(line); line=w; } else line=(line+' '+w).trim(); } if(line) out.push(line); } return out; }
 function tspans(lines, x, y, lh, cls){ return lines.map((l,i)=>`<text x="${x}" y="${y+i*lh}" class="${cls}">${esc(l)}</text>`).join(''); }
@@ -253,7 +253,7 @@ ${tspans(subLines,80,368,34,'sub')}
 ${body}
 <rect x="0" y="1130" width="1080" height="220" fill="#EAE8F5"/>
 <text x="80" y="1195" class="f1">${esc(next? 'Следующее занятие: '+next : 'Ждём на следующем занятии')}</text>
-${tspans(wrap(price? 'Абонемент: '+price+' · при оплате в день первого занятия −10%, первое занятие входит' : '',70),80,1240,32,'f2')}
+${tspans(wrap(price? 'Абонемент: '+price+' · при оплате в день первого занятия −15%, первое занятие входит' : '',70),80,1240,32,'f2')}
 <text x="80" y="1312" class="f3">KidsUP · б-р Маршала Рокоссовского, 6к1В · +7 (495) 120-90-24 · kidsup.ru</text></svg>`;
 }
 function refresh(reprice){ if(reprice||!$('price').value) $('price').value=priceFor(); $('preview').innerHTML=svg(); if(!$('text').dataset.touched) $('text').value=composeText(); }
