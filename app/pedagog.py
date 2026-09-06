@@ -155,7 +155,7 @@ h1{font-size:22px;margin:0 0 4px;color:var(--indigo)} .sub{color:var(--muted);ma
 label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:10px 0 4px}
 input,select,textarea{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
 textarea{min-height:70px}
-.kid{display:flex;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px;margin:6px 0;cursor:pointer}
+.kid{display:flex;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px;margin:6px 0;cursor:pointer}.kid>span:first-child{min-width:0;overflow-wrap:anywhere}
 .kid.sel{border-color:var(--indigo);background:#f1effb}.kid.done{opacity:.55}.kid .t{color:var(--muted);white-space:nowrap;font-size:14px}
 .seg{display:flex;gap:8px;margin-top:6px}.seg button{flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit;cursor:pointer}
 .seg button.on-yes{background:#eef7e0;border-color:var(--green)}.seg button.on-no{background:#fce8e9;border-color:var(--red)}
