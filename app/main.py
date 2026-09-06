@@ -2745,7 +2745,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-06.15"
+APP_VERSION = "2026-09-06.16"
 
 
 @app.get("/api/net")
@@ -2803,7 +2803,10 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
             "blocked_senders",
             # номер WhatsApp для разовых сообщений: 0077 как канал переписки,
             # а пока он выведен из работы — резервный
-            "chat_whatsapp"}
+            "chat_whatsapp",
+            # Яндекс: приложение OAuth «KidsUP реклама» (06.09) — id/секрет для обмена
+            # кода на токен, токен Директа и Метрики. Только настройки сервера, не в чат
+            "yandex_client_id", "yandex_client_secret", "yandex_direct_token", "yandex_metrika_token"}
 
 
 # Значения, которые нельзя отдавать целиком даже по авторизованному запросу.
