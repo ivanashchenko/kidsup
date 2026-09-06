@@ -37,6 +37,10 @@ def _init(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS pult_tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, who TEXT, t TEXT, text TEXT,
         done INTEGER DEFAULT 0, ord INTEGER DEFAULT 0, ts TEXT)""")
+    try:
+        conn.execute("ALTER TABLE pult_tasks ADD COLUMN note TEXT")
+    except Exception:
+        pass
 
 
 def today() -> str:
@@ -61,7 +65,7 @@ def duty(day: str) -> list[str]:
 def tasks(day: str) -> dict[str, list[dict]]:
     with db.get_conn() as conn:
         _init(conn)
-        rows = conn.execute("SELECT id, who, t, text, done FROM pult_tasks WHERE day=? ORDER BY who, ord, id",
+        rows = conn.execute("SELECT id, who, t, text, done, note FROM pult_tasks WHERE day=? ORDER BY who, ord, id",
                             (day,)).fetchall()
     out: dict[str, list[dict]] = {}
     for r in rows:
@@ -95,10 +99,12 @@ def set_tasks(day: str, who: str, items: list[dict], replace: bool = True) -> in
         return n
 
 
-def mark(task_id: int, flag: bool) -> bool:
+def mark(task_id: int, state: int, note: str = "") -> bool:
+    """state: 0 — не сделано, 1 — сделано, 2 — «не успела» (с причиной в note)."""
     with db.get_conn() as conn:
         _init(conn)
-        cur = conn.execute("UPDATE pult_tasks SET done=? WHERE id=?", (1 if flag else 0, int(task_id)))
+        cur = conn.execute("UPDATE pult_tasks SET done=?, note=? WHERE id=?",
+                           (int(state), (note or "")[:200], int(task_id)))
         return cur.rowcount > 0
 
 
@@ -147,50 +153,78 @@ def _inbox_open(day: str, who: str) -> int:
 
 
 def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str = "") -> str:
+    """Метка СЕЙЧАС идёт за часами: текущий — несделанный пункт с самым поздним временем,
+    которое уже наступило (мы внутри его окна). Несделанные пункты с более ранним временем —
+    «время прошло»: делаются сразу после текущего. Пункты без времени («весь день»,
+    «после каждого занятия») — фоновые, без метки. Будущие — приглушены."""
     c = COLOR.get(who, "#6c6a86")
-    done_n = sum(1 for i in items if i["done"])
+    done_n = sum(1 for i in items if i["done"] == 1)
+    open_items = [i for i in items if not i["done"]]
+    cur_id = None
+    if open_items:
+        timed = [(i, _first_time(i["t"])) for i in open_items if _first_time(i["t"])]
+        started = [(i, ft) for i, ft in timed if not now_hm or ft <= now_hm]
+        if started:
+            cur_id = max(started, key=lambda x: x[1])[0]["id"]
+        else:
+            cur_id = open_items[0]["id"]
+    cur_ft = next((_first_time(i["t"]) for i in items if i["id"] == cur_id), "")
     lis = []
-    current_marked = False
     for it in items:
-        st = ""
-        badge = ""
-        if it["done"]:
+        st, badge, extra = "", "", ""
+        ft = _first_time(it["t"])
+        if it["done"] == 1:
             st = "opacity:.45;text-decoration:line-through"
-        elif not current_marked:
-            current_marked = True
+        elif it["done"] == 2:
+            st = "opacity:.7"
+            badge = "<span style='display:inline-block;font-size:11px;font-weight:700;color:#fff;background:#a35f00;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>не успела</span>"
+            if it.get("note"):
+                extra = f" <span style='color:#a35f00;font-size:12.5px'>— {html.escape(it['note'])}</span>"
+        elif it["id"] == cur_id:
             st = f"background:#f1effb;border-left:4px solid {c};border-radius:8px;padding:6px 8px;margin-left:-8px"
             badge = f"<span style='display:inline-block;font-size:11px;font-weight:800;color:#fff;background:{c};border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>СЕЙЧАС</span>"
+        elif ft and cur_ft and ft < cur_ft:
+            badge = "<span style='display:inline-block;font-size:11px;font-weight:700;color:#a35f00;background:#fff1d6;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>время прошло — сразу после СЕЙЧАС</span>"
+        elif not ft:
+            badge = "<span style='display:inline-block;font-size:11px;font-weight:700;color:#0c6a94;background:#e6f4fb;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>фон</span>"
         else:
-            ft = _first_time(it["t"])
-            if ft and now_hm and ft < now_hm:
-                badge = "<span style='display:inline-block;font-size:11px;font-weight:700;color:#a35f00;background:#fff1d6;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>время прошло</span>"
-            else:
-                st = "opacity:.8"
+            st = "opacity:.7"
+        ctrl = ""
+        if not it["done"]:
+            ctrl = (f" <a href='#' style='font-size:12px;color:#a35f00;white-space:nowrap' onclick=\"var r=prompt('Почему не успела? Одно-два слова — Клод перенесёт пункт на завтра');"
+                    f"if(r!==null){{fetch('/api/pult/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{it['id']},state:2,note:r}})}}).then(()=>location.reload())}};return false\">не успела</a>")
         lis.append(
             f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
-            f"<input type='checkbox' {'checked' if it['done'] else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
+            f"<input type='checkbox' {'checked' if it['done'] == 1 else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
             f"onchange=\"fetch('/api/pult/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-            f"body:JSON.stringify({{id:{it['id']},done:this.checked}})}}).then(()=>location.reload())\">"
-            f"<span>{badge}" + (f"<b>{html.escape(it['t'])}</b> — " if it["t"] else "") + f"{it['text']}</span></label></li>")
+            f"body:JSON.stringify({{id:{it['id']},state:this.checked?1:0}})}}).then(()=>location.reload())\">"
+            f"<span>{badge}" + (f"<b>{html.escape(it['t'])}</b> — " if it["t"] else "") + f"{it['text']}{extra}{ctrl}</span></label></li>")
     body = "".join(lis) or "<li style='color:#6c6a86'>задач пока нет — Клод положит к началу смены</li>"
     nb = "" if onduty else " <span style='font-size:11px;color:#6c6a86;font-weight:500'>не в смене</span>"
     ib = _inbox_open(day, who) if day else 0
     ib_html = (f"<a href='#inbox' style='font-size:12.5px;color:#E30613;font-weight:700'>в инбоксе на тебя {ib} несделанных ↓</a>"
                if ib else "<span style='font-size:12.5px;color:#7DB928;font-weight:700'>инбокс на тебя чист</span>")
+    late = sum(1 for i in items if not i["done"] and _first_time(i["t"]) and cur_ft and _first_time(i["t"]) < cur_ft)
+    late_html = f" · <span style='color:#a35f00;font-weight:700'>{late} пункт(а) без галочки, время прошло</span>" if late else ""
     return (f"<div class='wcard' style='border-top-color:{c}'><div class='nm'>{html.escape(who)}{nb} "
             f"<span style='font-size:12px;color:#6c6a86;font-weight:600'>{done_n}/{len(items)}</span></div>"
-            f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · {ib_html}</div>"
+            f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · {ib_html}{late_html}</div>"
             f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol></div>")
 
 
-HOWTO = ("<details class='card' style='border-left:4px solid #312783;margin:10px 0'><summary style='cursor:pointer;font-weight:800'>Как работать с пультом — 5 правил</summary>"
-         "<ol class='small' style='margin:8px 0 0;padding-left:20px'>"
-         "<li><b>Твоя колонка — сверху вниз.</b> Порядок уже по деньгам: сначала то, что даёт оплату сегодня, потом записи на неделю, потом база. Пункт с меткой <b>СЕЙЧАС</b> — это то, что ты делаешь в эту минуту. Сделал — галочка, метка сама переедет на следующий.</li>"
-         "<li><b>Пункты со временем не сдвигаем.</b> Дверь в 10:00, выход к группе в 12:30, подтверждения в 15:00 работают только в своё время. Если такой пункт подошёл — прерываешь список, делаешь, возвращаешься на ту же строку.</li>"
-         "<li><b>Входящий звонок и мама у двери важнее любого пункта.</b> Ответил, оформил в CRM, вернулся на ту же строку.</li>"
-         "<li><b>Инбокс «Появилось за день» — это обещания клиентам.</b> Пункты с твоим именем разбираешь в шаге «инбокс» утром, а новые — при каждой перезагрузке страницы (раз в 5 минут) между строками списка, пока горит красная цифра «в инбоксе на тебя».</li>"
-         "<li><b>«Время прошло» — не пропускаем, а делаем следующим</b> после текущего. Не успел до конца смены — пункт остаётся без галочки, в итоге дня пишешь причину, Клод переносит его на завтра.</li>"
-         "</ol></details>")
+HOWTO = ("<div class='card' style='border-left:4px solid #312783;margin:10px 0;font-size:15px'>"
+         "<b>Как пользоваться — три шага.</b> "
+         "<b>1.</b> Делай пункт с меткой <span style='background:#312783;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:800'>СЕЙЧАС</span> — она идёт за часами. "
+         "<b>2.</b> Сделала — галочка. Не успела — нажми «не успела» и одно слово почему: пункт уйдёт Клоду и вернётся завтра. "
+         "<b>3.</b> Мама у двери или звонок — сначала они, потом обратно на СЕЙЧАС. "
+         "<details style='margin-top:6px;font-size:13.5px'><summary style='cursor:pointer;color:#6c6a86'>подробнее: время прошло, фон, инбокс</summary>"
+         "<ul style='margin:6px 0 0;padding-left:20px'>"
+         "<li><b>«время прошло»</b> — пункт со временем, который не сделан и не отмечен. Делается сразу после СЕЙЧАС, не пропускается. Если он уже бессмыслен (дверь в 10:00 в 11:30) — «не успела» с причиной.</li>"
+         "<li><b>«фон»</b> — пункты без времени: карта развития после каждого занятия, ответ в чате за 30 минут. Их делают между строками весь день.</li>"
+         "<li><b>Красная цифра «в инбоксе на тебя»</b> — обещания клиентам из звонков и переписки. Разбираются между строками при каждой перезагрузке (раз в 5 минут), пока цифра не станет зелёной.</li>"
+         "<li><b>Порядок колонки уже по деньгам</b>: сверху оплаты сегодня, ниже записи на неделю, в конце база. Перескакивать вниз к лёгкому нельзя.</li>"
+         "<li><b>Итог дня</b> складывается сам из галочек и «не успела»: писать отдельный отчёт не нужно, только заполнить причины.</li>"
+         "</ul></details></div>")
 
 
 def page(day: str = "", who: str = "") -> str:
@@ -207,7 +241,9 @@ def page(day: str = "", who: str = "") -> str:
     if who:
         order = [w for w in order + extra if w == who] or [who]
         extra = []
-    now_hm = datetime.now().strftime("%H:%M") if day == today() else ""
+    from . import autopilot
+    now_msk = autopilot._now()
+    now_hm = now_msk.strftime("%H:%M") if day == today() else ""
     cols = "".join(_col(w, tk.get(w, []), w in on or w in ("Лиза", "Борис"), day, now_hm) for w in order)
     if extra:
         cols += "".join(_col(w, tk.get(w, []), False, day, now_hm) for w in extra)
@@ -248,7 +284,7 @@ td{{padding:6px;border-bottom:1px solid var(--line);vertical-align:top}}.num{{te
 .links a{{display:inline-block;margin:4px 10px 4px 0;font-size:14px}}
 h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 </style></head><body><div class='wrap'>
-<div class='hero'><h1>Пульт · {wd}, {d.day:02d}.{d.month:02d} · в смене: {html.escape(hero_who)}</h1>
+<div class='hero'><h1>Пульт · {wd}, {d.day:02d}.{d.month:02d} · в смене: {html.escape(hero_who)} · <span id='clock'>{now_msk.strftime('%H:%M')}</span> МСК</h1>
 <p>Одна ссылка для всех: задачи по колонкам — только тем, кто сегодня работает, плюс Лиза и Борис. Галочка видна всем. Обновляется сама каждые 5 минут. Своя колонка: {filt}
 {"<a href='/pult'>все</a>" if who else ""}</p></div>
 <div class='kpis'>{kpi_html}</div>
@@ -258,5 +294,5 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 <div id='inbox'></div>{_inbox_block(day)}
 {zayavki.block()}
 {mesta.block()}
-<p style='color:#6c6a86;font-size:12px'>Пульт собран сервером {datetime.now().strftime('%H:%M')} · версия {ver}</p>
+<p style='color:#6c6a86;font-size:12px'>Пульт собран сервером {now_msk.strftime('%H:%M')} МСК · версия {ver}</p><script>(function(){{var off={int(now_msk.utcoffset().total_seconds())}*1000;function t(){{var d=new Date(Date.now()+off);document.getElementById('clock').textContent=('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)}};t();setInterval(t,15000)}})();</script>
 </div></body></html>"""

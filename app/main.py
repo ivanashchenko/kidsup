@@ -2257,7 +2257,11 @@ def api_pult_tasks_set(payload: dict = Body(...)):
 @app.post("/api/pult/done", dependencies=AUTH)
 def api_pult_done(payload: dict = Body(...)):
     from . import pult
-    return {"ok": pult.mark(int(payload.get("id") or 0), bool(payload.get("done", True)))}
+    if "state" in payload:
+        state = int(payload.get("state") or 0)
+    else:
+        state = 1 if payload.get("done", True) else 0
+    return {"ok": pult.mark(int(payload.get("id") or 0), state, str(payload.get("note") or ""))}
 
 
 @app.get("/karta", response_class=HTMLResponse, dependencies=AUTH)
@@ -2709,7 +2713,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-06.11"
+APP_VERSION = "2026-09-06.12"
 
 
 @app.get("/api/net")
