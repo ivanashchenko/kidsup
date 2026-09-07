@@ -146,8 +146,23 @@ class MoyklassClient:
             attrs = list(by_id.values())
         if attrs:
             body["attributes"] = attrs
+        # 07.09.2026: полный POST стирал и рекламный источник (advSourceId),
+        # ответственных, филиалы и метку Roistat — проверено на живой карточке.
+        # Переносим их из текущей карточки, если явно не меняем.
+        for f in ("advSourceId", "responsibles", "filials", "roistat"):
+            if cur.get(f) not in (None, "", []) and f not in fields:
+                body[f] = cur[f]
         body.update(fields)
-        return self.post(f"/v1/company/users/{user_id}", body)
+        try:
+            return self.post(f"/v1/company/users/{user_id}", body, retries=1)
+        except httpx.HTTPStatusError as e:
+            # МойКласс проверяет номер визита у Roistat: старая или чужая метка
+            # даёт 400 RoistatVisitNotFound — тогда пишем без неё, чтобы не
+            # терять остальные поля (сама метка при этом, увы, слетает).
+            if e.response.status_code == 400 and "Roistat" in e.response.text and "roistat" in body:
+                body.pop("roistat")
+                return self.post(f"/v1/company/users/{user_id}", body)
+            raise
 
     def post(self, path: str, body: dict | None = None, retries: int = 4):
         """POST с телом JSON (создание задач, комментариев, смена статусов)."""

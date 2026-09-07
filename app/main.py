@@ -2781,7 +2781,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-07.4"
+APP_VERSION = "2026-09-07.5"
 
 
 @app.get("/api/net")
@@ -3274,11 +3274,28 @@ def _lead_to_crm(lead: dict) -> None:
 
     # 2) CRM — по шагам, каждый сбой не роняет остальные
     mk = MoyklassClient(sync.get_api_key())
+    uid = None
     try:
         uid, same = _find_client(mk, phone)
+        # Сквозная аналитика: у карточки МойКласса есть родное поле roistat —
+        # его читает штатная интеграция МойКласс→Roistat и ставит заказу
+        # источник. До 07.09 визит писали только в комментарий, поэтому 88%
+        # заказов в Roistat шли как «nosource-crm». МойКласс проверяет номер
+        # визита у Roistat (400 RoistatVisitNotFound) — на ошибку создаём без.
+        visit = (lead.get("roistat") or "").strip()
+        roistat_written = False
         if not uid:
             try:
-                u = mk.post("/v1/company/users", {"name": child or "Заявка с сайта", "phone": phone})
+                body = {"name": child or "Заявка с сайта", "phone": phone}
+                u = None
+                if visit:
+                    try:
+                        u = mk.post("/v1/company/users", {**body, "roistat": visit}, retries=1)
+                        roistat_written = True
+                    except Exception as e:
+                        log.info("карточка с roistat=%s не принята (%s), создаём без", visit, e)
+                if u is None:
+                    u = mk.post("/v1/company/users", body)
                 uid = (u or {}).get("id")
                 if uid:
                     try:
@@ -3305,6 +3322,16 @@ def _lead_to_crm(lead: dict) -> None:
                         {"userId": uid, "comment": "\n".join(details), "showToUser": False})
             except Exception as e:
                 log.warning("комментарий не записан: %s", e)
+        # старая карточка без метки — дописываем визит (safe_update_user
+        # сам откатится на запись без roistat, если Roistat визит не знает)
+        if uid and visit and not roistat_written:
+            try:
+                cur_r = (mk.get(f"/v1/company/users/{uid}") or {}).get("roistat")
+                if not cur_r:
+                    mk.safe_update_user(uid, roistat=visit)
+                    roistat_written = bool((mk.get(f"/v1/company/users/{uid}") or {}).get("roistat"))
+            except Exception as e:
+                log.info("roistat в карточку %s не записан: %s", uid, e)
         # карточка могла лежать в архиве/недозвоне — живая заявка возвращает
         # её в воронку, иначе клиент не попадёт ни в один рабочий список
         if uid:
@@ -3339,12 +3366,15 @@ def _lead_to_crm(lead: dict) -> None:
     finally:
         mk.close()
 
-    # 3) лид в Roistat — чтобы воронка видела не только оплаты
-    try:
-        from . import roistat as roistat_mod
-        roistat_mod.push_lead(lead)
-    except Exception as e:
-        log.info("лид в Roistat не ушёл: %s", e)
+    # 3) лид в Roistat напрямую — только если карточка в CRM не появилась:
+    # иначе штатная интеграция МойКласс→Roistat уже создаёт заказ по карточке
+    # (с источником из поля roistat), а наш прямой заказ был бы дублем.
+    if not uid:
+        try:
+            from . import roistat as roistat_mod
+            roistat_mod.push_lead(lead)
+        except Exception as e:
+            log.info("лид в Roistat не ушёл: %s", e)
 
 
 @app.post("/hook/lead")
