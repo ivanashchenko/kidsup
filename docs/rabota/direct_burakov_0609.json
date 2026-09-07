@@ -36,5 +36,10 @@
   "regular_3km": 59455126
  },
  "counter": 32204964,
- "goal": 175173541
+ "goal": 175173541,
+ "retargeting_lists": {
+  "b_home2": 42312059,
+  "b_reg3": 42312060
+ },
+ "geo_attached": "2026-09-07 08:35"
 }
