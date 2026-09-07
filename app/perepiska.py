@@ -93,8 +93,15 @@ DAYS = {"понедельник": "пн", "вторник": "вт", "среда"
         "четверг": "чт", "пятница": "пт", "пятницу": "пт", "суббота": "сб",
         "субботу": "сб", "воскресенье": "вс"}
 TIME_RE = re.compile(r"\b(\d{1,2})[:.\s]?(\d{2})?\s*(?:час|ч\b)?")
+# 07.09.2026: «подходит» убрано из BOOK_RE — фраза «нам НЕ подходит
+# расписание» записала Мурашова в шахматы и отправила «Записали!».
+# Запись оформляем только по явному глаголу записи в ПОСЛЕДНЕМ сообщении
+# и никогда — если в нём есть отказ/перенос (NEG_RE): такое читает человек.
 BOOK_RE = re.compile(r"запиш|записыва|записать|давайте\s+на|берём|берем|"
-                     r"придём|придем|подходит", re.I)
+                     r"придём|придем|хотим\s+прийти|хотим\s+попасть", re.I)
+NEG_RE = re.compile(r"не\s+подход|не\s+смож|не\s+получ|не\s+буд|не\s+над|не\s+нужн|"
+                    r"не\s+хот|не\s+можем|отказ|отмен|уезжа|на\s+дач|не\s+быва|"
+                    r"не\s+в\s+городе|пока\s+нет|попозже|позже|потом|зачем", re.I)
 
 
 def _dialogs(day: str | None = None) -> list[dict]:
@@ -276,6 +283,7 @@ def scan(day: str | None = None) -> list[dict]:
             if not subj:
                 subj = next((n for n, rx in SUBJ_HINT if rx.search(last["text"])), None)
         out.append({"phone": phone, "name": d.get("name") or "", "text": text,
+                    "last_text": last["text"], "negative": bool(NEG_RE.search(last["text"] or "")),
                     "last_ts": last["ts"], "topic": topic, "subject": subj})
     return out
 
@@ -300,14 +308,16 @@ def run(day: str | None = None, dry: bool = True) -> dict:
             u = idx.get(it["phone"])
             it["uid"] = u["id"] if u else None
             text = ""
-            if it["topic"] and it["topic"] not in HUMAN_ONLY:
+            if it["topic"] and it["topic"] not in HUMAN_ONLY and not it.get("negative"):
                 text = compose(mk, it["topic"], it["subject"], it["name"])
             # «Запишите на вторник в 17:00» — если предмет, день и время
             # сходятся ровно на одной группе, оформляем запись сами.
             # Если подходит несколько или чего-то не хватает, решает
             # человек: записать не в ту группу дороже, чем подождать.
             it["booked"] = ""
-            day_, time_ = parse_booking(it["text"])
+            day_, time_ = parse_booking(it.get("last_text") or "")
+            if it.get("negative"):
+                day_, time_ = None, None
             if it["uid"] and it["subject"] and (day_ or time_):
                 cl = find_class(mk, it["subject"], day_, time_)
                 if cl:
