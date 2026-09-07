@@ -320,6 +320,11 @@ def save_classes(items: list[dict]):
         upsert_rows(conn, "classes",
                     ["id", "name", "course_id", "filial_id", "status", "max_students", "raw"],
                     rows)
+        # 07.09: группы, удалённые в CRM, иначе живут в таблице вечно и
+        # показываются в блоке «Места сейчас» (робототехника — четыре вместо двух)
+        ids = [r[0] for r in rows if r[0] is not None]
+        if len(ids) >= 50:
+            conn.execute("DELETE FROM classes WHERE id NOT IN (%s)" % ",".join("?" * len(ids)), ids)
 
 
 def save_user_subscriptions(items: list[dict]):
