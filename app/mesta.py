@@ -63,7 +63,8 @@ def _paid_by_class(conn) -> dict[int, set[int]]:
 
 def rows() -> list[dict]:
     with db.get_conn() as conn:
-        cls = conn.execute("SELECT id, name, max_students FROM classes WHERE name LIKE '2627_%'").fetchall()
+        cls = conn.execute("SELECT id, name, max_students FROM classes WHERE name LIKE '2627_%' "
+                           "AND (status IS NULL OR status = 'opened')").fetchall()   # удалённые/архивные группы CRM в таблице остаются
         paid_idx = _paid_by_class(conn)
         out = []
         for c in cls:
