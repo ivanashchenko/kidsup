@@ -1007,6 +1007,8 @@ DOC_GROUPS = [
          "Что писать по каждому ребёнку, куда, примеры по девяти направлениям и ссылка на страницу педагога"),
         ("__url:/pult", "🎛 ПУЛЬТ СМЕНЫ — одна ссылка на день: задачи тех, кто в смене, Лиза, Борис, цифры дня, инбокс, заявки, места",
          "Колонки задач только для дежурных по графику, галочки видны всем, обновляется каждые 5 минут. Своя колонка: /pult?who=Аня"),
+        ("roditeli_vidyat", "👀 «Родители видят, за что платят» — памятка педагогам и админам простыми словами",
+         "Почему семьи уходят через месяц, четыре действия педагога и четыре действия администратора, тексты и примеры строк, что нельзя писать."),
         ("gruppy_analiz_0709", "📊 Группы 2026/27 — детальный анализ на 07.09: каждая группа, цифры, маржа, решение и почему",
          "49 групп: норма, записано, оплатили, учатся без оплаты, пробные, маржа занятия; слияния, паузы, четыре новые группы, экономика, порядок действий и риски."),
         ("karta_progressa_v2", "🗺 Карта прогресса ученика — полный регламент (v2, 07.09)",
@@ -2785,7 +2787,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-07.8"
+APP_VERSION = "2026-09-07.9"
 
 
 @app.get("/api/net")
@@ -2827,7 +2829,7 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
             "anthropic_proxy_secret", "work_hours", "ext_by_day",
-            "vk_token", "vk_group_id", "vk_ads_client_id", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "tg_bot_token", "tg_channel", "mango_ext_admins", "pedagog_key",
+            "vk_token", "vk_group_id", "vk_ads_client_id", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "tg_bot_token", "tg_channel", "mango_ext_admins", "pedagog_key", "mk_web_login", "mk_web_password",
             "calls_parsed", "sms_on", "sms_sender_name", "lead_hook_key",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
@@ -2855,7 +2857,7 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
 # скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
 # страница настроек открыта всем, у кого есть пароль администратора.
 SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret",
-               "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token"}
+               "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password"}
 
 
 def _mask(key: str, value: str | None) -> str | None:
