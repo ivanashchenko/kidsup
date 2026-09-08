@@ -13,7 +13,8 @@ rooms = {int(k): v for k, v in rc["rooms"].items()}; classes = {int(k): v for k,
 DAYS = {"2026-09-07": "пн", "2026-09-08": "вт", "2026-09-09": "ср", "2026-09-10": "чт", "2026-09-11": "пт", "2026-09-12": "сб", "2026-09-13": "вс"}
 ORDER = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 HOURS = [f"{h:02d}" for h in range(9, 20)]
-ROOMS = [rooms[k] for k in sorted(rooms)]
+# 08.09 Борис: кабинетов физически четыре — К1–К4; К5–К8 в CRM не существуют
+ROOMS = [rooms[k] for k in sorted(rooms) if rooms[k] in ("К1", "К2", "К3", "К4")]
 
 def short(nm):
     nm = nm[5:] if nm.startswith("2627_") else nm
@@ -54,9 +55,9 @@ EVE = ["16", "17", "18", "19"]; MORN = ["09", "10", "11", "12", "13"]; DAYT = ["
 rows_util = []
 for d in ORDER:
     e = used(d, EVE); m = used(d, MORN); t = used(d, DAYT)
-    rows_util.append((d, m, len(MORN) * 8, t, len(DAYT) * 8, e, len(EVE) * 8))
-tot_used = sum(r[1] + r[3] + r[5] for r in rows_util); tot_cap = 8 * len(HOURS) * 7
-wk_eve_used = sum(r[5] for r in rows_util[:5]); wk_eve_cap = 5 * 4 * 8
+    rows_util.append((d, m, len(MORN) * 4, t, len(DAYT) * 4, e, len(EVE) * 4))
+tot_used = sum(r[1] + r[3] + r[5] for r in rows_util); tot_cap = 4 * len(HOURS) * 7
+wk_eve_used = sum(r[5] for r in rows_util[:5]); wk_eve_cap = 5 * 4 * 4
 
 css = """:root{--ink:#15132e;--muted:#6c6a86;--line:#e4e2f0;--bg:#f8f7fc;--indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
