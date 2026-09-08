@@ -1,0 +1,89 @@
+<title>Roistat: почему нет заявок и как починить</title>
+<style>
+:root{--ink:#15132e;--muted:#6c6a86;--line:#e4e2f0;--bg:#f8f7fc;--indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px 70px}
+.hero{background:linear-gradient(135deg,#312783,#1DA7E0);color:#fff;margin:0 -16px 20px;padding:26px 20px 22px;border-radius:0 0 18px 18px}
+.hero h1{margin:0 0 5px;font-size:26px;line-height:1.15}.hero p{margin:0;opacity:.92;font-size:15px}
+h2{font-size:20px;margin:30px 0 10px;color:var(--indigo);border-bottom:2px solid var(--line);padding-bottom:6px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0}
+.ok{border-left:4px solid var(--green);background:#f7fbf0}.warn{border-left:4px solid var(--amber);background:#fffaf0}.alarm{border-left:4px solid var(--red);background:#fff5f5}
+table{width:100%;border-collapse:collapse;font-size:14.5px}th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:8px 6px;border-bottom:2px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.scroll{overflow-x:auto}.small{font-size:13px;color:var(--muted)}
+.step{display:grid;grid-template-columns:56px 1fr;gap:12px;margin:14px 0}.step .n{font-size:30px;font-weight:800;color:var(--indigo);line-height:1;text-align:left}
+.tag{display:inline-block;padding:1px 9px;border-radius:10px;font-size:12px;font-weight:700;color:#fff}.tag.b{background:var(--blue)}.tag.g{background:var(--green)}.tag.r{background:#9a99b3}
+code{background:#f1effb;border-radius:5px;padding:1px 6px;font-size:13.5px}
+ul{padding-left:20px}li{margin:5px 0}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:12px 0}.kpi div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px}.kpi b{display:block;font-size:24px;color:var(--indigo)}
+</style>
+<div class="wrap">
+<div class="hero"><h1>Roistat: почему нет заявок и как это починить</h1>
+<p>Разбор 08.09.2026 по данным API проекта 228571. Отчёт показывает 921 визит за месяц и нули в колонках «Заявки», «Продажи», «Выручка» — при том что заказы в Roistat приходят каждый день. Ниже причина, пошаговая настройка и как проверить результат.</p></div>
+
+<div class="kpi">
+<div>Заказов в Roistat<b>500</b><span class="small">выгружено по API, 01.08–08.09</span></div>
+<div>С типом статуса «unused»<b>500 из 500</b><span class="small">то есть ни одной заявки и ни одной продажи</span></div>
+<div>С меткой визита<b>60</b><span class="small">остальные — «nosource-crm»</span></div>
+<div>С выручкой в заказе<b>145</b><span class="small">деньги едут, но не считаются</span></div>
+</div>
+
+<h2>1. Что происходит на самом деле</h2>
+<div class="card alarm">
+<p>В Roistat у заказа есть <b>ровно три типа статуса</b>: «В работе», «Оплачен», «Отменён». Это не названия, а типы — по ним система решает, что считать заявкой, что продажей, а что отменой. Проверка по API (<code>project/integration/status/list</code>) вернула только их.</p>
+<p>Наши заказы приезжают из МойКласса со <b>своими</b> названиями статусов: «1. Новая заявка», «3. Записался на пробное», «Учится», «Отказался» и так далее. Ни одно из них не сопоставлено с тремя типами Roistat — у всех 500 заказов в поле типа стоит <code>unused</code>, то есть «тип не задан».</p>
+<p><b>Следствие:</b> Roistat исправно принимает заказы, видит визиты, пишет звонки, но в отчёте по каналам считать ему нечего — заявок ноль, продаж ноль, выручки ноль. Именно это на вашем скрине.</p>
+</div>
+
+<h2>2. Пошагово: что нажать в кабинете Roistat</h2>
+<div class="card">
+<div class="step"><div class="n">1</div><div>Откройте <a href="https://cloud.roistat.com/">cloud.roistat.com</a>, проект <b>Kids UP (№228571)</b>.</div></div>
+<div class="step"><div class="n">2</div><div>Слева в нижней части меню — <b>шестерёнка «Управление проектом»</b> (или иконка «Интеграции» в левой панели). Нужен раздел <b>«Интеграции»</b>.</div></div>
+<div class="step"><div class="n">3</div><div>В списке подключённых интеграций найдите <b>«МойКласс»</b> и нажмите <b>«Настроить»</b> (шестерёнка справа от названия).</div></div>
+<div class="step"><div class="n">4</div><div>Внутри настройки найдите вкладку или шаг <b>«Статусы»</b> (в некоторых версиях — «Сопоставление статусов», «Статусы сделок», «Воронка»). Там слева будет список наших статусов из МойКласса, справа — выпадающий список с тремя вариантами: <b>В работе / Оплачен / Отменён</b>.</div></div>
+<div class="step"><div class="n">5</div><div>Проставьте соответствие по таблице ниже и нажмите <b>«Сохранить»</b>.</div></div>
+<div class="step"><div class="n">6</div><div>Напишите мне «статусы сопоставил» — я за минуту проверю по API, что тип перестал быть <code>unused</code>, и скажу, что видно в отчёте.</div></div>
+<p class="small">Через API эта настройка недоступна: методов записи сопоставления у Roistat нет (проверено 08.09 — <code>status/set</code>, <code>status/update</code> отвечают «resource_not_found»). Поэтому только руками в кабинете, это 3 минуты.</p>
+</div>
+
+<h2>3. Таблица сопоставления — что куда ставить</h2>
+<div class="card ok"><div class="scroll"><table>
+<tr><th>Статус записи в МойКлассе</th><th class="n">Заказов сейчас</th><th>Тип в Roistat</th><th>Почему так</th></tr>
+<tr><td><b>1. Новая заявка</b></td><td class="n">109</td><td><span class="tag b">В работе</span></td><td>Это и есть заявка: человек в воронке, решение не принято</td></tr>
+<tr><td><b>2. Подтвердил заявку</b></td><td class="n">—</td><td><span class="tag b">В работе</span></td><td>Тот же этап воронки, просто подтверждённый</td></tr>
+<tr><td><b>3. Записался на пробное</b></td><td class="n">82</td><td><span class="tag b">В работе</span></td><td>Заявка с назначенной датой — ещё не деньги</td></tr>
+<tr><td><b>5. Посетил пробное</b></td><td class="n">20</td><td><span class="tag b">В работе</span></td><td>Пришёл, но не оплатил — самая горячая часть воронки</td></tr>
+<tr><td><b>Учится</b></td><td class="n">161</td><td><span class="tag g">Оплачен</span></td><td>Абонемент куплен: это продажа, из заказа возьмётся выручка</td></tr>
+<tr><td><b>Отработка</b></td><td class="n">7</td><td><span class="tag g">Оплачен</span></td><td>Оплативший ребёнок, отрабатывает пропуск</td></tr>
+<tr><td><b>Отказался</b></td><td class="n">49</td><td><span class="tag r">Отменён</span></td><td>Явный отказ</td></tr>
+<tr><td><b>4. Не пришёл на пробное</b></td><td class="n">5</td><td><span class="tag r">Отменён</span></td><td>Не дошёл и не перезаписался</td></tr>
+<tr><td><b>Завершил / зап. в др. группу</b></td><td class="n">65</td><td><span class="tag r">Отменён</span></td><td>Запись закрыта; если ребёнок перешёл в другую группу, там своя запись со своим статусом</td></tr>
+</table></div>
+<p class="small">Количество заказов — по выгрузке 500 последних (01.08–08.09). Если в списке Roistat окажутся ещё статусы («Неактивный клиент», «Архив набора» и т. п.) — их тоже в «Отменён».</p></div>
+
+<h2>4. Что появится после настройки — и чего не появится</h2>
+<div class="card">
+<p><b>Появится:</b> в отчёте по каналам заполнятся «Заявки», «Конверсия в заявки», «Продажи», «Конверсия в продажи», «Выручка», «Средний чек». Данные пересчитаются задним числом — за весь период, а не с момента настройки. Станет видно, что приносят Яндекс Карты, 2ГИС, SEO и прямые заходы, и появится база для сравнения с Директом и VK.</p>
+<p><b>Не появится сразу:</b> привязка к каналу у тех заказов, где нет метки визита. Из 500 заказов метка есть у 60 — это заявки с сайта и звонки через подменный номер. Остальные 440 — записи, которые администратор создаёт руками в CRM: клиент пришёл сам, позвонил на обычный номер или его записали в группу по телефону из базы. У таких заказов источника нет и быть не может, они соберутся в отдельную строку «nosource-crm».</p>
+<p><b>Как эту долю уменьшать:</b> два канала уже размечены — форма сайта (с 07.09 пишет номер визита прямо в карточку МойКласса) и коллтрекинг (подменный номер +7 499 877-54-09 на сайте). Дальше по убыванию эффекта: подменный номер в Яндекс Бизнесе и 2ГИС; UTM-метки в рекламе (в кампаниях Директа и VK уже проставлены); ссылка на сайт из WhatsApp-подписи и из мессенджеров.</p>
+</div>
+
+<h2>5. Что работает уже сейчас</h2>
+<div class="card ok"><ul>
+<li><b>Группа «Заявки через Roistat» (id 343915) жива.</b> Коллтрекинг создаёт карточку и кладёт в неё запись: Королева София (08.09) и Сазонов Максим (07.09) — там. Массовые записи декабря 2025, которые видно в начале списка, — просто более старый слой той же группы.</li>
+<li><b>Коллтрекинг считает звонки.</b> Часть заказов приходит с типом <code>calltracking</code> и номером визита — по ним источник виден точно.</li>
+<li><b>Заявки с сайта размечены с 07.09.</b> Номер визита пишется в поле <code>roistat</code> карточки МойКласса, и штатная интеграция отдаёт его в заказ. Прямой дублирующий заказ мы больше не шлём.</li>
+<li><b>Выручка едет:</b> у 145 заказов заполнено поле выручки — как только «Учится» станет «Оплачен», деньги встанут в отчёт.</li>
+</ul></div>
+
+<h2>6. Срочно: тариф</h2>
+<div class="card alarm"><p>На скриншоте кабинета: тариф «Базовый 20 (2024-09)», <b>до истечения 7 дней</b>. Если не продлить до 15.09, вместе с тарифом отключатся подменные номера коллтрекинга и аналитика — ровно в тот момент, когда стартуют Директ и VK. Заодно стоит посмотреть, хватит ли 20 подменных номеров при новом трафике.</p></div>
+
+<h2>7. Порядок действий</h2>
+<div class="card"><table>
+<tr><th>Когда</th><th>Кто</th><th>Что</th></tr>
+<tr><td>Сегодня–завтра</td><td>Борис</td><td>Сопоставить статусы по таблице выше (3 минуты) и написать мне</td></tr>
+<tr><td>Сразу после</td><td>Клод</td><td>Проверить по API, что тип статусов сменился с <code>unused</code>; снять первый честный отчёт по каналам за месяц</td></tr>
+<tr><td>До 15.09</td><td>Борис</td><td>Продлить тариф Roistat</td></tr>
+<tr><td>При запуске рекламы</td><td>Клод</td><td>Ежедневная строка в отчёте дня: визиты, заявки, продажи и стоимость заявки по каналам</td></tr>
+</table></div>
+</div>

@@ -1152,6 +1152,8 @@ DOC_GROUPS = [
          "Все дела команды с фильтрами по людям и срочности"),
         ("reklama_nastroyka", "📣 Запуск рекламы: Директ и VK",
          "Шаги Бориса с галочками и что после каждого делает Клод; готовая структура кампаний, ключевые фразы, тексты объявлений, аудитории VK, UTM, цели Метрики и стоп-правила"),
+        ("roistat_zayavki", "📈 Roistat: почему в отчёте ноль заявок и как починить за 3 минуты",
+         "Все 500 заказов с типом unused — статусы МойКласса не сопоставлены с типами Roistat. Пошагово по экранам кабинета, таблица «наш статус → тип», что появится в отчёте и что такое nosource-crm."),
         ("dubli_plan", "🧹 Дубли карточек: 152 удалить автоматически, 83 склеить в интерфейсе",
          "Разбор всей базы 06.09: кто дубль, кого оставить, история каждой карточки, ссылки в CRM"),
         ("__url:/boris", "🎯 БОРИСУ — живой список решений: важно × срочно, польза в деньгах, статусы «сделано / ждём»",
@@ -2800,7 +2802,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-08.13"
+APP_VERSION = "2026-09-08.16"
 
 
 @app.get("/api/net")
@@ -5084,7 +5086,7 @@ def api_crm_status(payload: dict = Body(...)):
 
 
 @app.get("/api/ads/status", dependencies=AUTH)
-def api_ads_status():
+def api_ads_status(plan: str = "30377205"):
     """Готовность рекламы: Директ (кампании, объявления, счёт) и VK (план, баланс).
 
     08.09.2026: токены Директа и VK живут здесь, в настройках сервера, а
@@ -5143,6 +5145,29 @@ def api_ads_status():
                            params={"fields": "id,name,status,budget_limit_day,budget_limit", "limit": 20},
                            headers=hv, timeout=60)
             out["vk"]["plans"] = pl.json().get("items") if pl.status_code == 200 else {"http": pl.status_code, "body": pl.text[:200]}
+            # адресно наш план: в общем списке первыми идут удалённые, его там не видно
+            if plan:
+                one = httpx.get("https://ads.vk.com/api/v2/ad_plans.json",
+                                params={"_id": plan, "fields": "id,name,status,budget_limit_day,"
+                                        "budget_limit,date_start,date_end,ad_groups"},
+                                headers=hv, timeout=60)
+                out["vk"]["plan"] = (one.json().get("items") or [None])[0] if one.status_code == 200 \
+                    else {"http": one.status_code, "body": one.text[:200]}
+                gr = httpx.get("https://ads.vk.com/api/v2/ad_groups.json",
+                               params={"_ad_plan_id": plan, "fields": "id,name,status,budget_limit_day,"
+                                       "package_id,max_price", "limit": 50},
+                               headers=hv, timeout=60)
+                out["vk"]["groups"] = gr.json().get("items") if gr.status_code == 200 \
+                    else {"http": gr.status_code, "body": gr.text[:200]}
+                bn = httpx.get("https://ads.vk.com/api/v2/banners.json",
+                               params={"_ad_group__ad_plan_id": plan,
+                                       "fields": "id,name,status,moderation_status,ad_group_id", "limit": 100},
+                               headers=hv, timeout=60)
+                out["vk"]["banners"] = bn.json().get("items") if bn.status_code == 200 \
+                    else {"http": bn.status_code, "body": bn.text[:200]}
+                bg = httpx.get("https://ads.vk.com/api/v2/budget.json", headers=hv, timeout=60)
+                out["vk"]["budget"] = bg.json() if bg.status_code == 200 \
+                    else {"http": bg.status_code, "body": bg.text[:200]}
         except Exception as e:
             out["vk"]["error"] = str(e)[:200]
     return out
