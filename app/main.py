@@ -2312,6 +2312,13 @@ def pult_page(day: str = "", who: str = ""):
     return HTMLResponse(pult.page(day, who))
 
 
+@app.get("/obeshchaniya", response_class=HTMLResponse, dependencies=AUTH)
+def obeshchaniya_page(day: str = "", who: str = "Лиза"):
+    """Обещания клиентам одного человека — страница под телефон (08.09)."""
+    from . import pult
+    return HTMLResponse(pult.promises_page(day, who))
+
+
 @app.get("/api/pult/tasks", dependencies=AUTH)
 def api_pult_tasks(day: str = ""):
     from . import pult
@@ -2791,7 +2798,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-08.2"
+APP_VERSION = "2026-09-08.3"
 
 
 @app.get("/api/net")
@@ -4906,10 +4913,17 @@ def _inbox_block(day: str) -> str:
             f"<input type='checkbox' {'checked' if r['done'] else ''} onchange=\"fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{r['id']},done:this.checked}})}}).then(()=>location.reload())\"> "
             f"<span style='display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:800;color:#fff;background:{c}'>{html.escape(r['who'])}</span> "
             f"<span style='color:#6c6a86;font-size:12px'>{html.escape(r['ts'][11:16])}</span> "
-            f"{html.escape(r['text'])}" + (f" <span style='white-space:nowrap;color:#6c6a86'>{html.escape(r['phone'])}</span>" if r['phone'] else "") + "</li>")
-    body = "".join(items) or "<li style='color:#6c6a86'>пока пусто — сюда падает всё, что появилось из звонков и переписки за день</li>"
+            + (lambda tx: (f"{html.escape(tx[:140])}<details style='display:inline'><summary style='display:inline;cursor:pointer;color:#6c6a86'> …</summary> {html.escape(tx[140:])}</details>" if len(tx) > 160 else html.escape(tx)))(r['text'] or "")
+            + (f" <a href='tel:+{html.escape(r['phone'])}' style='white-space:nowrap;color:#6c6a86'>+{html.escape(r['phone'])}</a>" if r['phone'] else "") + "</li>")
+    body = "".join(items) or "<li style='color:#6c6a86'>пока пусто — сюда падает всё, что мы пообещали клиентам в звонках и переписке за день</li>"
+    by_who = {}
+    for r in rows:
+        if not r["done"]:
+            by_who[r["who"]] = by_who.get(r["who"], 0) + 1
+    heads = " · ".join(f"<a href='/obeshchaniya?who={html.escape(w)}' style='color:{col.get(w, '#6c6a86')};font-weight:700'>{html.escape(w)} {n}</a>" for w, n in sorted(by_who.items(), key=lambda x: -x[1]))
     return (f"<div class='card' style='border-left:4px solid #312783;margin:14px 0'>"
-            f"<b style='display:block;font-size:17px;margin-bottom:6px'>Появилось за день ({len(rows)})</b>"
+            f"<b style='display:block;font-size:17px;margin-bottom:2px'>Обещания клиентам за день ({len(rows)}, не закрыто {sum(by_who.values())})</b>"
+            f"<div style='font-size:13px;color:#6c6a86;margin-bottom:8px'>Что мы пообещали семьям в звонках и переписке. Своя страница под телефон: {heads or '—'}</div>"
             f"<ul style='list-style:none;padding:0;margin:0;font-size:14px'>{body}</ul></div>")
 
 
