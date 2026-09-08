@@ -17,6 +17,13 @@ DONE = pathlib.Path("/home/user/kidsup/docs/rabota/calls_done.json")
 TALK_MIN = 10          # короче — не расшифровываем (см. инструкцию рутины)
 KEY = db.get_setting("mango_key")
 SALT = db.get_setting("mango_salt")
+# 08.09.2026: контейнер откатили — локальная база с ключами Манго пропала, и
+# разбор встал. Если ключей нет, идём через сервер: /api/calls/list и
+# /api/calls/recording подписывают запрос своим ключом. Пароль — из окружения
+# (KIDSUP_ADMIN_PASS) или общий админский.
+SERVER = os.environ.get("KIDSUP_SERVER", "https://app.kidsup.ru")
+AUTH = ("admin", os.environ.get("KIDSUP_ADMIN_PASS", "CGWstart8*"))
+VIA_SERVER = not (KEY and SALT)
 
 
 def _call(url, data):
@@ -27,6 +34,11 @@ def _call(url, data):
 
 
 def calls(minutes: int) -> list[dict]:
+    if VIA_SERVER:
+        r = httpx.get(f"{SERVER}/api/calls/list", params={"minutes": minutes},
+                      auth=AUTH, timeout=180)
+        r.raise_for_status()
+        return r.json().get("calls", [])
     now = int(time.time())
     r = _call("https://app.mango-office.ru/vpbx/stats/request",
               {"date_from": now - minutes * 60, "date_to": now,
@@ -69,8 +81,12 @@ def transcribe(rows: list[dict]) -> None:
     ok = []
     for x in rows:
         f = f"/tmp/{x['rec'][:12]}.mp3"
-        r = _call("https://app.mango-office.ru/vpbx/queries/recording/post/",
-                  {"recording_id": x["rec"], "action": "download"})
+        if VIA_SERVER:
+            r = httpx.get(f"{SERVER}/api/calls/recording", params={"id": x["rec"]},
+                          auth=AUTH, timeout=180)
+        else:
+            r = _call("https://app.mango-office.ru/vpbx/queries/recording/post/",
+                      {"recording_id": x["rec"], "action": "download"})
         if r.status_code != 200 or len(r.content) < 1000:
             print(x["t"], x["phone"], "запись недоступна", r.status_code, flush=True)
             continue

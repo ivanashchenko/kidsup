@@ -2800,7 +2800,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-08.6"
+APP_VERSION = "2026-09-08.7"
 
 
 @app.get("/api/net")
@@ -4927,6 +4927,150 @@ def _inbox_block(day: str) -> str:
             f"<b style='display:block;font-size:17px;margin-bottom:2px'>Обещания клиентам за день ({len(rows)}, не закрыто {sum(by_who.values())})</b>"
             f"<div style='font-size:13px;color:#6c6a86;margin-bottom:8px'>Общий список для Бориса; у каждого те же пункты стоят в своей колонке выше. Не закрыто: {heads or '—'}</div>"
             f"<ul style='list-style:none;padding:0;margin:0;font-size:14px'>{body}</ul></div>")
+
+
+@app.get("/api/calls/list", dependencies=AUTH)
+def api_calls_list(minutes: int = 95):
+    """Список звонков Манго за последние N минут — для почасового разбора.
+
+    08.09.2026: рабочий контейнер откатили, локальная база с ключами Манго и
+    МойКласса пропала, и разбор звонков встал на три часа. Ключи есть здесь,
+    на сервере, поэтому контейнеру они больше не нужны: он берёт список через
+    этот эндпоинт, а запись — через /api/calls/recording. Только чтение.
+    """
+    import csv as _csv, io as _io, time as _time
+    from . import mango as _mango
+    now = int(_time.time())
+    req = _mango._call("stats/request", {
+        "date_from": now - int(minutes) * 60, "date_to": now,
+        "fields": ("records,start,finish,answer,from_extension,from_number,"
+                   "to_extension,to_number,disconnect_reason")})
+    key = (req.json() or {}).get("key")
+    if not key:
+        raise HTTPException(502, f"stats/request: {req.text[:200]}")
+    txt = ""
+    for _ in range(15):
+        _time.sleep(3)
+        res = _mango._call("stats/result", {"key": key})
+        if res.status_code == 200 and res.text.strip():
+            txt = res.text
+            break
+    rows = []
+    for x in (r for r in _csv.reader(_io.StringIO(txt), delimiter=";") if r):
+        rec, start, finish, answer, fe, fn, te, tn, reason = (x + [""] * 9)[:9]
+        dur = (int(finish) - int(answer)) if answer and answer != "0" else 0
+        t = datetime.fromtimestamp(int(start) + 3 * 3600).strftime("%H:%M") if start else ""
+        rows.append({"rec": rec.strip("[]"), "t": t, "dir": "out" if fe else "in",
+                     "phone": tn if fe else fn, "ext": fe or te, "dur": dur, "reason": reason})
+    return {"minutes": minutes, "calls": rows}
+
+
+@app.get("/api/calls/recording", dependencies=AUTH)
+def api_calls_recording(id: str):
+    """Файл записи разговора по recording_id — прокси к Манго (см. /api/calls/list)."""
+    from . import mango as _mango
+    r = _mango._call("queries/recording/post/", {"recording_id": id, "action": "download"})
+    if r.status_code != 200 or len(r.content) < 1000:
+        raise HTTPException(404, f"запись недоступна ({r.status_code}, {len(r.content)} байт)")
+    return Response(content=r.content, media_type="audio/mpeg")
+
+
+@app.get("/api/crm/user", dependencies=AUTH)
+def api_crm_user(phone: str = "", user_id: int = 0, days: int = 14):
+    """Карточки по телефону (или одна по id) с ближайшими записями и группами.
+
+    Тот же смысл, что и у /api/calls/*: контейнер после отката остаётся без
+    ключа МойКласса, а разбор звонков и переписок должен работать. Чтение.
+    """
+    from .moyklass_client import MoyklassClient
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        def _l(x, k):
+            return x.get(k, x) if isinstance(x, dict) else x
+        if user_id:
+            users = [mk.get(f"/v1/company/users/{int(user_id)}")]
+        else:
+            digits = "".join(c for c in phone if c.isdigit())
+            if len(digits) < 10:
+                raise HTTPException(400, "нужен phone (10+ цифр) или user_id")
+            users = _l(mk.get("/v1/company/users", {"phone": digits}), "users") or []
+        today = date.today()
+        since, until = today.isoformat(), (today + timedelta(days=days)).isoformat()
+        out = []
+        classes: dict[int, str] = {}
+        for u in users:
+            uid = u.get("id")
+            recs = []
+            for r in _l(mk.get("/v1/company/lessonRecords",
+                               {"userId": uid, "date": [since, until], "limit": 50}), "lessonRecords") or []:
+                try:
+                    lesson = mk.get(f"/v1/company/lessons/{r['lessonId']}")
+                except Exception:
+                    continue
+                cid = lesson.get("classId")
+                if cid not in classes:
+                    try:
+                        classes[cid] = (mk.get(f"/v1/company/classes/{cid}") or {}).get("name") or str(cid)
+                    except Exception:
+                        classes[cid] = str(cid)
+                recs.append({"date": lesson.get("date"), "time": (lesson.get("beginTime") or "")[:5],
+                             "class": classes[cid], "visit": r.get("visit"), "trial": bool(r.get("test"))})
+            joins = []
+            for j in _l(mk.get("/v1/company/joins", {"userId": uid}), "joins") or []:
+                if j.get("statusId") not in (2, 58132, 83760, 58131, 50509):
+                    continue
+                cid = j.get("classId")
+                if cid not in classes:
+                    try:
+                        classes[cid] = (mk.get(f"/v1/company/classes/{cid}") or {}).get("name") or str(cid)
+                    except Exception:
+                        classes[cid] = str(cid)
+                joins.append({"class": classes[cid], "statusId": j.get("statusId")})
+            out.append({"id": uid, "name": u.get("name"), "phone": u.get("phone"),
+                        "clientStateId": u.get("clientStateId"), "createdAt": u.get("createdAt"),
+                        "records": sorted(recs, key=lambda x: (x["date"] or "", x["time"])), "joins": joins})
+        return {"users": out}
+    finally:
+        mk.close()
+
+
+@app.post("/api/crm/comment", dependencies=AUTH)
+def api_crm_comment(payload: dict = Body(...)):
+    """Комментарий в карточку: {"userId": 123, "text": "..."} — showToUser всегда false."""
+    from .moyklass_client import MoyklassClient
+    uid, text = int(payload.get("userId") or 0), str(payload.get("text") or "").strip()
+    if not uid or not text:
+        raise HTTPException(400, "нужны userId и text")
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        mk.post("/v1/company/userComments", {"userId": uid, "comment": text[:4000], "showToUser": False})
+        return {"ok": True}
+    finally:
+        mk.close()
+
+
+@app.post("/api/crm/status", dependencies=AUTH)
+def api_crm_status(payload: dict = Body(...)):
+    """Статус клиента: {"userId": 123, "statusId": 146950, "reasonId": 313608}.
+
+    Статус, который уже стоит, МойКласс не принимает (400) — здесь это не
+    ошибка сервера, а ответ {"ok": false, "error": "..."}.
+    """
+    from .moyklass_client import MoyklassClient
+    uid, st = int(payload.get("userId") or 0), int(payload.get("statusId") or 0)
+    if not uid or not st:
+        raise HTTPException(400, "нужны userId и statusId")
+    body = {"statusId": st}
+    if payload.get("reasonId"):
+        body["statusChangeReasonId"] = int(payload["reasonId"])
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        mk.post(f"/v1/company/users/{uid}/status", body)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+    finally:
+        mk.close()
 
 
 @app.get("/api/mesta", dependencies=AUTH)

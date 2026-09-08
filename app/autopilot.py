@@ -1415,6 +1415,59 @@ def trial_reminder(mk: MoyklassClient) -> None:
         log.info("напоминание о пробном: %s на %s", phone[-4:], when)
 
 
+def trial_reminder_2h(mk: MoyklassClient) -> None:
+    """Короткое напоминание за 2 часа до первого занятия.
+
+    08.09.2026 Борис: уведомление «за 2 часа» до этого слал МойКласс —
+    холодным текстом «Это автоматическое уведомление» и без имени ребёнка,
+    с того же номера, где мы пишем по-человечески. Переносим к себе:
+    сценарий в МойКлассе выключаем, здесь шлём коротко и по делу.
+
+    Берём только записи на СЕГОДНЯШНИЕ пробные (test=true) конкретного
+    ребёнка — правило владельца: никаких напоминаний «по составу группы».
+    Окно — занятие начинается через 100–170 минут; отметка на запись, чтобы
+    сообщение ушло ровно один раз.
+    """
+    today = _today().isoformat()
+    try:
+        recs = mk.fetch_all("/v1/company/lessonRecords", ["lessonRecords"], params={
+            "date": today, "test": "true", "includeLessons": "true"})
+    except Exception:
+        log.exception("не удалось получить записи на сегодняшние пробные")
+        return
+    now = _now()
+    for r in recs:
+        uid = r.get("userId")
+        lesson = r.get("lesson") or {}
+        begin = (lesson.get("beginTime") or "")[:5]
+        if not uid or not begin or r.get("visit") is not None:
+            continue
+        try:
+            hh, mm = (int(x) for x in begin.split(":"))
+        except ValueError:
+            continue
+        minutes_left = (hh * 60 + mm) - (now.hour * 60 + now.minute)
+        if not (100 <= minutes_left <= 170):
+            continue
+        if not _mark("trial_reminder_2h", str(r.get("id"))):
+            continue
+        try:
+            user = mk.get(f"/v1/company/users/{uid}")
+        except Exception:
+            continue
+        phone = user.get("phone")
+        if not phone:
+            continue
+        nm = _child_name(user.get("name") or "")
+        child = _accusative(nm) if nm else "вашего ребёнка"
+        _wa(phone, f"Здравствуйте! Сегодня в {begin} ждём {child} на первом занятии 🌿\n"
+                   f"Адрес: б-р Маршала Рокоссовского, 6 к1В — 7-й подъезд, 2 этаж "
+                   f"(ориентир — магазин «Дикси»). Нужна сменная обувь, остальное наше.\n"
+                   f"Придите на 10 минут раньше, пожалуйста. Если планы изменились — "
+                   f"просто ответьте на это сообщение, перенесём.", kind="trial_reminder_2h")
+        log.info("напоминание за 2 часа: %s на %s", phone[-4:], begin)
+
+
 def _next_lesson(mk: MoyklassClient, uid: int, days: int = 21, class_id: int | None = None) -> str:
     """Ближайшее БУДУЩЕЕ занятие, на которое записан именно этот ребёнок:
     «7 сентября в 18:00». Пусто — записи на конкретное занятие нет.
@@ -3854,6 +3907,13 @@ def _loop() -> None:
                     # когда родитель уже дома и может ответить на вопрос
                     if now.hour == 18 and _mark("trial_reminder_day", str(_today())):
                         trial_reminder(mk)
+                    # и короткое напоминание за 2 часа до самого занятия —
+                    # проверяем каждый тик, окно 100–170 минут до начала
+                    if 8 <= now.hour <= 20:
+                        try:
+                            trial_reminder_2h(mk)
+                        except Exception:
+                            log.exception("напоминание за 2 часа упало — продолжаем")
                     # пропущенные входящие: каждые 15 мин в рабочие часы —
                     # клиент, до которого не перезвонили, остывает быстро
                     if 9 <= now.hour <= 20 and _mark("slot_q15_missed_in", _q15):
