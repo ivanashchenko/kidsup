@@ -2800,7 +2800,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-08.11"
+APP_VERSION = "2026-09-08.13"
 
 
 @app.get("/api/net")
@@ -5079,6 +5079,111 @@ def api_crm_status(payload: dict = Body(...)):
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)[:200]}
+    finally:
+        mk.close()
+
+
+@app.get("/api/ads/status", dependencies=AUTH)
+def api_ads_status():
+    """Готовность рекламы: Директ (кампании, объявления, счёт) и VK (план, баланс).
+
+    08.09.2026: токены Директа и VK живут здесь, в настройках сервера, а
+    рабочий контейнер после отката остаётся без них. Эндпоинт только читает —
+    ни ставок, ни запусков, ни модерации отсюда не делается.
+    """
+    import httpx
+    out = {"direct": {}, "vk": {}}
+    tok = db.get_setting("yandex_direct_token")
+    ids = [714182575, 714182576, 714182577, 714182578, 714188491, 714188492, 714188493, 714188494]
+    if tok:
+        h = {"Authorization": f"Bearer {tok}", "Accept-Language": "ru", "Content-Type": "application/json"}
+        try:
+            r = httpx.post("https://api.direct.yandex.com/json/v5/campaigns", headers=h, timeout=60,
+                           json={"method": "get", "params": {"SelectionCriteria": {"Ids": ids},
+                                 "FieldNames": ["Id", "Name", "State", "Status", "StatusPayment"]}}).json()
+            out["direct"]["campaigns"] = [{"id": c["Id"], "name": c["Name"], "state": c["State"],
+                                           "status": c["Status"], "payment": c.get("StatusPayment")}
+                                          for c in r.get("result", {}).get("Campaigns", [])]
+            a = httpx.post("https://api.direct.yandex.com/json/v5/ads", headers=h, timeout=60,
+                           json={"method": "get", "params": {"SelectionCriteria": {"CampaignIds": ids},
+                                 "FieldNames": ["Id", "CampaignId", "State", "Status"]}}).json()
+            ads = a.get("result", {}).get("Ads", [])
+            out["direct"]["ads"] = {"всего": len(ads),
+                                    "черновики": sum(1 for x in ads if x.get("Status") == "DRAFT"),
+                                    "на модерации": sum(1 for x in ads if x.get("Status") == "MODERATION"),
+                                    "приняты": sum(1 for x in ads if x.get("Status") == "ACCEPTED")}
+            b = httpx.post("https://api.direct.yandex.ru/live/v4/json/", timeout=60,
+                           json={"method": "AccountManagement", "token": tok, "locale": "ru",
+                                 "param": {"Action": "Get", "SelectionCriteria": {}}}).json()
+            acc = (b.get("data", {}).get("Accounts") or [{}])[0]
+            out["direct"]["balance"] = acc.get("Amount")
+            out["direct"]["day_budget"] = (acc.get("AccountDayBudget") or {}).get("Amount")
+        except Exception as e:
+            out["direct"]["error"] = str(e)[:200]
+    vt = db.get_setting("vk_ads_token")
+    if vt:
+        try:
+            hv = {"Authorization": f"Bearer {vt}"}
+            u = httpx.get("https://ads.vk.com/api/v2/user.json", headers=hv, timeout=60)
+            if u.status_code == 401:
+                # токен живёт сутки — обновляем по refresh_token
+                rt = db.get_setting("vk_ads_refresh_token")
+                tr = httpx.post("https://ads.vk.com/api/v2/oauth2/token.json", timeout=60,
+                                data={"grant_type": "refresh_token", "refresh_token": rt,
+                                      "client_id": db.get_setting("vk_ads_client_id"),
+                                      "client_secret": db.get_setting("vk_ads_client_secret")})
+                if tr.status_code == 200:
+                    j = tr.json()
+                    db.set_setting("vk_ads_token", j.get("access_token", ""))
+                    db.set_setting("vk_ads_refresh_token", j.get("refresh_token", ""))
+                    hv = {"Authorization": f"Bearer {j.get('access_token')}"}
+                    u = httpx.get("https://ads.vk.com/api/v2/user.json", headers=hv, timeout=60)
+            out["vk"]["account"] = u.json() if u.status_code == 200 else {"http": u.status_code, "body": u.text[:200]}
+            pl = httpx.get("https://ads.vk.com/api/v2/ad_plans.json",
+                           params={"fields": "id,name,status,budget_limit_day,budget_limit", "limit": 20},
+                           headers=hv, timeout=60)
+            out["vk"]["plans"] = pl.json().get("items") if pl.status_code == 200 else {"http": pl.status_code, "body": pl.text[:200]}
+        except Exception as e:
+            out["vk"]["error"] = str(e)[:200]
+    return out
+
+
+@app.get("/api/crm/classes", dependencies=AUTH)
+def api_crm_classes(q: str = "", limit: int = 40):
+    """Поиск групп по подстроке имени: id, название, статус, курс."""
+    from .moyklass_client import MoyklassClient
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        cls = mk.get("/v1/company/classes", {"limit": 500})
+        cls = cls.get("classes", cls) if isinstance(cls, dict) else cls
+        ql = (q or "").lower()
+        out = [{"id": c.get("id"), "name": c.get("name"), "status": c.get("status"),
+                "courseId": c.get("courseId"), "maxStudents": c.get("maxStudents")}
+               for c in (cls or []) if not ql or ql in (c.get("name") or "").lower()]
+        return {"total": len(out), "classes": out[:int(limit)]}
+    finally:
+        mk.close()
+
+
+@app.get("/api/crm/class", dependencies=AUTH)
+def api_crm_class(class_id: int, limit: int = 30):
+    """Последние записи в группу — чтобы видеть, куда падают заявки (буферы Roistat)."""
+    from .moyklass_client import MoyklassClient
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        js = mk.get("/v1/company/joins", {"classId": int(class_id), "limit": 200})
+        js = js.get("joins", js) if isinstance(js, dict) else js
+        js = sorted(js or [], key=lambda j: j.get("createdAt") or "", reverse=True)[:int(limit)]
+        out = []
+        for j in js:
+            try:
+                u = mk.get(f"/v1/company/users/{j['userId']}")
+            except Exception:
+                u = {}
+            out.append({"createdAt": j.get("createdAt"), "statusId": j.get("statusId"),
+                        "userId": j.get("userId"), "name": u.get("name"), "phone": u.get("phone"),
+                        "roistat": u.get("roistat")})
+        return {"classId": class_id, "joins": out}
     finally:
         mk.close()
 
