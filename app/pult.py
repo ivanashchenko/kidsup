@@ -189,6 +189,40 @@ def _inbox_open(day: str, who: str) -> int:
         return 0
 
 
+def _promises_html(day: str, who: str, color: str) -> str:
+    """Обещания клиентам этого человека — прямо в его колонке, под задачами.
+    08.09 Борис: «всё на одной странице», отдельной страницы под телефон не нужно."""
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute("SELECT id, ts, text, phone, source, done FROM plan_inbox WHERE day=? AND who=? ORDER BY done, id",
+                                (day, who)).fetchall()
+    except Exception:
+        rows = []
+    if not rows:
+        return ""
+    lis = []
+    for r in rows:
+        ph = "".join(ch for ch in (r["phone"] or "") if ch.isdigit())
+        tel = f" <a href='tel:+{ph}' style='color:#6c6a86;white-space:nowrap'>+{ph}</a>" if len(ph) >= 10 else ""
+        txt = html.escape(r["text"] or "")
+        short = txt if len(txt) <= 150 else f"{txt[:150]}<details style='display:inline'><summary style='display:inline;cursor:pointer;color:#6c6a86'> …</summary> {txt[150:]}</details>"
+        lis.append(f"<li style='margin:6px 0;{'opacity:.45;text-decoration:line-through' if r['done'] else ''}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
+                   f"<input type='checkbox' {'checked' if r['done'] else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
+                   f"onchange=\"fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{r['id']},done:this.checked}})}}).then(()=>location.reload())\">"
+                   f"<span><span style='color:#6c6a86;font-size:11.5px'>{html.escape((r['source'] or '')[:22])}</span> {short}{tel}</span></label></li>")
+    open_n = sum(1 for r in rows if not r["done"])
+    open_li = [h for r, h in zip(rows, lis) if not r["done"]]
+    done_li = [h for r, h in zip(rows, lis) if r["done"]]
+    body = "".join(open_li)
+    if done_li:
+        body += f"<details style='margin:4px 0'><summary style='cursor:pointer;color:#4e8a12;font-size:13px'>закрыто {len(done_li)} ✓</summary><ol style='list-style:none;padding:0;margin:0'>{''.join(done_li)}</ol></details>"
+    head_col = "#E30613" if open_n else "#4e8a12"
+    return (f"<div style='margin-top:12px;border-top:2px dashed {color};padding-top:8px'>"
+            f"<div style='font-weight:800;font-size:15px;color:{head_col}'>Обещания клиентам: {open_n} не закрыто</div>"
+            f"<div style='font-size:12px;color:#6c6a86;margin-bottom:4px'>что мы пообещали семьям в звонках и переписке — сверху вниз, галочка сразу после действия</div>"
+            f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol></div>")
+
+
 def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str = "") -> str:
     """Метка СЕЙЧАС идёт за часами: текущий — несделанный пункт с самым поздним временем,
     которое уже наступило (мы внутри его окна). Несделанные пункты с более ранним временем —
@@ -253,21 +287,21 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     body = body or "<li style='color:#6c6a86'>задач пока нет — Клод положит к началу смены</li>"
     nb = "" if onduty else " <span style='font-size:11px;color:#6c6a86;font-weight:500'>не в смене</span>"
     ib = _inbox_open(day, who) if day else 0
-    ib_html = (f"<a href='/obeshchaniya?who={html.escape(who)}' style='font-size:12.5px;color:#E30613;font-weight:700'>обещаний клиентам на тебе: {ib} ↗</a>"
-               if ib else "<span style='font-size:12.5px;color:#7DB928;font-weight:700'>обещаний клиентам на тебе нет</span>")
+    ib_html = (f"<span style='font-size:12.5px;color:#E30613;font-weight:700'>обещаний клиентам: {ib} — ниже в колонке ↓</span>"
+               if ib else "<span style='font-size:12.5px;color:#7DB928;font-weight:700'>обещаний клиентам нет</span>")
     late = sum(1 for i in items if not i["done"] and _first_time(i["t"]) and cur_ft and _first_time(i["t"]) < cur_ft)
     late_html = f" · <span style='color:#a35f00;font-weight:700'>{late} пункт(а) без галочки, время прошло</span>" if late else ""
     return (f"<div class='wcard' style='border-top-color:{c}'><div class='nm'>{html.escape(who)}{nb} "
             f"<span style='font-size:12px;color:#6c6a86;font-weight:600'>{done_n}/{len(items)}</span></div>"
             f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · {ib_html}{late_html}</div>"
-            f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol></div>")
+            f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol>{_promises_html(day, who, c) if day else ''}</div>")
 
 
 HOWTO = ("<div class='card' style='border-left:4px solid #312783;margin:10px 0;font-size:15px'>"
          "<b>Как пользоваться — три шага.</b> "
          "<b>1.</b> Делай пункт с меткой <span style='background:#312783;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:800'>СЕЙЧАС</span> — она идёт за часами. В колонке видны пять ближайших, остальное свёрнуто ниже. "
          "<b>2.</b> Сделала — галочка сразу, не вечером. Не успеваешь — «перенести на завтра ↩», пункт сам появится в твоей колонке завтра. "
-         "<b>3.</b> Красная строка <b>«обещаний клиентам на тебе: N»</b> — это семьи, которым мы что-то обещали в звонке или переписке. Открывается отдельной страницей под телефон, закрывается сверху вниз раз в час. "
+         "<b>3.</b> Ниже задач в твоей колонке — <b>«Обещания клиентам»</b>: семьи, которым мы что-то обещали в звонке или переписке. Закрываются сверху вниз раз в час, галочка сразу после действия. "
          "<details style='margin-top:6px;font-size:13.5px'><summary style='cursor:pointer;color:#6c6a86'>подробнее: время прошло, фон, явка</summary>"
          "<ul style='margin:6px 0 0;padding-left:20px'>"
          "<li><b>«время прошло»</b> — пункт со временем, который не сделан и не отмечен. Делается сразу после СЕЙЧАС, не пропускается; если уже бессмыслен — «перенести на завтра».</li>"

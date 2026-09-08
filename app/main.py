@@ -2798,7 +2798,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-08.4"
+APP_VERSION = "2026-09-08.5"
 
 
 @app.get("/api/net")
@@ -4920,10 +4920,10 @@ def _inbox_block(day: str) -> str:
     for r in rows:
         if not r["done"]:
             by_who[r["who"]] = by_who.get(r["who"], 0) + 1
-    heads = " · ".join(f"<a href='/obeshchaniya?who={html.escape(w)}' style='color:{col.get(w, '#6c6a86')};font-weight:700'>{html.escape(w)} {n}</a>" for w, n in sorted(by_who.items(), key=lambda x: -x[1]))
+    heads = " · ".join(f"<span style='color:{col.get(w, '#6c6a86')};font-weight:700'>{html.escape(w)} {n}</span>" for w, n in sorted(by_who.items(), key=lambda x: -x[1]))
     return (f"<div class='card' style='border-left:4px solid #312783;margin:14px 0'>"
             f"<b style='display:block;font-size:17px;margin-bottom:2px'>Обещания клиентам за день ({len(rows)}, не закрыто {sum(by_who.values())})</b>"
-            f"<div style='font-size:13px;color:#6c6a86;margin-bottom:8px'>Что мы пообещали семьям в звонках и переписке. Своя страница под телефон: {heads or '—'}</div>"
+            f"<div style='font-size:13px;color:#6c6a86;margin-bottom:8px'>Общий список для Бориса; у каждого те же пункты стоят в своей колонке выше. Не закрыто: {heads or '—'}</div>"
             f"<ul style='list-style:none;padding:0;margin:0;font-size:14px'>{body}</ul></div>")
 
 
