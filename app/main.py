@@ -2800,7 +2800,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-08.7"
+APP_VERSION = "2026-09-08.10"
 
 
 @app.get("/api/net")
@@ -4959,7 +4959,9 @@ def api_calls_list(minutes: int = 95):
     for x in (r for r in _csv.reader(_io.StringIO(txt), delimiter=";") if r):
         rec, start, finish, answer, fe, fn, te, tn, reason = (x + [""] * 9)[:9]
         dur = (int(finish) - int(answer)) if answer and answer != "0" else 0
-        t = datetime.fromtimestamp(int(start) + 3 * 3600).strftime("%H:%M") if start else ""
+        # Манго отдаёт метки в UTC; сервер живёт в МСК, поэтому берём utcfromtimestamp
+        # и прибавляем три часа вручную — иначе смещение уходит на час вперёд.
+        t = datetime.utcfromtimestamp(int(start) + 3 * 3600).strftime("%H:%M") if start else ""
         rows.append({"rec": rec.strip("[]"), "t": t, "dir": "out" if fe else "in",
                      "phone": tn if fe else fn, "ext": fe or te, "dur": dur, "reason": reason})
     return {"minutes": minutes, "calls": rows}
@@ -4968,8 +4970,16 @@ def api_calls_list(minutes: int = 95):
 @app.get("/api/calls/recording", dependencies=AUTH)
 def api_calls_recording(id: str):
     """Файл записи разговора по recording_id — прокси к Манго (см. /api/calls/list)."""
-    from . import mango as _mango
-    r = _mango._call("queries/recording/post/", {"recording_id": id, "action": "download"})
+    import hashlib as _hl
+    import httpx
+    # Манго на запрос записи отвечает 302 на файл — подпись считаем сами,
+    # чтобы можно было идти по редиректу (mango._call этого не делает).
+    key, salt = db.get_setting("mango_key"), db.get_setting("mango_salt")
+    body = json.dumps({"recording_id": id, "action": "download"}, separators=(",", ":"))
+    sign = _hl.sha256((key + body + salt).encode()).hexdigest()
+    r = httpx.post("https://app.mango-office.ru/vpbx/queries/recording/post/",
+                   data={"vpbx_api_key": key, "sign": sign, "json": body},
+                   timeout=120, follow_redirects=True)
     if r.status_code != 200 or len(r.content) < 1000:
         raise HTTPException(404, f"запись недоступна ({r.status_code}, {len(r.content)} байт)")
     return Response(content=r.content, media_type="audio/mpeg")
