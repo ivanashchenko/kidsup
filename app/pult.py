@@ -140,6 +140,21 @@ def kpi(day: str) -> dict:
                         firsts += 1
                 except ValueError:
                     pass
+        # 08.09 Борис: явку отмечает Лиза по вечерам по спискам педагогов — поэтому
+        # считаем и вчерашний день: он должен быть закрыт к утру.
+        from datetime import date as _d, timedelta as _td
+        yday = (_d.fromisoformat(day) - _td(days=1)).isoformat()
+        ylids = [r["id"] for r in conn.execute("SELECT id FROM lessons WHERE date=?", (yday,)).fetchall()]
+        y_kids = y_visits = 0
+        if ylids:
+            yq = ",".join("?" * len(ylids))
+            for r in conn.execute(f"SELECT raw FROM lesson_records WHERE lesson_id IN ({yq})", ylids):
+                y_kids += 1
+                try:
+                    if json.loads(r["raw"] or "{}").get("visit"):
+                        y_visits += 1
+                except ValueError:
+                    pass
         visits = 0
         if lids:
             for r in conn.execute(f"SELECT raw FROM lesson_records WHERE lesson_id IN ({q})", lids):
@@ -155,7 +170,7 @@ def kpi(day: str) -> dict:
         tk = conn.execute("SELECT COUNT(*), COALESCE(SUM(done),0) FROM pult_tasks WHERE day=?", (day,)).fetchone() \
             if conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE name='pult_tasks'").fetchone()[0] else (0, 0)
     return {"pays": pays[0], "pays_sum": int(pays[1]), "joins_new": joins_new, "lessons": len(lids), "kids": kids,
-            "firsts": firsts, "visits": visits, "inbox": ib[0], "inbox_done": ib[1], "tasks": tk[0], "tasks_done": tk[1]}
+            "firsts": firsts, "visits": visits, "y_kids": y_kids, "y_visits": y_visits, "inbox": ib[0], "inbox_done": ib[1], "tasks": tk[0], "tasks_done": tk[1]}
 
 
 def _first_time(t: str) -> str:
@@ -257,7 +272,7 @@ HOWTO = ("<div class='card' style='border-left:4px solid #312783;margin:10px 0;f
          "<ul style='margin:6px 0 0;padding-left:20px'>"
          "<li><b>«время прошло»</b> — пункт со временем, который не сделан и не отмечен. Делается сразу после СЕЙЧАС, не пропускается; если уже бессмыслен — «перенести на завтра».</li>"
          "<li><b>«фон»</b> — пункты без времени: карта развития после каждого занятия, ответ в чате за 30 минут. Делаются между строками весь день.</li>"
-         "<li><b>Явка</b> — красная плитка сверху «явка отмечена N из M». Отмечаем в первые 10 минут каждого занятия, а не вечером: без явки не видно, кто был на первом занятии и не оплатил.</li>"
+         "<li><b>Явка</b> — отмечает Лиза вечером по спискам педагогов (все занятия дня, флажок «пробное» у первых). Плитка сверху показывает вчера и сегодня; красная — вчерашний день не закрыт. Дежурная отмечает только первые занятия сразу после них — от этого зависит карта развития и оплата на выходе.</li>"
          "<li><b>Итог дня</b> складывается сам из галочек и переносов: отдельный отчёт писать не нужно.</li>"
          "</ul></details></div>")
 
@@ -296,9 +311,13 @@ def page(day: str = "", who: str = "") -> str:
         (f"{k['inbox_done']}/{k['inbox']}", "обещаний клиентам закрыто / всего"),
         (f"{k['tasks_done']}/{k['tasks']}", "задач смены сделано"),
     ]
-    vis_col = "#E30613" if (k["kids"] and k["visits"] == 0 and now_hm >= "10:30") else ("#a35f00" if k["kids"] and k["visits"] < k["kids"] // 2 else "#4e8a12")
+    # явку отмечает Лиза вечером по спискам педагогов: вчера должно быть закрыто к утру,
+    # сегодня — к 21:00. Красное — только если вчерашний день не закрыт.
+    y_ok = (not k["y_kids"]) or k["y_visits"] >= k["y_kids"] * 0.8
+    vis_col = "#4e8a12" if y_ok else "#E30613"
+    today_txt = f"сегодня {k['visits']} из {k['kids']} (Лиза закрывает вечером)" if now_hm < "21:00" else f"сегодня {k['visits']} из {k['kids']}"
     kpi_html = "".join(f"<div class='k'><b>{a}</b><span>{b}</span></div>" for a, b in kpis)
-    kpi_html += f"<div class='k' style='border-color:{vis_col}'><b style='color:{vis_col}'>{k['visits']} из {k['kids']}</b><span style='color:{vis_col};font-weight:700'>явка отмечена в CRM сегодня</span></div>"
+    kpi_html += f"<div class='k' style='border-color:{vis_col}'><b style='color:{vis_col}'>{k['y_visits']} из {k['y_kids']}</b><span style='color:{vis_col};font-weight:700'>явка за вчера в CRM · {today_txt}</span></div>"
     hero_who = " + ".join(on) if on else "смена не задана"
     filt = "".join(f"<a href='/pult?who={html.escape(w)}' style='margin-right:8px'>{html.escape(w)}</a>" for w in on + ["Лиза", "Борис"])
     return f"""<!doctype html><html lang='ru'><head><meta charset='utf-8'><title>Пульт KidsUP · {day}</title>
