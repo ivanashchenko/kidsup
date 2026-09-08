@@ -189,9 +189,24 @@ def get_conn():
 # --- настройки / служебные значения -------------------------------------
 
 def get_setting(key: str, default: str = "") -> str:
-    with get_conn() as conn:
-        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
-        return row["value"] if row else default
+    """Значение настройки: сначала база, затем переменная окружения.
+
+    08.09.2026: рабочий контейнер откатили — вместе с ним пропала локальная
+    data/kidsup.db, где лежали ключи МойКласса и Манго, и почасовой разбор
+    звонков встал. Переменные окружения переживают откат, поэтому ключи
+    можно положить туда (KIDSUP_MANGO_KEY, KIDSUP_MOYKLASS_API_KEY и т. п.):
+    база важнее, env — запасной вариант. На сервере ничего не меняется.
+    """
+    try:
+        with get_conn() as conn:
+            row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    except Exception:                     # базы ещё нет (свежий контейнер)
+        row = None
+    if row and row["value"]:
+        return row["value"]
+    import os
+    env = os.environ.get("KIDSUP_" + key.upper()) or os.environ.get(key.upper())
+    return env or default
 
 
 def set_setting(key: str, value: str) -> None:
