@@ -450,12 +450,20 @@ def supply(product: str, count: int, filial: str = "Kids UP Богородски
             pg.wait_for_timeout(1000)
             menu = pg.locator("md-select-menu:visible").first
             if search:
-                # поле поиска — только внутри ОТКРЫТОГО меню (на странице есть такое же в фильтре)
-                sb = menu.locator("input")
-                if sb.count():
-                    sb.first.click()
-                    sb.first.press_sequentially(value[:12], delay=30)
-                    pg.wait_for_timeout(1200)
+                # поле поиска — только внутри ОТКРЫТОГО меню (на странице есть такое же в фильтре);
+                # клик по нему через Playwright не проходит (перекрыт md-content), поэтому
+                # фокусируем через JS и печатаем с клавиатуры
+                # md-select перехватывает фокус, клавиатура до поля не доходит — ставим
+                # значение напрямую и шлём событие input, на которое подписан Angular
+                pg.evaluate("""([v]) => {
+                    const i = Array.from(document.querySelectorAll('md-select-menu input')).find(x => x.offsetParent !== null);
+                    if (!i) return false;
+                    i.value = v;
+                    i.dispatchEvent(new Event('input', {bubbles: true}));
+                    i.dispatchEvent(new Event('change', {bubbles: true}));
+                    i.dispatchEvent(new KeyboardEvent('keyup', {bubbles: true}));
+                    return true; }""", [value[:14]])
+                pg.wait_for_timeout(1300)
 
             def find():
                 o = menu.locator("md-option:visible")
