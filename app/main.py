@@ -2802,7 +2802,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.08"
+APP_VERSION = "2026-09-09.12"
 
 
 @app.get("/api/net")
@@ -5203,9 +5203,47 @@ def api_mkweb_open(payload: dict = Body(...)):
         raise HTTPException(400, "url должен начинаться с https://app.moyklass.com/")
     try:
         return mkweb.open_page(url, int(payload.get("wait_ms") or 4000), int(payload.get("max_text") or 6000),
-                               str(payload.get("click") or ""), bool(payload.get("links")))
+                               str(payload.get("click") or ""), bool(payload.get("links")),
+                               payload.get("actions") or None, bool(payload.get("rows")))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"open: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.get("/api/mkweb/history", dependencies=AUTH)
+def api_mkweb_history(period: str = "Сегодня", employee: str = "", event_type: str = "", max_pages: int = 40,
+                      date_from: str = "", date_to: str = ""):
+    """История действий сотрудников из МойКласса (браузер на сервере). Только чтение."""
+    from . import mkweb
+    try:
+        return mkweb.history(period, employee, event_type, max_pages, date_from, date_to)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"history: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.get("/api/mkweb/leftovers", dependencies=AUTH)
+def api_mkweb_leftovers():
+    """Остатки склада МойКласса. Только чтение."""
+    from . import mkweb
+    try:
+        return mkweb.leftovers()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"leftovers: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.post("/api/mkweb/supply", dependencies=AUTH)
+def api_mkweb_supply(payload: dict = Body(...)):
+    """Поставка на склад: {product, count, filial?, supplier?, payment?, cashbox?, cost?, comment?, dry_run=true}.
+    По умолчанию dry_run — форма заполняется и снимается, но не отправляется."""
+    from . import mkweb
+    try:
+        return mkweb.supply(str(payload.get("product") or ""), int(payload.get("count") or 0),
+                            str(payload.get("filial") or "Kids UP Богородский"),
+                            str(payload.get("supplier") or "Корректировка остатков"),
+                            str(payload.get("payment") or ""), str(payload.get("cashbox") or ""),
+                            float(payload.get("cost") or 0), str(payload.get("comment") or ""),
+                            bool(payload.get("dry_run", True)))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"supply: {type(e).__name__}: {str(e)[:300]}")
 
 
 @app.get("/api/mkweb/shot", dependencies=AUTH)

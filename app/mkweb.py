@@ -179,7 +179,8 @@ def login() -> dict:
         return {"ok": logged, "url": url, "title": title, "inputs": inputs, "text": body}
 
 
-def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = "", links: bool = False) -> dict:
+def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = "", links: bool = False,
+              actions: list | None = None, rows: bool = False) -> dict:
     """Открыть страницу под сохранённой сессией; вернуть текст и сделать скриншот."""
     from playwright.sync_api import sync_playwright
 
@@ -197,7 +198,7 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
             res = login()
             if not res.get("ok"):
                 return {"ok": False, "error": "сессия истекла, повторный вход не удался", "login": res}
-            return open_page(url, wait_ms, max_text, click, links)
+            return open_page(url, wait_ms, max_text, click, links, actions, rows)
         # баннер про cookies перекрывает низ экрана — принимаем один раз
         try:
             btn = pg.get_by_text("Согласен", exact=True)
@@ -211,9 +212,47 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
             # у которых нет угадываемого URL (например «Мой Чат»)
             pg.get_by_text(click, exact=True).first.click(timeout=15000)
             pg.wait_for_timeout(wait_ms)
+        done = []
+        for st in actions or []:
+            # шаги: {"click": "текст"} | {"css": "селектор", "click": true} | {"fill": "текст", "css"/"placeholder"/"label": ...}
+            #       | {"press": "Enter", "css": ...} | {"wait": мс} | {"scroll": "bottom"} | {"select_text": "текст в выпадашке"}
+            try:
+                if "wait" in st and len(st) == 1:
+                    pg.wait_for_timeout(int(st["wait"]))
+                elif "js" in st:
+                    # произвольный JS в странице — вернуть результат (для div-таблиц без <table>)
+                    st = {**st, "result": pg.evaluate(st["js"])}
+                elif st.get("scroll") == "bottom":
+                    for _ in range(int(st.get("times", 5))):
+                        pg.mouse.wheel(0, 4000)
+                        pg.wait_for_timeout(600)
+                elif "fill" in st:
+                    loc = (pg.locator(st["css"]) if st.get("css") else
+                           pg.get_by_placeholder(st["placeholder"]) if st.get("placeholder") else
+                           pg.get_by_label(st["label"]))
+                    loc.first.click(timeout=10000)
+                    loc.first.fill(str(st["fill"]))
+                    if st.get("press"):
+                        loc.first.press(st["press"])
+                elif st.get("press") and st.get("css"):
+                    pg.locator(st["css"]).first.press(st["press"])
+                elif st.get("css"):
+                    pg.locator(st["css"]).nth(int(st.get("nth", 0))).click(timeout=15000)
+                elif st.get("click"):
+                    pg.get_by_text(str(st["click"]), exact=bool(st.get("exact", True))).nth(int(st.get("nth", 0))).click(timeout=15000)
+                pg.wait_for_timeout(int(st.get("after", 1500)))
+                done.append({**st, "ok": True})
+            except Exception as e:  # noqa: BLE001
+                done.append({**st, "ok": False, "error": str(e).splitlines()[0][:160]})
+                if st.get("required", True):
+                    break
         text = pg.inner_text("body")[:max_text]
         pg.screenshot(path=str(SHOT), full_page=False)
-        out = {"ok": True, "url": pg.url, "title": pg.title(), "text": text}
+        out = {"ok": True, "url": pg.url, "title": pg.title(), "text": text, "actions": done}
+        if rows:
+            # строки таблиц целиком, по ячейкам — так читаем «Историю» и склад без угадывания по тексту
+            out["rows"] = [[(td.inner_text() or "").strip() for td in tr.query_selector_all("td,th")]
+                           for tr in pg.query_selector_all("table tr")][:400]
         if links:
             out["links"] = [{"text": (a.inner_text() or "").strip()[:60], "href": a.get_attribute("href")}
                             for a in pg.query_selector_all("a[href]")][:200]
@@ -224,3 +263,234 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
             pass
         b.close()
         return out
+
+
+# ───────────────────────── История действий сотрудников ─────────────────────────
+
+ROW_JS = """
+Array.from(document.querySelectorAll('.layout-align-space-between-stretch'))
+  .filter(e => e.children.length === 5)
+  .map(e => Array.from(e.children).map(c => (c.innerText || '').trim()))
+"""
+
+
+def _parse_hist_row(cells: list[str]) -> dict:
+    """Пять колонок «Истории»: дата/источник/ip · событие+кратко · подробности · причина · сотрудник."""
+    c0 = [x.strip() for x in cells[0].split("\n") if x.strip()]
+    c1 = [x.strip() for x in cells[1].split("\n") if x.strip()]
+    who = cells[4].replace("\n", " ").strip()
+    m = None
+    import re as _re
+    mm = _re.match(r"№(\d+)\s+(.*)", who)
+    if mm:
+        m = {"id": int(mm.group(1)), "name": mm.group(2).strip()}
+    return {
+        "ts": " ".join(c0[:2]) if len(c0) >= 2 else (c0[0] if c0 else ""),
+        "source": c0[2] if len(c0) > 2 else "",
+        "ip": (c0[3].replace("ip ", "") if len(c0) > 3 else ""),
+        "event": c1[0] if c1 else "",
+        "short": " · ".join(c1[1:]),
+        "details": cells[2].replace("\n", " · ").strip(),
+        "reason": cells[3].replace("\n", " ").strip(),
+        "who": (m or {}).get("name", who),
+        "who_id": (m or {}).get("id"),
+    }
+
+
+def history(period: str = "Сегодня", employee: str = "", event_type: str = "",
+            max_pages: int = 40, date_from: str = "", date_to: str = "") -> dict:
+    """Читает /history: период кнопкой («Вчера»/«Сегодня»/«Неделя»/«Месяц») или датами
+    ДД.ММ.ГГГГ, необязательные фильтры по сотруднику и типу события; листает страницы.
+    Возвращает события списком словарей. Только чтение."""
+    from playwright.sync_api import sync_playwright
+
+    if not STATE.exists():
+        login()
+    events: list[dict] = []
+    with _lock, sync_playwright() as p:
+        b = _launch(p)
+        ctx = b.new_context(storage_state=str(STATE), viewport={"width": 1400, "height": 900}, locale="ru-RU")
+        pg = ctx.new_page()
+        pg.goto(LOGIN_URL.rstrip("/") + "/history", wait_until="domcontentloaded", timeout=60000)
+        pg.wait_for_timeout(4000)
+        if pg.locator("input[type=password]").count() > 0:
+            b.close()
+            login()
+            return history(period, employee, event_type, max_pages, date_from, date_to)
+        try:
+            pg.get_by_text("Согласен", exact=True).first.click(timeout=2000)
+        except Exception:  # noqa: BLE001
+            pass
+        if date_from or date_to:
+            inputs = pg.locator("input.md-datepicker-input")
+            if date_from:
+                inputs.nth(0).fill(date_from); inputs.nth(0).press("Enter")
+            if date_to:
+                inputs.nth(1).fill(date_to); inputs.nth(1).press("Enter")
+        else:
+            pg.get_by_text(period, exact=True).first.click(timeout=10000)
+        pg.wait_for_timeout(500)
+
+        def pick(label: str, value: str):
+            pg.locator(f"md-select[aria-label='{label}']").first.click(timeout=10000)
+            pg.wait_for_timeout(800)
+            pg.locator(".md-select-menu-container.md-active md-option").filter(has_text=value).first.click(timeout=10000)
+            pg.wait_for_timeout(500)
+            pg.keyboard.press("Escape")
+
+        if employee:
+            pick("Сотрудник", employee)
+        if event_type:
+            pick("Тип события", event_type)
+        pg.get_by_text("Найти", exact=True).first.click(timeout=10000)
+        pg.wait_for_timeout(5000)
+        total_txt = ""
+        try:
+            total_txt = pg.get_by_text(re_compile(r"^Всего: \d+$")).first.inner_text(timeout=5000)
+        except Exception:  # noqa: BLE001
+            pass
+        page_no = 1
+        while True:
+            rows = pg.evaluate(ROW_JS) or []
+            events.extend(_parse_hist_row(r) for r in rows if len(r) == 5)
+            page_no += 1
+            if page_no > max_pages:
+                break
+            nxt = pg.locator(".mc-pagination-light-item").filter(has_text=re_compile(rf"^{page_no}$"))
+            if nxt.count() == 0:
+                break
+            nxt.first.click(timeout=10000)
+            pg.wait_for_timeout(3500)
+        pg.screenshot(path=str(SHOT))
+        b.close()
+    # дедуп по (ts, event, details, who): при перелистывании одна строка может попасть дважды
+    seen, out = set(), []
+    for e in events:
+        k = (e["ts"], e["event"], e["details"], e["who"])
+        if k in seen:
+            continue
+        seen.add(k); out.append(e)
+    return {"ok": True, "total_label": total_txt, "pages_read": page_no - 1, "events": out}
+
+
+def re_compile(pattern: str):
+    import re as _re
+    return _re.compile(pattern)
+
+
+# ───────────────────────── Склад ─────────────────────────
+
+LEFTOVERS_JS = """
+(() => {
+  const t = document.body.innerText; const i = t.indexOf('Всего:');
+  const lines = t.slice(i).split('\\n').map(s => s.trim()).filter(Boolean);
+  const items = []; 
+  for (let k = 1; k < lines.length; k++) {
+    if (lines[k].startsWith('Цена д/кл')) {
+      items.push({name: lines[k-1], price: (lines[k].match(/\\d+/)||[''])[0], filial: lines[k+1] || '', qty: (lines[k+2]||'').match(/-?\\d+/) ? parseInt((lines[k+2].match(/-?\\d+/)||['0'])[0]) : null});
+      k += 2;
+    }
+  }
+  return {total: lines[0], items};
+})()
+"""
+
+
+def leftovers() -> dict:
+    """Остатки склада: список {name, price, filial, qty}. Только чтение."""
+    from playwright.sync_api import sync_playwright
+
+    if not STATE.exists():
+        login()
+    with _lock, sync_playwright() as p:
+        b = _launch(p)
+        ctx = b.new_context(storage_state=str(STATE), viewport={"width": 1400, "height": 900}, locale="ru-RU")
+        pg = ctx.new_page()
+        pg.goto(LOGIN_URL.rstrip("/") + "/warehouse/leftovers", wait_until="domcontentloaded", timeout=60000)
+        pg.wait_for_timeout(5000)
+        for _ in range(8):
+            pg.mouse.wheel(0, 4000); pg.wait_for_timeout(400)
+        res = pg.evaluate(LEFTOVERS_JS)
+        b.close()
+    return {"ok": True, **(res or {})}
+
+
+def supply(product: str, count: int, filial: str = "Kids UP Богородский", supplier: str = "Корректировка остатков",
+           payment: str = "", cashbox: str = "", cost: float = 0, comment: str = "", dry_run: bool = True) -> dict:
+    """Оформить поставку одного товара через форму «Новая поставка».
+
+    dry_run=True — заполнить форму, сделать скриншот и НЕ нажимать «Добавить».
+    Себестоимость 0 + галочка «Провести товар с нулевой стоимостью» — чтобы
+    корректировка остатков не создавала расход в кассе.
+    """
+    from playwright.sync_api import sync_playwright
+
+    if not STATE.exists():
+        login()
+    with _lock, sync_playwright() as p:
+        b = _launch(p)
+        ctx = b.new_context(storage_state=str(STATE), viewport={"width": 1400, "height": 1000}, locale="ru-RU")
+        pg = ctx.new_page()
+        pg.goto(LOGIN_URL.rstrip("/") + "/warehouse/leftovers", wait_until="domcontentloaded", timeout=60000)
+        pg.wait_for_timeout(4500)
+        try:
+            pg.get_by_text("Согласен", exact=True).first.click(timeout=2000)
+        except Exception:  # noqa: BLE001
+            pass
+        pg.get_by_text("Добавить", exact=False).first.click(timeout=10000)
+        pg.wait_for_timeout(1500)
+        pg.get_by_text("Поставка", exact=True).first.click(timeout=10000)
+        pg.wait_for_timeout(3000)
+        steps = []
+
+        def pick(label: str, value: str, search: bool = False):
+            pg.locator(f"md-select[aria-label='{label}']").first.click(timeout=10000)
+            pg.wait_for_timeout(900)
+            menu = pg.locator(".md-select-menu-container.md-active")
+            if search:
+                sb = menu.locator("input[placeholder='Введите название']")
+                if sb.count():
+                    sb.first.fill(value); pg.wait_for_timeout(700)
+            opts = menu.locator("md-option").filter(has_text=value)
+            n = opts.count()
+            exact = [i for i in range(n) if opts.nth(i).inner_text().strip() == value]
+            (opts.nth(exact[0]) if exact else opts.first).click(timeout=10000)
+            pg.wait_for_timeout(700)
+            steps.append({"pick": label, "value": value, "options_matched": n})
+
+        try:
+            pick("Вид товара", product, search=True)
+            pick("Склад филиала", filial)
+            pg.locator("input[name=price]").first.fill(str(cost))
+            pg.locator("input[name=count]").first.fill(str(count))
+            if not cost:
+                pg.get_by_text("Провести товар с нулевой стоимостью", exact=True).first.click(timeout=5000)
+                pg.wait_for_timeout(400)
+            if payment:
+                pick("Вид оплаты поставки", payment)
+            if cashbox:
+                pick("Касса", cashbox)
+            pick("Поставщик", supplier)
+            if comment:
+                pg.locator("input[name=comment]").first.fill(comment)
+        except Exception as e:  # noqa: BLE001
+            pg.screenshot(path=str(SHOT))
+            b.close()
+            return {"ok": False, "error": str(e).splitlines()[0][:200], "steps": steps}
+        pg.wait_for_timeout(600)
+        form_text = ""
+        try:
+            hdr = pg.get_by_text("Новая поставка", exact=True).first
+            form_text = hdr.locator("xpath=ancestor::div[contains(@class,'layout-column')][1]").inner_text()[:1500]
+        except Exception:  # noqa: BLE001
+            pass
+        pg.screenshot(path=str(SHOT))
+        submitted = False
+        if not dry_run:
+            btn = pg.locator("button.md-primary.md-button").filter(has_text=re_compile(r"^\s*Добавить\s*$")).last
+            btn.click(timeout=10000)
+            pg.wait_for_timeout(3500)
+            submitted = pg.get_by_text("Новая поставка", exact=True).count() == 0
+            pg.screenshot(path=str(SHOT))
+        b.close()
+    return {"ok": True, "dry_run": dry_run, "submitted": submitted, "steps": steps, "form": form_text}
