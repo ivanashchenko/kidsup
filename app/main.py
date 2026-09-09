@@ -2802,7 +2802,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.20"
+APP_VERSION = "2026-09-09.21"
 
 
 @app.get("/api/net")
@@ -5256,6 +5256,27 @@ def api_mkweb_supply_edit(payload: dict = Body(...)):
                                  str(payload.get("comment") or ""), bool(payload.get("dry_run", True)))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"supply/edit: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.get("/api/mkweb/supplies", dependencies=AUTH)
+def api_mkweb_supplies():
+    """Список всех поставок склада с 2020 года. Только чтение."""
+    from . import mkweb
+    try:
+        return mkweb.supplies_list()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"supplies: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.post("/api/mkweb/supply/delete", dependencies=AUTH)
+def api_mkweb_supply_delete(payload: dict = Body(...)):
+    """Удалить поставку: {date: "23/09/24", product, qty, filial?}."""
+    from . import mkweb
+    try:
+        return mkweb.delete_supply(str(payload.get("date") or ""), str(payload.get("product") or ""),
+                                   int(payload.get("qty") or 0), str(payload.get("filial") or "Kids UP Богородский"))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"supply/delete: {type(e).__name__}: {str(e)[:300]}")
 
 
 @app.get("/api/mkweb/shot", dependencies=AUTH)

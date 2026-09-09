@@ -638,3 +638,93 @@ def edit_supply(date_ddmmyy: str, product: str, old_qty: int, new_qty: int, comm
         b.close()
     return {"ok": True, "dry_run": dry_run, "saved": saved, "row": found, "count_before": before,
             "count_after": str(new_qty), "total_after": total}
+
+
+SUPPLY_ROWS_JS = """
+(() => {
+  const rows = Array.from(document.querySelectorAll('*')).filter(e => {
+    const t = (e.innerText || '').trim();
+    return e.children.length > 2 && /^\\d{2}\\/\\d{2}\\/\\d{2}\\n/.test(t) && /(edit|delete)/.test(t) && t.length < 500; });
+  const seen = new Set(); const out = [];
+  for (const r of rows) {
+    const t = r.innerText.trim(); if (seen.has(t)) continue; seen.add(t);
+    const lines = t.split('\\n').map(x => x.trim()).filter(Boolean);
+    const qty = lines.find(l => /^-?\\d+ шт$/.test(l));
+    out.push({date: lines[0], product: lines[1], qty: qty ? parseInt(qty) : null,
+              filial: (lines.find(l => /^Kids UP/.test(l)) || ''), raw: lines.join(' | ')});
+  }
+  return out;
+})()
+"""
+
+
+def _open_supplies(pg):
+    pg.goto(LOGIN_URL.rstrip("/") + "/warehouse/supplies", wait_until="domcontentloaded", timeout=60000)
+    pg.wait_for_timeout(5000)
+    try:
+        pg.get_by_text("Согласен", exact=True).first.click(timeout=2000)
+    except Exception:  # noqa: BLE001
+        pass
+    pg.evaluate("""() => { const i = document.querySelectorAll('input.md-datepicker-input')[0];
+        i.focus(); i.value = '01.01.2020'; i.dispatchEvent(new Event('input', {bubbles: true}));
+        i.dispatchEvent(new Event('change', {bubbles: true})); i.blur(); }""")
+    pg.wait_for_timeout(4000)
+    for _ in range(12):
+        pg.mouse.wheel(0, 4000); pg.wait_for_timeout(300)
+
+
+def supplies_list() -> dict:
+    """Все поставки с 2020 года: дата, товар, количество, филиал. Только чтение."""
+    from playwright.sync_api import sync_playwright
+
+    if not STATE.exists():
+        login()
+    with _lock, sync_playwright() as p:
+        b = _launch(p)
+        ctx = b.new_context(storage_state=str(STATE), viewport={"width": 1400, "height": 1000}, locale="ru-RU")
+        pg = ctx.new_page()
+        _open_supplies(pg)
+        rows = pg.evaluate(SUPPLY_ROWS_JS) or []
+        b.close()
+    return {"ok": True, "rows": rows}
+
+
+def delete_supply(date_ddmmyy: str, product: str, qty: int, filial: str = "Kids UP Богородский") -> dict:
+    """Удалить поставку целиком (карандаш-корзина → «Да»). Строка ищется по дате, товару, количеству и филиалу."""
+    from playwright.sync_api import sync_playwright
+    import re as _re
+
+    if not STATE.exists():
+        login()
+    target = _re.sub(r"\s+", " ", product).strip().lower()
+    with _lock, sync_playwright() as p:
+        b = _launch(p)
+        ctx = b.new_context(storage_state=str(STATE), viewport={"width": 1400, "height": 1000}, locale="ru-RU")
+        pg = ctx.new_page()
+        _open_supplies(pg)
+        found = pg.evaluate("""([date, target, qty, filial]) => {
+            const norm = s => (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+            const rows = Array.from(document.querectorAll ? [] : document.querySelectorAll('*')).filter(e => {
+                const t = (e.innerText || '').trim();
+                return e.children.length > 2 && t.startsWith(date + '\\n') && /delete/.test(t) && t.length < 500; });
+            for (const r of rows.reverse()) {
+                const lines = r.innerText.split('\\n').map(x => x.trim()).filter(Boolean);
+                if (norm(lines[1]) !== target) continue;
+                if (!lines.some(l => l === qty + ' шт')) continue;
+                if (filial && !lines.some(l => norm(l) === norm(filial))) continue;
+                const btn = Array.from(r.querySelectorAll('button')).find(b => /delete/.test(b.innerText));
+                if (!btn) continue;
+                btn.scrollIntoView({block: 'center'}); btn.click();
+                return lines.join(' | ');
+            }
+            return null; }""", [date_ddmmyy, target, str(qty), filial])
+        if not found:
+            b.close()
+            return {"ok": False, "error": f"строка {date_ddmmyy} · {product} · {qty} шт · {filial} не найдена"}
+        pg.wait_for_timeout(2000)
+        pg.get_by_text("Да", exact=True).first.click(timeout=10000)
+        pg.wait_for_timeout(3500)
+        still = pg.get_by_text("Удаление поставки", exact=True).count() > 0
+        pg.screenshot(path=str(SHOT))
+        b.close()
+    return {"ok": not still, "deleted": not still, "row": found}
