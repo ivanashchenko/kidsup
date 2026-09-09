@@ -106,6 +106,28 @@ def check_auth(credentials: HTTPBasicCredentials | None = Depends(_security)):
 AUTH = [Depends(check_auth)]
 
 
+def check_owner(credentials: HTTPBasicCredentials | None = Depends(_security)):
+    """Доступ владельца: пользователь «boris» и пароль из настройки owner_password.
+
+    09.09.2026 Борис: «app.kidsup.ru/settings — а админы это не увидят?» Общий пароль
+    admin знают все админы, поэтому настройки с ключами банка, кассы и МойКласса,
+    браузер МойКласса и деплой закрыты отдельным паролем. Пока owner_password не
+    задан — работает обычная авторизация (чтобы можно было задать его в первый раз).
+    """
+    owner_pw = db.get_setting("owner_password")
+    if not owner_pw:
+        return check_auth(credentials)
+    ok = (credentials is not None
+          and secrets.compare_digest(credentials.username, "boris")
+          and secrets.compare_digest(credentials.password, owner_pw))
+    if not ok:
+        raise HTTPException(status_code=401, detail="Только для владельца",
+                            headers={"WWW-Authenticate": "Basic"})
+
+
+OWNER_AUTH = [Depends(check_owner)]
+
+
 def render(request: Request, template: str, **ctx) -> HTMLResponse:
     counts = db.table_counts()
     ctx.update({
@@ -1256,12 +1278,12 @@ def _settings_ctx(request: Request, msg: str = "", ok: bool = True) -> HTMLRespo
     )
 
 
-@app.get("/settings", response_class=HTMLResponse, dependencies=AUTH)
+@app.get("/settings", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def settings_page(request: Request):
     return _settings_ctx(request)
 
 
-@app.post("/settings", response_class=HTMLResponse, dependencies=AUTH)
+@app.post("/settings", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def settings_save(request: Request, api_key: str = Form(""),
                   history_months: str = Form("")):
     saved = []
@@ -1275,7 +1297,7 @@ def settings_save(request: Request, api_key: str = Form(""),
     return _settings_ctx(request, msg, bool(saved))
 
 
-@app.post("/settings/test", response_class=HTMLResponse, dependencies=AUTH)
+@app.post("/settings/test", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def settings_test(request: Request):
     """Пробный запрос к МойКласс — сразу видно, живой ключ или нет."""
     if not sync.get_api_key():
@@ -1287,6 +1309,56 @@ def settings_test(request: Request):
         return _settings_ctx(request, f"Связь есть: МойКласс отдал {n} сотрудников.", True)
     except Exception as e:                                    # noqa: BLE001
         return _settings_ctx(request, f"Не получилось: {e}", False)
+
+
+OWNER_FIELDS = [
+    ("tbank_token", "Т-Банк Бизнес — токен Открытого API (только чтение)", True),
+    ("tbank_inn", "ИНН компании для Т-Банка", False),
+    ("komtet_login", "Комтет Касса — логин пользователя «только просмотр»", False),
+    ("komtet_password", "Комтет Касса — пароль", True),
+    ("mk_web_login", "МойКласс — логин технического сотрудника", False),
+    ("mk_web_password", "МойКласс — пароль технического сотрудника", True),
+    ("owner_password", "Пароль владельца для этой страницы (пользователь boris)", True),
+]
+
+
+def _owner_ctx(msg: str = "") -> str:
+    rows = []
+    for key, label, secret in OWNER_FIELDS:
+        val = db.get_setting(key)
+        shown = ("задан, …" + val[-3:] + f" ({len(val)} симв.)" if secret and val else (val or "— не задан —"))
+        rows.append(f"<label><span>{html.escape(label)}</span><small>сейчас: {html.escape(shown)}</small>"
+                    f"<input type='{'password' if secret else 'text'}' name='{key}' placeholder='вставьте новое значение, чтобы заменить' autocomplete='off'></label>")
+    return f"""<!doctype html><html lang='ru'><head><meta charset='utf-8'><title>Настройки владельца</title>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<style>body{{font:16px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;background:#f8f7fc;color:#15132e;margin:0;padding:20px}}
+.w{{max-width:720px;margin:0 auto}}h1{{color:#312783;font-size:24px}}label{{display:block;background:#fff;border:1px solid #e4e2f0;border-radius:12px;padding:12px 14px;margin:10px 0}}
+label span{{display:block;font-weight:600}}label small{{display:block;color:#6c6a86;margin:2px 0 6px}}input{{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #cfcde0;border-radius:8px;font-size:15px}}
+button{{background:#7DB928;color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:16px;font-weight:700;cursor:pointer}}.msg{{background:#eef8e6;border-left:4px solid #7DB928;padding:10px 12px;border-radius:8px;margin:12px 0}}
+p.note{{color:#6c6a86;font-size:14px}}</style></head><body><div class='w'>
+<h1>Настройки владельца</h1>
+<p class='note'>Эта страница и всё, что на ней, закрыто отдельным паролем владельца — общий пароль admin сюда не подходит. Значения хранятся как секреты и в ответах сервера не показываются. Пустое поле — оставить как есть.</p>
+{('<div class="msg">' + html.escape(msg) + '</div>') if msg else ''}
+<form method='post'>{''.join(rows)}<button type='submit'>Сохранить</button></form>
+</div></body></html>"""
+
+
+@app.get("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+def owner_page():
+    """Форма владельца для ключей банка, кассы и МойКласса (09.09.2026)."""
+    return HTMLResponse(_owner_ctx())
+
+
+@app.post("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+async def owner_save(request: Request):
+    form = await request.form()
+    saved = []
+    for key, label, _secret in OWNER_FIELDS:
+        v = (form.get(key) or "").strip()
+        if v:
+            db.set_setting(key, v)
+            saved.append(label.split(" — ")[0])
+    return HTMLResponse(_owner_ctx("Сохранено: " + ", ".join(saved) if saved else "Ничего не изменено."))
 
 
 @app.get("/base", response_class=HTMLResponse, dependencies=AUTH)
@@ -2802,7 +2874,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.22"
+APP_VERSION = "2026-09-09.23"
 
 
 @app.get("/api/net")
@@ -2853,7 +2925,7 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
             # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
             "roistat_project", "roistat_key",
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
-            "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret",
+            "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret", "owner_password",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
             "waba_template_id", "waba_templates",
@@ -2873,7 +2945,7 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
 # сам прокси. Показываем хвост: убедиться «тот ли вписан» можно,
 # скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
 # страница настроек открыта всем, у кого есть пароль администратора.
-SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_secret",
+SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_secret", "owner_password",
                "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password"}
 
 
@@ -2883,12 +2955,12 @@ def _mask(key: str, value: str | None) -> str | None:
     return f"…{value[-4:]} ({len(value)} симв.)"
 
 
-@app.get("/api/settings", dependencies=AUTH)
+@app.get("/api/settings", dependencies=OWNER_AUTH)
 async def api_get_settings():
     return {k: _mask(k, db.get_setting(k)) for k in sorted(SETTABLE)}
 
 
-@app.post("/api/settings", dependencies=AUTH)
+@app.post("/api/settings", dependencies=OWNER_AUTH)
 async def api_set_setting(payload: dict):
     """{"key": "...", "value": "..."} — только ключи из SETTABLE."""
     key, value = (payload.get("key") or "").strip(), payload.get("value")
@@ -2989,7 +3061,7 @@ async def api_ai_dialog(payload: dict):
     return {"разбор": brain.read_dialog(ms)}
 
 
-@app.post("/api/deploy", dependencies=AUTH)
+@app.post("/api/deploy", dependencies=OWNER_AUTH)
 async def api_deploy(request: Request):
     """Самообновление: тело запроса — tar.gz с app/ и requirements.txt.
     Распаковывает в корень проекта и перезапускает службу через 2 секунды.
@@ -3021,7 +3093,7 @@ async def api_deploy(request: Request):
             "hint": "через ~10 секунд проверьте /api/health — version должна смениться"}
 
 
-@app.post("/api/restart", dependencies=AUTH)
+@app.post("/api/restart", dependencies=OWNER_AUTH)
 async def api_restart():
     """Перезапуск службы (после deploy или при зависании фоновых потоков)."""
     import threading
@@ -5172,21 +5244,21 @@ def api_crm_dossier(q: list[str] = Query(default=[]), days_back: int = 7, days_a
     return {"window": [since, until], "groups": out}
 
 
-@app.get("/api/mkweb/status", dependencies=AUTH)
+@app.get("/api/mkweb/status", dependencies=OWNER_AUTH)
 def api_mkweb_status():
     """Браузер МойКласса на сервере: стоит ли playwright/Chromium, есть ли сессия."""
     from . import mkweb
     return mkweb.status()
 
 
-@app.post("/api/mkweb/setup", dependencies=AUTH)
+@app.post("/api/mkweb/setup", dependencies=OWNER_AUTH)
 def api_mkweb_setup():
     """Установка playwright и Chromium на сервере (в фоне; ход — в /api/mkweb/status)."""
     from . import mkweb
     return mkweb.setup()
 
 
-@app.post("/api/mkweb/login", dependencies=AUTH)
+@app.post("/api/mkweb/login", dependencies=OWNER_AUTH)
 def api_mkweb_login():
     """Вход в МойКласс под техническим сотрудником, сохранение сессии."""
     from . import mkweb
@@ -5196,7 +5268,7 @@ def api_mkweb_login():
         raise HTTPException(500, f"login: {type(e).__name__}: {str(e)[:300]}")
 
 
-@app.post("/api/mkweb/open", dependencies=AUTH)
+@app.post("/api/mkweb/open", dependencies=OWNER_AUTH)
 def api_mkweb_open(payload: dict = Body(...)):
     """Открыть страницу МойКласса под сохранённой сессией: {url, wait_ms?}. Только чтение."""
     from . import mkweb
@@ -5211,7 +5283,7 @@ def api_mkweb_open(payload: dict = Body(...)):
         raise HTTPException(500, f"open: {type(e).__name__}: {str(e)[:300]}")
 
 
-@app.get("/api/mkweb/history", dependencies=AUTH)
+@app.get("/api/mkweb/history", dependencies=OWNER_AUTH)
 def api_mkweb_history(period: str = "Сегодня", employee: str = "", event_type: str = "", max_pages: int = 40,
                       date_from: str = "", date_to: str = ""):
     """История действий сотрудников из МойКласса (браузер на сервере). Только чтение."""
@@ -5222,7 +5294,7 @@ def api_mkweb_history(period: str = "Сегодня", employee: str = "", event_
         raise HTTPException(500, f"history: {type(e).__name__}: {str(e)[:300]}")
 
 
-@app.get("/api/mkweb/leftovers", dependencies=AUTH)
+@app.get("/api/mkweb/leftovers", dependencies=OWNER_AUTH)
 def api_mkweb_leftovers():
     """Остатки склада МойКласса. Только чтение."""
     from . import mkweb
@@ -5232,7 +5304,7 @@ def api_mkweb_leftovers():
         raise HTTPException(500, f"leftovers: {type(e).__name__}: {str(e)[:300]}")
 
 
-@app.post("/api/mkweb/supply", dependencies=AUTH)
+@app.post("/api/mkweb/supply", dependencies=OWNER_AUTH)
 def api_mkweb_supply(payload: dict = Body(...)):
     """Поставка на склад: {product, count, filial?, supplier?, payment?, cashbox?, cost?, comment?, dry_run=true}.
     По умолчанию dry_run — форма заполняется и снимается, но не отправляется."""
@@ -5248,7 +5320,7 @@ def api_mkweb_supply(payload: dict = Body(...)):
         raise HTTPException(500, f"supply: {type(e).__name__}: {str(e)[:300]}")
 
 
-@app.post("/api/mkweb/supply/edit", dependencies=AUTH)
+@app.post("/api/mkweb/supply/edit", dependencies=OWNER_AUTH)
 def api_mkweb_supply_edit(payload: dict = Body(...)):
     """Правка количества в старой поставке: {date: "17/10/23", product, old_qty, new_qty, comment?, dry_run=true}."""
     from . import mkweb
@@ -5260,7 +5332,7 @@ def api_mkweb_supply_edit(payload: dict = Body(...)):
         raise HTTPException(500, f"supply/edit: {type(e).__name__}: {str(e)[:300]}")
 
 
-@app.get("/api/mkweb/supplies", dependencies=AUTH)
+@app.get("/api/mkweb/supplies", dependencies=OWNER_AUTH)
 def api_mkweb_supplies():
     """Список всех поставок склада с 2020 года. Только чтение."""
     from . import mkweb
@@ -5270,7 +5342,7 @@ def api_mkweb_supplies():
         raise HTTPException(500, f"supplies: {type(e).__name__}: {str(e)[:300]}")
 
 
-@app.post("/api/mkweb/supply/delete", dependencies=AUTH)
+@app.post("/api/mkweb/supply/delete", dependencies=OWNER_AUTH)
 def api_mkweb_supply_delete(payload: dict = Body(...)):
     """Удалить поставку: {date: "23/09/24", product, qty, filial?}."""
     from . import mkweb
@@ -5281,7 +5353,7 @@ def api_mkweb_supply_delete(payload: dict = Body(...)):
         raise HTTPException(500, f"supply/delete: {type(e).__name__}: {str(e)[:300]}")
 
 
-@app.get("/api/mkweb/shot", dependencies=AUTH)
+@app.get("/api/mkweb/shot", dependencies=OWNER_AUTH)
 def api_mkweb_shot():
     """Последний скриншот браузера МойКласса."""
     from . import mkweb
