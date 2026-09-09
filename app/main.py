@@ -2802,7 +2802,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-08.16"
+APP_VERSION = "2026-09-09.01"
 
 
 @app.get("/api/net")
@@ -5044,6 +5044,36 @@ def api_crm_user(phone: str = "", user_id: int = 0, days: int = 14):
         return {"users": out}
     finally:
         mk.close()
+
+
+@app.get("/api/day/firsts", dependencies=AUTH)
+def api_day_firsts(day: str = "", ahead: int = 0):
+    """Первые (пробные) занятия дня: время, группа, ребёнок, телефон, оплата.
+
+    Нужно, чтобы собирать колонки пульта не вслепую: у дежурной должен быть
+    поимённый список тех, кого сегодня встречать и с кем говорить на выходе.
+    Только чтение локальной базы синхронизации.
+    """
+    d = day or date.today().isoformat()
+    days = [d] + [(date.fromisoformat(d) + timedelta(days=i)).isoformat() for i in range(1, max(0, ahead) + 1)]
+    out = []
+    with db.get_conn() as conn:
+        for dd in days:
+            for les in conn.execute("SELECT * FROM lessons WHERE date=?", (dd,)).fetchall():
+                for r in conn.execute("SELECT * FROM lesson_records WHERE lesson_id=?", (les["id"],)).fetchall():
+                    try:
+                        raw = json.loads(r["raw"] or "{}")
+                    except ValueError:
+                        raw = {}
+                    if not raw.get("test"):
+                        continue
+                    u = conn.execute("SELECT name, phone FROM users WHERE id=?", (r["user_id"],)).fetchone()
+                    cl = conn.execute("SELECT name FROM classes WHERE id=?", (les["class_id"],)).fetchone()
+                    out.append({"date": dd, "time": (les["begin_time"] or "")[:5],
+                                "class": (cl["name"] if cl else str(les["class_id"])),
+                                "user_id": r["user_id"], "name": (u["name"] if u else ""),
+                                "phone": (u["phone"] if u else ""), "visit": raw.get("visit")})
+    return {"days": days, "firsts": sorted(out, key=lambda x: (x["date"], x["time"]))}
 
 
 @app.post("/api/crm/comment", dependencies=AUTH)
