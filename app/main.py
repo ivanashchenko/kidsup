@@ -2802,7 +2802,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.19"
+APP_VERSION = "2026-09-09.20"
 
 
 @app.get("/api/net")
@@ -5244,6 +5244,18 @@ def api_mkweb_supply(payload: dict = Body(...)):
                             bool(payload.get("dry_run", True)))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"supply: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.post("/api/mkweb/supply/edit", dependencies=AUTH)
+def api_mkweb_supply_edit(payload: dict = Body(...)):
+    """Правка количества в старой поставке: {date: "17/10/23", product, old_qty, new_qty, comment?, dry_run=true}."""
+    from . import mkweb
+    try:
+        return mkweb.edit_supply(str(payload.get("date") or ""), str(payload.get("product") or ""),
+                                 int(payload.get("old_qty") or 0), int(payload.get("new_qty") or 0),
+                                 str(payload.get("comment") or ""), bool(payload.get("dry_run", True)))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"supply/edit: {type(e).__name__}: {str(e)[:300]}")
 
 
 @app.get("/api/mkweb/shot", dependencies=AUTH)
