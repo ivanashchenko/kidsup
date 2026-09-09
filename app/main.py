@@ -2874,7 +2874,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.23"
+APP_VERSION = "2026-09-09.26"
 
 
 @app.get("/api/net")
@@ -5485,6 +5485,58 @@ def api_ads_status(plan: str = "30377205"):
                 out["vk"]["budget"] = bg.json() if bg.status_code == 200 \
                     else {"http": bg.status_code, "body": bg.text[:200]}
         except Exception as e:
+            out["vk"]["error"] = str(e)[:200]
+    return out
+
+
+@app.get("/api/ads/geo", dependencies=OWNER_AUTH)
+def api_ads_geo(plan: str = "30377205"):
+    """Гео-таргетинг и креативы: группы объявлений Директа (RegionIds) и групп VK.
+
+    09.09.2026 Борис: «учтён ли везде гео-таргетинг?» — проверяем по факту,
+    а не по памяти. Только чтение.
+    """
+    import httpx
+    out: dict = {"direct": {}, "vk": {}}
+    tok = db.get_setting("yandex_direct_token")
+    ids = [714182575, 714182576, 714182577, 714182578, 714188491, 714188492, 714188493, 714188494]
+    if tok:
+        h = {"Authorization": f"Bearer {tok}", "Accept-Language": "ru", "Content-Type": "application/json"}
+        try:
+            r = httpx.post("https://api.direct.yandex.com/json/v5/adgroups", headers=h, timeout=60,
+                           json={"method": "get", "params": {
+                               "SelectionCriteria": {"CampaignIds": ids},
+                               "FieldNames": ["Id", "Name", "CampaignId", "RegionIds", "Status", "NegativeKeywords"]}}).json()
+            out["direct"]["adgroups"] = [
+                {"id": g["Id"], "campaign": g["CampaignId"], "name": g.get("Name"),
+                 "regions": g.get("RegionIds"), "status": g.get("Status")}
+                for g in r.get("result", {}).get("AdGroups", [])]
+            out["direct"]["error"] = r.get("error")
+            # расшифровка кодов регионов — чтобы не гадать, что такое 10738
+            need = sorted({r for g in out["direct"].get("adgroups", []) for r in (g.get("regions") or [])})
+            if need:
+                dr = httpx.post("https://api.direct.yandex.com/json/v5/dictionaries", headers=h, timeout=60,
+                                json={"method": "get", "params": {"DictionaryNames": ["GeoRegions"]}}).json()
+                names = {g["GeoRegionId"]: g["GeoRegionName"]
+                         for g in dr.get("result", {}).get("GeoRegions", [])}
+                out["direct"]["regions"] = {str(r): names.get(r, "?") for r in need}
+        except Exception as e:  # noqa: BLE001
+            out["direct"]["error"] = str(e)[:200]
+    vt = db.get_setting("vk_ads_token")
+    if vt:
+        hv = {"Authorization": f"Bearer {vt}"}
+        try:
+            gr = httpx.get("https://ads.vk.com/api/v2/ad_groups.json",
+                           params={"_ad_plan_id": plan, "limit": 50,
+                                   "fields": "id,name,status,targetings,budget_limit_day,package_id,objective"},
+                           headers=hv, timeout=60)
+            out["vk"]["groups"] = gr.json().get("items") if gr.status_code == 200 else {"http": gr.status_code, "body": gr.text[:300]}
+            bn = httpx.get("https://ads.vk.com/api/v2/banners.json",
+                           params={"_ad_group__ad_plan_id": plan, "limit": 50,
+                                   "fields": "id,name,status,moderation_status,ad_group_id,content,urls,textblocks"},
+                           headers=hv, timeout=60)
+            out["vk"]["banners"] = bn.json().get("items") if bn.status_code == 200 else {"http": bn.status_code, "body": bn.text[:300]}
+        except Exception as e:  # noqa: BLE001
             out["vk"]["error"] = str(e)[:200]
     return out
 
