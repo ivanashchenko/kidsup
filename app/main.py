@@ -2802,7 +2802,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.21"
+APP_VERSION = "2026-09-09.22"
 
 
 @app.get("/api/net")
@@ -2852,6 +2852,8 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
             # сквозная аналитика: без этих двух ключей выгрузка оплат в Roistat
             # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
             "roistat_project", "roistat_key",
+            # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
+            "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
             "waba_template_id", "waba_templates",
@@ -2871,7 +2873,7 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
 # сам прокси. Показываем хвост: убедиться «тот ли вписан» можно,
 # скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
 # страница настроек открыта всем, у кого есть пароль администратора.
-SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret",
+SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_secret",
                "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password"}
 
 
