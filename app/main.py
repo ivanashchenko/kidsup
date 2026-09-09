@@ -2709,6 +2709,7 @@ def _inbox_store(payload: dict) -> None:
                 "VALUES (?, ?, ?, ?)", echoes)
         for ts, phone, chat_type, text, mid in rows:
             _match_click(conn, ts, phone, chat_type)
+            _catch_visit(conn, phone, text)
     # Отказ ловим в момент получения, а не при следующем разборе: между
     # просьбой снять бронь и очередной рассылкой бывает меньше часа.
     for ts, phone, chat_type, text, mid in rows:
@@ -2734,6 +2735,27 @@ def _clicks_init(conn) -> None:
         id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, channel TEXT,
         roistat_visit TEXT, utm TEXT, referrer TEXT,
         matched_phone TEXT, matched_ts TEXT)""")
+
+
+# «…Ваш номер: 208868» — кнопка WhatsApp подставляет номер визита Roistat в текст
+# первого сообщения. Раньше он оседал в переписке и никуда не шёл: сквозная
+# аналитика знала только тех, кому визит записала интеграция в комментарий CRM.
+WA_VISIT_RE = re.compile(r"[Вв]аш номер:\s*(\d{4,12})")
+
+
+def _catch_visit(conn, phone: str, text: str) -> None:
+    """Достаёт номер визита Roistat из первого сообщения клиента и запоминает."""
+    m = WA_VISIT_RE.search(text or "")
+    ph10 = "".join(ch for ch in str(phone or "") if ch.isdigit())[-10:]
+    if not m or len(ph10) != 10:
+        return
+    try:
+        from . import roistat as _roistat
+        _roistat._ensure_visits_table(conn)
+        conn.execute("INSERT OR REPLACE INTO roistat_visits (phone10, visit, source, ts) "
+                     "VALUES (?, ?, 'wa_hello', datetime('now'))", (ph10, m.group(1)))
+    except Exception as e:  # noqa: BLE001
+        log.info("визит из сообщения не записан: %s", e)
 
 
 def _match_click(conn, ts: str, phone: str, chat_type: str) -> None:
@@ -2874,7 +2896,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.26"
+APP_VERSION = "2026-09-09.27"
 
 
 @app.get("/api/net")
@@ -5487,6 +5509,18 @@ def api_ads_status(plan: str = "30377205"):
         except Exception as e:
             out["vk"]["error"] = str(e)[:200]
     return out
+
+
+@app.post("/api/roistat/catch-visits", dependencies=AUTH)
+def api_roistat_catch_visits():
+    """Разобрать уже накопленную переписку и вытащить из неё номера визитов Roistat."""
+    n = 0
+    with db.get_conn() as conn:
+        for r in conn.execute("SELECT phone, text FROM wazzup_inbox WHERE text LIKE '%аш номер:%'"):
+            before = conn.total_changes
+            _catch_visit(conn, r["phone"], r["text"])
+            n += 1 if conn.total_changes > before else 0
+    return {"ok": True, "новых_связок": n}
 
 
 @app.get("/api/ads/geo", dependencies=OWNER_AUTH)
