@@ -346,7 +346,7 @@ def history(period: str = "Сегодня", employee: str = "", event_type: str 
         pg.wait_for_timeout(5000)
         total_txt = ""
         try:
-            total_txt = pg.get_by_text(re_compile(r"^Всего: \d+$")).first.inner_text(timeout=5000)
+            total_txt = pg.locator("text=/Всего:\\s*\\d+/").first.inner_text(timeout=5000)
         except Exception:  # noqa: BLE001
             pass
         page_no = 1
@@ -356,7 +356,7 @@ def history(period: str = "Сегодня", employee: str = "", event_type: str 
             page_no += 1
             if page_no > max_pages:
                 break
-            nxt = pg.locator(".mc-pagination-light-item").filter(has_text=re_compile(rf"^{page_no}$"))
+            nxt = pg.locator(".mc-pagination-light-item").filter(has_text=re_compile(rf"^\s*{page_no}\s*$"))
             if nxt.count() == 0:
                 break
             nxt.first.click(timeout=10000)
@@ -444,19 +444,50 @@ def supply(product: str, count: int, filial: str = "Kids UP Богородски
         steps = []
 
         def pick(label: str, value: str, search: bool = False):
-            pg.locator(f"md-select[aria-label='{label}']").first.click(timeout=10000)
-            pg.wait_for_timeout(900)
-            menu = pg.locator(".md-select-menu-container.md-active")
+            sel = pg.locator(f"md-select[aria-label='{label}']").first
+            sel.scroll_into_view_if_needed(timeout=10000)
+            sel.click(timeout=15000)
+            pg.wait_for_timeout(1000)
             if search:
-                sb = menu.locator("input[placeholder='Введите название']")
+                sb = pg.locator("input[placeholder='Введите название']:visible")
                 if sb.count():
-                    sb.first.fill(value); pg.wait_for_timeout(700)
-            opts = menu.locator("md-option").filter(has_text=value)
-            n = opts.count()
-            exact = [i for i in range(n) if opts.nth(i).inner_text().strip() == value]
-            (opts.nth(exact[0]) if exact else opts.first).click(timeout=10000)
-            pg.wait_for_timeout(700)
-            steps.append({"pick": label, "value": value, "options_matched": n})
+                    # fill() не дёргает ng-change — печатаем как человек
+                    sb.first.click()
+                    sb.first.press_sequentially(value[:25], delay=25)
+                    pg.wait_for_timeout(1200)
+
+            def find():
+                o = pg.locator("md-option:visible")
+                cnt = o.count()
+                for i in range(cnt):
+                    if o.nth(i).inner_text().strip() == value:
+                        return o, cnt, i
+                for i in range(cnt):
+                    if value.lower() in o.nth(i).inner_text().strip().lower():
+                        return o, cnt, i
+                return o, cnt, None
+
+            opts, n, idx = find()
+            tries = 0
+            while idx is None and tries < 12:
+                # список длинный и подгружается при прокрутке — крутим само меню
+                menu = pg.locator(".md-select-menu-container.md-active md-content, md-select-menu md-content").first
+                try:
+                    box = menu.bounding_box()
+                    if box:
+                        pg.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+                        pg.mouse.wheel(0, 900)
+                except Exception:  # noqa: BLE001
+                    pg.mouse.wheel(0, 900)
+                pg.wait_for_timeout(500)
+                opts, n, idx = find()
+                tries += 1
+            if idx is None:
+                raise RuntimeError(f"в списке «{label}» нет варианта «{value}» (видно {n})")
+            opts.nth(idx).scroll_into_view_if_needed(timeout=10000)
+            opts.nth(idx).click(timeout=15000)
+            pg.wait_for_timeout(800)
+            steps.append({"pick": label, "value": value, "visible_options": n})
 
         try:
             pick("Вид товара", product, search=True)
