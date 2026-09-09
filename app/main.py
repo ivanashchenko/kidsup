@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import Body, Depends, FastAPI, Form, HTTPException, Request
+from fastapi import Body, Depends, FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, PlainTextResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
@@ -2802,7 +2802,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.01"
+APP_VERSION = "2026-09-09.03"
 
 
 @app.get("/api/net")
@@ -5074,6 +5074,100 @@ def api_day_firsts(day: str = "", ahead: int = 0):
                                 "user_id": r["user_id"], "name": (u["name"] if u else ""),
                                 "phone": (u["phone"] if u else ""), "visit": raw.get("visit")})
     return {"days": days, "firsts": sorted(out, key=lambda x: (x["date"], x["time"]))}
+
+
+@app.get("/api/crm/dossier", dependencies=AUTH)
+def api_crm_dossier(q: list[str] = Query(default=[]), days_back: int = 7, days_ahead: int = 14):
+    """Досье групп по подстрокам имени: педагог, кабинет, слоты недели, дети с возрастом.
+
+    09.09.2026: решения «слить / заменить / донабрать» нельзя принимать без
+    возрастов детей, педагога и кабинета у каждой группы. Только чтение
+    локальной базы синхронизации (classes, lessons, managers, rooms, joins, users).
+    """
+    if not q:
+        raise HTTPException(400, "нужен хотя бы один q= (подстрока имени группы)")
+    today = date.today()
+    since = (today - timedelta(days=days_back)).isoformat()
+    until = (today + timedelta(days=days_ahead)).isoformat()
+    live = (2, 58132, 83760, 58131, 50509)
+    DAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+
+    def _age(raw: str):
+        try:
+            for a in (json.loads(raw or "{}").get("attributes") or []):
+                if a.get("attributeAlias") == "birthday" and a.get("value"):
+                    b = date.fromisoformat(str(a["value"])[:10])
+                    m = (today.year - b.year) * 12 + today.month - b.month - (today.day < b.day)
+                    return b.isoformat(), round(m / 12, 1)
+        except Exception:
+            pass
+        return None, None
+
+    out = []
+    # Локальная синхронизация занятий не хранит teacherIds — педагогов берём
+    # из API по каждой группе (один вызов на группу, только чтение).
+    mk = None
+    try:
+        from .moyklass_client import MoyklassClient
+        mk = MoyklassClient(sync.get_api_key())
+    except Exception:
+        mk = None
+    with db.get_conn() as conn:
+        managers = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM managers")}
+        rooms = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM rooms")}
+        seen = set()
+        for sub in q:
+            for c in conn.execute("SELECT * FROM classes WHERE name LIKE ? AND status!='archive'", (f"%{sub}%",)):
+                if c["id"] in seen:
+                    continue
+                seen.add(c["id"])
+                teachers, room_ids, slots = {}, {}, {}
+                n_les = 0
+                lessons_raw = []
+                if mk is not None:
+                    try:
+                        resp = mk.get("/v1/company/lessons", {"classId": c["id"], "date": [since, until], "limit": 100})
+                        lessons_raw = (resp.get("lessons", resp) if isinstance(resp, dict) else resp) or []
+                    except Exception:
+                        lessons_raw = []
+                if not lessons_raw:
+                    for l in conn.execute("SELECT * FROM lessons WHERE class_id=? AND date BETWEEN ? AND ?",
+                                          (c["id"], since, until)):
+                        try:
+                            lr = json.loads(l["raw"] or "{}")
+                        except ValueError:
+                            lr = {}
+                        lr.setdefault("date", l["date"]); lr.setdefault("beginTime", l["begin_time"])
+                        lessons_raw.append(lr)
+                for lr in lessons_raw:
+                    n_les += 1
+                    for t in lr.get("teacherIds") or []:
+                        teachers[managers.get(t, str(t))] = teachers.get(managers.get(t, str(t)), 0) + 1
+                    rid = lr.get("roomId")
+                    room_ids[rooms.get(rid, str(rid))] = room_ids.get(rooms.get(rid, str(rid)), 0) + 1
+                    try:
+                        dname = DAYS[date.fromisoformat(str(lr.get("date"))[:10]).weekday()]
+                    except Exception:
+                        dname = "?"
+                    key = f"{dname} {(lr.get('beginTime') or '')[:5]}"
+                    slots[key] = slots.get(key, 0) + 1
+                kids = []
+                for j in conn.execute("SELECT * FROM joins WHERE class_id=? AND status_id IN (%s)" % ",".join("?" * len(live)),
+                                      (c["id"], *live)):
+                    u = conn.execute("SELECT name, phone, raw, client_state_id FROM users WHERE id=?", (j["user_id"],)).fetchone()
+                    bday, age = _age(u["raw"] if u else "")
+                    kids.append({"user_id": j["user_id"], "name": (u["name"] if u else ""), "phone": (u["phone"] if u else ""),
+                                 "join_status": j["status_id"], "join_created": (j["created_at"] or "")[:10],
+                                 "birthday": bday, "age": age})
+                out.append({"id": c["id"], "name": c["name"], "status": c["status"], "cap": c["max_students"],
+                            "teachers": teachers, "rooms": room_ids, "slots": slots, "lessons_in_window": n_les,
+                            "kids": sorted(kids, key=lambda k: (k["join_status"], k["name"]))})
+    if mk is not None:
+        try:
+            mk.close()
+        except Exception:
+            pass
+    return {"window": [since, until], "groups": out}
 
 
 @app.post("/api/crm/comment", dependencies=AUTH)
