@@ -2802,7 +2802,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.03"
+APP_VERSION = "2026-09-09.06"
 
 
 @app.get("/api/net")
@@ -5168,6 +5168,52 @@ def api_crm_dossier(q: list[str] = Query(default=[]), days_back: int = 7, days_a
         except Exception:
             pass
     return {"window": [since, until], "groups": out}
+
+
+@app.get("/api/mkweb/status", dependencies=AUTH)
+def api_mkweb_status():
+    """Браузер МойКласса на сервере: стоит ли playwright/Chromium, есть ли сессия."""
+    from . import mkweb
+    return mkweb.status()
+
+
+@app.post("/api/mkweb/setup", dependencies=AUTH)
+def api_mkweb_setup():
+    """Установка playwright и Chromium на сервере (в фоне; ход — в /api/mkweb/status)."""
+    from . import mkweb
+    return mkweb.setup()
+
+
+@app.post("/api/mkweb/login", dependencies=AUTH)
+def api_mkweb_login():
+    """Вход в МойКласс под техническим сотрудником, сохранение сессии."""
+    from . import mkweb
+    try:
+        return mkweb.login()
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"login: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.post("/api/mkweb/open", dependencies=AUTH)
+def api_mkweb_open(payload: dict = Body(...)):
+    """Открыть страницу МойКласса под сохранённой сессией: {url, wait_ms?}. Только чтение."""
+    from . import mkweb
+    url = str(payload.get("url") or "")
+    if not url.startswith("https://app.moyklass.com/"):
+        raise HTTPException(400, "url должен начинаться с https://app.moyklass.com/")
+    try:
+        return mkweb.open_page(url, int(payload.get("wait_ms") or 4000), int(payload.get("max_text") or 6000))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"open: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.get("/api/mkweb/shot", dependencies=AUTH)
+def api_mkweb_shot():
+    """Последний скриншот браузера МойКласса."""
+    from . import mkweb
+    if not mkweb.SHOT.exists():
+        raise HTTPException(404, "скриншота ещё нет")
+    return Response(content=mkweb.SHOT.read_bytes(), media_type="image/png")
 
 
 @app.post("/api/crm/comment", dependencies=AUTH)
