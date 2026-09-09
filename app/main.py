@@ -2896,7 +2896,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.27"
+APP_VERSION = "2026-09-09.28"
 
 
 @app.get("/api/net")
@@ -5521,6 +5521,73 @@ def api_roistat_catch_visits():
             _catch_visit(conn, r["phone"], r["text"])
             n += 1 if conn.total_changes > before else 0
     return {"ok": True, "новых_связок": n}
+
+
+@app.post("/api/ads/direct", dependencies=OWNER_AUTH)
+def api_ads_direct(payload: dict = Body(...)):
+    """Прямой вызов API Яндекс.Директа под нашим токеном (только владелец).
+
+    {"service": "adgroups", "method": "update", "params": {...}} — API v5;
+    {"live4": {"method": "AccountManagement", "param": {...}}} — старый Live4
+    (там живёт дневной бюджет аккаунта). Токен не покидает сервер.
+    """
+    import httpx
+    tok = db.get_setting("yandex_direct_token")
+    if not tok:
+        raise HTTPException(400, "нет yandex_direct_token")
+    if payload.get("live4"):
+        body = {**payload["live4"], "token": tok, "locale": "ru"}
+        r = httpx.post("https://api.direct.yandex.ru/live/v4/json/", json=body, timeout=90)
+        return r.json()
+    service = str(payload.get("service") or "")
+    if not service.isalpha():
+        raise HTTPException(400, "service — только буквы (campaigns, adgroups, ads, dictionaries…)")
+    h = {"Authorization": f"Bearer {tok}", "Accept-Language": "ru", "Content-Type": "application/json"}
+    r = httpx.post(f"https://api.direct.yandex.com/json/v5/{service}", headers=h, timeout=90,
+                   json={"method": payload.get("method") or "get", "params": payload.get("params") or {}})
+    return r.json()
+
+
+@app.post("/api/ads/vk", dependencies=OWNER_AUTH)
+def api_ads_vk(payload: dict = Body(...)):
+    """Прямой вызов VK Ads API под нашим токеном (только владелец).
+
+    {"path": "ad_plans/30377205.json", "method": "post", "json": {...}} либо
+    {"path": "banners.json", "method": "get", "params": {...}}. Токен живёт здесь.
+    """
+    import httpx
+    path = str(payload.get("path") or "").lstrip("/")
+    if ".." in path or not path:
+        raise HTTPException(400, "path обязателен")
+    tok = db.get_setting("vk_ads_token")
+    hv = {"Authorization": f"Bearer {tok}"}
+    url = "https://ads.vk.com/api/v2/" + path
+    method = str(payload.get("method") or "get").lower()
+
+    def call():
+        if method == "get":
+            return httpx.get(url, params=payload.get("params") or {}, headers=hv, timeout=90)
+        return httpx.request(method, url, json=payload.get("json") or {},
+                             params=payload.get("params") or {}, headers=hv, timeout=90)
+
+    r = call()
+    if r.status_code == 401:
+        # токен живёт сутки — обновляем и повторяем
+        tr = httpx.post("https://ads.vk.com/api/v2/oauth2/token.json", timeout=60,
+                        data={"grant_type": "refresh_token",
+                              "refresh_token": db.get_setting("vk_ads_refresh_token"),
+                              "client_id": db.get_setting("vk_ads_client_id"),
+                              "client_secret": db.get_setting("vk_ads_client_secret")})
+        if tr.status_code == 200:
+            j = tr.json()
+            db.set_setting("vk_ads_token", j.get("access_token", ""))
+            db.set_setting("vk_ads_refresh_token", j.get("refresh_token", ""))
+            hv["Authorization"] = "Bearer " + j.get("access_token", "")
+            r = call()
+    try:
+        return {"http": r.status_code, "body": r.json()}
+    except Exception:  # noqa: BLE001
+        return {"http": r.status_code, "text": r.text[:1000]}
 
 
 @app.get("/api/ads/geo", dependencies=OWNER_AUTH)
