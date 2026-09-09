@@ -448,41 +448,70 @@ def supply(product: str, count: int, filial: str = "Kids UP Богородски
             sel.scroll_into_view_if_needed(timeout=10000)
             sel.click(timeout=15000)
             pg.wait_for_timeout(1000)
+            menu = pg.locator("md-select-menu:visible").first
             if search:
-                sb = pg.locator("input[placeholder='Введите название']:visible")
+                # поле поиска — только внутри ОТКРЫТОГО меню (на странице есть такое же в фильтре)
+                sb = menu.locator("input")
                 if sb.count():
-                    # fill() не дёргает ng-change — печатаем как человек
                     sb.first.click()
-                    sb.first.press_sequentially(value[:25], delay=25)
+                    sb.first.press_sequentially(value[:12], delay=30)
                     pg.wait_for_timeout(1200)
 
             def find():
-                o = pg.locator("md-option:visible")
+                o = menu.locator("md-option:visible")
                 cnt = o.count()
-                for i in range(cnt):
-                    if o.nth(i).inner_text().strip() == value:
+                import re as _re
+                nv = _re.sub(r"\s+", " ", value).strip().lower()
+                texts = [_re.sub(r"\s+", " ", o.nth(i).inner_text()).strip().lower() for i in range(cnt)]
+                for i, t in enumerate(texts):
+                    if t == nv:
                         return o, cnt, i
-                for i in range(cnt):
-                    if value.lower() in o.nth(i).inner_text().strip().lower():
+                for i, t in enumerate(texts):
+                    if nv in t:
                         return o, cnt, i
                 return o, cnt, None
 
             opts, n, idx = find()
+            if idx is None and search and n == 0:
+                # поиск ничего не дал (другое написание) — очищаем и идём по списку прокруткой
+                sb = menu.locator("input")
+                if sb.count():
+                    sb.first.fill("")
+                    pg.wait_for_timeout(800)
+                opts, n, idx = find()
             tries = 0
-            while idx is None and tries < 12:
-                # список длинный и подгружается при прокрутке — крутим само меню
-                menu = pg.locator(".md-select-menu-container.md-active md-content, md-select-menu md-content").first
+            while idx is None and tries < 25:
+                # длинный список подгружается при прокрутке — крутим контейнер меню
                 try:
-                    box = menu.bounding_box()
-                    if box:
-                        pg.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-                        pg.mouse.wheel(0, 900)
+                    # md-virtual-repeat рисует ~30 опций; прокручиваем его скроллер, а не md-content
+                    sc = menu.locator(".md-virtual-repeat-scroller, md-content").first
+                    sc.evaluate("el => { el.scrollTop += 600; el.dispatchEvent(new Event('scroll')); }")
                 except Exception:  # noqa: BLE001
-                    pg.mouse.wheel(0, 900)
-                pg.wait_for_timeout(500)
+                    pg.mouse.wheel(0, 600)
+                pg.wait_for_timeout(450)
                 opts, n, idx = find()
                 tries += 1
             if idx is None:
+                # последний шанс: опции есть в DOM, но не отрисованы — ищем по тексту с
+                # нормализацией пробелов (в названиях бывают двойные) и кликаем через JS
+                import re as _re
+                target = _re.sub(r"\s+", " ", value).strip().lower()
+                clicked = pg.evaluate(
+                    """([target]) => {
+                        const norm = s => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+                        const menus = Array.from(document.querySelectorAll('md-select-menu'));
+                        const vis = menus.filter(m => m.offsetParent !== null);
+                        const pool = (vis.length ? vis : menus).flatMap(m => Array.from(m.querySelectorAll('md-option')));
+                        let el = pool.find(o => norm(o.textContent) === target) || pool.find(o => norm(o.textContent).includes(target));
+                        if (!el) return false;
+                        el.scrollIntoView({block: 'center'});
+                        el.click();
+                        return norm(el.textContent);
+                    }""", [target])
+                if clicked:
+                    pg.wait_for_timeout(800)
+                    steps.append({"pick": label, "value": value, "via": "js", "matched": clicked})
+                    return
                 raise RuntimeError(f"в списке «{label}» нет варианта «{value}» (видно {n})")
             opts.nth(idx).scroll_into_view_if_needed(timeout=10000)
             opts.nth(idx).click(timeout=15000)
