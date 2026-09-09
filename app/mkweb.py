@@ -179,7 +179,7 @@ def login() -> dict:
         return {"ok": logged, "url": url, "title": title, "inputs": inputs, "text": body}
 
 
-def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000) -> dict:
+def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = "", links: bool = False) -> dict:
     """Открыть страницу под сохранённой сессией; вернуть текст и сделать скриншот."""
     from playwright.sync_api import sync_playwright
 
@@ -191,9 +191,32 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000) -> dict:
         pg = ctx.new_page()
         pg.goto(url, wait_until="domcontentloaded", timeout=60000)
         pg.wait_for_timeout(wait_ms)
+        if pg.locator("input[type=password]").count() > 0:
+            # сессия протухла — перелогиниваемся тем же браузером и идём снова
+            b.close()
+            res = login()
+            if not res.get("ok"):
+                return {"ok": False, "error": "сессия истекла, повторный вход не удался", "login": res}
+            return open_page(url, wait_ms, max_text, click, links)
+        # баннер про cookies перекрывает низ экрана — принимаем один раз
+        try:
+            btn = pg.get_by_text("Согласен", exact=True)
+            if btn.count() > 0:
+                btn.first.click(timeout=3000)
+                pg.wait_for_timeout(500)
+        except Exception:  # noqa: BLE001
+            pass
+        if click:
+            # клик по пункту меню/кнопке по видимому тексту — так добираемся до разделов,
+            # у которых нет угадываемого URL (например «Мой Чат»)
+            pg.get_by_text(click, exact=True).first.click(timeout=15000)
+            pg.wait_for_timeout(wait_ms)
         text = pg.inner_text("body")[:max_text]
         pg.screenshot(path=str(SHOT), full_page=False)
         out = {"ok": True, "url": pg.url, "title": pg.title(), "text": text}
+        if links:
+            out["links"] = [{"text": (a.inner_text() or "").strip()[:60], "href": a.get_attribute("href")}
+                            for a in pg.query_selector_all("a[href]")][:200]
         # сессия могла обновиться (cookies) — сохраняем
         try:
             ctx.storage_state(path=str(STATE))

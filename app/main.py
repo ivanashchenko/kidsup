@@ -2802,7 +2802,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.06"
+APP_VERSION = "2026-09-09.08"
 
 
 @app.get("/api/net")
@@ -5202,7 +5202,8 @@ def api_mkweb_open(payload: dict = Body(...)):
     if not url.startswith("https://app.moyklass.com/"):
         raise HTTPException(400, "url должен начинаться с https://app.moyklass.com/")
     try:
-        return mkweb.open_page(url, int(payload.get("wait_ms") or 4000), int(payload.get("max_text") or 6000))
+        return mkweb.open_page(url, int(payload.get("wait_ms") or 4000), int(payload.get("max_text") or 6000),
+                               str(payload.get("click") or ""), bool(payload.get("links")))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"open: {type(e).__name__}: {str(e)[:300]}")
 
