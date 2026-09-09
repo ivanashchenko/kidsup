@@ -2710,6 +2710,12 @@ def _inbox_store(payload: dict) -> None:
         for ts, phone, chat_type, text, mid in rows:
             _match_click(conn, ts, phone, chat_type)
             _catch_visit(conn, phone, text)
+    # Из рекламы пришёл — карточка заводится сама, без админа (09.09 Борис).
+    for ts, phone, chat_type, text, mid in rows:
+        try:
+            _msg_to_crm(phone, chat_type)
+        except Exception as e:  # noqa: BLE001
+            log.info("автокарточка по %s не создана: %s", (phone or "")[-4:], e)
     # Отказ ловим в момент получения, а не при следующем разборе: между
     # просьбой снять бронь и очередной рассылкой бывает меньше часа.
     for ts, phone, chat_type, text, mid in rows:
@@ -2756,6 +2762,81 @@ def _catch_visit(conn, phone: str, text: str) -> None:
                      "VALUES (?, ?, 'wa_hello', datetime('now'))", (ph10, m.group(1)))
     except Exception as e:  # noqa: BLE001
         log.info("визит из сообщения не записан: %s", e)
+
+
+def _visit_for(phone: str) -> str:
+    """Номер визита Roistat по телефону: из первого сообщения или из клика по кнопке."""
+    ph10 = "".join(ch for ch in str(phone or "") if ch.isdigit())[-10:]
+    if len(ph10) != 10:
+        return ""
+    with db.get_conn() as conn:
+        try:
+            from . import roistat as _roistat
+            _roistat._ensure_visits_table(conn)
+            r = conn.execute("SELECT visit FROM roistat_visits WHERE phone10=?", (ph10,)).fetchone()
+            if r and r[0]:
+                return str(r[0])
+        except Exception:  # noqa: BLE001
+            pass
+        _clicks_init(conn)
+        r = conn.execute("SELECT roistat_visit FROM messenger_clicks WHERE substr(matched_phone,-10)=? "
+                         "AND roistat_visit != '' ORDER BY id DESC LIMIT 1", (ph10,)).fetchone()
+        return str(r[0]) if r and r[0] else ""
+
+
+AUTO_LEAD_CLASS = 343915          # «Заявки через Roistat» — тот же приёмник, что у коллтрекинга
+
+
+def _msg_to_crm(phone: str, chat_type: str) -> None:
+    """Написал из рекламы — карточка в МойКлассе заводится сама, с номером визита.
+
+    09.09.2026 Борис: «чтобы админы руками не делали карточки, а автоматом
+    создавалась с номером roistat». Работает только когда визит известен —
+    то есть человек пришёл с сайта по нашей кнопке. Если карточка на номере
+    уже есть, ничего не создаём: только дописываем визит, если поле пустое.
+    """
+    from . import autopilot
+    from .moyklass_client import MoyklassClient
+    ph10 = "".join(ch for ch in str(phone or "") if ch.isdigit())[-10:]
+    visit = _visit_for(phone)
+    if not visit or len(ph10) != 10:
+        return
+    if not autopilot._mark("msg_lead", ph10):
+        return                                   # одна попытка на номер
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        found = (mk.get("/v1/company/users", {"phone": ph10}) or {}).get("users") or []
+        if found:
+            for u in found:                      # карточка есть — только дописать визит
+                if not (u.get("roistat") or "").strip():
+                    try:
+                        mk.safe_update_user(u["id"], roistat=visit)
+                    except Exception:  # noqa: BLE001
+                        pass
+            return
+        user = mk.post("/v1/company/users", {"name": ph10, "phones": ["+7" + ph10],
+                                             "roistat": visit, "clientStateId": 125951})
+        uid = (user or {}).get("id")
+        if uid:
+            try:
+                mk.post("/v1/company/joins", {"userId": uid, "classId": AUTO_LEAD_CLASS,
+                                              "statusId": 50509, "createSourceId": 2})
+            except Exception as e:  # noqa: BLE001
+                log.info("запись в «Заявки через Roistat» не создана: %s", e)
+        with db.get_conn() as conn:
+            _inbox_init(conn)
+            now = autopilot._now()
+            who = (autopilot._admins_today() or autopilot._admins() or [{}])[0].get("name") or "Аня"
+            conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) VALUES (?,?,?,?,?,?)",
+                         (now.date().isoformat(), now.isoformat(timespec="minutes"),
+                          {"Анна Инкина": "Аня", "Елена Кузнецова": "Лена",
+                           "Ирина Головина": "Ира"}.get(who, who)[:20],
+                          f"Новая заявка из рекламы ({chat_type}), +7{ph10}, визит Roistat {visit}. "
+                          f"Карточка создана автоматически и лежит в «Заявки через Roistat» — узнать "
+                          f"имя ребёнка, возраст и направление, переименовать карточку и записать "
+                          f"на первое занятие."[:400], "+7" + ph10, "автозаявка"))
+    finally:
+        mk.close()
 
 
 def _match_click(conn, ts: str, phone: str, chat_type: str) -> None:
@@ -2896,7 +2977,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.28"
+APP_VERSION = "2026-09-09.31"
 
 
 @app.get("/api/net")
@@ -5523,6 +5604,37 @@ def api_roistat_catch_visits():
     return {"ok": True, "новых_связок": n}
 
 
+@app.post("/api/roistat/auto-cards", dependencies=AUTH)
+def api_roistat_auto_cards(payload: dict = Body(default={})):
+    """Проверка и добор автокарточек: {"phone": "79...", "dry_run": true}.
+
+    Без телефона проходит по всем, кто писал нам и у кого известен визит
+    Roistat. dry_run показывает, что было бы сделано, ничего не меняя.
+    """
+    dry = bool(payload.get("dry_run", True))
+    one = "".join(ch for ch in str(payload.get("phone") or "") if ch.isdigit())[-10:]
+    with db.get_conn() as conn:
+        phones = [r[0] for r in conn.execute(
+            "SELECT DISTINCT phone FROM wazzup_inbox WHERE phone IS NOT NULL AND phone != ''")]
+    out = []
+    for ph in phones:
+        ph10 = "".join(ch for ch in str(ph) if ch.isdigit())[-10:]
+        if one and ph10 != one:
+            continue
+        visit = _visit_for(ph)
+        if not visit:
+            continue
+        if dry:
+            out.append({"phone": ph10, "visit": visit})
+            continue
+        try:
+            _msg_to_crm(ph, "whatsapp")
+            out.append({"phone": ph10, "visit": visit, "ok": True})
+        except Exception as e:  # noqa: BLE001
+            out.append({"phone": ph10, "visit": visit, "error": str(e)[:200]})
+    return {"ok": True, "dry_run": dry, "кандидатов": len(out), "список": out[:50]}
+
+
 @app.post("/api/ads/direct", dependencies=OWNER_AUTH)
 def api_ads_direct(payload: dict = Body(...)):
     """Прямой вызов API Яндекс.Директа под нашим токеном (только владелец).
@@ -5546,6 +5658,29 @@ def api_ads_direct(payload: dict = Body(...)):
     r = httpx.post(f"https://api.direct.yandex.com/json/v5/{service}", headers=h, timeout=90,
                    json={"method": payload.get("method") or "get", "params": payload.get("params") or {}})
     return r.json()
+
+
+@app.post("/api/ads/vk/image", dependencies=OWNER_AUTH)
+def api_ads_vk_image(payload: dict = Body(...)):
+    """Загрузка картинки в VK Ads: {"name": "creative.jpg", "b64": "<base64>"}.
+
+    Отдельно от общего прохода: там JSON, а VK принимает картинку только
+    multipart-формой. Возвращает id, который потом ставится объявлению.
+    """
+    import base64 as _b64
+    import httpx
+    raw = _b64.b64decode(payload.get("b64") or "")
+    if not raw:
+        raise HTTPException(400, "нет b64")
+    name = str(payload.get("name") or "creative.jpg")
+    tok = db.get_setting("vk_ads_token")
+    r = httpx.post("https://ads.vk.com/api/v2/content/static.json",
+                   headers={"Authorization": f"Bearer {tok}"},
+                   files={"file": (name, raw, "image/jpeg")}, timeout=120)
+    try:
+        return {"http": r.status_code, "body": r.json()}
+    except Exception:  # noqa: BLE001
+        return {"http": r.status_code, "text": r.text[:600]}
 
 
 @app.post("/api/ads/vk", dependencies=OWNER_AUTH)
