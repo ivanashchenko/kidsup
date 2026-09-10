@@ -142,3 +142,10 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 .av-gab img{object-position:50% 20%}.av-ann img{object-position:50% 28%}
 .av-len img{transform:scale(1.18);transform-origin:50% 25%}
 .av-vik img{object-position:50% 30%}.av-mab img{object-position:50% 30%}
+
+/* ——— фотогалерея занятия ——— */
+.gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:20px}
+.gal figure{margin:0;border-radius:var(--r);overflow:hidden;background:#eef2f8;
+     box-shadow:0 10px 28px rgba(49,39,131,.12)}
+.gal img{width:100%;height:260px;object-fit:cover;display:block}
+@media (max-width:560px){.gal img{height:220px}}
