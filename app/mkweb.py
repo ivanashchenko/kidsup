@@ -180,8 +180,14 @@ def login() -> dict:
 
 
 def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = "", links: bool = False,
-              actions: list | None = None, rows: bool = False) -> dict:
-    """Открыть страницу под сохранённой сессией; вернуть текст и сделать скриншот."""
+              actions: list | None = None, rows: bool = False, frame: str = "") -> dict:
+    """Открыть страницу под сохранённой сессией; вернуть текст и сделать скриншот.
+
+    frame — подстрока адреса вложенного фрейма (например «moychat»): «Мой Чат»
+    живёт в iframe на чужом домене, из главной страницы его содержимое не видно
+    ни через JS, ни через локаторы. Когда frame задан, все шаги и чтение текста
+    идут внутри этого фрейма, а скриншот по-прежнему снимается со всей вкладки.
+    """
     from playwright.sync_api import sync_playwright
 
     if not STATE.exists():
@@ -198,7 +204,7 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
             res = login()
             if not res.get("ok"):
                 return {"ok": False, "error": "сессия истекла, повторный вход не удался", "login": res}
-            return open_page(url, wait_ms, max_text, click, links, actions, rows)
+            return open_page(url, wait_ms, max_text, click, links, actions, rows, frame)
         # баннер про cookies перекрывает низ экрана — принимаем один раз
         try:
             btn = pg.get_by_text("Согласен", exact=True)
@@ -212,41 +218,61 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
             # у которых нет угадываемого URL (например «Мой Чат»)
             pg.get_by_text(click, exact=True).first.click(timeout=15000)
             pg.wait_for_timeout(wait_ms)
+        tgt = pg
+        if frame:
+            for _ in range(20):          # iframe подгружается позже самой страницы
+                tgt = next((f for f in pg.frames if frame in (f.url or "")), None)
+                if tgt:
+                    break
+                pg.wait_for_timeout(700)
+            if not tgt:
+                b.close()
+                return {"ok": False, "error": f"фрейм «{frame}» не найден",
+                        "frames": [f.url for f in pg.frames][:10]}
         done = []
         for st in actions or []:
             # шаги: {"click": "текст"} | {"css": "селектор", "click": true} | {"fill": "текст", "css"/"placeholder"/"label": ...}
             #       | {"press": "Enter", "css": ...} | {"wait": мс} | {"scroll": "bottom"} | {"select_text": "текст в выпадашке"}
             try:
                 if "wait" in st and len(st) == 1:
-                    pg.wait_for_timeout(int(st["wait"]))
+                    tgt.wait_for_timeout(int(st["wait"]))
                 elif "js" in st:
                     # произвольный JS в странице — вернуть результат (для div-таблиц без <table>)
-                    st = {**st, "result": pg.evaluate(st["js"])}
+                    st = {**st, "result": tgt.evaluate(st["js"])}
                 elif st.get("scroll") == "bottom":
                     for _ in range(int(st.get("times", 5))):
                         pg.mouse.wheel(0, 4000)
                         pg.wait_for_timeout(600)
+                elif "select" in st:
+                    # выпадающий <select>: значение либо видимый текст. Через JS не выходит —
+                    # React слушает своё событие, а Playwright эмулирует выбор по-настоящему.
+                    loc = tgt.locator(st["css"]).nth(int(st.get("nth", 0)))
+                    val = str(st["select"])
+                    if st.get("by") == "label":
+                        loc.select_option(label=val)
+                    else:
+                        loc.select_option(val)
                 elif "fill" in st:
-                    loc = (pg.locator(st["css"]) if st.get("css") else
-                           pg.get_by_placeholder(st["placeholder"]) if st.get("placeholder") else
-                           pg.get_by_label(st["label"]))
+                    loc = (tgt.locator(st["css"]) if st.get("css") else
+                           tgt.get_by_placeholder(st["placeholder"]) if st.get("placeholder") else
+                           tgt.get_by_label(st["label"]))
                     loc.first.click(timeout=10000)
                     loc.first.fill(str(st["fill"]))
                     if st.get("press"):
                         loc.first.press(st["press"])
                 elif st.get("press") and st.get("css"):
-                    pg.locator(st["css"]).first.press(st["press"])
+                    tgt.locator(st["css"]).first.press(st["press"])
                 elif st.get("css"):
-                    pg.locator(st["css"]).nth(int(st.get("nth", 0))).click(timeout=15000)
+                    tgt.locator(st["css"]).nth(int(st.get("nth", 0))).click(timeout=15000)
                 elif st.get("click"):
-                    pg.get_by_text(str(st["click"]), exact=bool(st.get("exact", True))).nth(int(st.get("nth", 0))).click(timeout=15000)
-                pg.wait_for_timeout(int(st.get("after", 1500)))
+                    tgt.get_by_text(str(st["click"]), exact=bool(st.get("exact", True))).nth(int(st.get("nth", 0))).click(timeout=15000)
+                tgt.wait_for_timeout(int(st.get("after", 1500)))
                 done.append({**st, "ok": True})
             except Exception as e:  # noqa: BLE001
                 done.append({**st, "ok": False, "error": str(e).splitlines()[0][:160]})
                 if st.get("required", True):
                     break
-        text = pg.inner_text("body")[:max_text]
+        text = tgt.inner_text("body")[:max_text]
         pg.screenshot(path=str(SHOT), full_page=False)
         out = {"ok": True, "url": pg.url, "title": pg.title(), "text": text, "actions": done}
         if rows:

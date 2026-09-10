@@ -2986,7 +2986,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.26"
+APP_VERSION = "2026-09-10.28"
 
 
 @app.get("/api/net")
@@ -5394,7 +5394,8 @@ def api_mkweb_open(payload: dict = Body(...)):
     try:
         return mkweb.open_page(url, int(payload.get("wait_ms") or 4000), int(payload.get("max_text") or 6000),
                                str(payload.get("click") or ""), bool(payload.get("links")),
-                               payload.get("actions") or None, bool(payload.get("rows")))
+                               payload.get("actions") or None, bool(payload.get("rows")),
+                               str(payload.get("frame") or ""))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"open: {type(e).__name__}: {str(e)[:300]}")
 
