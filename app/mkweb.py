@@ -347,13 +347,7 @@ def history(period: str = "Сегодня", employee: str = "", event_type: str 
             pg.get_by_text("Согласен", exact=True).first.click(timeout=2000)
         except Exception:  # noqa: BLE001
             pass
-        if date_from or date_to:
-            inputs = pg.locator("input.md-datepicker-input")
-            if date_from:
-                inputs.nth(0).fill(date_from); inputs.nth(0).press("Enter")
-            if date_to:
-                inputs.nth(1).fill(date_to); inputs.nth(1).press("Enter")
-        else:
+        if not (date_from or date_to):
             pg.get_by_text(period, exact=True).first.click(timeout=10000)
         pg.wait_for_timeout(500)
 
@@ -368,6 +362,20 @@ def history(period: str = "Сегодня", employee: str = "", event_type: str 
             pick("Сотрудник", employee)
         if event_type:
             pick("Тип события", event_type)
+        # Даты заполняем ПОСЛЕ выпадашек и по одному символу: раньше они стояли
+        # первыми и fill() ставил значение мимо Angular — фильтр молча не
+        # применялся, и вместо августа приходил сентябрь.
+        if date_from or date_to:
+            inputs = pg.locator("input.md-datepicker-input")
+            for i, val in ((0, date_from), (1, date_to)):
+                if not val:
+                    continue
+                box = inputs.nth(i)
+                box.click(timeout=10000)
+                box.fill("")
+                box.type(val, delay=40)
+                box.press("Enter")
+                pg.wait_for_timeout(600)
         pg.get_by_text("Найти", exact=True).first.click(timeout=10000)
         pg.wait_for_timeout(5000)
         total_txt = ""
