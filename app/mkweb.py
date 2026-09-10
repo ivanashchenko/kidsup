@@ -362,20 +362,18 @@ def history(period: str = "Сегодня", employee: str = "", event_type: str 
             pick("Сотрудник", employee)
         if event_type:
             pick("Тип события", event_type)
-        # Даты заполняем ПОСЛЕ выпадашек и по одному символу: раньше они стояли
-        # первыми и fill() ставил значение мимо Angular — фильтр молча не
-        # применялся, и вместо августа приходил сентябрь.
-        if date_from or date_to:
-            inputs = pg.locator("input.md-datepicker-input")
-            for i, val in ((0, date_from), (1, date_to)):
-                if not val:
-                    continue
-                box = inputs.nth(i)
-                box.click(timeout=10000)
-                box.fill("")
-                box.type(val, delay=40)
-                box.press("Enter")
-                pg.wait_for_timeout(600)
+        # Даты. Две грабли разом:
+        #   1. Enter после ввода Angular не считает завершением — нужен Tab (blur),
+        #      иначе значение остаётся в поле, но в модель не попадает и фильтр молчит.
+        #   2. Период жёстко ограничен 32 днями: поставили «от» — «до» само встаёт
+        #      на «от + 32 дня». Второй ввод после этого попадает обратно в первое
+        #      поле и ломает всё. Поэтому «до» не трогаем вовсе, а лишние дни
+        #      отсекаем при разборе.
+        if date_from:
+            box = pg.locator("input.md-datepicker-input").nth(0)
+            box.fill(date_from)
+            box.press("Tab")
+            pg.wait_for_timeout(1500)
         pg.get_by_text("Найти", exact=True).first.click(timeout=10000)
         pg.wait_for_timeout(5000)
         total_txt = ""
