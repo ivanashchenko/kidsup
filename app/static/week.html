@@ -3,6 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Roistat Counter Start -->
+<script>
+(function(w, d, s, h, id) {
+    w.roistatProjectId = id; w.roistatHost = h;
+    var p = d.location.protocol == "https:" ? "https://" : "http://";
+    var u = /^.*roistat_visit=[^;]+(.*)?$/.test(d.cookie) ? "/dist/module.js" : "/api/site/1.0/"+id+"/init?referrer="+encodeURIComponent(d.location.href);
+    var js = d.createElement(s); js.charset="UTF-8"; js.async = 1; js.src = p+h+u; var js2 = d.getElementsByTagName(s)[0]; js2.parentNode.insertBefore(js, js2);
+})(window, document, 'script', 'cloud.roistat.com', '3397a0b40200c8ca0a11591ad26c71c5');
+</script>
+<!-- Roistat Counter End -->
 <title>Неделя открытых уроков KidsUP — 31 августа – 13 сентября</title>
 <meta name="description" content="С 31 августа по 13 сентября приходите на настоящее занятие своей группы в KidsUP. Живое расписание со свободными местами, первое занятие условно-бесплатное.">
 <link rel="canonical" href="https://kidsupweek.ru/">
@@ -428,16 +438,6 @@ document.getElementById('lead').addEventListener('submit', async function (e) {
     btn.disabled = false; btn.textContent = 'Записаться на урок';
   }
 });
-/* Roistat — сквозная аналитика */
-(function (w, d, s, h, id) {
-  w.roistatProjectId = id; w.roistatHost = h;
-  var p = d.location.protocol == 'https:' ? 'https://' : 'http://';
-  var u = /^.*roistat_visit=[^;]+(.*)?$/.test(d.cookie)
-    ? '/dist/module.js'
-    : '/api/site/1.0/' + id + '/init?referrer=' + encodeURIComponent(d.location.href);
-  var js = d.createElement(s); js.charset = 'UTF-8'; js.async = 1; js.src = p + h + u;
-  var js2 = d.getElementsByTagName(s)[0]; js2.parentNode.insertBefore(js, js2);
-})(window, document, 'script', 'cloud.roistat.com', '228571');
 </script>
 <!-- Яндекс.Метрика — счётчик 69569509, тот же, что на kidsup.ru -->
 <script>
