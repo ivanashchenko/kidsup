@@ -2977,7 +2977,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.08"
+APP_VERSION = "2026-09-10.09"
 
 
 @app.get("/api/net")
@@ -3014,7 +3014,7 @@ async def health():
             "morning_done": autopilot._has_mark("morning", today)}
 
 
-SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
+SETTABLE = {"crm_tasks_off", "auto_join_groups", "admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",

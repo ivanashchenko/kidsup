@@ -48,6 +48,65 @@ DUTY = 232805
 # равно некому — администратор уже ушёл.
 HOUR_FROM, HOUR_TO = 9, 20
 
+# 10.09.2026, по разбору Иры: запись в реальную группу — не техническое
+# действие, а решение педагога. В раннем развитии и лицее оно зависит от
+# того, говорит ли ребёнок, сколько уже в группе и потянет ли она ещё
+# одного; администратор это знает, переписка — нет. 02.09 и 07.09 автомат
+# записал двоих в живые группы, и один из них ответил «вы ошиблись».
+# Поэтому по умолчанию мы больше не записываем сами: находим группу,
+# кладём дело дежурной и говорим клиенту правду — «администратор
+# подтвердит». Включить прежнее поведение можно настройкой auto_join_groups=1.
+def _auto_join() -> bool:
+    return db.get_setting("auto_join_groups", "0") == "1"
+
+
+def _inbox(who: str, text: str, phone: str, source: str) -> None:
+    """Дело для админа в блок «Появилось за день» (задачи в CRM не создаём)."""
+    try:
+        httpx.post("https://app.kidsup.ru/api/plan/inbox",
+                   auth=("admin", db.get_setting("admin_pass", "CGWstart8*")),
+                   json={"who": who, "text": text[:400], "phone": phone,
+                         "source": source[:40]}, timeout=60)
+    except Exception as e:  # noqa: BLE001
+        log.warning("инбокс не записан: %s", e)
+
+
+def _duty_name() -> str:
+    """Имя дежурной на сегодня; не достучались — кладём Лене."""
+    try:
+        r = httpx.get("https://app.kidsup.ru/api/duty",
+                      auth=("admin", db.get_setting("admin_pass", "CGWstart8*")),
+                      timeout=60).json()
+        full = ((r.get("duty") or [{}])[0].get("name") or "").split()
+        return full[0] if full else "Лена"
+    except Exception:  # noqa: BLE001
+        return "Лена"
+
+
+def _book_request(mk, it: dict, cl: dict) -> str:
+    """Просьба записаться: дело дежурной + честный ответ клиенту.
+
+    Прежний ответ «Записали! ждём вас» обещал место, которого никто не
+    подтверждал. Новый ничего не обещает и не врёт про дату — время
+    называет администратор, когда посмотрит группу.
+    """
+    if _auto_join():
+        try:
+            mk.post("/v1/company/joins",
+                    {"userId": it["uid"], "classId": cl["id"], "statusId": JOIN_TRIAL})
+            return (f"Записали! {cl['name']} — ждём вас. Адрес: {ADDRESS}. "
+                    f"Первое занятие условно-бесплатное: не понравится — платить не нужно.")
+        except Exception as e:  # noqa: BLE001
+            log.warning("запись не создана: %s", e)
+    _inbox(_duty_name(),
+           f"{it.get('name') or 'клиент'} (+{it['phone']}) просит записать: {cl['name']}. "
+           f"Цитата: «{(it.get('last_text') or '')[:120]}». Проверить возраст и наполняемость "
+           f"с педагогом, оформить запись и подтвердить время клиенту.",
+           it["phone"], "переписка")
+    return ("Поняла вас! Передаю администратору — он посмотрит свободное место "
+            "в этой группе, подтвердит время и напишет вам. Группы небольшие, "
+            "педагог смотрит по возрасту и уровню, поэтому подтверждаем вручную.")
+
 # Что мы умеем отвечать сами. Порядок важен: проверяем сверху вниз,
 # первое совпадение и определяет тему.
 TOPICS = [
@@ -323,19 +382,10 @@ def run(day: str | None = None, dry: bool = True) -> dict:
                 if cl:
                     it["booked"] = cl["name"]
                     if not dry:
-                        try:
-                            mk.post("/v1/company/joins",
-                                    {"userId": it["uid"], "classId": cl["id"],
-                                     "statusId": JOIN_TRIAL})
-                            text = (f"Записали! {cl['name']} — ждём вас. "
-                                    f"Адрес: {ADDRESS}. Первое занятие "
-                                    f"условно-бесплатное: не понравится — "
-                                    f"платить не нужно.")
-                        except Exception as e:
-                            log.warning("запись не создана: %s", e)
-                            it["booked"] = ""
+                        text = _book_request(mk, it, cl)
                     else:
-                        text = f"[записал бы в {cl['name']}]"
+                        text = (f"[передал бы администратору: {cl['name']}]" if not _auto_join()
+                                else f"[записал бы в {cl['name']}]")
             it["answer"] = text
             if not text:
                 report["человеку"] += 1

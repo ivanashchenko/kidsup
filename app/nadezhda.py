@@ -53,6 +53,33 @@ CAT_URGENT, CAT_CALL = 44337, 104576
 ACTIVE = {2, 50509, 58131, 58132, 83760}
 MIN_TALK = 10          # короче — разговора не было, разбирать нечего
 
+# 10.09.2026, по разбору Иры: запись в живую группу — решение педагога, а не
+# следствие расшифровки. Из «договорились на вторник» не видно ни возраста,
+# ни того, сколько уже в группе. По умолчанию кладём дело дежурной; прежнее
+# поведение включается настройкой auto_join_groups=1.
+AUTO_JOIN = None       # ленивая инициализация: db читается при первом вызове run()
+
+
+def _inbox(text: str, phone: str) -> None:
+    """Дело для дежурной в блок «Появилось за день»."""
+    import httpx
+    from . import db as _db
+    try:
+        r = httpx.get("https://app.kidsup.ru/api/duty",
+                      auth=("admin", _db.get_setting("admin_pass", "CGWstart8*")),
+                      timeout=60).json()
+        full = ((r.get("duty") or [{}])[0].get("name") or "").split()
+        who = full[0] if full else "Лена"
+    except Exception:  # noqa: BLE001
+        who = "Лена"
+    try:
+        httpx.post("https://app.kidsup.ru/api/plan/inbox",
+                   auth=("admin", _db.get_setting("admin_pass", "CGWstart8*")),
+                   json={"who": who, "text": text[:400], "phone": phone,
+                         "source": "звонок Надежды"}, timeout=60)
+    except Exception as e:  # noqa: BLE001
+        log.warning("инбокс не записан: %s", e)
+
 # «Некачественный лид» — статус, в который мы складывали тех, кто звонил
 # не нам, а в Клуб Буракова. Номер есть в нашей CRM, но клиент не наш:
 # такие разговоры Надежды разбирать не нужно и тем более нельзя записывать
@@ -176,6 +203,10 @@ def match_group(mk: MoyklassClient, got: dict) -> list[dict]:
 
 
 def run(day: str | None = None, apply: bool = True) -> dict:
+    global AUTO_JOIN
+    if AUTO_JOIN is None:
+        from . import db as _db
+        AUTO_JOIN = _db.get_setting("auto_join_groups", "0") == "1"
     calls = our_calls(day)
     if not calls:
         log.info("звонков Надежды по нашей базе за день нет")
@@ -229,7 +260,7 @@ def run(day: str | None = None, apply: bool = True) -> dict:
 
             if len(cand) == 1 and info["договорились"] and not info["отказ"]:
                 g = cand[0]
-                if apply:
+                if apply and AUTO_JOIN:
                     try:
                         mk.post("/v1/company/joins",
                                 {"userId": c["uid"], "classId": g["id"],
@@ -238,9 +269,17 @@ def run(day: str | None = None, apply: bool = True) -> dict:
                     except Exception:
                         log.warning("запись не создалась: %s → %s", c["uid"], g["name"])
                         cand = []
+                elif apply:
+                    # 10.09.2026: сами в живую группу не записываем — возраст и
+                    # наполняемость смотрит педагог, а из расшифровки этого не видно.
+                    _inbox(f"{c['name'] or c['num']} (+7{c['num']}): в разговоре с Надеждой "
+                           f"договорились. Подходит {g['name']}. Проверить возраст и место "
+                           f"с педагогом, оформить запись и подтвердить время клиенту. "
+                           f"Расшифровка — в карточке.", c["num"])
+                    stat["дежурной"] = stat.get("дежурной", 0) + 1
                 report.append({"кто": c["name"], "тел": c["num"], "uid": c["uid"],
-                               "итог": "записан", "группа": g["name"],
-                               "цитата": text[:300]})
+                               "итог": "записан" if AUTO_JOIN else "дежурной: оформить запись",
+                               "группа": g["name"], "цитата": text[:300]})
             elif not info["отказ"]:
                 stat["владельцу"] += 1
                 why = ("несколько подходящих групп" if len(cand) > 1
