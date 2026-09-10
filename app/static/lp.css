@@ -149,3 +149,16 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
      box-shadow:0 10px 28px rgba(49,39,131,.12)}
 .gal img{width:100%;height:260px;object-fit:cover;display:block}
 @media (max-width:560px){.gal img{height:220px}}
+
+/* ——— отзывы родителей с Яндекс Карт ——— */
+.revs{columns:3;column-gap:16px;margin-top:22px}
+@media (max-width:980px){.revs{columns:2}}
+@media (max-width:640px){.revs{columns:1}}
+.rev{break-inside:avoid;margin:0 0 16px;background:#fff;border:1px solid var(--line);
+     border-radius:var(--r);padding:20px 22px}
+.rev .stars{color:var(--amber);font-size:15px;letter-spacing:3px;line-height:1}
+.rev blockquote{margin:12px 0 0;font-size:15px;line-height:1.6;color:var(--ink)}
+.rev figcaption{margin-top:14px;font-size:13px;color:var(--muted)}
+.revs-all{margin-top:20px;font-size:15px}
+.revs-all a{color:var(--blue-ink);font-weight:600;text-decoration:none;border-bottom:1px solid rgba(29,167,224,.35)}
+.revs-all a:hover{border-bottom-color:currentColor}
