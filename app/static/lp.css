@@ -125,3 +125,20 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
   .step{grid-template-columns:1fr;gap:3px}
   .cta.ghost{margin-left:0;margin-top:10px}
 }
+
+/* ——— педагоги на страницах курсов ——— */
+.peds{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:22px}
+.ped{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:20px;text-align:center}
+.ped .av{display:inline-block;width:132px;height:132px;border-radius:50%;overflow:hidden;
+     box-shadow:0 8px 24px rgba(49,39,131,.18);background:linear-gradient(135deg,#1DA7E0,#312783)}
+.ped .av img{width:100%;height:100%;object-fit:cover;object-position:50% 22%;display:block}
+.ped h3{font-size:18px;font-weight:700;color:var(--indigo);margin:12px 0 2px}
+.ped .subj{font-size:13px;color:var(--muted);margin-bottom:10px}
+.ped p{font-size:14.5px;color:var(--muted);text-align:left;margin:8px 0}
+.ped .q{font-size:14.5px;color:var(--ink);font-style:italic;text-align:left;
+     border-left:3px solid var(--line);padding-left:12px;margin-top:12px}
+.av-tat img{object-position:50% 50%}.av-kat img{object-position:50% 34%}
+.av-mar img{object-position:50% 50%}.av-luch img{object-position:50% 30%}
+.av-gab img{object-position:50% 20%}.av-ann img{object-position:50% 28%}
+.av-len img{transform:scale(1.18);transform-origin:50% 25%}
+.av-vik img{object-position:50% 30%}.av-mab img{object-position:50% 30%}
