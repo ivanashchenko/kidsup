@@ -2977,7 +2977,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-09.31"
+APP_VERSION = "2026-09-10.05"
 
 
 @app.get("/api/net")
@@ -3028,7 +3028,7 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
             # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
             "roistat_project", "roistat_key",
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
-            "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret", "owner_password",
+            "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret", "owner_password", "yandex_audience_token",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
             "waba_template_id", "waba_templates",
@@ -3048,7 +3048,7 @@ SETTABLE = {"crm_tasks_off", "admin_schedule", "daily_tasks_per_admin", "broadca
 # сам прокси. Показываем хвост: убедиться «тот ли вписан» можно,
 # скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
 # страница настроек открыта всем, у кого есть пароль администратора.
-SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_secret", "owner_password",
+SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_secret", "owner_password", "yandex_audience_token",
                "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password"}
 
 
@@ -5604,6 +5604,119 @@ def api_roistat_catch_visits():
     return {"ok": True, "новых_связок": n}
 
 
+ROISTAT_JUNK_RE = re.compile(r"^(звонок от\s*)?\+?7?\d{10,11}$", re.I)
+
+
+def _card_activity(conn, uid: int) -> dict:
+    """Признаки того, что карточкой реально пользуются: записи, оплаты, группы."""
+    joins = conn.execute("SELECT class_id, status_id FROM joins WHERE user_id=?", (uid,)).fetchall()
+    real = [j for j in joins if j["class_id"] != AUTO_LEAD_CLASS]
+    pays = conn.execute("SELECT COUNT(*) FROM payments WHERE user_id=?", (uid,)).fetchone()[0]
+    recs = conn.execute("SELECT COUNT(*) FROM lesson_records WHERE user_id=?", (uid,)).fetchone()[0]
+    row = conn.execute("SELECT name, phone, created_at FROM users WHERE id=?", (uid,)).fetchone()
+    name = (row["name"] if row else "") or ""
+    return {"id": uid, "name": name, "created": (row["created_at"] if row else "") or "",
+            "joins": len(real), "pays": pays, "records": recs,
+            "junk_name": bool(ROISTAT_JUNK_RE.match(name.strip())),
+            "score": len(real) * 3 + pays * 5 + recs}
+
+
+@app.post("/api/crm/roistat-merge", dependencies=AUTH)
+def api_crm_roistat_merge(payload: dict = Body(default={})):
+    """Дубли по телефону: перенести номер визита Roistat в рабочую карточку.
+
+    09.09.2026 Борис: «есть карточки, созданные по звонкам Roistat, но админы их
+    не использовали и завели новые руками — перенеси номер в рабочие». Логика:
+    на одном телефоне ищем карточку-пустышку с визитом (имя из цифр, нет записей
+    и оплат) и рабочую карточку (записи, оплаты, человеческое имя). Визит
+    переносим в рабочую, пустышку помечаем «ДУБЛЬ» и уводим в архив набора —
+    удалять сам ничего не буду.
+    """
+    from .moyklass_client import MoyklassClient
+    since = str(payload.get("since") or "2026-08-10")
+    dry = bool(payload.get("dry_run", True))
+    limit = int(payload.get("limit") or 200)
+    groups: dict[str, list[int]] = {}
+    with db.get_conn() as conn:
+        for r in conn.execute("SELECT id, phone FROM users WHERE phone IS NOT NULL AND phone != ''"):
+            ph = "".join(ch for ch in str(r["phone"]) if ch.isdigit())[-10:]
+            if len(ph) == 10:
+                groups.setdefault(ph, []).append(r["id"])
+        dups = {ph: ids for ph, ids in groups.items() if len(ids) > 1}
+        cards = {ph: [_card_activity(conn, i) for i in ids] for ph, ids in dups.items()}
+    mk = MoyklassClient(sync.get_api_key())
+    out, done = [], 0
+    diag = {"групп_с_дублями": len(cards), "свежих": 0, "есть_пустышка": 0,
+            "пустышка_с_визитом": 0, "есть_рабочая": 0, "у_рабочей_уже_визит": 0}
+    try:
+        for ph, lst in cards.items():
+            if done >= limit:
+                break
+            fresh = [c for c in lst if (c["created"] or "")[:10] >= since]
+            if not fresh:
+                continue
+            diag["свежих"] += 1
+            junk = [c for c in lst if c["junk_name"] and c["score"] == 0]
+            live = [c for c in lst if c["score"] > 0 or not c["junk_name"]]
+            if not junk or not live:
+                continue
+            diag["есть_пустышка"] += 1
+            worker = sorted(live, key=lambda x: -x["score"])[0]
+            diag["есть_рабочая"] += 1
+            for donor in junk:
+                try:
+                    du = mk.get(f"/v1/company/users/{donor['id']}") or {}
+                except Exception:
+                    du = {}
+                visit = (du.get("roistat") or "").strip()
+                if not visit:
+                    # интеграция часто пишет визит не в поле, а строкой «Промокод: 208906»
+                    try:
+                        from . import roistat as _roistat
+                        cm = mk.get("/v1/company/userComments", {"userId": donor["id"]}) or {}
+                        txt = " ".join((c.get("comment") or "") for c in (cm.get("userComments") or []))
+                        mm = _roistat.VISIT_RE.search(txt)
+                        if mm:
+                            visit = mm.group(1)
+                    except Exception:  # noqa: BLE001
+                        pass
+                if visit:
+                    diag["пустышка_с_визитом"] += 1
+                item = {"phone": ph, "визит": visit or "—",
+                        "пустышка": f"{donor['id']} {donor['name']}",
+                        "рабочая": f"{worker['id']} {worker['name']}",
+                        "активность_рабочей": {k: worker[k] for k in ("joins", "pays", "records")}}
+                if not dry:
+                    try:
+                        if visit:
+                            wu = mk.get(f"/v1/company/users/{worker['id']}") or {}
+                            if not (wu.get("roistat") or "").strip():
+                                mk.safe_update_user(worker["id"], roistat=visit)
+                                mk.post("/v1/company/userComments",
+                                        {"userId": worker["id"], "showToUser": False,
+                                         "comment": f"Перенесён номер визита Roistat {visit} из дублирующей "
+                                                    f"карточки №{donor['id']} ({donor['name']}). "
+                                                    f"Клод, {date.today().isoformat()}."})
+                            else:
+                                diag["у_рабочей_уже_визит"] += 1
+                        mk.safe_update_user(donor["id"], name=f"ДУБЛЬ на удаление → {worker['id']}")
+                        mk.post("/v1/company/userComments",
+                                {"userId": donor["id"], "showToUser": False,
+                                 "comment": f"Дубль карточки №{worker['id']} ({worker['name']}): тот же телефон, "
+                                            f"вся работа ведётся там. Помечена на удаление. "
+                                            f"Клод, {date.today().isoformat()}."})
+                        item["ok"] = True
+                    except Exception as e:  # noqa: BLE001
+                        item["error"] = str(e)[:200]
+                out.append(item)
+                done += 1
+
+    finally:
+        mk.close()
+    return {"ok": True, "dry_run": dry, "с_даты": since, "диагностика": diag,
+            "к_переносу": len(out), "список": out[:60]}
+
+
 @app.post("/api/roistat/auto-cards", dependencies=AUTH)
 def api_roistat_auto_cards(payload: dict = Body(default={})):
     """Проверка и добор автокарточек: {"phone": "79...", "dry_run": true}.
@@ -5681,6 +5794,35 @@ def api_ads_vk_image(payload: dict = Body(...)):
         return {"http": r.status_code, "body": r.json()}
     except Exception:  # noqa: BLE001
         return {"http": r.status_code, "text": r.text[:600]}
+
+
+@app.post("/api/ads/audience", dependencies=OWNER_AUTH)
+def api_ads_audience(payload: dict = Body(...)):
+    """Яндекс Аудитории: {"path": "management/v1/segments", "method": "get", "json": {...}}.
+
+    Радиус вокруг адреса в Директе задаётся только гео-сегментом Аудиторий,
+    поэтому нужен отдельный ход к их API. Токен берём свой (yandex_audience_token),
+    если задан, иначе пробуем токеном Директа — у них общий OAuth-аккаунт.
+    """
+    import httpx
+    tok = db.get_setting("yandex_audience_token") or db.get_setting("yandex_direct_token")
+    if not tok:
+        raise HTTPException(400, "нет токена Яндекса")
+    path = str(payload.get("path") or "").lstrip("/")
+    if ".." in path or not path:
+        raise HTTPException(400, "path обязателен")
+    url = "https://api-audience.yandex.ru/" + path
+    h = {"Authorization": f"OAuth {tok}", "Content-Type": "application/json"}
+    method = str(payload.get("method") or "get").lower()
+    if method == "get":
+        r = httpx.get(url, headers=h, params=payload.get("params") or {}, timeout=90)
+    else:
+        r = httpx.request(method, url, headers=h, json=payload.get("json") or {},
+                          params=payload.get("params") or {}, timeout=90)
+    try:
+        return {"http": r.status_code, "body": r.json()}
+    except Exception:  # noqa: BLE001
+        return {"http": r.status_code, "text": r.text[:800]}
 
 
 @app.post("/api/ads/vk", dependencies=OWNER_AUTH)
