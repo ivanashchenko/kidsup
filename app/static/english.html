@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Roistat Counter Start -->
+<script>
+(function(w, d, s, h, id) {
+    w.roistatProjectId = id; w.roistatHost = h; w.roistatPage = d.location.href; w.roistatReferrer = d.referrer;
+    var p = d.location.protocol == "https:" ? "https://" : "http://";
+    var u = /^.*roistat_visit=[^;]+(.*)?$/.test(d.cookie) ? "/dist/module.js" : "/api/site/1.0/"+id+"/init?referrer="+encodeURIComponent(d.location.href);
+    var js = d.createElement(s); js.charset="UTF-8"; js.async = 1; js.src = p+h+u; var js2 = d.getElementsByTagName(s)[0]; js2.parentNode.insertBefore(js, js2);
+})(window, document, 'script', 'cloud.roistat.com', '3397a0b40200c8ca0a11591ad26c71c5');
+</script>
+<!-- Roistat Counter End -->
+<title>Английский для детей в KidsUP — заговорит за год</title>
+<meta name="description" content="Английский 3–12 лет на Бульваре Рокоссовского: занятие целиком на английском, до 8 детей в группе, кембриджская лестница Starters — Movers — Flyers. Видно по месяцам, что уже умеет ребёнок. Первое занятие условно-бесплатное.">
+<link rel="canonical" href="https://kidsup.ru/english">
+<meta name="theme-color" content="#312783">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kidsup.ru/english">
+<meta property="og:title" content="Английский для детей в KidsUP — заговорит за год">
+<meta property="og:description" content="Занятие целиком на английском, до 8 детей в группе, кембриджская лестница. Видно по месяцам, что уже умеет ребёнок.">
+<meta property="og:image" content="https://kidsup.ru/static/og.jpg">
+<meta property="og:locale" content="ru_RU">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%A9%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap">
+<style>
+:root{
+  --indigo:#312783; --blue:#1DA7E0; --green:#7DB928; --amber:#F59C00; --red:#E30613;
+  --green-cta:#5C8C1D; --green-ink:#4E7A18; --blue-ink:#0F6E96; --red-ink:#C1050F;
+  --ink:#221F3B; --muted:#6A6F87; --bg:#FFFFFF; --soft:#F2F8FD; --line:#E6E9F2; --r:18px;
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth;scroll-padding-top:12px;overflow-x:clip}
+body{background:var(--bg);color:var(--ink);
+     font:16px/1.62 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+     overflow-x:clip}
+h1,h2,h3,.num{font-family:Rubik,Inter,system-ui,sans-serif;text-wrap:balance}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+section{padding:46px 0}
+h2{font-size:clamp(23px,4.4vw,32px);line-height:1.15;font-weight:900;color:var(--indigo);margin-bottom:8px}
+.lead{color:var(--muted);max-width:62ch;font-size:17px}
+a{color:var(--blue-ink)}
+
+/* ——— шапка ——— */
+.hero{background:linear-gradient(140deg,#312783 0%,#3b3bb0 45%,#1DA7E0 100%);color:#fff;
+      padding:52px 0 46px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-90px;top:-90px;width:340px;height:340px;
+      border-radius:50%;background:rgba(255,255,255,.08)}
+.hero h1{font-size:clamp(29px,6vw,50px);line-height:1.06;font-weight:900;margin-bottom:14px;position:relative}
+.hero p{font-size:clamp(16px,2.4vw,19px);opacity:.95;max-width:56ch;position:relative}
+.hero .brand{font-weight:700;letter-spacing:.16em;font-size:12px;opacity:.85;margin-bottom:18px;
+      text-transform:uppercase;position:relative}
+.cta{display:inline-flex;align-items:center;gap:9px;background:var(--green-cta);color:#fff;
+     text-decoration:none;font-weight:700;font-family:Rubik,sans-serif;
+     padding:14px 28px;border-radius:999px;margin-top:22px;position:relative;
+     box-shadow:0 8px 22px rgba(0,0,0,.18)}
+.cta:hover{filter:brightness(1.07)}
+.cta.ghost{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.5);margin-left:10px}
+.hero .note{margin-top:18px;font-size:14.5px;opacity:.9;position:relative}
+
+/* ——— полоса фактов ——— */
+.facts{background:var(--soft);border-block:1px solid var(--line);padding:24px 0}
+.facts .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px}
+.facts b{display:block;font-family:Rubik,sans-serif;font-size:27px;font-weight:900;color:var(--indigo);line-height:1.1}
+.facts span{font-size:14px;color:var(--muted)}
+
+/* ——— карточки ——— */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px;margin-top:22px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:19px 20px}
+.card h3{font-size:17px;font-weight:700;color:var(--indigo);margin-bottom:6px}
+.card p{font-size:15px;color:var(--muted)}
+
+/* ——— дорожка по месяцам ——— */
+.road{margin-top:24px;display:grid;gap:0}
+.step{display:grid;grid-template-columns:104px 1fr;gap:18px;padding:16px 0;border-top:1px solid var(--line)}
+.step:first-child{border-top:0}
+.step .when{font-family:Rubik,sans-serif;font-weight:700;color:var(--blue-ink);font-size:15px;padding-top:1px}
+.step h3{font-size:17px;font-weight:700;margin-bottom:3px}
+.step p{font-size:15px;color:var(--muted)}
+.step.exam{background:#F7FBF0;border-radius:14px;padding:16px 14px;border-top:0;margin:6px 0}
+.step.exam .when{color:var(--green-ink)}
+
+/* ——— занятие ——— */
+.lesson{counter-reset:l;margin-top:20px;display:grid;gap:10px}
+.lesson li{list-style:none;display:grid;grid-template-columns:44px 1fr;gap:14px;align-items:start;
+     background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 15px}
+.lesson li::before{counter-increment:l;content:counter(l);font-family:Rubik,sans-serif;font-weight:900;
+     color:#fff;background:var(--blue);width:30px;height:30px;border-radius:50%;
+     display:grid;place-items:center;font-size:15px}
+.lesson b{display:block;font-size:15.5px}
+.lesson span{font-size:14.5px;color:var(--muted)}
+
+/* ——— вопросы ——— */
+details{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 17px;margin-top:10px}
+details[open]{border-color:#c9d9ea}
+summary{font-family:Rubik,sans-serif;font-weight:700;cursor:pointer;font-size:16.5px;color:var(--indigo)}
+details p{margin-top:9px;font-size:15px;color:var(--muted)}
+
+.dark{background:var(--indigo);color:#fff}
+.dark h2{color:#fff}
+.dark .lead{color:rgba(255,255,255,.85)}
+.dark .card{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.18)}
+.dark .card h3{color:#fff}
+.dark .card p{color:rgba(255,255,255,.82)}
+
+/* ——— расписание ——— */
+table{width:100%;border-collapse:collapse;font-size:15px;margin-top:18px}
+th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+   padding:9px 8px;border-bottom:2px solid var(--line)}
+td{padding:11px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.scroll{overflow-x:auto}
+.pill{display:inline-block;padding:2px 11px;border-radius:999px;font-size:12.5px;font-weight:700;color:#fff;white-space:nowrap}
+.p-free{background:var(--green-cta)}.p-few{background:var(--amber)}.p-none{background:#9a99b3}
+
+/* ——— цена ——— */
+.price{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:20px}
+.price .box{border:2px solid var(--line);border-radius:var(--r);padding:20px}
+.price .box.hi{border-color:var(--green);background:#F8FCF2}
+.price .num{font-size:33px;font-weight:900;color:var(--indigo);line-height:1.1}
+.price small{color:var(--muted);font-size:14px}
+.price ul{margin:12px 0 0 0;padding-left:18px;font-size:14.5px;color:var(--muted)}
+.price li{margin:5px 0}
+
+/* ——— форма ——— */
+.form-sec{background:var(--soft);border-top:1px solid var(--line)}
+form{max-width:460px;margin:20px auto 0;text-align:left;background:#fff;border:1px solid var(--line);
+     border-radius:var(--r);padding:22px}
+label{display:block;font-size:13.5px;font-weight:600;margin:12px 0 5px}
+input,select{width:100%;padding:12px 13px;border:1px solid #cfd6e4;border-radius:11px;font:inherit;font-size:16px}
+input:focus,select:focus{outline:2px solid var(--blue);outline-offset:1px;border-color:var(--blue)}
+.consent{display:flex;gap:9px;align-items:flex-start;font-weight:400;font-size:13px;color:var(--muted);margin-top:14px}
+.consent input{width:auto;margin-top:3px}
+button{width:100%;margin-top:16px;background:var(--green-cta);color:#fff;border:0;border-radius:999px;
+       padding:14px;font:700 16px Rubik,sans-serif;cursor:pointer}
+button:hover{filter:brightness(1.07)}
+button:disabled{opacity:.6;cursor:default}
+.hp{position:absolute;left:-9999px}
+.f-err{color:var(--red-ink);font-size:13px;margin-top:5px}
+.alt{font-size:13.5px;color:var(--muted);margin-top:13px;text-align:center}
+.done{text-align:center;padding:12px 0}
+
+footer{background:#1b1740;color:rgba(255,255,255,.78);padding:32px 0;font-size:14.5px}
+footer a{color:#8fd0f2}
+footer b{color:#fff;font-family:Rubik,sans-serif}
+@media (max-width:560px){
+  .step{grid-template-columns:1fr;gap:3px}
+  .cta.ghost{margin-left:0;margin-top:10px}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="brand">KidsUP · Бульвар Рокоссовского</div>
+    <h1>Ребёнок заговорит по-английски.<br>Не переведёт — заговорит.</h1>
+    <p>Занятие идёт целиком на английском, без перевода на русский, с первой минуты. До 8 детей
+    в группе — каждый говорит вслух не меньше 12 раз за занятие. Кембриджская лестница:
+    Starters → Movers → Flyers.</p>
+    <a class="cta" href="#signup">Записаться на первое занятие</a>
+    <a class="cta ghost" href="#road">Что ребёнок будет уметь по месяцам</a>
+    <p class="note">Учебный год идёт с 31 августа — присоединиться можно в любой месяц,
+    педагог определит уровень на первом занятии.</p>
+  </div>
+</header>
+
+<div class="facts">
+  <div class="wrap grid">
+    <div><b>до 8</b><span>детей в группе — не 15 и не 20</span></div>
+    <div><b>100%</b><span>занятия на английском, без перевода</span></div>
+    <div><b>12+</b><span>раз ребёнок говорит вслух за 50 минут</span></div>
+    <div><b>3–12</b><span>лет — своя дорожка для каждого возраста</span></div>
+  </div>
+</div>
+
+<section id="road">
+  <div class="wrap">
+    <h2>Что ребёнок будет уметь — месяц за месяцем</h2>
+    <p class="lead">Обычно родителю говорят «занимается, всё хорошо». Мы говорим иначе: вот
+    что ребёнок умеет сейчас и что появится дальше. Дорожка первого года для 5–8 лет —
+    у малышей и у школьников она своя, но так же расписана.</p>
+
+    <div class="road">
+      <div class="step"><div class="when">Сентябрь</div><div>
+        <h3>Понимает речь, ещё не говорит</h3>
+        <p>Выполняет команды педагога без перевода: встань, покружись, дай синий, прыгни три раза.
+        Молчание первых недель — нормальный и ожидаемый этап: ребёнок сначала набирает слух.</p></div></div>
+
+      <div class="step"><div class="when">Октябрь</div><div>
+        <h3>Первые ответы о себе</h3>
+        <p>Говорит целыми фразами, а не словами: <i>My name is… I'm five. I'm fine, thank you.</i>
+        Знает 4–5 стихов и песен наизусть. Родителям приходит первое видео с занятия.</p></div></div>
+
+      <div class="step"><div class="when">Ноябрь</div><div>
+        <h3>10–15 стихов наизусть, слышит слова в потоке</h3>
+        <p>Узнаёт знакомые слова в быстрой английской речи — это тот навык, из-за отсутствия
+        которого школьный английский потом не работает. Цвета, счёт, семья, еда, животные.</p></div></div>
+
+      <div class="step"><div class="when">Декабрь</div><div>
+        <h3>Отвечает на вопросы и играет сценку</h3>
+        <p>Отвечает про себя, семью и то, что любит. Понимает и называет больше 150 слов.
+        На новогоднем занятии — короткая сценка на английском для родителей.</p></div></div>
+
+      <div class="step"><div class="when">Январь</div><div>
+        <h3>Начинает читать — со знакомых стихов</h3>
+        <p>Те же стихи, которые ребёнок давно знает наизусть, он получает напечатанными.
+        Читаем хором, ведём пальцем по строке. Ребёнок читает не «буквы», а текст,
+        который уже понимает, — поэтому получается сразу.</p></div></div>
+
+      <div class="step"><div class="when">Февраль — март</div><div>
+        <h3>Первая сказка целиком</h3>
+        <p>Henny Penny, The Little Red Hen — читаем и разыгрываем без единого русского слова.
+        Дома ребёнок читает только вместе с аудио, чтобы не закрепить неправильное произношение.</p></div></div>
+
+      <div class="step exam"><div class="when">Апрель</div><div>
+        <h3>Внутренний экзамен в формате Cambridge</h3>
+        <p>Слушание, говорение и — для тех, кто готов, — чтение, ровно по структуре
+        Pre A1 Starters. Родитель получает результат по разделам и видит не «занимался год»,
+        а конкретный уровень. Сдавать настоящий кембриджский экзамен или нет — решает семья,
+        мы подготовим и поможем записаться.</p></div></div>
+
+      <div class="step"><div class="when">Май</div><div>
+        <h3>Рассказывает о себе сам, без подсказки</h3>
+        <p>6–8 связных фраз, понимает педагога без перевода, читает знакомый текст вслух.
+        Около 300 слов и 40 рабочих фраз за первый год.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section style="background:var(--soft);border-block:1px solid var(--line)">
+  <div class="wrap">
+    <h2>Как проходит занятие</h2>
+    <p class="lead">50 минут, ни одной русской фразы. Структура одинаковая каждый раз —
+    ребёнок знает, что будет дальше, и потому не боится говорить.</p>
+    <ul class="lesson">
+      <li><b>Ритуал входа — 3 минуты</b><span>Одна и та же песня-приветствие. Сигнал: русский язык
+        закончился, начался английский.</span></li>
+      <li><b>Движение и команды — 7 минут</b><span>Педагог говорит — дети делают. Тело помогает
+        понять смысл без перевода, и никто не сидит на месте.</span></li>
+      <li><b>Вспоминаем прошлое занятие — 7 минут</b><span>Не «повторяем», а достаём из памяти:
+        именно усилие вспомнить закрепляет слово. Повторы идут через день, три, неделю и месяц.</span></li>
+      <li><b>Новое — 10 минут</b><span>Учим не отдельные слова, а готовые фразы целиком —
+        так ребёнок сразу говорит предложениями.</span></li>
+      <li><b>Игра, где нужно говорить — 15 минут</b><span>Настолки, поиск, сценки, соревнования.
+        Считаем реплики каждого ребёнка: молчунов в группе не остаётся.</span></li>
+      <li><b>Стих или сказка и ритуал выхода — 8 минут</b><span>То, что уйдёт домой в аудио.
+        Прощальная песня — и переключение обратно на русский.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="dark">
+  <div class="wrap">
+    <h2>15 минут дома, которые решают почти всё</h2>
+    <p class="lead">Скажем честно арифметику, которую обычно не показывают. Два занятия в неделю
+    по 50 минут — это 60 часов за учебный год. Чтобы ребёнок свободно заговорил, языку нужно
+    звучать заметно больше.</p>
+    <div class="cards">
+      <div class="card"><h3>Что мы даём</h3><p>Плейлист ровно тех песен, стихов и сказок,
+        которые ребёнок проходит на занятии. Ничего нового, ничего лишнего — только то,
+        что уже знакомо.</p></div>
+      <div class="card"><h3>Что делает семья</h3><p>Включает эти 15 минут фоном: пока едете,
+        завтракаете, собираете конструктор. Не заставляя слушать и не проверяя.</p></div>
+      <div class="card"><h3>Что это даёт</h3><p>Ещё около 45 часов английского за год —
+        почти второй учебный год, бесплатно. Именно поэтому дети, у кого дома звучит аудио,
+        обгоняют остальных к декабрю.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Вопросы, которые задают почти все</h2>
+
+    <details open><summary>Почему на занятии не переводят на русский?</summary>
+      <p>Как только в занятии появляется перевод, ребёнок перестаёт слушать английский
+      и ждёт русского — мозг выбирает лёгкий путь. Поэтому смысл объясняется движением,
+      картинкой, интонацией и повтором. Первые недели ребёнок понимает малую часть — и это
+      нормально: к концу года понимание вырастает в разы, а привычки «ждать перевода» не возникает.</p></details>
+
+    <details><summary>А почему вы не учите алфавит с первого месяца?</summary>
+      <p>Учим, но не с него начинаем — и вот почему. Ребёнок, который выучил «эй-би-си» раньше,
+      чем услышал язык, читает слово <i>cat</i> как «си-эй-ти» и не понимает, что прочёл.
+      Сначала звук и смысл, потом буква. У дошкольников буквы приходят во втором полугодии
+      и на втором году; у школьников 8–12, которые уже пишут по-русски, — с первого месяца,
+      им иначе неудобно.</p></details>
+
+    <details><summary>Ребёнок молчит на занятиях. Это провал?</summary>
+      <p>Это ожидаемая фаза, у неё есть название — период молчания. Ребёнок набирает слух
+      и начинает говорить, когда накопит достаточно. Мы не давим и не вызываем к доске:
+      сначала ребёнок отвечает хором вместе со всеми, потом — сам. Если молчание затягивается
+      дольше обычного, педагог скажет вам об этом первым и предложит, что делать.</p></details>
+
+    <details><summary>Мы приходим в середине года. Не поздно?</summary>
+      <p>Нет. Педагог определяет уровень на первом занятии и ставит ребёнка в группу, где ему
+      будет по силам, а не по возрасту. Догонять помогает тот же домашний плейлист —
+      он есть с первого дня.</p></details>
+
+    <details><summary>Чем это отличается от школьного английского?</summary>
+      <p>В школе язык изучают: правила, перевод, упражнения. У нас на языке живут: команды,
+      игры, стихи, сценки, сказки. Поэтому школьный английский чаще даёт оценку в дневнике,
+      а наш — ребёнка, который отвечает на вопрос иностранца.</p></details>
+  </div>
+</section>
+
+<section style="background:var(--soft);border-block:1px solid var(--line)">
+  <div class="wrap">
+    <h2>Как вы будете видеть прогресс</h2>
+    <div class="cards">
+      <div class="card"><h3>Видео с занятия</h3><p>Раз в две недели — короткий ролик, где слышно
+        и видно вашего ребёнка. Не постановочный отчёт, а рабочий момент.</p></div>
+      <div class="card"><h3>Карточка речи</h3><p>Четыре раза в год педагог отмечает конкретное:
+        сколько фраз ребёнок говорит сам, отвечает ли на вопрос без подсказки, читает ли знакомый текст.</p></div>
+      <div class="card"><h3>Экзамен в апреле</h3><p>Внутренний, в формате Cambridge, по разделам.
+        Видно не «стал лучше», а уровень и что именно подтянуть.</p></div>
+    </div>
+
+    <h2 style="margin-top:38px">Чего мы не обещаем</h2>
+    <p class="lead">Честность здесь дешевле разочарования через полгода.</p>
+    <div class="cards">
+      <div class="card"><h3>Носителя языка</h3><p>У нас работает русскоязычный педагог,
+        который ведёт занятие целиком по-английски. Для детей это работает лучше: он понимает,
+        где ребёнку трудно.</p></div>
+      <div class="card"><h3>Международный сертификат за год</h3><p>Кембриджский экзамен —
+        отдельная процедура и отдельная плата. Школьник с нуля обычно готов к нему к апрелю
+        первого года, дошкольник — к концу второго. Мы говорим об этом сразу.</p></div>
+      <div class="card"><h3>«Свободно заговорит за три месяца»</h3><p>За три месяца ребёнок начнёт
+        понимать и отвечать короткими фразами. Свободная речь — это год и домашний контур.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="groups">
+  <div class="wrap">
+    <h2>Группы и свободные места</h2>
+    <p class="lead">Живые данные из нашей системы записи, обновляются каждые несколько минут.
+    В группу до 8 детей — поэтому места заканчиваются быстро.</p>
+    <div class="scroll"><table id="tbl">
+      <thead><tr><th>Возраст</th><th>Уровень</th><th>Дни</th><th>Время</th><th>Места</th></tr></thead>
+      <tbody><tr><td colspan="5" style="color:var(--muted)">Загружаем расписание…</td></tr></tbody>
+    </table></div>
+    <p class="alt" style="text-align:left">Не нашли удобное время — напишите нам, мы ведём лист ожидания
+    и открываем новые группы по спросу.</p>
+  </div>
+</section>
+
+<section style="background:var(--soft);border-block:1px solid var(--line)">
+  <div class="wrap">
+    <h2>Сколько стоит</h2>
+    <div class="price">
+      <div class="box hi">
+        <div class="num">8 400 ₽</div>
+        <small>8 занятий в месяц, 2 раза в неделю</small>
+        <ul>
+          <li>Занятие 50 минут, до 8 детей</li>
+          <li>Домашний аудиоплейлист — без доплаты</li>
+          <li>Видео с занятий и карточка речи</li>
+        </ul>
+      </div>
+      <div class="box">
+        <div class="num">5 000 ₽</div>
+        <small>4 занятия в месяц, 1 раз в неделю</small>
+        <ul>
+          <li>Для тех, кто пробует или совмещает</li>
+          <li>К экзамену за год такой темп не выводит — говорим честно</li>
+        </ul>
+      </div>
+      <div class="box">
+        <div class="num">Первое занятие</div>
+        <small>условно-бесплатное</small>
+        <ul>
+          <li>Не понравилось — платить не нужно</li>
+          <li>Понравилось — занятие входит в первый абонемент</li>
+          <li>В день первого занятия на первый абонемент — скидка 15%</li>
+          <li>−10% на второй предмет, второго ребёнка и многодетным семьям;
+              скидки не суммируются, действует наибольшая</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="form-sec" id="signup">
+  <div class="wrap" style="text-align:center">
+    <h2>Записаться на первое занятие</h2>
+    <p class="lead" style="margin:0 auto">Оставьте телефон — администратор подберёт группу по уровню
+    и возрасту и ответит на вопросы. Перезваниваем в течение 15 минут в рабочее время.</p>
+    <form id="lead" action="https://app.kidsup.ru/api/public/lead" method="post" novalidate>
+      <label for="f-phone">Ваш телефон</label>
+      <input id="f-phone" name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-describedby="f-phone-err">
+      <p id="f-phone-err" class="f-err" hidden>Проверьте номер: нужен российский мобильный, например +7 916 000-00-00</p>
+      <label for="f-name">Имя ребёнка</label>
+      <input id="f-name" name="name" placeholder="Мария" autocomplete="off">
+      <label for="f-age">Возраст ребёнка</label>
+      <input id="f-age" name="age" placeholder="5 лет">
+      <input class="hp" id="f-web" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label class="consent"><input type="checkbox" id="f-ok" name="consent" required>
+        <span>Соглашаюсь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки
+        персональных данных</a> и на обработку моих данных для записи на занятие</span></label>
+      <button type="submit">Отправить заявку</button>
+      <p class="alt">Удобнее самим?
+      <a href="https://app.kidsup.ru/go/whatsapp?src=english" target="_blank" rel="noopener">WhatsApp</a> ·
+      <a href="tel:+74951209024">+7 495 120-90-24</a> · ежедневно с 9:00</p>
+    </form>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <b>Детский центр и английский сад KidsUP</b><br>
+    Москва, бульвар Маршала Рокоссовского, 6 к1В — 2 минуты от метро Бульвар Рокоссовского,
+    напротив ТЦ «Янтарь». 7-й подъезд, 2 этаж.<br>
+    <a href="tel:+74951209024">+7 495 120-90-24</a> ·
+    <a href="https://app.kidsup.ru/go/whatsapp?src=english-footer" target="_blank" rel="noopener">WhatsApp</a> ·
+    <a href="https://kidsup.ru/">все направления центра</a>
+  </div>
+</footer>
+
+<script>
+/* Живое расписание английского из той же системы, что видят администраторы. */
+fetch('https://app.kidsup.ru/api/public/schedule').then(function(r){return r.json()}).then(function(d){
+  var rows = (d.groups || []).filter(function(g){ return g.course === 'Английский язык' && g.day !== '—'; });
+  var ord = {'Пн · Ср': '1', 'Вт · Чт': '2'};   /* иначе «Вт» встаёт выше «Пн» по алфавиту */
+  rows.sort(function(a,b){ return ((ord[a.day]||'9')+a.time).localeCompare((ord[b.day]||'9')+b.time); });
+  var tb = document.querySelector('#tbl tbody');
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">' +
+      'Позвоните нам — подскажем актуальные места.</td></tr>'; return; }
+  tb.innerHTML = rows.map(function(g){
+    var lvl = (g.name.match(/_(Pre-A1[^(]*|A1[^(]*)\(/) || [,''])[1].trim() || 'по уровню';
+    var pill = g.free > 2 ? '<span class="pill p-free">есть места</span>'
+             : g.free > 0 ? '<span class="pill p-few">последние: ' + g.free + '</span>'
+                          : '<span class="pill p-none">лист ожидания</span>';
+    return '<tr><td>' + (g.age || '') + '</td><td>' + lvl + '</td><td>' + g.day +
+           '</td><td>' + g.time + '</td><td>' + pill + '</td></tr>';
+  }).join('');
+}).catch(function(){
+  document.querySelector('#tbl tbody').innerHTML =
+    '<tr><td colspan="5" style="color:var(--muted)">Позвоните нам — подскажем актуальные места.</td></tr>';
+});
+
+/* Заявка — тот же приём, что и на главной странице сайта. */
+function normPhone(v){ var s = (v||'').replace(/\D/g,''); if (s.length === 11 && s[0] === '8') s = '7' + s.slice(1);
+  return (s.length === 11 && s[0] === '7' && s[1] === '9') ? s : ''; }
+document.getElementById('lead').addEventListener('submit', async function(e){
+  e.preventDefault();
+  var err = document.getElementById('f-phone-err');
+  var p = normPhone(document.getElementById('f-phone').value);
+  if (!p) { err.hidden = false; document.getElementById('f-phone').focus(); return; }
+  err.hidden = true;
+  var ok = document.getElementById('f-ok');
+  if (ok && !ok.checked) { ok.focus(); return; }
+  var btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true; btn.textContent = 'Отправляем…';
+  var rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
+  try {
+    var r = await fetch('https://app.kidsup.ru/api/public/lead', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: document.getElementById('f-name').value,
+                            age: document.getElementById('f-age').value,
+                            phone: p, course: 'Английский язык', roistat: rv,
+                            note: ('страница английского | ' + (location.search || '').slice(1)).slice(0, 250),
+                            website: document.getElementById('f-web').value})});
+    var j = await r.json();
+    if (j.ok) {
+      try { ym(69569509, 'reachGoal', 'lead', {course: 'Английский язык'}); } catch (_) {}
+      try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
+      e.target.innerHTML = '<div class="done"><h3 style="color:var(--green-ink)">Заявка принята</h3>' +
+        '<p style="color:var(--muted)">Администратор перезвонит в течение 15 минут в рабочее время ' +
+        'и подберёт группу по уровню ребёнка.</p></div>';
+      return;
+    }
+    throw new Error('bad');
+  } catch (_) {
+    btn.disabled = false; btn.textContent = 'Отправить заявку';
+    err.textContent = 'Не получилось отправить. Позвоните нам: +7 495 120-90-24'; err.hidden = false;
+  }
+});
+</script>
+
+<!-- Яндекс.Метрика — счётчик 69569509 (тот же, что на kidsup.ru) -->
+<script>
+(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],
+k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+(window,document,"script","https://mc.yandex.ru/metrika/tag.js","ym");
+ym(69569509,"init",{clickmap:true,trackLinks:true,accurateTrackBounce:true,webvisor:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/69569509" style="position:absolute;left:-9999px" alt="" loading="lazy" decoding="async"></div></noscript>
+<!-- Пиксель VK Рекламы (счётчик 3355457) -->
+<script>
+var _tmr = window._tmr || (window._tmr = []);
+_tmr.push({id: "3355457", type: "pageView", start: (new Date()).getTime()});
+(function (d, w, id) {
+  if (d.getElementById(id)) return;
+  var ts = d.createElement("script"); ts.type = "text/javascript"; ts.async = true; ts.id = id;
+  ts.src = "https://top-fwz1.mail.ru/js/code.js";
+  var f = function () {var s = d.getElementsByTagName("script")[0]; s.parentNode.insertBefore(ts, s);};
+  if (w.opera == "[object Opera]") { d.addEventListener("DOMContentLoaded", f, false); } else { f(); }
+})(document, window, "tmr-code");
+</script>
+<noscript><div><img src="https://top-fwz1.mail.ru/counter?id=3355457;js=na" style="position:absolute;left:-9999px" alt="Top.Mail.Ru" loading="lazy" decoding="async"></div></noscript>
+</body>
+</html>

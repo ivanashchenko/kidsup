@@ -2986,7 +2986,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.25"
+APP_VERSION = "2026-09-10.26"
 
 
 @app.get("/api/net")
@@ -6284,6 +6284,31 @@ def _preview(name: str) -> HTMLResponse:
     html = f.read_text(encoding="utf-8")
     html = html.replace("<head>", '<head>\n<meta name="robots" content="noindex, nofollow">', 1)
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/english", response_class=HTMLResponse)
+async def english_page():
+    """Страница английского для родителей — без пароля, живое расписание групп
+    из /api/public/schedule и заявка в тот же приём, что и на сайте. Отдельная
+    страница нужна, потому что английский продаётся не «списком направлений»,
+    а тем, что ребёнок умеет к каждому месяцу."""
+    f = BASE / "static" / "english.html"
+    if not f.exists():
+        raise HTTPException(404, "страница не собрана")
+    return HTMLResponse(f.read_text(encoding="utf-8"))
+
+
+@app.get("/english/metodika", response_class=HTMLResponse)
+def english_metodika_page():
+    """Рабочая методика для педагогов английского — открытая ссылка без пароля.
+
+    Внутренний стандарт (/base/english_standard) педагогам не годится: там разбор
+    несостыковок и он под общим паролем администраторов. Педагогу нужен документ,
+    который открывается с телефона и говорит, как вести занятие."""
+    f = BASE / "static" / "english_metodika.html"
+    if not f.exists():
+        raise HTTPException(404, "страница не собрана")
+    return HTMLResponse(f.read_text(encoding="utf-8"))
 
 
 @app.get("/day", response_class=HTMLResponse)
