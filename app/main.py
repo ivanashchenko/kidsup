@@ -2991,7 +2991,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.47"
+APP_VERSION = "2026-09-10.48"
 
 
 @app.get("/api/net")
@@ -5514,6 +5514,25 @@ def api_mkweb_open(payload: dict = Body(...)):
                                str(payload.get("frame") or ""))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"open: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.post("/api/web/open", dependencies=OWNER_AUTH)
+def api_web_open(payload: dict = Body(...)):
+    """Открыть публичную страницу чистым браузером: {url, wait_ms?, actions?}.
+
+    Для источников, которые отдают содержимое только живому браузеру, — прежде
+    всего отзывов на Яндекс Картах. Сессия МойКласса сюда не подмешивается.
+    """
+    from . import mkweb
+    url = str(payload.get("url") or "")
+    if not url.startswith("https://"):
+        raise HTTPException(400, "нужен https-адрес")
+    try:
+        return mkweb.open_public(url, int(payload.get("wait_ms") or 6000),
+                                 int(payload.get("max_text") or 20000),
+                                 payload.get("actions") or None)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"open_public: {type(e).__name__}: {str(e)[:300]}")
 
 
 @app.get("/api/mkweb/history", dependencies=OWNER_AUTH)

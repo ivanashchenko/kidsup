@@ -323,6 +323,62 @@ def _parse_hist_row(cells: list[str]) -> dict:
     }
 
 
+def open_public(url: str, wait_ms: int = 6000, max_text: int = 20000,
+                actions: list | None = None) -> dict:
+    """Открыть ЛЮБУЮ публичную страницу чистым браузером — без сессии МойКласса.
+
+    Нужно там, где данные отдаются только живому браузеру: отзывы на Яндекс
+    Картах приходят обычным запросом в количестве трёх штук и обрезанными.
+    Контекст создаётся пустым, поэтому cookies МойКласса на чужой домен
+    не уезжают: это единственная причина, по которой функция отдельная,
+    а не флаг у open_page.
+    """
+    from playwright.sync_api import sync_playwright
+
+    if not url.startswith("https://"):
+        return {"ok": False, "error": "только https"}
+    with _lock, sync_playwright() as p:
+        b = _launch(p)
+        ctx = b.new_context(viewport={"width": 1280, "height": 1000}, locale="ru-RU",
+                            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                       "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                       "Chrome/124.0 Safari/537.36")
+        pg = ctx.new_page()
+        pg.goto(url, wait_until="domcontentloaded", timeout=90000)
+        pg.wait_for_timeout(wait_ms)
+        done = []
+        for st in actions or []:
+            try:
+                if "wait" in st and len(st) == 1:
+                    pg.wait_for_timeout(int(st["wait"]))
+                elif "js" in st:
+                    st = {**st, "result": pg.evaluate(st["js"])}
+                elif st.get("scroll"):
+                    box = st.get("css")
+                    for _ in range(int(st.get("times", 10))):
+                        if box:
+                            pg.eval_on_selector(box, "e => e.scrollBy(0, e.clientHeight * 2)")
+                        else:
+                            pg.mouse.wheel(0, 3000)
+                        pg.wait_for_timeout(int(st.get("pause", 700)))
+                elif st.get("css"):
+                    pg.locator(st["css"]).nth(int(st.get("nth", 0))).click(timeout=15000)
+                elif st.get("click"):
+                    pg.get_by_text(str(st["click"]), exact=bool(st.get("exact", False))) \
+                      .nth(int(st.get("nth", 0))).click(timeout=15000)
+                pg.wait_for_timeout(int(st.get("after", 1200)))
+                done.append({**st, "ok": True})
+            except Exception as e:  # noqa: BLE001
+                done.append({**st, "ok": False, "error": str(e).splitlines()[0][:160]})
+                if st.get("required", True):
+                    break
+        text = pg.inner_text("body")[:max_text]
+        pg.screenshot(path=str(SHOT), full_page=False)
+        out = {"ok": True, "url": pg.url, "title": pg.title(), "text": text, "actions": done}
+        b.close()
+        return out
+
+
 def history(period: str = "Сегодня", employee: str = "", event_type: str = "",
             max_pages: int = 40, date_from: str = "", date_to: str = "") -> dict:
     """Читает /history: период кнопкой («Вчера»/«Сегодня»/«Неделя»/«Месяц») или датами
