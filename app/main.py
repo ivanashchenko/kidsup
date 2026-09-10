@@ -930,6 +930,10 @@ DOC_GROUPS = [
          "Живой список: кому сегодня не дозвонились и кто не ответил на сообщение-догон. Строится в момент открытия"),
         ("__url:/zapolnyaemost", "📊 Заполняемость групп 2026/27",
          "Все группы сезона против плана, самые пустые сверху, горящие подсвечены. По ним собираются приоритеты обзвона"),
+        ("bonusy_avgust", "💰 Бонусы за август — Аня и Ира, поимённо",
+         "Как посчитана выплата 10.09: ставки, из чего сложилась сумма, "
+         "сколько ещё лежит на столе по августовским записям и почему разрыв "
+         "именно такой. Каждая запись видна отдельной строкой — можно проверить любую"),
         ("bonusy_raschet", "💰 Рейтинг админов и расчёт бонусов",
          "Записи, дошедшие до пробного и оплаты по каждому админу с 17.08 "
          "с начислением по ставкам владельца. Пробные начинаются 31.08 — "
@@ -2977,7 +2981,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.15"
+APP_VERSION = "2026-09-10.17"
 
 
 @app.get("/api/net")
@@ -5920,7 +5924,7 @@ def api_ads_geo(plan: str = "30377205"):
 
 
 @app.get("/api/bonusy", dependencies=OWNER_AUTH)
-def api_bonusy(since: str = "2026-08-01"):
+def api_bonusy(since: str = "2026-08-01", until: str = "", rows: int = 0, who: str = ""):
     """Расчёт бонусов по схеме владельца от 26.08 за период с since.
 
     10.09: страница bonusy_raschet собиралась 30.08 — за день до первых пробных,
@@ -5932,10 +5936,17 @@ def api_bonusy(since: str = "2026-08-01"):
     data = bonusy.collect(since)
     keep = ("count", "total_all", "cont", "zayavki", "came", "paid",
             "money", "forecast", "trial_pot")
-    return {"since": since, "today": date.today().isoformat(),
-            "rates": {"пробное": bonusy.RATE_TRIAL, "оплата сразу": bonusy.RATE_BUY_FAST,
-                      "оплата за 2 недели": bonusy.RATE_BUY_2W},
-            "admins": {who: {k: v[k] for k in keep} for who, v in data.items()}}
+    out = {"since": since, "today": date.today().isoformat(),
+           "rates": {"пробное": bonusy.RATE_TRIAL, "оплата сразу": bonusy.RATE_BUY_FAST,
+                     "оплата за 2 недели": bonusy.RATE_BUY_2W},
+           "admins": {who: {k: v[k] for k in keep} for who, v in data.items()}}
+    if rows:
+        # построчно: без этого выплату нельзя показать самому админу, а
+        # непрозрачный бонус не мотивирует, а злит
+        who_f = [w.strip() for w in (who or "").split(",") if w.strip()]
+        out["rows"] = {w: [r for r in v["rows"] if not until or r["date"] <= until]
+                       for w, v in data.items() if not who_f or w in who_f}
+    return out
 
 
 @app.get("/api/crm/classes", dependencies=AUTH)
