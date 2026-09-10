@@ -2977,7 +2977,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.14"
+APP_VERSION = "2026-09-10.15"
 
 
 @app.get("/api/net")
@@ -5917,6 +5917,25 @@ def api_ads_geo(plan: str = "30377205"):
         except Exception as e:  # noqa: BLE001
             out["vk"]["error"] = str(e)[:200]
     return out
+
+
+@app.get("/api/bonusy", dependencies=OWNER_AUTH)
+def api_bonusy(since: str = "2026-08-01"):
+    """Расчёт бонусов по схеме владельца от 26.08 за период с since.
+
+    10.09: страница bonusy_raschet собиралась 30.08 — за день до первых пробных,
+    поэтому показывала почти нули. Августовская работа превращается в деньги
+    в сентябре, и чтобы платить по факту, счёт нужно уметь пересобрать в любой
+    день. Сводка без построчной выкладки: детали остаются на странице.
+    """
+    from . import bonusy
+    data = bonusy.collect(since)
+    keep = ("count", "total_all", "cont", "zayavki", "came", "paid",
+            "money", "forecast", "trial_pot")
+    return {"since": since, "today": date.today().isoformat(),
+            "rates": {"пробное": bonusy.RATE_TRIAL, "оплата сразу": bonusy.RATE_BUY_FAST,
+                      "оплата за 2 недели": bonusy.RATE_BUY_2W},
+            "admins": {who: {k: v[k] for k in keep} for who, v in data.items()}}
 
 
 @app.get("/api/crm/classes", dependencies=AUTH)
