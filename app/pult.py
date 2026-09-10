@@ -31,6 +31,8 @@ ROLE = {"Аня": "телефон, деньги, пробные", "Ира": "д�
         "Лиза": "переписка", "Борис": "решения"}
 MON = {1: "yan", 2: "fev", 3: "mar", 4: "apr", 5: "may", 6: "iyn", 7: "iyl", 8: "avg", 9: "sen", 10: "okt", 11: "noy", 12: "dek"}
 LIVE_JOIN = (2, 58132, 83760, 58131)
+# «перенос со вчера от Лена» читается как машинный текст — держим родительный падеж
+OT = {"Аня": "Ани", "Лена": "Лены", "Ира": "Иры", "Лиза": "Лизы", "Борис": "Бориса"}
 
 
 def _init(conn):
@@ -104,8 +106,15 @@ def mark(task_id: int, state: int, note: str = "") -> bool:
 
     08.09: кнопку «не успела» с вопросом «почему» за три дня не нажали ни разу —
     пункты просто висели. Теперь одна кнопка без вопросов: пункт помечается
-    перенесённым и СРАЗУ копируется в колонку того же человека на завтра
-    (без дублей, если нажать дважды)."""
+    перенесённым и СРАЗУ копируется в завтрашнюю колонку (без дублей, если
+    нажать дважды).
+
+    10.09: перенос уходил тому же человеку — и попадал в никуда. 10.09 дежурит
+    одна Лена, 11.09 — Ира и Аня; всё, что Лена перенесла бы «на завтра»,
+    легло бы в колонку человека, который завтра не работает, и пункт не увидел
+    бы никто. Поэтому дело дежурной уходит той, кто дежурит завтра, с пометкой,
+    от кого оно пришло. Лизу (переписка) и Бориса (решения) не трогаем: у них
+    роль, а не смена."""
     from datetime import date, timedelta
     with db.get_conn() as conn:
         _init(conn)
@@ -114,11 +123,18 @@ def mark(task_id: int, state: int, note: str = "") -> bool:
                            (int(state), (note or "")[:200], int(task_id)))
         if int(state) == 2 and row:
             nxt = (date.fromisoformat(row["day"]) + timedelta(days=1)).isoformat()
-            text = row["text"] if row["text"].startswith("↩") else "↩ <b>перенос со вчера</b> — " + row["text"]
-            dup = conn.execute("SELECT 1 FROM pult_tasks WHERE day=? AND who=? AND text=?", (nxt, row["who"], text)).fetchone()
+            who, frm = row["who"], ""
+            shifts = set(SHORT.values())          # Аня, Лена, Ира — те, у кого смены
+            if who in shifts:
+                tomorrow = [d for d in duty(nxt) if d in shifts]
+                if tomorrow and who not in tomorrow:
+                    who, frm = tomorrow[0], f" от {OT.get(row['who'], row['who'])}"
+            head = f"↩ <b>перенос со вчера{frm}</b> — "
+            text = row["text"] if row["text"].startswith("↩") else head + row["text"]
+            dup = conn.execute("SELECT 1 FROM pult_tasks WHERE day=? AND who=? AND text=?", (nxt, who, text)).fetchone()
             if not dup:
                 conn.execute("INSERT INTO pult_tasks (day, who, t, text, done, note) VALUES (?,?,?,?,0,'')",
-                             (nxt, row["who"], row["t"], text))
+                             (nxt, who, row["t"], text))
         return cur.rowcount > 0
 
 
@@ -262,7 +278,7 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             st = "opacity:.7"
         ctrl = ""
         if not it["done"]:
-            ctrl = (f" <a href='#' style='font-size:12px;color:#a35f00;white-space:nowrap' title='Пункт уйдёт в твою колонку на завтра' onclick=\""
+            ctrl = (f" <a href='#' style='font-size:12px;color:#a35f00;white-space:nowrap' title='Пункт уйдёт в завтрашнюю колонку — твою, если ты завтра в смене, иначе к дежурной' onclick=\""
                     f"fetch('/api/pult/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{it['id']},state:2,note:'перенос'}})}}).then(()=>location.reload());return false\">перенести на завтра ↩</a>")
         lis.append((it["done"] == 1, it["done"] == 0,
             f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
@@ -300,7 +316,7 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
 HOWTO = ("<div class='card' style='border-left:4px solid #312783;margin:10px 0;font-size:15px'>"
          "<b>Как пользоваться — три шага.</b> "
          "<b>1.</b> Делай пункт с меткой <span style='background:#312783;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:800'>СЕЙЧАС</span> — она идёт за часами. В колонке видны пять ближайших, остальное свёрнуто ниже. "
-         "<b>2.</b> Сделала — галочка сразу, не вечером. Не успеваешь — «перенести на завтра ↩», пункт сам появится в твоей колонке завтра. "
+         "<b>2.</b> Сделала — галочка сразу, не вечером. Не успеваешь — «перенести на завтра ↩», пункт сам появится в завтрашней колонке: в твоей, если ты завтра в смене, иначе у дежурной, с пометкой, от кого. "
          "<b>3.</b> Ниже задач в твоей колонке — <b>«Обещания клиентам»</b>: семьи, которым мы что-то обещали в звонке или переписке. Закрываются сверху вниз раз в час, галочка сразу после действия. "
          "<details style='margin-top:6px;font-size:13.5px'><summary style='cursor:pointer;color:#6c6a86'>подробнее: время прошло, фон, явка</summary>"
          "<ul style='margin:6px 0 0;padding-left:20px'>"
