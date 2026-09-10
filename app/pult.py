@@ -205,6 +205,33 @@ def _inbox_open(day: str, who: str) -> int:
         return 0
 
 
+def _paid_recently(days: int = 30) -> dict[str, tuple[str, int]]:
+    """Телефон (последние 10 цифр) → (дата, сумма) последней оплаты за N дней.
+
+    10.09.2026, по разбору Иры: первой задачей дня стояло «Слатину срочно
+    отправить ссылку на оплату», а он оплатил 05.09 — 5 200 ₽ за ту самую
+    группу. Заметка администратора была написана вечером 09.09 и к утру
+    протухла, а проверить оплату можно было одним запросом. Теперь у каждого
+    пункта, где клиент недавно платил, висит зелёная плашка с датой и суммой:
+    видно и мне, когда я собираю пульт, и админу, когда она его открывает.
+    """
+    from datetime import date as _d, timedelta as _td
+    since = (_d.today() - _td(days=days)).isoformat()
+    out: dict[str, tuple[str, int]] = {}
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT u.phone, p.date, p.summa FROM payments p JOIN users u ON u.id = p.user_id "
+                "WHERE p.summa > 0 AND substr(p.date,1,10) >= ? ORDER BY p.date", (since,)).fetchall()
+    except Exception:
+        return out
+    for r in rows:
+        ph = "".join(ch for ch in (r["phone"] or "") if ch.isdigit())[-10:]
+        if len(ph) == 10:
+            out[ph] = (r["date"][:10], int(r["summa"]))   # последняя по возрастанию даты
+    return out
+
+
 def _promises_html(day: str, who: str, color: str) -> str:
     """Обещания клиентам этого человека — прямо в его колонке, под задачами.
     08.09 Борис: «всё на одной странице», отдельной страницы под телефон не нужно."""
@@ -216,10 +243,17 @@ def _promises_html(day: str, who: str, color: str) -> str:
         rows = []
     if not rows:
         return ""
+    paid = _paid_recently()
     lis = []
     for r in rows:
         ph = "".join(ch for ch in (r["phone"] or "") if ch.isdigit())
         tel = f" <a href='tel:+{ph}' style='color:#6c6a86;white-space:nowrap'>+{ph}</a>" if len(ph) >= 10 else ""
+        pay = paid.get(ph[-10:]) if len(ph) >= 10 else None
+        if pay:
+            d, summa = pay
+            tel += (f" <span style='display:inline-block;background:#eaf5db;color:#3f6f0f;border-radius:6px;"
+                    f"padding:1px 7px;font-size:11.5px;font-weight:700;white-space:nowrap'>"
+                    f"оплата {d[8:10]}.{d[5:7]} · {summa:,} ₽</span>".replace(",", " "))
         txt = html.escape(r["text"] or "")
         short = txt if len(txt) <= 150 else f"{txt[:150]}<details style='display:inline'><summary style='display:inline;cursor:pointer;color:#6c6a86'> …</summary> {txt[150:]}</details>"
         lis.append(f"<li style='margin:6px 0;{'opacity:.45;text-decoration:line-through' if r['done'] else ''}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
@@ -260,6 +294,13 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     for it in items:
         st, badge, extra = "", "", ""
         ft = _first_time(it["t"])
+        # 10.09, просьба Иры: «пишите красным жизненно важное, без чего работа
+        # встанет, а не СРОЧНО перенёс ли пробник свой день». Пункт, начатый
+        # с «!!», получает красную плашку и красную рамку; всё остальное —
+        # обычная работа, и выглядеть должно обычно.
+        crit = it["text"].startswith("!!")
+        if crit:
+            it = {**it, "text": it["text"][2:].lstrip()}
         if it["done"] == 1:
             st = "opacity:.45;text-decoration:line-through"
         elif it["done"] == 2:
@@ -267,6 +308,10 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             badge = "<span style='display:inline-block;font-size:11px;font-weight:700;color:#fff;background:#a35f00;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>перенесено на завтра</span>"
             if it.get("note") and it["note"] != "перенос":
                 extra = f" <span style='color:#a35f00;font-size:12.5px'>— {html.escape(it['note'])}</span>"
+        elif crit:
+            st = "background:#fff2f2;border-left:4px solid #E30613;border-radius:8px;padding:6px 8px;margin-left:-8px"
+            badge = ("<span style='display:inline-block;font-size:11px;font-weight:800;color:#fff;background:#E30613;"
+                     "border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>БЕЗ ЭТОГО ВСТАНЕТ</span>")
         elif it["id"] == cur_id:
             st = f"background:#f1effb;border-left:4px solid {c};border-radius:8px;padding:6px 8px;margin-left:-8px"
             badge = f"<span style='display:inline-block;font-size:11px;font-weight:800;color:#fff;background:{c};border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>СЕЙЧАС</span>"
@@ -315,7 +360,7 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
 
 HOWTO = ("<div class='card' style='border-left:4px solid #312783;margin:10px 0;font-size:15px'>"
          "<b>Как пользоваться — три шага.</b> "
-         "<b>1.</b> Делай пункт с меткой <span style='background:#312783;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:800'>СЕЙЧАС</span> — она идёт за часами. В колонке видны пять ближайших, остальное свёрнуто ниже. "
+         "<b>1.</b> Сначала — красное <span style='background:#E30613;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:800'>БЕЗ ЭТОГО ВСТАНЕТ</span>: без него работа встаёт или будут проблемы. Дальше — пункт с меткой <span style='background:#312783;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:800'>СЕЙЧАС</span>, она идёт за часами. В колонке видны пять ближайших, остальное свёрнуто ниже. "
          "<b>2.</b> Сделала — галочка сразу, не вечером. Не успеваешь — «перенести на завтра ↩», пункт сам появится в завтрашней колонке: в твоей, если ты завтра в смене, иначе у дежурной, с пометкой, от кого. "
          "<b>3.</b> Ниже задач в твоей колонке — <b>«Обещания клиентам»</b>: семьи, которым мы что-то обещали в звонке или переписке. Закрываются сверху вниз раз в час, галочка сразу после действия. "
          "<details style='margin-top:6px;font-size:13.5px'><summary style='cursor:pointer;color:#6c6a86'>подробнее: время прошло, фон, явка</summary>"
