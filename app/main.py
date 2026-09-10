@@ -168,16 +168,31 @@ def price_yml():
     from xml.sax.saxutils import escape as _e
     from . import autopilot as _ap
     skip = ("Английский летний клуб",)
+    # Куда ведёт позиция витрины и какой снимок к ней прикладываем.
+    # Яндекс требует прямую ссылку на JPG/PNG по http(s) — отдаём со своего домена.
+    lp = {
+        "Английский детский сад": ("/minisad", "minisad_1.jpg"),
+        "Английский язык": ("/english", "english_1.jpg"),
+        "Подготовка к школе": ("/podgotovka", "podgotovka_1.jpg"),
+        "Дошкольный университет": ("/nulevoy", "nulevoy_1.jpg"),
+        "ИЗО-студия": ("/izo", "izo_1.jpg"),
+        "Шахматы": ("/shahmaty", "shahmaty_1.jpg"),
+        "Робототехника": ("/robototehnika", "robototehnika_1.jpg"),
+    }
     cats, offers = [], []
     for ci, (course, pr) in enumerate((c, v) for c, v in PRICES.items() if c not in skip):
         cats.append(f'<category id="{ci + 1}">{_e(course)}</category>')
+        page, photo = lp.get(course, ("/#courses", ""))
+        url = f"https://kidsup.ru{page}"
+        pic = f"<picture>https://app.kidsup.ru/static/img/lp/{photo}</picture>" if photo else ""
         for li, (title, _old, price) in enumerate(pr["lines"]):
             oid = f"{ci + 1}-{li + 1}"
             name = f"{course} · {title}"
             desc = pr["title"]
             offers.append(
-                f'<offer id="{_e(oid)}" available="true"><url>https://kidsup.ru/#courses</url>'
+                f'<offer id="{_e(oid)}" available="true"><url>{_e(url)}</url>'
                 f"<price>{int(price)}</price><currencyId>RUR</currencyId><categoryId>{ci + 1}</categoryId>"
+                f"<vendor>KidsUP</vendor>{pic}"
                 f"<name>{_e(name)}</name><description>{_e(desc)}</description></offer>")
     body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
             f'<yml_catalog date="{_ap._now().strftime("%Y-%m-%d %H:%M")}"><shop><name>KidsUP</name>'
@@ -2991,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.49"
+APP_VERSION = "2026-09-10.50"
 
 
 @app.get("/api/net")
