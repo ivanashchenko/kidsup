@@ -2555,6 +2555,87 @@ def _converted_since(phone: str, since: str) -> str:
         return "был на занятии" if row else ""
 
 
+def incoming_missed() -> None:
+    """Клиент звонил НАМ и не дозвонился — дело дежурной, без автосообщений.
+
+    10.09.2026. Мама Лызь Савелия пробивалась к нам 18 раз за десять минут
+    (36 строк в Манго: схема гоняла вызов по добавочным 10 и 12), ни один
+    вызов не был отвечен, — и система этого не заметила вовсе. Причина в
+    mango.missed(): там стоит `if not r["from_ext"]: continue`, то есть
+    считаются только ИСХОДЯЩИЕ недозвоны, «мы звонили — не взяли». Входящий,
+    на который не ответили мы, для автоматики не существовал.
+
+    Сообщение клиенту отсюда не уходит: он звонил голосом, ему нужен звонок,
+    а не автоответ. Кладём дело дежурной; если попыток много — красным.
+    """
+    MIN_TRIES = 3
+    try:
+        rows = mango._day_calls(None)
+    except Exception:
+        log.exception("недозвоны входящих: Манго не ответила")
+        return
+    by: dict[str, dict] = {}
+    for r in rows:
+        if r.get("from_ext"):                     # исходящий — не наш случай
+            continue
+        num = "".join(ch for ch in (r.get("from_num") or "") if ch.isdigit())
+        if len(num) < 10:
+            continue
+        d = by.setdefault(num, {"tries": set(), "talked": False, "last": 0})
+        if r.get("answer") and (r["finish"] - r["answer"]) >= mango.TALK_MIN:
+            d["talked"] = True
+        else:
+            # один вызов раскладывается в строку на каждый добавочный схемы,
+            # поэтому попытки считаем по минутам, а не по строкам
+            d["tries"].add(int(r.get("start") or 0) // 60)
+            d["last"] = max(d["last"], int(r.get("start") or 0))
+    today = _today().isoformat()
+    duty = _duty_name()
+    for num, d in by.items():
+        tries = len(d["tries"])
+        if d["talked"] or tries < MIN_TRIES:
+            continue
+        if not _mark("incoming_missed", f"{today}:{num}"):
+            continue
+        name = _name_by_phone(num)
+        who = f"{name} (+{num})" if name else f"Неизвестный номер +{num}"
+        hard = tries >= 5
+        text = (f"{'!! ' if hard else ''}{who} — звонил нам {tries} раз подряд и "
+                f"НИ РАЗУ не дозвонился. Перезвонить первым делом и извиниться. "
+                f"Если карточки нет — завести (имя и фамилия ребёнка).")
+        with db.get_conn() as conn:
+            conn.execute("""CREATE TABLE IF NOT EXISTS plan_inbox (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT, who TEXT,
+                text TEXT, phone TEXT, source TEXT, done INTEGER DEFAULT 0)""")
+            conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) "
+                         "VALUES (?,?,?,?,?,?)",
+                         (today, _now().isoformat(timespec="minutes"), duty,
+                          text[:400], num, "не дозвонился"))
+        log.warning("входящий недозвон: +%s, попыток %d → инбокс %s", num[-4:], tries, duty)
+
+
+def _duty_name() -> str:
+    """Короткое имя дежурной на сегодня; не вышло — Лена."""
+    try:
+        from . import pult
+        d = [x for x in pult.duty(_today().isoformat()) if x in set(pult.SHORT.values())]
+        return d[0] if d else "Лена"
+    except Exception:
+        return "Лена"
+
+
+def _name_by_phone(num: str) -> str:
+    try:
+        with db.get_conn() as conn:
+            r = conn.execute(
+                "SELECT name FROM users WHERE replace(replace(replace(replace("
+                "phone,'+',''),' ',''),'-',''),')','') LIKE ? LIMIT 1",
+                ("%" + num[-10:],)).fetchone()
+        return (r["name"] or "") if r else ""
+    except Exception:
+        return ""
+
+
 def missed_calls(days: list[str] | None = None) -> None:
     """Догон недозвонов. days=None — за сегодня (часовой тик); список дат —
     разовый догон за прошедшие дни (окно часа пролетало 29.08, 31.08,
@@ -3991,6 +4072,13 @@ def _loop() -> None:
                         missed_calls(days=["2026-08-31", "2026-09-01"])
                     except Exception:
                         log.exception("разовый догон за 31.08–01.09 упал")
+                # входящие недозвоны — раз в 20 минут: клиент, который не может
+                # к нам пробиться, не должен ждать до конца часа
+                if 8 <= now.hour <= 21 and _mark("slot_inmissed", f"{_today()}:{now.hour}:{now.minute // 20}"):
+                    try:
+                        incoming_missed()
+                    except Exception:
+                        log.exception("недозвоны входящих упали — продолжаем")
                 if 10 <= now.hour <= 20 and _mark("slot_hourly_missed", _hour):
                     # Манго жёстко ограничивает stats/request; один 429 в
                     # этом вызове 24.08 убивал весь тик — и вместе с ним все

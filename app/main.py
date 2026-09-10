@@ -2981,7 +2981,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.19"
+APP_VERSION = "2026-09-10.21"
 
 
 @app.get("/api/net")
@@ -5146,7 +5146,11 @@ def api_calls_list(minutes: int = 95):
         # и прибавляем три часа вручную — иначе смещение уходит на час вперёд.
         t = datetime.utcfromtimestamp(int(start) + 3 * 3600).strftime("%H:%M") if start else ""
         rows.append({"rec": rec.strip("[]"), "t": t, "dir": "out" if fe else "in",
-                     "phone": tn if fe else fn, "ext": fe or te, "dur": dur, "reason": reason})
+                     "phone": tn if fe else fn, "ext": fe or te, "dur": dur, "reason": reason,
+                     # 10.09: разбор «почему клиент не дозвонился» невозможен без
+                     # сырых полей — на какой добавочный шёл вызов и был ли ответ
+                     "to_ext": te, "from_ext": fe, "answered": bool(answer and answer != "0"),
+                     "start": int(start) if start else 0})
     return {"minutes": minutes, "calls": rows}
 
 
