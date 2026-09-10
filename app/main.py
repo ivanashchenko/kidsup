@@ -55,8 +55,11 @@ async def _public_hosts(request, call_next):
         # Старые страницы Tilda не должны стать 404 после переезда: у них
         # есть позиции в поиске и живые ссылки в переписках. 301 ведёт на
         # соответствующий раздел новой главной.
+        # «/english» здесь больше нет: у этого адреса есть позиции в поиске и живые
+        # ссылки, и теперь по нему отдаётся настоящая страница английского
+        # (роут /english), а не якорь на главной — это лучше редиректа.
         TILDA_301 = {
-            "/english": "/#courses", "/schoolpreparation1": "/#courses",
+            "/schoolpreparation1": "/#courses",
             "/schoolpreparation2": "/#courses", "/preschooluniversity": "/#courses",
             "/precocity1": "/#courses", "/precocity2": "/#courses",
             "/chess": "/#courses", "/drawing": "/#courses",
@@ -2986,7 +2989,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.28"
+APP_VERSION = "2026-09-10.31"
 
 
 @app.get("/api/net")
@@ -3049,7 +3052,11 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "admin_schedule", "daily_tasks_
             "chat_whatsapp",
             # Яндекс: приложение OAuth «KidsUP реклама» (06.09) — id/секрет для обмена
             # кода на токен, токен Директа и Метрики. Только настройки сервера, не в чат
-            "yandex_client_id", "yandex_client_secret", "yandex_direct_token", "yandex_metrika_token"}
+            "yandex_client_id", "yandex_client_secret", "yandex_direct_token", "yandex_metrika_token",
+            # вход в кабинет Яндекса через браузер на сервере: автотаргетинг и расширенный
+            # геотаргетинг Директ через API не отдаёт вообще, а прайс в Яндекс Бизнесе
+            # правится только руками. Логин и пароль — только сюда, не в чат
+            "yandex_web_login", "yandex_web_password"}
 
 
 # Значения, которые нельзя отдавать целиком даже по авторизованному запросу.
@@ -3058,7 +3065,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "admin_schedule", "daily_tasks_
 # скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
 # страница настроек открыта всем, у кого есть пароль администратора.
 SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_secret", "owner_password", "yandex_audience_token",
-               "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password"}
+               "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password", "yandex_web_password"}
 
 
 def _mask(key: str, value: str | None) -> str | None:

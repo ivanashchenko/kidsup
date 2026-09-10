@@ -91,8 +91,10 @@ a{color:var(--blue-ink)}
 .lesson li::before{counter-increment:l;content:counter(l);font-family:Rubik,sans-serif;font-weight:900;
      color:#fff;background:var(--blue);width:30px;height:30px;border-radius:50%;
      display:grid;place-items:center;font-size:15px}
-.lesson b{display:block;font-size:15.5px}
-.lesson span{font-size:14.5px;color:var(--muted)}
+/* b и span — третий и четвёртый элементы сетки, и без grid-column они падали
+   во вторую строку первой колонки шириной 44px: текст рассыпался по одному слову */
+.lesson b{display:block;font-size:15.5px;grid-column:2}
+.lesson span{font-size:14.5px;color:var(--muted);grid-column:2}
 
 /* ——— вопросы ——— */
 details{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 17px;margin-top:10px}
