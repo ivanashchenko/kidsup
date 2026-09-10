@@ -2991,7 +2991,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.35"
+APP_VERSION = "2026-09-10.39"
 
 
 @app.get("/api/net")
@@ -5075,6 +5075,113 @@ def api_plan_inbox_add(payload: dict = Body(...)):
                       str(payload.get("who") or "Аня")[:20], str(payload.get("text") or "")[:400],
                       str(payload.get("phone") or "")[:20], str(payload.get("source") or "")[:40]))
     return {"ok": True}
+
+
+@app.get("/api/segment/english-unpaid", dependencies=AUTH)
+def api_segment_english_unpaid(rows: int = 0):
+    """Кто записан на английский сезона 2627, но абонемент так и не купил.
+
+    Нужен, чтобы отправить им страницу курса — и чтобы отправить законно.
+    Поэтому здесь же считается, кому вообще можно писать: СМС по закону
+    о рекламе допустима только тем, кто у нас раньше платил, а мессенджер —
+    только там, где с семьёй уже есть переписка. Считается по локальной базе
+    сервера, МойКласс не дёргаем.
+    """
+    from . import wazzup as _wz
+    # Признак оплаты — не абонемент в базе, а статус записи «Учится»: абонементы
+    # сезона 2026/27 в справочнике названы по-другому и по названию не ловятся,
+    # а статус ставится в момент оплаты и потому надёжен.
+    PAID = "Учится"
+    DEAD = ("Отказался", "Завершил")
+    season = "2026-08-01"
+    with db.get_conn() as conn:
+        cls = {r["id"]: (r["name"] or "") for r in
+               conn.execute("SELECT id, name FROM classes").fetchall()}
+        eng = {i for i, n in cls.items() if n.startswith("2627_АЯ")}
+        if not eng:
+            raise HTTPException(503, "классы ещё не синхронизированы")
+        # подписки: английский язык — да, английский детский сад — нет,
+        # это другой продукт и другие деньги
+        subs = {r["id"]: (r["name"] or "") for r in
+                conn.execute("SELECT id, name FROM subscriptions").fetchall()}
+        eng_sub = {i for i, n in subs.items()
+                   if "нглийск" in n and "сад" not in n.lower() and "класс" not in n.lower()}
+        paid_eng, paid_ever = set(), set()
+        for r in conn.execute("SELECT user_id, subscription_id, begin_date "
+                              "FROM user_subscriptions").fetchall():
+            if r["subscription_id"] in eng_sub and (r["begin_date"] or "") >= season:
+                paid_eng.add(r["user_id"])
+        for r in conn.execute("SELECT DISTINCT user_id FROM payments "
+                              "WHERE summa > 0").fetchall():
+            paid_ever.add(r["user_id"])
+        jst = {r["id"]: (r["name"] or "") for r in
+               conn.execute("SELECT id, name FROM join_statuses").fetchall()}
+        joined: dict[int, dict] = {}
+        learning: set[int] = set()
+        for r in conn.execute("SELECT user_id, class_id, status_id, created_at "
+                              "FROM joins").fetchall():
+            if r["class_id"] not in eng:
+                continue
+            st = jst.get(r["status_id"], "")
+            if st == PAID:
+                learning.add(r["user_id"])
+                continue
+            if st.startswith(DEAD):
+                continue
+            cur = joined.get(r["user_id"])
+            if not cur or (r["created_at"] or "") > cur["when"]:
+                joined[r["user_id"]] = {"class": cls[r["class_id"]],
+                                        "when": (r["created_at"] or "")[:10], "st": st}
+        out = []
+        for uid, info in joined.items():
+            if uid in learning or uid in paid_eng:
+                continue
+            u = conn.execute("SELECT name, phone, client_state_id FROM users WHERE id=?",
+                             (uid,)).fetchone()
+            if not u:
+                continue
+            phone = "".join(c for c in (u["phone"] or "") if c.isdigit())
+            if len(phone) < 11:
+                continue
+            # 146328 «не писать», 125957 отказ, 345759 архив набора — не трогаем
+            if u["client_state_id"] in (146328, 125957, 345759):
+                continue
+            try:
+                live = [t for t in _wz.channels_for(phone) if t != "whatsapp"]
+            except Exception:  # noqa: BLE001
+                live = []
+            out.append({"id": uid, "name": (u["name"] or "").strip(), "phone": phone,
+                        "group": info["class"][5:], "since": info["when"],
+                        "status": info["st"],
+                        "zayavka": "Заявки" in info["class"],
+                        "sms_ok": uid in paid_ever, "messengers": live})
+    out.sort(key=lambda x: x["since"], reverse=True)
+    res = {
+        "всего": len(out),
+        "в_живых_группах": sum(1 for x in out if not x["zayavka"]),
+        "в_буфере_заявок": sum(1 for x in out if x["zayavka"]),
+        "смс_можно": sum(1 for x in out if x["sms_ok"]),
+        "смс_нельзя": sum(1 for x in out if not x["sms_ok"]),
+        "есть_живой_мессенджер": sum(1 for x in out if x["messengers"]),
+    }
+    with db.get_conn() as conn:
+        us_total = conn.execute("SELECT COUNT(*) c FROM user_subscriptions").fetchone()["c"]
+        us_new = conn.execute("SELECT COUNT(*) c FROM user_subscriptions WHERE begin_date>=?",
+                              (season,)).fetchone()["c"]
+        by_status: dict[str, int] = {}
+        for r in conn.execute("SELECT class_id, status_id FROM joins").fetchall():
+            if r["class_id"] in eng:
+                k = jst.get(r["status_id"], str(r["status_id"]))
+                by_status[k] = by_status.get(k, 0) + 1
+    res["диагностика"] = {"классов_АЯ": len(eng), "абонементов_АЯ": len(eng_sub),
+                          "оплативших_АЯ": len(paid_eng),
+                          "строк_user_subscriptions": us_total,
+                          "из_них_с_01.08": us_new,
+                          "статусы_записей_АЯ": by_status,
+                          "примеры_названий": [subs[i] for i in list(eng_sub)[:4]]}
+    if rows:
+        res["строки"] = out
+    return res
 
 
 @app.get("/api/plan/inbox", dependencies=AUTH)
