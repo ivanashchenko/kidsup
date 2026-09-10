@@ -59,8 +59,10 @@ async def _public_hosts(request, call_next):
         # ссылки, и теперь по нему отдаётся настоящая страница английского
         # (роут /english), а не якорь на главной — это лучше редиректа.
         TILDA_301 = {
-            "/schoolpreparation1": "/#courses",
-            "/schoolpreparation2": "/#courses", "/preschooluniversity": "/#courses",
+            # обе старые страницы подготовки ведут на одну новую: ступень определяет
+            # не адрес, а чтение ребёнка, и разводить их на два лендинга нечестно
+            "/schoolpreparation1": "/podgotovka",
+            "/schoolpreparation2": "/podgotovka", "/preschooluniversity": "/#courses",
             "/precocity1": "/#courses", "/precocity2": "/#courses",
             "/chess": "/#courses", "/drawing": "/#courses",
             "/arithmetic": "/#courses", "/speechtherapist": "/#courses",
@@ -2989,7 +2991,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.32"
+APP_VERSION = "2026-09-10.34"
 
 
 @app.get("/api/net")
@@ -6304,6 +6306,36 @@ async def english_page():
     if not f.exists():
         raise HTTPException(404, "страница не собрана")
     return HTMLResponse(f.read_text(encoding="utf-8"))
+
+
+def _lp(name: str) -> HTMLResponse:
+    """Посадочная страница отдельного курса — без пароля, живые места из
+    /api/public/schedule и заявка тем же приёмом, что на сайте. Отдельные
+    страницы нужны потому, что курс продаётся не строчкой в списке направлений,
+    а тем, что ребёнок умеет к каждому месяцу."""
+    f = BASE / "static" / name
+    if not f.exists():
+        raise HTTPException(404, "страница не собрана")
+    return HTMLResponse(f.read_text(encoding="utf-8"))
+
+
+@app.get("/podgotovka", response_class=HTMLResponse)
+def podgotovka_page():
+    """Подготовка к школе. Сюда же 301 со старых адресов Tilda
+    /schoolpreparation1 и /schoolpreparation2."""
+    return _lp("podgotovka.html")
+
+
+@app.get("/minisad", response_class=HTMLResponse)
+def minisad_page():
+    """Английский мини-сад ГКП 9:00–13:00, 2–4 года."""
+    return _lp("minisad.html")
+
+
+@app.get("/nulevoy", response_class=HTMLResponse)
+def nulevoy_page():
+    """Нулевой класс 10:00–14:00, 5–7 лет."""
+    return _lp("nulevoy.html")
 
 
 @app.get("/english/metodika", response_class=HTMLResponse)
