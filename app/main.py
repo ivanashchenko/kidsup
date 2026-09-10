@@ -8,6 +8,7 @@ import logging
 import re
 import secrets
 import threading
+import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
@@ -2985,7 +2986,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.23"
+APP_VERSION = "2026-09-10.24"
 
 
 @app.get("/api/net")
@@ -5780,6 +5781,26 @@ def api_ads_direct(payload: dict = Body(...)):
     if not service.isalpha():
         raise HTTPException(400, "service — только буквы (campaigns, adgroups, ads, dictionaries…)")
     h = {"Authorization": f"Bearer {tok}", "Accept-Language": "ru", "Content-Type": "application/json"}
+    if service == "reports":
+        # 10.09: отчёт Директа приходит не JSON, а TSV, и общий проход на нём падал —
+        # без него нельзя ответить на простой вопрос «сколько кликов и по какой цене».
+        # Режим ожидания синхронный: отчёты у нас маленькие, на дневную сводку хватает.
+        h.update({"processingMode": "auto", "returnMoneyInMicros": "false",
+                  "skipReportHeader": "true", "skipReportSummary": "true"})
+        for _ in range(12):
+            r = httpx.post("https://api.direct.yandex.com/json/v5/reports", headers=h, timeout=120,
+                           json={"params": payload.get("params") or {}})
+            if r.status_code in (201, 202):      # отчёт ещё считается
+                time.sleep(4)
+                continue
+            break
+        if r.status_code != 200:
+            return {"http": r.status_code, "text": r.text[:600]}
+        lines = [ln.split("\t") for ln in r.text.strip().splitlines() if ln]
+        if not lines:
+            return {"rows": [], "note": "пусто"}
+        head, body = lines[0], lines[1:]
+        return {"rows": [dict(zip(head, x)) for x in body]}
     r = httpx.post(f"https://api.direct.yandex.com/json/v5/{service}", headers=h, timeout=90,
                    json={"method": payload.get("method") or "get", "params": payload.get("params") or {}})
     return r.json()
