@@ -2991,7 +2991,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.39"
+APP_VERSION = "2026-09-10.40"
 
 
 @app.get("/api/net")
@@ -6443,6 +6443,25 @@ def minisad_page():
 def nulevoy_page():
     """Нулевой класс 10:00–14:00, 5–7 лет."""
     return _lp("nulevoy.html")
+
+
+@app.get("/robototehnika", response_class=HTMLResponse)
+def robototehnika_page():
+    """Робототехника: партнёрский курс школы «Айтроник», 4–12 лет."""
+    return _lp("robototehnika.html")
+
+
+@app.get("/robototehnika/pedagog", response_class=HTMLResponse)
+def robototehnika_pedagog_page():
+    """Кто ведёт робототехнику. Отдельная страница: курс выбирают по человеку,
+    и показать педагога до оплаты честнее, чем после."""
+    return _lp("robototehnika_pedagog.html")
+
+
+@app.get("/shahmaty", response_class=HTMLResponse)
+def shahmaty_page():
+    """Шахматы по методике школы EduChess, 6–12 лет."""
+    return _lp("shahmaty.html")
 
 
 @app.get("/english/metodika", response_class=HTMLResponse)
