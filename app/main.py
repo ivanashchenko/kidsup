@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-11.20"
+APP_VERSION = "2026-09-11.21"
 
 
 @app.get("/api/net")
@@ -4640,6 +4640,13 @@ def api_guard_stop(off: bool = True):
     """Мгновенный стоп-кран для ВСЕХ автосообщений."""
     db.set_setting("messages_off", "1" if off else "0")
     return {"ok": True, "автосообщения": "остановлены" if off else "включены"}
+
+
+@app.get("/api/wazzup/channels", dependencies=AUTH)
+def api_wazzup_channels():
+    """Каналы Wazzup со статусами — видно, жив ли WABA-номер и в каком он профиле."""
+    from . import wazzup
+    return {"channels": wazzup.all_channels()}
 
 
 @app.get("/api/wazzup/channels-map", dependencies=AUTH)
