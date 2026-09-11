@@ -1181,8 +1181,6 @@ DOC_GROUPS = [
          "Почему сначала предмет и уровень, и только потом расписание"),
         ("predmety_shpargalka", "🎓 Предметы: что держать в голове",
          "Шпаргалка админа по каждому направлению: одна фраза ради «да», три факта, живые свободные места и цены"),
-        ("bonusy_avgust_komande", "🤝 Бонусы за август: расчёт Ане и Ире",
-         "Открытая страница для обеих: построчный расчёт, ответы на прозвучавшие вопросы и правила с сентября. Ссылку можно отправлять администраторам"),
         ("bonusy_adminov", "💰 Бонусы администратора: ставки и расчёт ЗП",
          "Почему такие ставки, сколько выйдет по месяцам при графике 4/3 — с сентября по май"),
         ("promo_vvod", "🪧 Заведение промо-контакта",
@@ -1201,8 +1199,6 @@ DOC_GROUPS = [
          "Вехи вместо оценок по ПкШ, английскому, саду и нулевому классу; ежедневные сводки, месячные отчёты, порядок запуска"),
     ]),
     ("Владельцу", [
-        ("bonusy_avgust_razbor", "🧾 Бонусы за август: разбор по фактам",
-         "Построчный расчёт Ане и Ире за 17–31.08, сверка табеля с журналом и разбор каждого возражения — с цифрами из АТС и CRM"),
         ("reestr_del", "✅ Реестр важных и срочных дел",
          "Все дела команды с фильтрами по людям и срочности"),
         ("reklama_nastroyka", "📣 Запуск рекламы: Директ и VK",
@@ -3010,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-11.27"
+APP_VERSION = "2026-09-11.28"
 
 
 @app.get("/api/net")
@@ -6184,6 +6180,24 @@ def api_ads_geo(plan: str = "30377205"):
         except Exception as e:  # noqa: BLE001
             out["vk"]["error"] = str(e)[:200]
     return out
+
+
+@app.get("/lk/{token}", response_class=HTMLResponse)
+def lk_page(token: str):
+    """Личная страница бонуса администратора. Без общего пароля: его знают все
+    админы, а зарплата — не общая информация. Доступ по личной ссылке."""
+    from . import lk
+    who = lk.whoami(token)
+    if not who:
+        raise HTTPException(404)
+    return HTMLResponse(lk.page(who))
+
+
+@app.get("/api/lk/links", dependencies=OWNER_AUTH)
+def api_lk_links():
+    """Личные ссылки для раздачи администраторам."""
+    from . import lk
+    return {who: f"https://app.kidsup.ru/lk/{t}" for who, t in lk.tokens().items()}
 
 
 @app.post("/api/bonus/tarif/run", dependencies=OWNER_AUTH)
