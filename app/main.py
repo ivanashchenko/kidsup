@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-11.16"
+APP_VERSION = "2026-09-11.18"
 
 
 @app.get("/api/net")
@@ -5534,11 +5534,12 @@ def api_mkweb_login():
 
 
 @app.post("/api/yandex/login", dependencies=OWNER_AUTH)
-def api_yandex_login():
+def api_yandex_login(payload: dict = Body(default={})):
     """Вход в Яндекс под рабочим аккаунтом: нужен для Директа и Бизнеса,
-    где часть переключателей API v5 не отдаёт."""
+    где часть переключателей API v5 не отдаёт. {"reveal": true} — снять экран
+    с открытым паролем до отправки формы."""
     from . import mkweb
-    return mkweb.ya_login()
+    return mkweb.ya_login(bool(payload.get("reveal")))
 
 
 @app.post("/api/yandex/sms/start", dependencies=OWNER_AUTH)
@@ -5577,12 +5578,13 @@ def api_yandex_open(payload: dict = Body(...)):
 
 
 @app.get("/api/yandex/shot", dependencies=OWNER_AUTH)
-def api_yandex_shot():
-    """Последний снимок экрана браузера в Яндексе."""
+def api_yandex_shot(which: str = ""):
+    """Снимок экрана браузера в Яндексе; which=pw — экран с открытым паролем."""
     from . import mkweb
-    if not mkweb.YA_SHOT.exists():
+    f = mkweb.YA_SHOT_PW if which == "pw" else mkweb.YA_SHOT
+    if not f.exists():
         raise HTTPException(404, "снимка ещё нет")
-    return Response(content=mkweb.YA_SHOT.read_bytes(), media_type="image/png")
+    return Response(content=f.read_bytes(), media_type="image/png")
 
 
 @app.post("/api/mkweb/open", dependencies=OWNER_AUTH)

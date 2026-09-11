@@ -831,9 +831,11 @@ def delete_supply(date_ddmmyy: str, product: str, qty: int, filial: str = "Kids 
 
 YA_STATE = DATA / "ya_web_state.json"
 YA_SHOT = DATA / "ya_web_last.png"
+# снимок с открытым паролем — отдельным файлом, иначе финальный экран его затрёт
+YA_SHOT_PW = DATA / "ya_web_password.png"
 
 
-def ya_login() -> dict:
+def ya_login(reveal: bool = False) -> dict:
     """Вход на passport.yandex.ru под yandex_web_login / yandex_web_password.
 
     Пароль берётся только из настроек сервера и в ответ не попадает. Если
@@ -904,6 +906,22 @@ def ya_login() -> dict:
                 pg.wait_for_timeout(600)
                 got = len(pw.input_value() or "")
             steps.append(f"пароль набран ({got} из {len(pwd)} симв.)")
+            if reveal:
+                # 11.09 Борис: «покажи сперва ввод пароля открыто». У паспорта
+                # рядом с полем есть глазок — жмём его и снимаем экран до
+                # отправки формы, чтобы владелец своими глазами увидел, что
+                # именно уходит в Яндекс.
+                try:
+                    pg.locator("input[type=password] ~ button, "
+                               "input[type=password] + button, "
+                               "[class*=password] button").first.click(timeout=8000)
+                    pg.wait_for_timeout(1200)
+                except Exception:  # noqa: BLE001
+                    pg.evaluate("document.querySelector('input[type=password]')"
+                                ".setAttribute('type','text')")
+                    pg.wait_for_timeout(600)
+                pg.screenshot(path=str(YA_SHOT_PW))
+                steps.append("снимок с открытым паролем сделан")
             nxt = pg.get_by_role("button", name="Далее")
             if nxt.count() and nxt.first.is_enabled():
                 steps.append("жму «Далее»")
