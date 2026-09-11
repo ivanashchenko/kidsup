@@ -40,11 +40,29 @@ ROBOT_RE = re.compile(
     # «Статус изменён с … на …» пишет сама CRM при смене статуса, а
     # «Звонок от 7…. Страница захвата» — метка Roistat о происхождении
     # заявки. Ни то, ни другое не значит, что с семьёй поговорили.
-    r"^Статус изменён с |^Звонок от \d+\.? ?Страница захвата|Страница захвата: kidsup")
+    r"^Статус изменён с |^Звонок от \d+\.? ?Страница захвата|Страница захвата: kidsup|"
+    # авторассылки: сообщение ушло само, разговора с семьёй не было
+    r"^Авто-реактивация|^Авто: подтверждение")
+
+# Комментарий, которым админ сам отметил, что это вообще не семья:
+# соискатель, рабочий номер компании, чужая студия, продажа услуг.
+NOT_CLIENT_RE = re.compile(
+    r"собеседовани|номер компании|не клиент|хочет познакомиться с управляющим|"
+    r"предлага(ет|ют) (сотрудничеств|реклам|услуги)", re.I)
 
 
 def _robot(text: str) -> bool:
     return bool(ROBOT_RE.search((text or "").strip()))
+
+
+def _not_client(text: str) -> bool:
+    """Ищем только в начале комментария: дальше по тексту слова попадаются
+    в обычном разговоре («ходили в студию танцев») и дают ложные срабатывания."""
+    return bool(NOT_CLIENT_RE.search((text or "").strip()[:120]))
+
+
+# от «делать нечего» к «надо звонить»: у семьи берём самый рабочий вердикт
+KIND_ORDER = ["не клиент", "работает", "говорили", "переписка", "писали", "звонили", "не доделали"]
 
 
 def _rows(conn, sql: str, args: tuple) -> list[dict]:
@@ -136,7 +154,11 @@ def audit(limit: int = 0) -> dict:
                 human = [c for c in comments if c["date"] >= r["created"] and not _robot(c["text"])]
 
                 dup = len(cards) > 1
-                if works:
+                if any(_not_client(c["text"]) for c in comments):
+                    kind, why = "не клиент", ("админ уже пометил, что это не семья: "
+                                              + next(c["text"][:90] for c in comments
+                                                     if _not_client(c["text"])))
+                elif works:
                     kind, why = "работает", ("у семьи есть запись в рабочем статусе: "
                                              + "; ".join(f"{w['class']} — {w['status']}" for w in works[:3]))
                 elif human:
@@ -158,8 +180,23 @@ def audit(limit: int = 0) -> dict:
     finally:
         mk.close()
 
-    by = {}
+    # Одна семья оставляет несколько заявок (футбол, танцы, акробатика — один
+    # телефон, шесть строк). Для работы это один звонок, а не шесть.
+    fam: dict[str, dict] = {}
+    for x in sorted(out, key=lambda x: KIND_ORDER.index(x["kind"]) if x["kind"] in KIND_ORDER else 9):
+        f = fam.setdefault(x["phone"], {"phone": x["phone"], "name": x["name"], "kind": x["kind"],
+                                        "why": x["why"], "days": x["days"], "uid": x["uid"],
+                                        "cards": len(x["cards"]), "хочет": []})
+        f["хочет"].append(x["class"] or x["comment"])
+        f["days"] = max(f["days"], x["days"])
+    families = sorted(fam.values(), key=lambda f: -f["days"])
+
+    by: dict[str, int] = {}
     for x in out:
         by[x["kind"]] = by.get(x["kind"], 0) + 1
-    return {"проверено": len(out), "итог": by, "заявки": out,
+    by_fam: dict[str, int] = {}
+    for f in families:
+        by_fam[f["kind"]] = by_fam.get(f["kind"], 0) + 1
+    return {"проверено": len(out), "итог": by, "семей": len(families), "итог_по_семьям": by_fam,
+            "заявки": out, "семьи": families,
             "было_в_блоке": len(data["untouched"]) + len(data["tried"])}
