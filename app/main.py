@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-11.08"
+APP_VERSION = "2026-09-11.11"
 
 
 @app.get("/api/net")
@@ -5531,6 +5531,38 @@ def api_mkweb_login():
         return mkweb.login()
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"login: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.post("/api/yandex/login", dependencies=OWNER_AUTH)
+def api_yandex_login():
+    """Вход в Яндекс под рабочим аккаунтом: нужен для Директа и Бизнеса,
+    где часть переключателей API v5 не отдаёт."""
+    from . import mkweb
+    return mkweb.ya_login()
+
+
+@app.post("/api/yandex/open", dependencies=OWNER_AUTH)
+def api_yandex_open(payload: dict = Body(...)):
+    """Страница Яндекса под сохранённой сессией: {url, wait_ms?, actions?}."""
+    from . import mkweb
+    url = str(payload.get("url") or "")
+    if not re.match(r"^https://([a-z0-9-]+\.)*yandex\.(ru|com)/", url):
+        raise HTTPException(400, "url должен быть на yandex.ru / yandex.com")
+    try:
+        return mkweb.ya_open(url, int(payload.get("wait_ms") or 6000),
+                             int(payload.get("max_text") or 8000),
+                             payload.get("actions") or None, bool(payload.get("links")))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"{type(e).__name__}: {e}")
+
+
+@app.get("/api/yandex/shot", dependencies=OWNER_AUTH)
+def api_yandex_shot():
+    """Последний снимок экрана браузера в Яндексе."""
+    from . import mkweb
+    if not mkweb.YA_SHOT.exists():
+        raise HTTPException(404, "снимка ещё нет")
+    return Response(content=mkweb.YA_SHOT.read_bytes(), media_type="image/png")
 
 
 @app.post("/api/mkweb/open", dependencies=OWNER_AUTH)

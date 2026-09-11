@@ -816,3 +816,151 @@ def delete_supply(date_ddmmyy: str, product: str, qty: int, filial: str = "Kids 
         pg.screenshot(path=str(SHOT))
         b.close()
     return {"ok": not still, "deleted": not still, "row": found}
+
+
+# ───────────────────────── Яндекс: Директ и Бизнес через браузер ─────────────────────────
+#
+# 11.09.2026. В Директе два переключателя, которых нет в API v5: автотаргетинг
+# в группах и расширенный географический таргетинг. Вчера автотаргетинг съел
+# 97% дневного расхода (13 391 показ против 15 по ключевым фразам), а выключить
+# его запросом нельзя. Борис завёл отдельный аккаунт Яндекса под эту работу —
+# заходим им в кабинет и щёлкаем руками, как человек.
+#
+# Сессия Яндекса живёт отдельным файлом: смешивать её с сессией МойКласса
+# нельзя, это разные домены и разные аккаунты.
+
+YA_STATE = DATA / "ya_web_state.json"
+YA_SHOT = DATA / "ya_web_last.png"
+
+
+def ya_login() -> dict:
+    """Вход на passport.yandex.ru под yandex_web_login / yandex_web_password.
+
+    Пароль берётся только из настроек сервера и в ответ не попадает. Если
+    Яндекс спросит подтверждение (капча, код из SMS) — возвращаем текст экрана,
+    решает его владелец: автоматически такое обходить нельзя и не нужно.
+    """
+    from playwright.sync_api import sync_playwright
+
+    user = db.get_setting("yandex_web_login")
+    pwd = db.get_setting("yandex_web_password")
+    if not user or not pwd:
+        return {"ok": False, "error": "yandex_web_login / yandex_web_password не заданы"}
+    with _lock, sync_playwright() as p:
+        b = _launch(p)
+        ctx = b.new_context(viewport={"width": 1440, "height": 950}, locale="ru-RU",
+                            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                       "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                       "Chrome/124.0 Safari/537.36")
+        pg = ctx.new_page()
+        steps = []
+        try:
+            pg.goto("https://passport.yandex.ru/auth", wait_until="domcontentloaded", timeout=90000)
+            pg.wait_for_timeout(3500)
+            # Паспорт теперь открывается на входе по номеру телефона; поле для
+            # логина прячется за «Ещё» → «Войти по логину».
+            if pg.locator("input[name=login], #passp-field-login").count() == 0:
+                pg.get_by_text("Ещё", exact=True).first.click(timeout=15000)
+                pg.wait_for_timeout(1500)
+                pg.get_by_text("Войти по логину", exact=True).first.click(timeout=15000)
+                pg.wait_for_timeout(3000)
+                steps.append("переключились на вход по логину")
+            login_box = pg.locator("input[name=login], #passp-field-login, input[type=text]").first
+            login_box.fill(user)
+            # Кнопка «Войти» у паспорта без type=submit и с меняющимся id —
+            # надёжнее отправлять форму клавишей.
+            login_box.press("Enter")
+            steps.append("логин введён")
+            pg.wait_for_timeout(4000)
+            pw = pg.locator("input[type=password]").first
+            pw.wait_for(timeout=25000)
+            pw.fill(pwd)
+            pw.press("Enter")
+            steps.append("пароль введён")
+            pg.wait_for_timeout(7000)
+        except Exception as e:  # noqa: BLE001
+            pg.screenshot(path=str(YA_SHOT))
+            out = {"ok": False, "error": str(e).splitlines()[0][:200], "steps": steps,
+                   "url": pg.url, "text": pg.inner_text("body")[:1500]}
+            b.close()
+            return out
+        # вошли, если паспорт больше не просит пароль и нас увели с /auth
+        ok = pg.locator("input[type=password]").count() == 0 and "/auth" not in pg.url
+        text = pg.inner_text("body")[:1500]
+        pg.screenshot(path=str(YA_SHOT))
+        if ok:
+            ctx.storage_state(path=str(YA_STATE))
+        b.close()
+        return {"ok": ok, "url": pg.url, "steps": steps, "text": text}
+
+
+def ya_open(url: str, wait_ms: int = 6000, max_text: int = 8000,
+            actions: list | None = None, links: bool = False) -> dict:
+    """Открыть страницу Яндекса под сохранённой сессией и выполнить шаги.
+
+    Шаги те же, что у open_page: {"css","click","fill","select","js","scroll"}.
+    Скриншот кладётся в data/ya_web_last.png — по нему видно, что реально
+    произошло на экране, а не что мы про это думаем.
+    """
+    from playwright.sync_api import sync_playwright
+
+    if not YA_STATE.exists():
+        res = ya_login()
+        if not res.get("ok"):
+            return {"ok": False, "error": "нет сессии Яндекса", "login": res}
+    with _lock, sync_playwright() as p:
+        b = _launch(p)
+        ctx = b.new_context(storage_state=str(YA_STATE), viewport={"width": 1440, "height": 950},
+                            locale="ru-RU",
+                            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                       "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                       "Chrome/124.0 Safari/537.36")
+        pg = ctx.new_page()
+        pg.goto(url, wait_until="domcontentloaded", timeout=90000)
+        pg.wait_for_timeout(wait_ms)
+        done = []
+        for st in actions or []:
+            try:
+                if "wait" in st and len(st) == 1:
+                    pg.wait_for_timeout(int(st["wait"]))
+                elif "js" in st:
+                    st = {**st, "result": pg.evaluate(st["js"])}
+                elif st.get("scroll"):
+                    for _ in range(int(st.get("times", 5))):
+                        pg.mouse.wheel(0, 3000)
+                        pg.wait_for_timeout(int(st.get("pause", 500)))
+                elif "select" in st:
+                    loc = pg.locator(st["css"]).nth(int(st.get("nth", 0)))
+                    if st.get("by") == "label":
+                        loc.select_option(label=str(st["select"]))
+                    else:
+                        loc.select_option(str(st["select"]))
+                elif "fill" in st:
+                    loc = pg.locator(st["css"]) if st.get("css") else pg.get_by_placeholder(st["placeholder"])
+                    loc.first.click(timeout=10000)
+                    loc.first.fill(str(st["fill"]))
+                    if st.get("press"):
+                        loc.first.press(st["press"])
+                elif st.get("css"):
+                    pg.locator(st["css"]).nth(int(st.get("nth", 0))).click(timeout=20000)
+                elif st.get("click"):
+                    pg.get_by_text(str(st["click"]), exact=bool(st.get("exact", False))) \
+                      .nth(int(st.get("nth", 0))).click(timeout=20000)
+                pg.wait_for_timeout(int(st.get("after", 1500)))
+                done.append({**st, "ok": True})
+            except Exception as e:  # noqa: BLE001
+                done.append({**st, "ok": False, "error": str(e).splitlines()[0][:200]})
+                if st.get("required", True):
+                    break
+        out = {"ok": True, "url": pg.url, "title": pg.title(),
+               "text": pg.inner_text("body")[:max_text], "actions": done}
+        if links:
+            out["links"] = [{"text": (a.inner_text() or "").strip()[:70], "href": a.get_attribute("href")}
+                            for a in pg.query_selector_all("a[href]")][:250]
+        pg.screenshot(path=str(YA_SHOT), full_page=False)
+        try:
+            ctx.storage_state(path=str(YA_STATE))
+        except Exception:  # noqa: BLE001
+            pass
+        b.close()
+        return out
