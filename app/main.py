@@ -3010,7 +3010,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-11.23"
+APP_VERSION = "2026-09-11.24"
 
 
 @app.get("/api/net")
@@ -6184,6 +6184,27 @@ def api_ads_geo(plan: str = "30377205"):
         except Exception as e:  # noqa: BLE001
             out["vk"]["error"] = str(e)[:200]
     return out
+
+
+@app.post("/api/bonus/tarif/run", dependencies=OWNER_AUTH)
+def api_bonus_tarif_run(p0: str = "2026-09-01", p1: str = ""):
+    """Считает бонусы по действующему тарифу за период. Обход CRM — минуты,
+    поэтому запуск фоновый, результат забирать через GET /api/bonus/tarif."""
+    from . import bonus_tarif
+    return bonus_tarif.start(p0, p1 or date.today().isoformat())
+
+
+@app.get("/api/bonus/tarif", dependencies=OWNER_AUTH)
+def api_bonus_tarif(full: int = 0):
+    """Последний расчёт по тарифу. full=0 — только итоги, full=1 — с именами."""
+    from . import bonus_tarif
+    st = bonus_tarif.status()
+    d = st.get("data")
+    if d and not full:
+        d["people"] = {w: {k: (len(v) if isinstance(v, list) else v)
+                           for k, v in p.items()} for w, p in d["people"].items()}
+        d.pop("plan", None); d.pop("act", None)
+    return st
 
 
 @app.get("/api/bonusy", dependencies=OWNER_AUTH)
