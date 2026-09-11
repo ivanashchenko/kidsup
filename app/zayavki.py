@@ -153,6 +153,17 @@ def _li(r: dict, extra: str = "") -> str:
             f"{r['days']} дн.</span>{extra}</li>")
 
 
+def _semey(n: int) -> str:
+    """«54 семьи», а не «54 семей» — цифры админы читают каждый день."""
+    tail = n % 100
+    if not 11 <= tail <= 14:
+        if n % 10 == 1:
+            return f"{n} семья"
+        if n % 10 in (2, 3, 4):
+            return f"{n} семьи"
+    return f"{n} семей"
+
+
 def _checked_block() -> str:
     """Блок по перепроверенному списку (app/zayavki_audit.py).
 
@@ -186,7 +197,7 @@ def _checked_block() -> str:
          f"({len(todo)})</b>"
          f"<div style='font-size:12.5px;color:#6c6a86;margin-bottom:8px'>Проверено по всем карточкам "
          f"на номере: записи, звонки, переписка и живые комментарии. Заявки одной семьи сведены в "
-         f"одну строку. Из {d['проверено']} строк блока это {len(fams)} семей, и работы — на "
+         f"одну строку. Из {d['проверено']} строк блока это {_semey(len(fams))}, и работы — на "
          f"{len(todo)}.</div>"]
     if todo:
         p.append("<div style='font-weight:700;color:#E30613;font-size:13px'>Ни звонка, ни сообщения, "
