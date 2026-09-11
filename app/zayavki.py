@@ -218,7 +218,10 @@ def _checked_block() -> str:
                      "<ul style='list-style:none;padding:0;margin:6px 0 0'>"
                      + "".join(_li_f(f, f" <span style='color:#6c6a86;font-size:12px'>"
                                         f"{html.escape(f['why'][:90])}</span>") for f in s) + "</ul></details>")
-    p.append(f"<div style='font-size:12px;color:#6c6a86;margin-top:8px'>Проверка обновляется раз в час.</div></div>")
+    when = zayavki_audit._CACHE.get("ts")
+    p.append(f"<div style='font-size:12px;color:#6c6a86;margin-top:8px'>Проверено "
+             f"{when.strftime('%d.%m в %H:%M') if when else 'только что'}, "
+             f"обновляется раз в час.</div></div>")
     return "".join(p)
 
 

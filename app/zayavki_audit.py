@@ -20,9 +20,11 @@
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from . import db, sync, zayavki
 
@@ -70,14 +72,41 @@ def _rows(conn, sql: str, args: tuple) -> list[dict]:
 
 
 _CACHE: dict = {"ts": None, "data": None, "busy": False}
+# Разбор переживает перезапуск: за одно утро 11.09 сервер передеплоили
+# одиннадцать раз, и каждый раз пульт на несколько минут возвращался к сырому
+# списку на 68 строк — админы видели работу, которой нет. Поэтому результат
+# лежит ещё и на диске.
+CACHE_FILE = Path(__file__).resolve().parent.parent / "data" / "zayavki_audit.json"
+
+
+def _load_disk() -> None:
+    if _CACHE["data"] or not CACHE_FILE.exists():
+        return
+    try:
+        raw = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+        _CACHE.update(data=raw["data"], ts=datetime.fromisoformat(raw["ts"]))
+    except Exception:  # noqa: BLE001
+        log.warning("разбор заявок с диска не прочитался")
+
+
+def _save_disk(d: dict, ts: datetime) -> None:
+    try:
+        CACHE_FILE.parent.mkdir(exist_ok=True)
+        CACHE_FILE.write_text(json.dumps({"ts": ts.isoformat(), "data": d}, ensure_ascii=False),
+                              encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        log.warning("разбор заявок на диск не записался")
 
 
 def cached(max_age_min: int = 60) -> dict | None:
     """Готовый разбор для блока на пульте. Считается в фоне: один проход —
     это под сотню обращений к МойКлассу, столько страница ждать не может.
-    Пока первый расчёт не закончился, возвращаем None, и блок рисуется
-    по-старому — лучше грубый список, чем пустая страница."""
+    Пока первого расчёта нет вовсе, возвращаем None, и блок рисуется
+    по-старому — лучше грубый список, чем пустая страница. Если расчёт есть,
+    но устарел, отдаём его и пересчитываем в фоне: устаревшая правда лучше
+    свежей неправды."""
     import threading
+    _load_disk()
     now = datetime.now()
     fresh = _CACHE["data"] and _CACHE["ts"] and (now - _CACHE["ts"]) < timedelta(minutes=max_age_min)
     if not fresh and not _CACHE["busy"]:
@@ -86,7 +115,9 @@ def cached(max_age_min: int = 60) -> dict | None:
         def _run():
             try:
                 d = audit()
-                _CACHE.update(data=d, ts=datetime.now())
+                ts = datetime.now()
+                _CACHE.update(data=d, ts=ts)
+                _save_disk(d, ts)
             except Exception:  # noqa: BLE001
                 log.exception("аудит заявок не досчитался")
             finally:
