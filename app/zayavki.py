@@ -153,7 +153,71 @@ def _li(r: dict, extra: str = "") -> str:
             f"{r['days']} дн.</span>{extra}</li>")
 
 
+def _checked_block() -> str:
+    """Блок по перепроверенному списку (app/zayavki_audit.py).
+
+    11.09 Борис: «перепроверь, что эти 68 заявок реально необработанные, может
+    это дубли». Оказалось: из 68 строк работы — на 14 семей. Остальное — семьи,
+    с которыми уже говорили и не сменили статус записи, заявки одной семьи на
+    пять кружков сразу, соискатели и рабочие номера компаний. Поэтому сначала
+    показываем проверенный список, а сырой — только пока проверка считается.
+    """
+    from . import zayavki_audit
+    d = zayavki_audit.cached()
+    if not d:
+        return ""
+    fams = d["семьи"]
+
+    def _sec(kind: str) -> list[dict]:
+        return [f for f in fams if f["kind"] == kind]
+
+    def _li_f(f: dict, tail: str = "") -> str:
+        want = " + ".join(dict.fromkeys(x for x in f["хочет"] if x))[:70]
+        dup = f" · {f['cards']} карточки на номере" if f["cards"] > 1 else ""
+        return (f"<li style='margin:6px 0'><a href='https://app.moyklass.com/client/{f['uid']}' "
+                f"target='_blank' style='font-weight:700;color:#312783'>"
+                f"{html.escape(f['name'] or f['phone'])}</a> "
+                f"<span style='white-space:nowrap;color:#6c6a86'>{html.escape(f['phone'])}</span> · "
+                f"{html.escape(want)} · <span style='color:#6c6a86'>{f['days']} дн.{dup}</span>{tail}</li>")
+
+    todo = _sec("не доделали")
+    p = [f"<div class='card' style='border-left:4px solid #E30613;margin:14px 0'>"
+         f"<b style='display:block;font-size:17px;margin-bottom:4px'>Заявки, где мы не доделали "
+         f"({len(todo)})</b>"
+         f"<div style='font-size:12.5px;color:#6c6a86;margin-bottom:8px'>Проверено по всем карточкам "
+         f"на номере: записи, звонки, переписка и живые комментарии. Заявки одной семьи сведены в "
+         f"одну строку. Из {d['проверено']} строк блока это {len(fams)} семей, и работы — на "
+         f"{len(todo)}.</div>"]
+    if todo:
+        p.append("<div style='font-weight:700;color:#E30613;font-size:13px'>Ни звонка, ни сообщения, "
+                 "ни комментария. Первый набор дня</div>"
+                 "<ul style='list-style:none;padding:0;margin:0;font-size:14px'>"
+                 + "".join(_li_f(f) for f in todo) + "</ul>")
+    else:
+        p.append("<div style='color:#7DB928;font-weight:700'>Все заявки сезона тронуты. Так держать.</div>")
+    for kind, title in (("писали", "Писали в мессенджер, ответа нет — позвонить"),
+                        ("звонили", "Звонили, разговора не вышло — набрать ещё раз"),
+                        ("говорили", "Разговор был, а заявка висит «новой» — поставить статус записи"),
+                        ("работает", "Семья уже занимается — закрыть заявку-хвост"),
+                        ("не клиент", "Не семьи: соискатели, рабочие номера компаний — закрыть отказом")):
+        s = _sec(kind)
+        if s:
+            p.append(f"<details style='margin-top:8px;font-size:13.5px'><summary style='cursor:pointer;"
+                     f"font-weight:700'>{title} — {len(s)}</summary>"
+                     "<ul style='list-style:none;padding:0;margin:6px 0 0'>"
+                     + "".join(_li_f(f, f" <span style='color:#6c6a86;font-size:12px'>"
+                                        f"{html.escape(f['why'][:90])}</span>") for f in s) + "</ul></details>")
+    p.append(f"<div style='font-size:12px;color:#6c6a86;margin-top:8px'>Проверка обновляется раз в час.</div></div>")
+    return "".join(p)
+
+
 def block() -> str:
+    try:
+        checked = _checked_block()
+        if checked:
+            return checked
+    except Exception:  # проверка не важнее самого блока
+        pass
     try:
         d = collect()
     except Exception as e:  # страница плана важнее блока

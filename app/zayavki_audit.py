@@ -69,6 +69,33 @@ def _rows(conn, sql: str, args: tuple) -> list[dict]:
     return [dict(r) for r in conn.execute(sql, args)]
 
 
+_CACHE: dict = {"ts": None, "data": None, "busy": False}
+
+
+def cached(max_age_min: int = 60) -> dict | None:
+    """Готовый разбор для блока на пульте. Считается в фоне: один проход —
+    это под сотню обращений к МойКлассу, столько страница ждать не может.
+    Пока первый расчёт не закончился, возвращаем None, и блок рисуется
+    по-старому — лучше грубый список, чем пустая страница."""
+    import threading
+    now = datetime.now()
+    fresh = _CACHE["data"] and _CACHE["ts"] and (now - _CACHE["ts"]) < timedelta(minutes=max_age_min)
+    if not fresh and not _CACHE["busy"]:
+        _CACHE["busy"] = True
+
+        def _run():
+            try:
+                d = audit()
+                _CACHE.update(data=d, ts=datetime.now())
+            except Exception:  # noqa: BLE001
+                log.exception("аудит заявок не досчитался")
+            finally:
+                _CACHE["busy"] = False
+
+        threading.Thread(target=_run, daemon=True, name="zayavki-audit").start()
+    return _CACHE["data"]
+
+
 def audit(limit: int = 0) -> dict:
     """Проходит горячие заявки блока и по каждой выносит вердикт."""
     data = zayavki.collect()
