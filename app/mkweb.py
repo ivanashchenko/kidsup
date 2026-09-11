@@ -1088,20 +1088,32 @@ def ya_sms_start(phone_tail: str = "") -> dict:
                     b.close(); return
                 field = pg.locator("input[type=text], input[type=tel], input[inputmode=numeric]").first
                 field.click()
-                pg.keyboard.type(str(_SMS["code"]).strip(), delay=130)
-                pg.wait_for_timeout(1200)
-                field.press("Enter")
-                pg.wait_for_timeout(9000)
+                code = str(_SMS["code"]).strip()
+                pg.keyboard.type(code, delay=130)
+                say(f"код набран ({len(code)} цифр)")
+                # Паспорт отправляет код сам, как только набрана последняя
+                # цифра: поле исчезает, и Enter по нему падает по таймауту —
+                # так мы потеряли предыдущий код уже после успешного входа.
+                pg.wait_for_timeout(6000)
+                try:
+                    if field.count() and field.is_visible():
+                        field.press("Enter", timeout=5000)
+                except Exception:  # noqa: BLE001
+                    pass
+                pg.wait_for_timeout(7000)
                 # После кода паспорт предлагает «входить по лицу или отпечатку»
                 # и ждёт ответа. Это уже внутри аккаунта, но пока мы на этом
                 # экране, сессия неполная — отказываемся и идём в Директ.
-                for label in ("Напомнить позже", "Не сейчас", "Пропустить", "Позже"):
-                    btn = pg.get_by_text(label, exact=True)
-                    if btn.count():
-                        say(f"жму «{label}»")
-                        btn.first.click(timeout=10000)
-                        pg.wait_for_timeout(4000)
-                        break
+                for label in ("Пропустить", "Напомнить позже", "Не сейчас", "Позже"):
+                    try:
+                        btn = pg.get_by_text(label, exact=True)
+                        if btn.count():
+                            say(f"жму «{label}»")
+                            btn.first.click(timeout=10000)
+                            pg.wait_for_timeout(4000)
+                            break
+                    except Exception:  # noqa: BLE001
+                        continue
                 pg.goto("https://direct.yandex.ru/", wait_until="domcontentloaded", timeout=90000)
                 pg.wait_for_timeout(7000)
                 pg.screenshot(path=str(YA_SHOT))
