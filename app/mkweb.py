@@ -848,10 +848,22 @@ def ya_login() -> dict:
         return {"ok": False, "error": "yandex_web_login / yandex_web_password не заданы"}
     with _lock, sync_playwright() as p:
         b = _launch(p)
+        # 11.09: Борис тем же паролем вошёл руками, а нам паспорт отвечал
+        # «Неверный пароль». Так Яндекс отвечает не только на плохой пароль,
+        # но и на подозрительный вход: безголовый браузер из дата-центра,
+        # мгновенно вставленный в поле пароль, пустая история. Поэтому здесь
+        # часовой пояс Москвы, обычный набор заголовков, скрытый признак
+        # автоматизации и ввод по символам с задержкой.
         ctx = b.new_context(viewport={"width": 1440, "height": 950}, locale="ru-RU",
+                            timezone_id="Europe/Moscow",
+                            extra_http_headers={"Accept-Language": "ru-RU,ru;q=0.9"},
                             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                       "Chrome/124.0 Safari/537.36")
+                                       "Chrome/124.0.0.0 Safari/537.36")
+        ctx.add_init_script(
+            "Object.defineProperty(navigator,'webdriver',{get:()=>undefined});"
+            "Object.defineProperty(navigator,'languages',{get:()=>['ru-RU','ru']});"
+            "Object.defineProperty(navigator,'plugins',{get:()=>[1,2,3,4,5]});")
         pg = ctx.new_page()
         steps = []
         try:
@@ -866,18 +878,39 @@ def ya_login() -> dict:
                 pg.wait_for_timeout(3000)
                 steps.append("переключились на вход по логину")
             login_box = pg.locator("input[name=login], #passp-field-login, input[type=text]").first
-            login_box.fill(user)
+            login_box.click()
+            login_box.type(user, delay=90)
             # Кнопка «Войти» у паспорта без type=submit и с меняющимся id —
             # надёжнее отправлять форму клавишей.
+            pg.wait_for_timeout(800)
             login_box.press("Enter")
             steps.append("логин введён")
-            pg.wait_for_timeout(4000)
+            pg.wait_for_timeout(5000)
             pw = pg.locator("input[type=password]").first
             pw.wait_for(timeout=25000)
-            pw.fill(pwd)
-            pw.press("Enter")
-            steps.append("пароль введён")
-            pg.wait_for_timeout(7000)
+            # 11.09: пароль верный (Борис вошёл им руками), а паспорт отвечал
+            # «неверный». На снимке экрана поле было заполнено, но кнопка
+            # «Далее» оставалась серой — React не увидел ввода, и форма ушла
+            # с пустым паролем. Поэтому набираем настоящими нажатиями клавиш
+            # (fill вставляет значение мимо событий) и сверяем длину.
+            pw.click()
+            pg.keyboard.press("Control+a")
+            pg.keyboard.press("Delete")
+            pg.keyboard.type(pwd, delay=120)
+            pg.wait_for_timeout(1200)
+            got = len(pw.input_value() or "")
+            if got != len(pwd):
+                pg.keyboard.type(pwd[got:], delay=150)
+                pg.wait_for_timeout(600)
+                got = len(pw.input_value() or "")
+            steps.append(f"пароль набран ({got} из {len(pwd)} симв.)")
+            nxt = pg.get_by_role("button", name="Далее")
+            if nxt.count() and nxt.first.is_enabled():
+                steps.append("жму «Далее»")
+                nxt.first.click(timeout=15000)
+            else:
+                pw.press("Enter")
+            pg.wait_for_timeout(9000)
         except Exception as e:  # noqa: BLE001
             pg.screenshot(path=str(YA_SHOT))
             out = {"ok": False, "error": str(e).splitlines()[0][:200], "steps": steps,
@@ -964,3 +997,114 @@ def ya_open(url: str, wait_ms: int = 6000, max_text: int = 8000,
             pass
         b.close()
         return out
+
+
+# ───────────────────────── Вход в Яндекс по коду из SMS ─────────────────────────
+#
+# 11.09. Пароль верный — Борис вошёл им руками в ту же минуту, — но паспорт
+# отвечает нашему браузеру «Неверный пароль»: поле заполнено полностью, кнопка
+# «Далее» активна, и всё равно отказ. Так Яндекс встречает вход с серверного
+# адреса. Разовый код из SMS такую проверку проходит, а сохранённая сессия
+# потом живёт своей жизнью и пароль больше не нужен.
+#
+# Браузер при этом должен пережить два наших вызова: сначала «отправь код»,
+# потом «вот код». Поэтому он ждёт в фоновом потоке, а код кладётся в _SMS.
+
+_SMS: dict = {"thread": None, "code": None, "state": "", "log": [], "ts": None}
+
+
+def ya_sms_start(phone_tail: str = "") -> dict:
+    """Шаг 1: открыть паспорт, попросить код в SMS и ждать его до пяти минут."""
+    import threading
+
+    if _SMS["thread"] and _SMS["thread"].is_alive():
+        return {"ok": True, "already": True, "state": _SMS["state"], "log": _SMS["log"][-6:]}
+    user = db.get_setting("yandex_web_login")
+    if not user:
+        return {"ok": False, "error": "yandex_web_login не задан"}
+    _SMS.update(code=None, state="запускаю", log=[], ts=time.time())
+
+    def _worker():
+        from playwright.sync_api import sync_playwright
+        say = _SMS["log"].append
+        try:
+            with _lock, sync_playwright() as p:
+                b = _launch(p)
+                ctx = b.new_context(viewport={"width": 1440, "height": 950}, locale="ru-RU",
+                                    timezone_id="Europe/Moscow",
+                                    extra_http_headers={"Accept-Language": "ru-RU,ru;q=0.9"},
+                                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                               "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                               "Chrome/124.0.0.0 Safari/537.36")
+                ctx.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
+                pg = ctx.new_page()
+                pg.goto("https://passport.yandex.ru/auth", wait_until="domcontentloaded", timeout=90000)
+                pg.wait_for_timeout(3500)
+                if pg.locator("input[name=login], #passp-field-login").count() == 0:
+                    pg.get_by_text("Ещё", exact=True).first.click(timeout=15000)
+                    pg.wait_for_timeout(1500)
+                    pg.get_by_text("Войти по логину", exact=True).first.click(timeout=15000)
+                    pg.wait_for_timeout(3000)
+                box = pg.locator("input[name=login], #passp-field-login, input[type=text]").first
+                box.click()
+                pg.keyboard.type(user, delay=90)
+                pg.wait_for_timeout(700)
+                box.press("Enter")
+                pg.wait_for_timeout(5000)
+                say("логин введён")
+                sms = pg.get_by_text("Войти с помощью смс", exact=False)
+                if not sms.count():
+                    _SMS["state"] = "кнопки «Войти с помощью смс» нет"
+                    pg.screenshot(path=str(YA_SHOT)); b.close(); return
+                sms.first.click(timeout=20000)
+                pg.wait_for_timeout(6000)
+                pg.screenshot(path=str(YA_SHOT))
+                _SMS["state"] = "код отправлен, жду"
+                say("код запрошен: " + pg.inner_text("body")[:160].replace("\n", " "))
+                for _ in range(150):          # пять минут
+                    if _SMS["code"]:
+                        break
+                    pg.wait_for_timeout(2000)
+                if not _SMS["code"]:
+                    _SMS["state"] = "код не дождался"
+                    b.close(); return
+                field = pg.locator("input[type=text], input[type=tel], input[inputmode=numeric]").first
+                field.click()
+                pg.keyboard.type(str(_SMS["code"]).strip(), delay=130)
+                pg.wait_for_timeout(1200)
+                field.press("Enter")
+                pg.wait_for_timeout(9000)
+                pg.screenshot(path=str(YA_SHOT))
+                ok = "/auth" not in pg.url and pg.locator("input[type=password]").count() == 0
+                if ok:
+                    ctx.storage_state(path=str(YA_STATE))
+                    _SMS["state"] = "вошли, сессия сохранена"
+                else:
+                    _SMS["state"] = "не вышло: " + pg.inner_text("body")[:200].replace("\n", " ")
+                b.close()
+        except Exception as e:  # noqa: BLE001
+            _SMS["state"] = f"ошибка: {type(e).__name__}: {str(e).splitlines()[0][:160]}"
+
+    t = threading.Thread(target=_worker, daemon=True, name="ya-sms")
+    _SMS["thread"] = t
+    t.start()
+    time.sleep(18)
+    return {"ok": True, "state": _SMS["state"], "log": _SMS["log"][-6:]}
+
+
+def ya_sms_code(code: str) -> dict:
+    """Шаг 2: передать код из SMS ожидающему браузеру."""
+    if not (_SMS["thread"] and _SMS["thread"].is_alive()):
+        return {"ok": False, "error": "вход не запущен или уже завершился", "state": _SMS["state"]}
+    _SMS["code"] = "".join(ch for ch in str(code) if ch.isdigit())
+    for _ in range(30):
+        time.sleep(2)
+        if not _SMS["thread"].is_alive():
+            break
+    return {"ok": YA_STATE.exists(), "state": _SMS["state"], "log": _SMS["log"][-6:]}
+
+
+def ya_sms_status() -> dict:
+    return {"state": _SMS["state"], "log": _SMS["log"][-8:],
+            "alive": bool(_SMS["thread"] and _SMS["thread"].is_alive()),
+            "session": YA_STATE.exists()}

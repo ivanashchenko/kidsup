@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-11.12"
+APP_VERSION = "2026-09-11.16"
 
 
 @app.get("/api/net")
@@ -5539,6 +5539,26 @@ def api_yandex_login():
     где часть переключателей API v5 не отдаёт."""
     from . import mkweb
     return mkweb.ya_login()
+
+
+@app.post("/api/yandex/sms/start", dependencies=OWNER_AUTH)
+def api_yandex_sms_start():
+    """Запросить у Яндекса код в SMS: браузер ждёт код до пяти минут."""
+    from . import mkweb
+    return mkweb.ya_sms_start()
+
+
+@app.post("/api/yandex/sms/code", dependencies=OWNER_AUTH)
+def api_yandex_sms_code(payload: dict = Body(...)):
+    """Передать код из SMS ожидающему браузеру: {"code": "1234"}."""
+    from . import mkweb
+    return mkweb.ya_sms_code(str(payload.get("code") or ""))
+
+
+@app.get("/api/yandex/sms/status", dependencies=OWNER_AUTH)
+def api_yandex_sms_status():
+    from . import mkweb
+    return mkweb.ya_sms_status()
 
 
 @app.post("/api/yandex/open", dependencies=OWNER_AUTH)
