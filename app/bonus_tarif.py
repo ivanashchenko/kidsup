@@ -225,11 +225,14 @@ def collect(p0: str, p1: str) -> dict:
         sdel = (len(t) * RATE_TRIAL + len(new) * RATE_NEW
                 + len(back) * RATE_BACK + len(sec) * RATE_SECOND)
         sh_plan, sh_fact = shifts_plan.get(who, 0), shifts_fact.get(who, 0)
-        shifts = sh_plan or sh_fact
+        # Гарантия — только за смены администратора по графику владельца.
+        # Дни с активностью в CRM (shifts_fact) гарантию не дают: у чат-админа
+        # они есть каждый день, а смен на ресепшене нет.
+        guarantee = sh_plan * RATE_SHIFT
         people[who] = {
             "trials": t, "new": new, "back": back, "second": sec,
             "sdelnaya": sdel, "shifts_plan": sh_plan, "shifts_fact": sh_fact,
-            "guarantee": shifts * RATE_SHIFT, "to_pay": max(sdel, shifts * RATE_SHIFT),
+            "guarantee": guarantee, "to_pay": max(sdel, guarantee),
         }
 
     return {"period": [p0, p1], "built": datetime.now().isoformat(timespec="seconds"),
