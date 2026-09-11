@@ -215,13 +215,25 @@ def collect(p0: str, p1: str) -> dict:
         for n in act.get(k, ()):
             shifts_fact[n] += 1
 
+    # Кто привёл ребёнка: автор первой записи в сезоне. Оплату часто проводит
+    # не он — за 1–11.09 таких платежей половина, — поэтому считаем оба варианта:
+    # «по тому, кто провёл оплату» и «по тому, кто записал».
+    first_author: dict[int, str] = {}
+    for j in sorted(joins, key=lambda x: x["created"]):
+        first_author.setdefault(j["uid"], j["who"])
+    for f in fam.values():
+        f["author"] = first_author.get(f["uid"]) or f["who"]
+
     people = {}
     for who in sorted({*(t["who"] for t in trials), *(f["who"] for f in fam.values()),
+                       *(f["author"] for f in fam.values()),
                        *(s["who"] for s in second), *shifts_plan, *shifts_fact}):
         t = [x for x in trials if x["who"] == who]
         new = [f for f in fam.values() if f["who"] == who and f["kind"] == "новый"]
         back = [f for f in fam.values() if f["who"] == who and f["kind"] == "возврат спящего"]
         sec = [x for x in second if x["who"] == who]
+        new_a = [f for f in fam.values() if f["author"] == who and f["kind"] == "новый"]
+        back_a = [f for f in fam.values() if f["author"] == who and f["kind"] == "возврат спящего"]
         sdel = (len(t) * RATE_TRIAL + len(new) * RATE_NEW
                 + len(back) * RATE_BACK + len(sec) * RATE_SECOND)
         sh_plan, sh_fact = shifts_plan.get(who, 0), shifts_fact.get(who, 0)
@@ -229,10 +241,14 @@ def collect(p0: str, p1: str) -> dict:
         # Дни с активностью в CRM (shifts_fact) гарантию не дают: у чат-админа
         # они есть каждый день, а смен на ресепшене нет.
         guarantee = sh_plan * RATE_SHIFT
+        sdel_a = (len(t) * RATE_TRIAL + len(new_a) * RATE_NEW
+                  + len(back_a) * RATE_BACK + len(sec) * RATE_SECOND)
         people[who] = {
             "trials": t, "new": new, "back": back, "second": sec,
             "sdelnaya": sdel, "shifts_plan": sh_plan, "shifts_fact": sh_fact,
             "guarantee": guarantee, "to_pay": max(sdel, guarantee),
+            "new_by_author": new_a, "back_by_author": back_a,
+            "sdelnaya_by_author": sdel_a, "to_pay_by_author": max(sdel_a, guarantee),
         }
 
     return {"period": [p0, p1], "built": datetime.now().isoformat(timespec="seconds"),
@@ -243,6 +259,37 @@ def collect(p0: str, p1: str) -> dict:
             "act": {k: sorted(v) for k, v in act.items()},
             "pays_total": pays_total, "pays_no_manager": pays_no_mgr,
             "joins": len(joins)}
+
+
+def paycheck(p0: str, p1: str, limit: int = 40) -> dict:
+    """Откуда у платежа берётся менеджер: автор проведения или ответственный
+    за карточку. От этого зависит, чья это работа в бонусе."""
+    mk = MoyklassClient(sync.get_api_key())
+    mk.authenticate()
+    try:
+        r = mk.get("/v1/company/payments", {"limit": 500, "date": [p0, p1]})
+        ps = [p for p in ((r.get("payments") if isinstance(r, dict) else r) or [])
+              if p.get("optype") == "income" and (p.get("summa") or 0) > 0 and p.get("userId")]
+        rows, same, diff, nomgr = [], 0, 0, 0
+        for p in ps[:limit]:
+            u = mk.get(f"/v1/company/users/{p['userId']}")
+            time.sleep(0.25)
+            resp = u.get("responsibles") or []
+            mid = p.get("managerId")
+            if not mid:
+                nomgr += 1
+            elif mid in resp:
+                same += 1
+            else:
+                diff += 1
+            rows.append({"pay": p.get("id"), "date": p.get("date"), "name": u.get("name"),
+                         "manager": MGR.get(mid, mid),
+                         "responsibles": [MGR.get(x, x) for x in resp]})
+        return {"checked": len(rows), "manager_is_responsible": same,
+                "manager_differs": diff, "no_manager": nomgr,
+                "payments_in_period": len(ps), "rows": rows}
+    finally:
+        mk.close()
 
 
 def _run(p0: str, p1: str) -> None:

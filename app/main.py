@@ -3010,7 +3010,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-11.25"
+APP_VERSION = "2026-09-11.27"
 
 
 @app.get("/api/net")
@@ -6192,6 +6192,14 @@ def api_bonus_tarif_run(p0: str = "2026-09-01", p1: str = ""):
     поэтому запуск фоновый, результат забирать через GET /api/bonus/tarif."""
     from . import bonus_tarif
     return bonus_tarif.start(p0, p1 or date.today().isoformat())
+
+
+@app.get("/api/bonus/paycheck", dependencies=OWNER_AUTH)
+def api_bonus_paycheck(p0: str = "2026-09-01", p1: str = "", limit: int = 40):
+    """Проверка, чей менеджер стоит у платежа: автор проведения или
+    ответственный за карточку. Нужна, чтобы бонус считался за работу."""
+    from . import bonus_tarif
+    return bonus_tarif.paycheck(p0, p1 or date.today().isoformat(), limit)
 
 
 @app.get("/api/bonus/tarif", dependencies=OWNER_AUTH)
