@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-10.52"
+APP_VERSION = "2026-09-11.05"
 
 
 @app.get("/api/net")
@@ -5267,8 +5267,14 @@ def api_calls_list(minutes: int = 95):
     key = (req.json() or {}).get("key")
     if not key:
         raise HTTPException(502, f"stats/request: {req.text[:200]}")
+    # 11.09: один и тот же запрос за 900 минут вернул сначала 0 звонков, потом 31.
+    # Манго отдаёт 200 с пустым телом, пока выгрузка считается, и отличить это
+    # от «готово, звонков нет» нельзя. Раньше после 45 секунд молча возвращался
+    # пустой список — почасовой разбор видел «0 звонков» и пропускал час
+    # разговоров вместе со всеми обещаниями клиентам. Теперь ждём дольше и
+    # честно говорим в ready, дождались мы выгрузки или сдались.
     txt = ""
-    for _ in range(15):
+    for _ in range(30):
         _time.sleep(3)
         res = _mango._call("stats/result", {"key": key})
         if res.status_code == 200 and res.text.strip():
@@ -5287,7 +5293,7 @@ def api_calls_list(minutes: int = 95):
                      # сырых полей — на какой добавочный шёл вызов и был ли ответ
                      "to_ext": te, "from_ext": fe, "answered": bool(answer and answer != "0"),
                      "start": int(start) if start else 0})
-    return {"minutes": minutes, "calls": rows}
+    return {"minutes": minutes, "calls": rows, "ready": bool(txt.strip())}
 
 
 @app.get("/api/calls/recording", dependencies=AUTH)
@@ -5306,6 +5312,18 @@ def api_calls_recording(id: str):
     if r.status_code != 200 or len(r.content) < 1000:
         raise HTTPException(404, f"запись недоступна ({r.status_code}, {len(r.content)} байт)")
     return Response(content=r.content, media_type="audio/mpeg")
+
+
+@app.get("/api/zayavki/audit", dependencies=AUTH)
+def api_zayavki_audit(limit: int = 0):
+    """Перепроверка блока «Заявки без обработки»: по каждой строке — все карточки
+    на номере, их записи, комментарии, переписка и вердикт. Только чтение."""
+    from . import zayavki_audit
+    try:
+        return zayavki_audit.audit(limit=limit)
+    except Exception as e:  # noqa: BLE001
+        import traceback
+        return {"ok": False, "error": str(e)[:300], "trace": traceback.format_exc()[-1200:]}
 
 
 @app.get("/api/crm/user", dependencies=AUTH)

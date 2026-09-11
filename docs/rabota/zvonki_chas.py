@@ -35,10 +35,24 @@ def _call(url, data):
 
 def calls(minutes: int) -> list[dict]:
     if VIA_SERVER:
-        r = httpx.get(f"{SERVER}/api/calls/list", params={"minutes": minutes},
-                      auth=AUTH, timeout=180)
-        r.raise_for_status()
-        return r.json().get("calls", [])
+        # 11.09: выгрузка Манго считается на их стороне, и пока она не готова,
+        # ответ приходит пустым. Один и тот же запрос за 900 минут вернул
+        # сначала 0 звонков, потом 31 — то есть час разговоров мог молча
+        # потеряться вместе с обещаниями клиентам. Поэтому пустой ответ с
+        # ready=false пробуем ещё дважды, прежде чем поверить в тишину.
+        for i in range(3):
+            r = httpx.get(f"{SERVER}/api/calls/list", params={"minutes": minutes},
+                          auth=AUTH, timeout=240)
+            r.raise_for_status()
+            j = r.json()
+            if j.get("calls") or j.get("ready"):
+                return j.get("calls", [])
+            if i < 2:
+                print(f"выгрузка Манго не успела, попытка {i + 2} из 3")
+                time.sleep(10)
+        print("ВНИМАНИЕ: Манго так и не отдала выгрузку — это не значит, "
+              "что звонков не было; следующий разбор возьмёт окно шире")
+        return []
     now = int(time.time())
     r = _call("https://app.mango-office.ru/vpbx/stats/request",
               {"date_from": now - minutes * 60, "date_to": now,
