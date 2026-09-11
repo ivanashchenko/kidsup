@@ -1092,13 +1092,27 @@ def ya_sms_start(phone_tail: str = "") -> dict:
                 pg.wait_for_timeout(1200)
                 field.press("Enter")
                 pg.wait_for_timeout(9000)
+                # После кода паспорт предлагает «входить по лицу или отпечатку»
+                # и ждёт ответа. Это уже внутри аккаунта, но пока мы на этом
+                # экране, сессия неполная — отказываемся и идём в Директ.
+                for label in ("Напомнить позже", "Не сейчас", "Пропустить", "Позже"):
+                    btn = pg.get_by_text(label, exact=True)
+                    if btn.count():
+                        say(f"жму «{label}»")
+                        btn.first.click(timeout=10000)
+                        pg.wait_for_timeout(4000)
+                        break
+                pg.goto("https://direct.yandex.ru/", wait_until="domcontentloaded", timeout=90000)
+                pg.wait_for_timeout(7000)
                 pg.screenshot(path=str(YA_SHOT))
-                ok = "/auth" not in pg.url and pg.locator("input[type=password]").count() == 0
+                body = pg.inner_text("body")[:300].replace("\n", " ")
+                ok = "passport.yandex" not in pg.url
                 if ok:
                     ctx.storage_state(path=str(YA_STATE))
-                    _SMS["state"] = "вошли, сессия сохранена"
+                    _SMS["state"] = f"вошли, сессия сохранена · {pg.url[:60]}"
                 else:
-                    _SMS["state"] = "не вышло: " + pg.inner_text("body")[:200].replace("\n", " ")
+                    _SMS["state"] = "не вышло: " + body
+                say(body[:160])
                 b.close()
         except Exception as e:  # noqa: BLE001
             _SMS["state"] = f"ошибка: {type(e).__name__}: {str(e).splitlines()[0][:160]}"
