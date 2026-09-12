@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-12.5"
+APP_VERSION = "2026-09-12.6"
 
 
 @app.get("/api/net")
@@ -6274,6 +6274,21 @@ def api_bonusy(since: str = "2026-08-01", until: str = "", rows: int = 0, who: s
         out["rows"] = {w: [r for r in v["rows"] if not until or r["date"] <= until]
                        for w, v in data.items() if not who_f or w in who_f}
     return out
+
+
+@app.get("/api/crm/raw-user", dependencies=OWNER_AUTH)
+def api_crm_raw_user(user_id: int):
+    """Карточка как её отдаёт МойКласс, вместе с атрибутами и комментариями.
+    Нужна, чтобы видеть, где лежит номер визита Roistat."""
+    from .moyklass_client import MoyklassClient
+    from . import sync
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        u = mk.get(f"/v1/company/users/{user_id}")
+        c = mk.get("/v1/company/userComments", {"userId": user_id, "limit": 50})
+    finally:
+        mk.close()
+    return {"user": u, "comments": (c.get("comments") if isinstance(c, dict) else c)}
 
 
 @app.get("/api/crm/names/audit", dependencies=OWNER_AUTH)
