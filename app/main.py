@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-11.28"
+APP_VERSION = "2026-09-12.1"
 
 
 @app.get("/api/net")
@@ -3057,7 +3057,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "admin_schedule", "daily_tasks_
             # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
             "roistat_project", "roistat_key",
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
-            "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret", "owner_password", "yandex_audience_token",
+            "cam_password", "cam_embeds", "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret", "owner_password", "yandex_audience_token",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
             "waba_template_id", "waba_templates",
@@ -3081,7 +3081,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "admin_schedule", "daily_tasks_
 # сам прокси. Показываем хвост: убедиться «тот ли вписан» можно,
 # скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
 # страница настроек открыта всем, у кого есть пароль администратора.
-SECRET_KEYS = {"anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_secret", "owner_password", "yandex_audience_token",
+SECRET_KEYS = {"cam_password", "anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_secret", "owner_password", "yandex_audience_token",
                "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password", "yandex_web_password"}
 
 
@@ -6180,6 +6180,27 @@ def api_ads_geo(plan: str = "30377205"):
         except Exception as e:  # noqa: BLE001
             out["vk"]["error"] = str(e)[:200]
     return out
+
+
+@app.get("/kamery", response_class=HTMLResponse)
+def kamery_page(request: Request):
+    """Видеонаблюдение для родителей. Свой пароль, не общий админский."""
+    from . import kamery
+    if kamery.ok_token(request.cookies.get(kamery.COOKIE) or ""):
+        return HTMLResponse(kamery.page())
+    return HTMLResponse(kamery.login_page())
+
+
+@app.post("/kamery", response_class=HTMLResponse)
+def kamery_login(password: str = Form("")):
+    from . import kamery
+    if not kamery.ok_token(password.strip()):
+        return HTMLResponse(kamery.login_page("Неверный пароль. "
+                                              "Проверьте раскладку и пробелы."), status_code=401)
+    r = HTMLResponse(kamery.page())
+    r.set_cookie(kamery.COOKIE, password.strip(), max_age=60 * 60 * 24 * 60,
+                 httponly=True, samesite="lax", secure=True)
+    return r
 
 
 @app.get("/lk/{token}", response_class=HTMLResponse)
