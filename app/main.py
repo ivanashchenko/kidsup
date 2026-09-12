@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-12.1"
+APP_VERSION = "2026-09-12.3"
 
 
 @app.get("/api/net")
@@ -6274,6 +6274,49 @@ def api_bonusy(since: str = "2026-08-01", until: str = "", rows: int = 0, who: s
         out["rows"] = {w: [r for r in v["rows"] if not until or r["date"] <= until]
                        for w, v in data.items() if not who_f or w in who_f}
     return out
+
+
+@app.get("/api/crm/phones", dependencies=OWNER_AUTH)
+def api_crm_phones(kind: str = "clients", fmt: str = "txt"):
+    """Телефоны клиентов для загрузки в рекламные кабинеты (только владелец).
+
+    kind=clients — те, кто хоть раз платил; kind=all — все карточки с телефоном.
+    fmt=txt — по номеру в строке (VK Ads, Яндекс Аудитории принимают такой файл);
+    fmt=md5 — md5 от номера, если кабинет просит хэши.
+    """
+    import hashlib
+    from .moyklass_client import MoyklassClient
+    from . import sync, taskguard
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        users = taskguard.pull_all(mk, "/v1/company/users", "users", cache_hours=2)
+        payers = set()
+        if kind == "clients":
+            subs = taskguard.pull_all(mk, "/v1/company/userSubscriptions",
+                                      "subscriptions", cache_hours=6)
+            payers = {s["userId"] for s in subs
+                      if (s.get("stats") or {}).get("totalPayed", 0) > 0}
+    finally:
+        mk.close()
+    out = []
+    for u in users:
+        if kind == "clients" and u["id"] not in payers:
+            continue
+        for p in (u.get("phone") or []) if isinstance(u.get("phone"), list) else [u.get("phone")]:
+            d = "".join(ch for ch in str(p or "") if ch.isdigit())
+            if len(d) == 11 and d[0] in "78":
+                d = "7" + d[1:]
+            elif len(d) == 10:
+                d = "7" + d
+            else:
+                continue
+            if len(set(d[1:])) <= 2:      # 79990000000 и подобный мусор
+                continue
+            out.append(hashlib.md5(d.encode()).hexdigest() if fmt == "md5" else d)
+    out = sorted(set(out))
+    return PlainTextResponse("\n".join(out) + "\n",
+                             headers={"Content-Disposition":
+                                      f'attachment; filename="phones_{kind}.txt"'})
 
 
 @app.get("/api/crm/classes", dependencies=AUTH)
