@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-12.3"
+APP_VERSION = "2026-09-12.5"
 
 
 @app.get("/api/net")
@@ -6274,6 +6274,33 @@ def api_bonusy(since: str = "2026-08-01", until: str = "", rows: int = 0, who: s
         out["rows"] = {w: [r for r in v["rows"] if not until or r["date"] <= until]
                        for w, v in data.items() if not who_f or w in who_f}
     return out
+
+
+@app.get("/api/crm/names/audit", dependencies=OWNER_AUTH)
+def api_names_audit(limit: int = 0, full: int = 0):
+    """Кого надо почистить: пометки в имени карточки. Ничего не меняет."""
+    from . import names_fix
+    d = names_fix.audit(limit)
+    if not full:
+        d["rows"] = d["rows"][:40]
+        d["manual"] = d["manual"][:20]
+    return d
+
+
+@app.post("/api/crm/names/fix", dependencies=OWNER_AUTH)
+def api_names_fix(dry_run: int = 1, limit: int = 0):
+    """Выносит пометки из имени в комментарий. Перед правкой — копия базы."""
+    from . import names_fix
+    return names_fix.start(bool(dry_run), limit)
+
+
+@app.get("/api/crm/names/status", dependencies=OWNER_AUTH)
+def api_names_status(full: int = 0):
+    from . import names_fix
+    st = names_fix.status()
+    if st.get("data") and not full:
+        st["data"]["rows"] = st["data"]["rows"][:40]
+    return st
 
 
 @app.get("/api/crm/phones", dependencies=OWNER_AUTH)
