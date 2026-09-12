@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-12.6"
+APP_VERSION = "2026-09-12.13"
 
 
 @app.get("/api/net")
@@ -6274,6 +6274,57 @@ def api_bonusy(since: str = "2026-08-01", until: str = "", rows: int = 0, who: s
         out["rows"] = {w: [r for r in v["rows"] if not until or r["date"] <= until]
                        for w, v in data.items() if not who_f or w in who_f}
     return out
+
+
+@app.post("/api/crm/join-roistat", dependencies=OWNER_AUTH)
+def api_crm_join_roistat(join_id: int, user_id: int, value: str):
+    """Проставить номер визита Roistat на записи. Тело собирается из текущей
+    записи: обновление join, как и клиента, заменяет объект целиком."""
+    from .moyklass_client import MoyklassClient
+    from . import sync
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        cur = mk.get("/v1/company/joins", {"userId": user_id, "limit": 50})
+        js = cur.get("joins") if isinstance(cur, dict) else cur
+        j = next((x for x in (js or []) if x["id"] == join_id), None)
+        if not j:
+            raise HTTPException(404, "запись не найдена")
+        params = dict(j.get("params") or {})
+        v = int(value) if str(value).isdigit() else value
+        params["roistat"] = v
+        body = {"statusId": j["statusId"], "params": params,
+                "roistat": v, "createSourceId": j.get("createSourceId")}
+        for f in ("managerId", "advSourceId", "price", "comment",
+                  "autoJoin", "autoDebit", "statusChangeReasonId"):
+            if j.get(f) is not None:
+                body[f] = j[f]
+        try:
+            r = mk.post(f"/v1/company/joins/{join_id}", body)
+        except Exception as e:  # noqa: BLE001
+            txt = getattr(getattr(e, "response", None), "text", "")
+            return {"ok": False, "sent": body,
+                    "error": f"{type(e).__name__}: {str(e)[:200]}", "body": txt[:600]}
+        after = mk.get("/v1/company/joins", {"userId": user_id, "limit": 50})
+        aj = next((x for x in ((after.get("joins") if isinstance(after, dict) else after) or [])
+                   if x["id"] == join_id), {})
+        return {"ok": True, "sent": body, "now": {"statusId": aj.get("statusId"),
+                "roistat": (aj.get("params") or {}).get("roistat"),
+                "managerId": aj.get("managerId"), "classId": aj.get("classId")}, "resp": r}
+    finally:
+        mk.close()
+
+
+@app.get("/api/crm/raw-joins", dependencies=OWNER_AUTH)
+def api_crm_raw_joins(user_id: int):
+    """Записи клиента как их отдаёт МойКласс — с полем номера визита Roistat."""
+    from .moyklass_client import MoyklassClient
+    from . import sync
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        j = mk.get("/v1/company/joins", {"userId": user_id, "limit": 50})
+    finally:
+        mk.close()
+    return j
 
 
 @app.get("/api/crm/raw-user", dependencies=OWNER_AUTH)
