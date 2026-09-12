@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-12.13"
+APP_VERSION = "2026-09-12.16"
 
 
 @app.get("/api/net")
@@ -6312,6 +6312,25 @@ def api_crm_join_roistat(join_id: int, user_id: int, value: str):
                 "managerId": aj.get("managerId"), "classId": aj.get("classId")}, "resp": r}
     finally:
         mk.close()
+
+
+@app.get("/api/crm/states", dependencies=OWNER_AUTH)
+def api_crm_states():
+    """Справочник статусов клиента и статусов записи — как их видит МойКласс."""
+    from .moyklass_client import MoyklassClient
+    from . import sync
+    mk = MoyklassClient(sync.get_api_key())
+    out = {}
+    try:
+        for path in ("/v1/company/userStatuses", "/v1/company/joinStatuses",
+                     "/v1/company/statusReasons", "/v1/company/statusChangeReasons"):
+            try:
+                out[path.rsplit("/", 1)[-1]] = mk.get(path)
+            except Exception as e:  # noqa: BLE001
+                out[path.rsplit("/", 1)[-1]] = {"error": f"{type(e).__name__}: {str(e)[:160]}"}
+    finally:
+        mk.close()
+    return out
 
 
 @app.get("/api/crm/raw-joins", dependencies=OWNER_AUTH)
