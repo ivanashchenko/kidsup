@@ -3075,7 +3075,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-13.15"
+APP_VERSION = "2026-09-13.16"
 
 
 @app.get("/api/net")
@@ -6041,11 +6041,23 @@ def api_roistat_auto_cards(payload: dict = Body(default={})):
     with db.get_conn() as conn:
         phones = [r[0] for r in conn.execute(
             "SELECT DISTINCT phone FROM wazzup_inbox WHERE phone IS NOT NULL AND phone != ''")]
+    # свои номера и не-телефоны в список не попадают: админ, разбирая его,
+    # тратит время на наш же WABA-канал и на id телеграм-чатов, у которых
+    # телефона нет вовсе
+    team = {"".join(ch for ch in str(x) if ch.isdigit())[-10:]
+            for x in (db.get_setting("wa_senders", "").split(",")
+                      + [db.get_setting("chat_whatsapp", ""),
+                         db.get_setting("digest_phone", "")]) if x}
     out = []
     for ph in phones:
-        ph10 = "".join(ch for ch in str(ph) if ch.isdigit())[-10:]
+        digits = "".join(ch for ch in str(ph) if ch.isdigit())
+        ph10 = digits[-10:]
         if one and ph10 != one:
             continue
+        if len(digits) < 11 or not digits.startswith(("7", "8")):
+            continue                      # id чата мессенджера, а не номер
+        if ph10 in team:
+            continue                      # свой номер
         visit = _visit_for(ph)
         if not visit:
             continue
