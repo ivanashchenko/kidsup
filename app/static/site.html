@@ -228,6 +228,15 @@ footer a{color:#fff}
 .sched .s-tbl .hotf{color:var(--red-ink);font-weight:700;white-space:nowrap}
 .sched .s-tbl .btn{padding:.4rem .9rem;font-size:.8rem;margin:0}
 @media(max-width:700px){.sched .s-tbl td:nth-child(2){display:none}}
+@media(max-width:640px){
+  /* на телефоне таблица не помещается и кнопка «Записаться» уезжает за край —
+     разворачиваем строку в карточку */
+  .sched .s-tbl,.sched .s-tbl tbody,.sched .s-tbl tr,.sched .s-tbl td{display:block;width:100%}
+  .sched .s-tbl tr{border-top:1px solid var(--line);padding:.75rem 0}
+  .sched .s-tbl td{border-top:0;padding:.12rem 0}
+  .sched .s-tbl td:last-child{text-align:left!important;margin-top:.55rem}
+  .sched .s-tbl .btn{display:block;width:100%;text-align:center;padding:.65rem 1rem;font-size:.92rem}
+}
 /* педагоги */
 .teach{background:#fff}
 .t-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-top:1.4rem}
@@ -336,9 +345,9 @@ body.js .reveal.in{opacity:1;transform:none}
   text-decoration:none;transition:all .15s}
 .age-chip:hover{background:var(--blue);color:#fff;transform:translateY(-1px)}
 .hero-geo{color:var(--muted);font-size:.88rem;margin-top:.9rem}
-.mini-lead{background:var(--soft);border-radius:16px;padding:16px 18px;margin:1.6rem 0 0;
-  display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.mini-lead b{font:700 1rem Rubik;color:var(--indigo);flex-basis:100%}
+.mini-lead{background:#fff;border:2px solid var(--blue);border-radius:16px;padding:16px 18px;
+  margin:1.6rem 0 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mini-lead b{font:700 1.05rem/1.35 Rubik;color:var(--ink);flex-basis:100%}
 .mini-lead input{flex:1 1 190px;border:1px solid #d6d3ea;border-radius:10px;
   padding:.7rem .9rem;font:400 1rem Inter,system-ui}
 .mini-lead button{border:0;background:var(--green);color:#fff;border-radius:10px;
@@ -414,7 +423,7 @@ body.js .reveal.in{opacity:1;transform:none}
 </style>
 
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "ChildCare", "name": "KidsUP", "alternateName": "Детский центр и английский сад KidsUP", "description": "Детский центр и английский сад на Бульваре Рокоссовского: подготовка к школе, английский по программе Cambridge, раннее развитие, мини-сад и нулевой класс, логопед, ИЗО, шахматы, ментальная арифметика. Дети от 1,3 до 12 лет.", "url": "https://kidsup.ru", "telephone": "+74951209024", "address": {"@type": "PostalAddress", "streetAddress": "бульвар Маршала Рокоссовского, 6к1В", "addressLocality": "Москва", "addressRegion": "Москва", "addressCountry": "RU"}, "areaServed": [{"@type": "Place", "name": "Метрогородок"}, {"@type": "Place", "name": "Богородское"}, {"@type": "Place", "name": "Преображенское"}, {"@type": "Place", "name": "Восточный округ Москвы"}], "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "09:00", "closes": "20:00"}], "publicAccess": true, "isAccessibleForFree": false, "audience": {"@type": "PeopleAudience", "suggestedMinAge": 1, "suggestedMaxAge": 12}, "sameAs": ["https://vk.com/club220359229"], "aggregateRating": {"@type": "AggregateRating", "ratingValue": "5.0", "reviewCount": "253", "bestRating": "5", "worstRating": "1"}}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Первое занятие правда бесплатное?", "acceptedAnswer": {"@type": "Answer", "text": "Оно условно-бесплатное: если не понравится — платить не нужно; если остаётесь — занятие входит в первый абонемент. На нём педагог проводит бесплатную диагностику. У мини-сада и нулевого класса — бесплатный пробный день, дальше пробная неделя с зачётом стоимости при покупке месяца. Четыре направления — исключение: на ИЗО и шахматах пробное занятие стоит 850 ₽, на робототехнике — 1 600 ₽, при покупке абонемента сумма идёт в зачёт. На танцах первое занятие входит в абонемент, если остаётесь, иначе — 850 ₽. Место можно закрепить: оплатить первое занятие 1 600 ₽ вперёд — при покупке абонемента сумма идёт в зачёт, не понравится — вернём."}}, {"@type": "Question", "name": "Что будет, если ребёнок заболеет?", "acceptedAnswer": {"@type": "Answer", "text": "С медицинской справкой занятие отрабатывается в группе того же уровня в течение 30 дней, а если такой группы нет — 50% стоимости зачисляем на баланс к следующему абонементу. Без справки занятие считается проведённым. Плюс 3 недели «заморозки» абонемента в учебном году, например на отпуск."}}, {"@type": "Question", "name": "Как понять, в какую группу попадёт ребёнок?", "acceptedAnswer": {"@type": "Answer", "text": "Сначала предмет и уровень, потом время. Английский делим по уровням Cambridge (Starters/Movers/Flyers), подготовку к школе — на группы для нечитающих и читающих. Уровень определяем на первом занятии-диагностике."}}, {"@type": "Question", "name": "Есть ли занятия в выходные?", "acceptedAnswer": {"@type": "Answer", "text": "Да: подготовка к школе по субботам, шахматы в пятницу и воскресенье, ментальная арифметика по воскресеньям. Подберём расписание под вашу неделю."}}, {"@type": "Question", "name": "Ребёнок стеснительный — вдруг не пойдёт на контакт?", "acceptedAnswer": {"@type": "Answer", "text": "Это самый частый страх — и именно поэтому первое занятие ни к чему не обязывает. Группы у нас по 6–8 детей, педагог успевает к каждому и умеет мягко включать «наблюдателей» в игру. Если ребёнку нужно время — посидите рядом на первом занятии. Не пойдёт — вы ничего не платите."}}, {"@type": "Question", "name": "Мы ещё не определились с расписанием на год", "acceptedAnswer": {"@type": "Answer", "text": "Так у большинства в августе! Начните с пробного и диагностики — расписание у нас гибкое: если что-то поменяется, переведём в другую группу по тому же предмету. Неделя открытых уроков идёт с 31.08 по 13.09 — в это время знакомиться приходят целыми группами, это самый живой момент. Но прийти на первое условно-бесплатное занятие можно в любое время года. У мини-сада и нулевого класса вместо занятия — бесплатный пробный день."}}, {"@type": "Question", "name": "Как проходит оплата?", "acceptedAnswer": {"@type": "Answer", "text": "Помесячно. У большинства направлений абонемент на 8 занятий; у логопеда, ментальной арифметики и робототехники — на 4 занятия; у сада и нулевого класса — 8/12/20 посещений. Оплатить можно на ресепшене или по ссылке."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Первое занятие правда бесплатное?", "acceptedAnswer": {"@type": "Answer", "text": "Оно условно-бесплатное: если не понравится — платить не нужно; если остаётесь — занятие входит в первый абонемент. На нём педагог проводит бесплатную диагностику. У мини-сада и нулевого класса — бесплатный пробный день, дальше пробная неделя с зачётом стоимости при покупке месяца. Четыре направления — исключение: на ИЗО и шахматах пробное занятие стоит 850 ₽, на робототехнике — 1 600 ₽, при покупке абонемента сумма идёт в зачёт. На танцах первое занятие входит в абонемент, если остаётесь, иначе — 850 ₽. Место можно закрепить: оплатить первое занятие 1 600 ₽ вперёд — при покупке абонемента сумма идёт в зачёт, не понравится — вернём."}}, {"@type": "Question", "name": "Что будет, если ребёнок заболеет?", "acceptedAnswer": {"@type": "Answer", "text": "С медицинской справкой занятие отрабатывается в группе того же уровня в течение 30 дней, а если такой группы нет — 50% стоимости зачисляем на баланс к следующему абонементу. Без справки занятие считается проведённым. Плюс 3 недели «заморозки» абонемента в учебном году, например на отпуск."}}, {"@type": "Question", "name": "Как понять, в какую группу попадёт ребёнок?", "acceptedAnswer": {"@type": "Answer", "text": "Сначала предмет и уровень, потом время. Английский делим по уровням Cambridge (Starters/Movers/Flyers), подготовку к школе — на группы для нечитающих и читающих. Уровень определяем на первом занятии-диагностике."}}, {"@type": "Question", "name": "Есть ли занятия в выходные?", "acceptedAnswer": {"@type": "Answer", "text": "Да: подготовка к школе по субботам, шахматы в пятницу и воскресенье, ментальная арифметика по воскресеньям. Подберём расписание под вашу неделю."}}, {"@type": "Question", "name": "Ребёнок стеснительный — вдруг не пойдёт на контакт?", "acceptedAnswer": {"@type": "Answer", "text": "Это самый частый страх — и именно поэтому первое занятие ни к чему не обязывает. Группы у нас по 6–8 детей, педагог успевает к каждому и умеет мягко включать «наблюдателей» в игру. Если ребёнку нужно время — посидите рядом на первом занятии. Не пойдёт — вы ничего не платите."}}, {"@type": "Question", "name": "Мы ещё не определились с расписанием на год", "acceptedAnswer": {"@type": "Answer", "text": "Так у большинства в августе! Начните с пробного и диагностики — расписание у нас гибкое: если что-то поменяется, переведём в другую группу по тому же предмету. Неделя открытых уроков идёт с 14 по 20 сентября — в это время знакомиться приходят целыми группами, это самый живой момент. Но прийти на первое условно-бесплатное занятие можно в любое время года. У мини-сада и нулевого класса вместо занятия — бесплатный пробный день."}}, {"@type": "Question", "name": "Как проходит оплата?", "acceptedAnswer": {"@type": "Answer", "text": "Помесячно. У большинства направлений абонемент на 8 занятий; у логопеда, ментальной арифметики и робототехники — на 4 занятия; у сада и нулевого класса — 8/12/20 посещений. Оплатить можно на ресепшене или по ссылке."}}]}</script>
 </head>
 <body>
 
@@ -477,11 +486,11 @@ body.js .reveal.in{opacity:1;transform:none}
 <section class="events" id="events">
   <div class="wrap">
     <h2>Неделя открытых уроков</h2>
-    <p class="sub">31 августа — 13 сентября. Группы уже стартовали: приходите на обычное
+    <p class="sub">14–20 сентября. Группы уже стартовали: приходите на обычное
     занятие своей группы и посмотрите, как всё устроено изнутри.</p>
     <div class="ev-solo reveal">
       <div class="ev-solo-head">
-        <span class="ev-solo-badge">31 августа — 13 сентября</span>
+        <span class="ev-solo-badge">14–20 сентября</span>
         <h3>📚 Первое занятие — условно-бесплатное</h3>
       </div>
       <div class="ev-solo-body">
@@ -498,7 +507,7 @@ body.js .reveal.in{opacity:1;transform:none}
           наклейка, за каждые десять наклеек — подарок. Стараться становится интересно.</li>
         </ul>
         <div class="ev-solo-cta">
-          <a class="btn btn-green" href="#signup" data-ev="📚 Открытый урок (31.08–13.09)">Выбрать открытый урок</a>
+          <a class="btn btn-green" href="#signup" data-ev="📚 Открытый урок (14–20.09)">Выбрать открытый урок</a>
           <span class="ev-solo-note">Мест в группах 6–8 — записываемся заранее</span>
         </div>
       </div>
@@ -1350,7 +1359,7 @@ body.js .reveal.in{opacity:1;transform:none}
     <details><summary>Мы ещё не определились с расписанием на год</summary>
       <p>Так у большинства в августе! Начните с пробного и диагностики — расписание у нас
       гибкое: если что-то поменяется, переведём в другую группу по тому же предмету.
-      Неделя открытых уроков идёт с 31.08 по 13.09 — в это время знакомиться приходят целыми
+      Неделя открытых уроков идёт с 14 по 20 сентября — в это время знакомиться приходят целыми
       группами, это самый живой момент. Но прийти на первое условно-бесплатное занятие можно
       в любое время года. У мини-сада и нулевого класса вместо занятия — бесплатный пробный день.</p></details>
     <details><summary>Как проходит оплата?</summary>
@@ -1535,7 +1544,7 @@ const NAMES = ["Подготовка к школе", "Английский яз�
 const sel = document.getElementById('f-course');
 NAMES.forEach(n => { const o = document.createElement('option'); o.textContent = n; sel.append(o); });
 const og1b = document.createElement('optgroup'); og1b.label = 'Открытый урок — первое занятие условно-бесплатное';
-['📚 Открытый урок (31.08–13.09)']
+['📚 Открытый урок (14–20.09)']
   .forEach(n => { const o = document.createElement('option'); o.textContent = n; og1b.append(o); });
 sel.append(og1b);
 const og2 = document.createElement('optgroup'); og2.label = 'Новые направления — лист ожидания';
@@ -2015,7 +2024,7 @@ document.querySelectorAll('.mini-lead').forEach(function(f){
 <script>
 window.__applyOffer = function(today){
   // Оффер живёт по календарю сам: после 31.08 счётчик и «цены прошлого
-  // года» умирают, их место занимает Неделя открытых уроков (по 6.09),
+  // года» умирают, их место занимает Неделя открытых уроков (по 20.09),
   // после — вечнозелёное условно-бесплатное занятие. Функция принимает
   // дату параметром, чтобы переключение можно было проверить тестом,
   // не подменяя Date всему документу.
@@ -2027,11 +2036,11 @@ window.__applyOffer = function(today){
       cnt=document.getElementById('cnt');
   if(!badge||!card) return 'нет элементов';
   if (today <= d(8,31)) return 'старые цены';
-  if (today <= d(9,13)) {
-    badge.textContent='Неделя открытых уроков — до 13 сентября';
+  if (today <= d(9,20)) {
+    badge.textContent='Неделя открытых уроков — 14–20 сентября';
     title.textContent='📚 Неделя открытых уроков';
     if(cnt) cnt.hidden=true;
-    card.querySelector('.note').innerHTML='До 13 сентября можно прийти на обычное '+
+    card.querySelector('.note').innerHTML='С 14 по 20 сентября можно прийти на обычное '+
       'занятие своей группы. Первое занятие — условно-бесплатное: не понравится — '+
       'платить не нужно.';
     return 'неделя уроков';

@@ -900,9 +900,9 @@ APOLOGY_TEXT = (
     "Прошу прощения за прошлое сообщение — в нём ошибка: {имя_в} мы помним "
     "не по лагерю, а по занятиям «{курс}». Рассылка ушла общим текстом, "
     "это моя оплошность. Извините!\n\n"
-    "Приглашение при этом в силе, и оно про другое: 29 августа у нас праздник "
-    "открытия сезона, а 31 августа – 13 сентября — Неделя открытых уроков: можно "
-    "прийти на любое занятие нового учебного года и выбрать своё.\n"
+    "Приглашение при этом в силе, и оно про другое: 14–20 сентября у нас Неделя "
+    "открытых уроков — можно прийти на любое занятие нового учебного года "
+    "и выбрать своё.\n"
     "Записать {имя_в} на открытый урок?"
 )
 
@@ -3006,7 +3006,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-12.16"
+APP_VERSION = "2026-09-13.2"
 
 
 @app.get("/api/net")
@@ -6706,6 +6706,21 @@ async def vstrechi_page():
         raise HTTPException(404, "страница ещё не собрана (python3 -m app.events)")
     return HTMLResponse(f.read_text(encoding="utf-8"),
                         headers={"Cache-Control": "public, max-age=600"})
+
+
+@app.post("/api/vstrechi/build", dependencies=AUTH)
+def vstrechi_build():
+    """Пересобрать docs/vstrechi.html.
+
+    Страница статическая, а расписание в ней — из CRM. Локально собрать
+    нельзя: API-ключ МойКласса живёт только на сервере. Поэтому сборка
+    после выкладки идёт этим вызовом, а не командой в консоли."""
+    from . import events as events_mod
+    html = events_mod.build()
+    f = BASE.parent / "docs" / "vstrechi.html"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(html, encoding="utf-8")
+    return {"ok": True, "bytes": len(html)}
 
 
 def await_page(which: str) -> HTMLResponse:
