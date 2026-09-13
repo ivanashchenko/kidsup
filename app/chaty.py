@@ -56,6 +56,59 @@ def links() -> dict[int, str]:
     return out
 
 
+INVITE_RE = re.compile(r"https://chat\.whatsapp\.com/[A-Za-z0-9]{10,40}")
+
+
+def find_links(limit: int = 40) -> dict:
+    """Поискать ссылки-приглашения в истории переписки.
+
+    Чаты заводят с телефона, а ссылку потом кидают родителю в диалог.
+    Значит она уже лежит в переписке — и её не надо просить заново.
+    Кому именно её отправляли, видно по телефону: так понятно, какой
+    группе какая ссылка принадлежит."""
+    found: dict[str, dict] = {}
+    with db.get_conn() as conn:
+        for table in ("wazzup_outbox", "wazzup_inbox"):
+            try:
+                rows = conn.execute(
+                    f"SELECT ts, phone, text FROM {table} "
+                    f"WHERE text LIKE '%chat.whatsapp.com%' ORDER BY ts DESC "
+                    f"LIMIT ?", (int(limit) * 5,)).fetchall()
+            except Exception:
+                continue
+            for ts, phone, text in rows:
+                for url in INVITE_RE.findall(text or ""):
+                    f = found.setdefault(url, {"url": url, "first_seen": ts,
+                                               "phones": [], "where": table})
+                    if phone and phone not in f["phones"]:
+                        f["phones"].append(phone)
+    # телефон получателя → группы, в которых учится его ребёнок
+    who = _phone_classes()
+    for f in found.values():
+        cls: dict[int, str] = {}
+        for ph in f["phones"]:
+            for cid, title in who.get((ph or "")[-10:], []):
+                cls[cid] = title
+        f["classes"] = [{"id": c, "title": t} for c, t in cls.items()]
+    return {"total": len(found), "links": sorted(
+        found.values(), key=lambda f: f["first_seen"] or "", reverse=True)}
+
+
+def _phone_classes() -> dict[str, list[tuple[int, str]]]:
+    """Телефон (10 цифр) → группы его детей среди активных 2627_*."""
+    out: dict[str, list[tuple[int, str]]] = {}
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """SELECT u.phone, c.id, c.name FROM joins j
+               JOIN users u ON u.id = j.user_id
+               JOIN classes c ON c.id = j.class_id
+               WHERE j.status_id = 2 AND c.status = 'opened'
+                 AND u.phone IS NOT NULL AND u.phone != ''""").fetchall()
+    for phone, cid, name in rows:
+        out.setdefault((phone or "")[-10:], []).append((cid, name))
+    return out
+
+
 def code_of(class_id: int) -> str:
     """Короткий код группы для ссылки в СМС: «Гр6» из имени → g6."""
     with db.get_conn() as conn:
@@ -149,6 +202,49 @@ def _first(name: str) -> str:
     """Имя ребёнка из «Фамилия Имя» — для подписи, какая группа чья."""
     parts = (name or "").split()
     return parts[1] if len(parts) > 1 else (parts[0] if parts else "")
+
+
+def groups() -> list[dict]:
+    """Активные группы направления с составом — для страницы /chaty.
+
+    Нужна и до рассылки: пока ссылок нет, админ добавляет родителей
+    в чат руками, и ему нужен точный список телефонов по группе.
+    """
+    ln = links()
+    with db.get_conn() as conn:
+        # «2627_АЯ_Заявки» — буфер новых обращений, а не учебная группа:
+        # чата у неё нет и родителей в ней быть не может
+        cls = conn.execute(
+            """SELECT id, name FROM classes
+               WHERE status='opened' AND name LIKE '2627_АЯ_%'
+                 AND name NOT LIKE '%Заявки%'
+               ORDER BY name""").fetchall()
+        out = []
+        for cid, name in cls:
+            kids = conn.execute(
+                """SELECT u.name, u.phone FROM joins j
+                   JOIN users u ON u.id = j.user_id
+                   WHERE j.class_id = ? AND j.status_id = 2
+                   ORDER BY u.name""", (cid,)).fetchall()
+            out.append({"id": cid, "name": name, "title": _short(cid),
+                        "code": code_of(cid), "link": ln.get(cid, ""),
+                        "kids": [{"name": k, "phone": p} for k, p in kids]})
+    return out
+
+
+def save_links(raw: dict) -> dict:
+    """Сохранить ссылки со страницы. Пустое поле — убрать ссылку группы."""
+    keep = {}
+    for k, v in (raw or {}).items():
+        s = str(v or "").strip()
+        if not str(k).isdigit():
+            continue
+        if s and not s.startswith("https://chat.whatsapp.com/"):
+            return {"ok": False, "error": f"не похоже на ссылку-приглашение: {s[:60]}"}
+        if s:
+            keep[str(k)] = s
+    db.set_setting("group_chats", json.dumps(keep, ensure_ascii=False))
+    return {"ok": True, "saved": len(keep)}
 
 
 def send(dry: bool = True) -> dict:

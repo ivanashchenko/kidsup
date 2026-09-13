@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Чаты групп — KidsUP{% endblock %}
+{% block content %}
+<h1>Чаты учебных групп</h1>
+<p class="muted">Приглашение в чат своей группы — родителям тех детей, кто в неё
+ходит. Один родитель получает одно сообщение: у двоих детей в разных группах
+в нём обе ссылки. Сначала WhatsApp и мессенджеры, СМС — только тем, кому
+не доставилось.</p>
+
+<div class="cards">
+  <div class="card"><div class="card-value">{{ groups|length }}</div>
+    <div class="card-label">групп английского</div></div>
+  <div class="card"><div class="card-value">{{ kids }}</div>
+    <div class="card-label">детей ходит</div></div>
+  <div class="card"><div class="card-value">{{ ready }}</div>
+    <div class="card-label">ссылок заполнено</div></div>
+</div>
+
+<div class="notice"><b>Где взять ссылку.</b> В WhatsApp: откройте чат группы →
+«Данные группы» → «Пригласить по ссылке» → «Копировать». Вставьте её в поле
+нужной группы и нажмите «Сохранить ссылки». Пока ссылки нет, родителей можно
+добавить в чат руками — кнопка «Скопировать номера» даёт список телефонов
+группы.</p></div>
+
+<form id="f-links">
+{% for g in groups %}
+<div class="card" style="margin-bottom:14px">
+  <b>{{ g.title }}</b>
+  <span class="muted"> · {{ g.name }} · код {{ g.code }}</span>
+  <div style="margin:.6rem 0">
+    <input name="{{ g.id }}" value="{{ g.link }}" style="width:100%;padding:.5rem .7rem"
+           placeholder="https://chat.whatsapp.com/…" autocomplete="off">
+  </div>
+  <div class="muted" style="font-size:.9rem">
+    {% if g.kids %}
+      {% for k in g.kids %}{{ k.name }} — {{ k.phone }}{% if not loop.last %} · {% endif %}{% endfor %}
+    {% else %}в группе пока никто не числится как «Учится»{% endif %}
+  </div>
+  {% if g.kids %}
+  <button type="button" class="btn" style="margin-top:.6rem"
+          data-phones="{% for k in g.kids %}{{ k.phone }}{% if not loop.last %}, {% endif %}{% endfor %}"
+          onclick="navigator.clipboard.writeText(this.dataset.phones);this.textContent='Скопировано'">
+    Скопировать номера</button>
+  {% endif %}
+</div>
+{% endfor %}
+<button type="submit" class="btn btn-primary">Сохранить ссылки</button>
+</form>
+
+<h2 style="margin-top:1.6rem">Рассылка</h2>
+<p class="muted">«Показать, кому уйдёт» ничего не отправляет — только собирает
+письма. Отправка ставит их в общую очередь: она сама держит окно 9:00–20:00
+и лимиты номера.</p>
+<button class="btn" onclick="plan()">Показать, кому уйдёт</button>
+<button class="btn btn-primary" onclick="send()">Отправить приглашения</button>
+<pre id="out" style="white-space:pre-wrap;margin-top:1rem"></pre>
+
+<script>
+const out = document.getElementById('out');
+document.getElementById('f-links').onsubmit = async e => {
+  e.preventDefault();
+  const body = {};
+  new FormData(e.target).forEach((v, k) => body[k] = v);
+  const r = await fetch('/api/chaty/links', {method: 'POST',
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const j = await r.json();
+  out.textContent = j.ok ? `Сохранено ссылок: ${j.saved}` : `Ошибка: ${j.error}`;
+  if (j.ok) location.reload();
+};
+async function plan() {
+  const j = await (await fetch('/api/chaty/plan')).json();
+  if (!j.ok) { out.textContent = j.error; return; }
+  out.textContent = `Получателей: ${j.total}\n\n` + j.recipients.map(
+    r => `${r.child} · ${r.phone}\n${r.text}\nСМС: ${r.sms}`).join('\n\n');
+}
+async function send() {
+  if (!confirm('Отправить приглашения родителям?')) return;
+  const j = await (await fetch('/api/chaty/send?dry=0', {method: 'POST'})).json();
+  out.textContent = j.ok ? `Поставлено в очередь: ${j.queued} из ${j.total}` : j.error;
+}
+</script>
+{% endblock %}

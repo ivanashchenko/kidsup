@@ -2932,6 +2932,30 @@ def api_chaty_plan():
     return chaty.plan()
 
 
+@app.get("/chaty", response_class=HTMLResponse, dependencies=AUTH)
+def chaty_page(request: Request):
+    """Чаты учебных групп: ссылки-приглашения, состав и рассылка."""
+    from . import chaty
+    gs = chaty.groups()
+    return render(request, "chaty.html", active="chaty", groups=gs,
+                  kids=sum(len(g["kids"]) for g in gs),
+                  ready=sum(1 for g in gs if g["link"]))
+
+
+@app.post("/api/chaty/links", dependencies=AUTH)
+def api_chaty_links(payload: dict = Body(...)):
+    """Сохранить ссылки-приглашения: {"<id группы>": "<ссылка>"}."""
+    from . import chaty
+    return chaty.save_links(payload)
+
+
+@app.get("/api/chaty/find-links", dependencies=AUTH)
+def api_chaty_find_links(limit: int = 40):
+    """Ссылки-приглашения, уже уходившие родителям в переписке."""
+    from . import chaty
+    return chaty.find_links(limit=limit)
+
+
 @app.post("/api/chaty/send", dependencies=AUTH)
 def api_chaty_send(dry: int = 1):
     """Поставить приглашения в очередь рассылки. dry=1 — только посчитать."""
@@ -3040,7 +3064,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-13.4"
+APP_VERSION = "2026-09-13.7"
 
 
 @app.get("/api/net")
