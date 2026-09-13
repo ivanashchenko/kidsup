@@ -2704,7 +2704,14 @@ def _inbox_store(payload: dict) -> None:
         ts = autopilot._now().isoformat(timespec="seconds")
         if msg.get("isEcho"):
             etext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
-            echoes.append((ts, phone, str(msg.get("messageId") or ""), etext[:500]))
+            # authorId — это managerId сотрудника в МойКлассе; у отправок
+            # через API его нет, и там остаётся только authorName «Admin».
+            # Без этого поля нельзя сказать, кто из админов писал клиенту:
+            # журнал вебхука хранит лишь последние 300 событий, то есть
+            # полдня, и считать по нему можно только задним числом.
+            echoes.append((ts, phone, str(msg.get("messageId") or ""), etext[:500],
+                           str(msg.get("authorId") or ""),
+                           str(msg.get("authorName") or "")))
             continue
         text = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
         rows.append((ts, phone, (msg.get("chatType") or "")[:12], text[:500],
@@ -2718,7 +2725,9 @@ def _inbox_store(payload: dict) -> None:
         conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_outbox (
             id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
             message_id TEXT UNIQUE, text TEXT)""")
-        for ddl in ("ALTER TABLE wazzup_outbox ADD COLUMN message_id TEXT",
+        for ddl in ("ALTER TABLE wazzup_outbox ADD COLUMN author_id TEXT",
+                    "ALTER TABLE wazzup_outbox ADD COLUMN author_name TEXT",
+                    "ALTER TABLE wazzup_outbox ADD COLUMN message_id TEXT",
                     "ALTER TABLE wazzup_outbox ADD COLUMN text TEXT"):
             try:
                 conn.execute(ddl)
@@ -2734,8 +2743,8 @@ def _inbox_store(payload: dict) -> None:
                 "VALUES (?, ?, ?, ?, ?)", rows)
         if echoes:
             conn.executemany(
-                "INSERT OR IGNORE INTO wazzup_outbox (ts, phone, message_id, text) "
-                "VALUES (?, ?, ?, ?)", echoes)
+                "INSERT OR IGNORE INTO wazzup_outbox (ts, phone, message_id, text, "
+                "author_id, author_name) VALUES (?, ?, ?, ?, ?, ?)", echoes)
         for ts, phone, chat_type, text, mid in rows:
             _match_click(conn, ts, phone, chat_type)
             _catch_visit(conn, phone, text)
@@ -2923,6 +2932,36 @@ def api_chaty_links(payload: dict = Body(...)):
     return chaty.save_links(payload)
 
 
+@app.get("/api/perepiska/kto", dependencies=AUTH)
+def api_perepiska_kto(day: str = ""):
+    """Кто из админов сколько написал клиентам за день.
+
+    Считается по authorId из вебхука Wazzup — это managerId сотрудника.
+    У отправок через API автора нет: там за подписью «Admin» идут
+    автопилот и рассылки, и их видно отдельной строкой."""
+    from . import autopilot
+    d = day or autopilot._today().isoformat()
+    MGR = {"232805": "Аня", "232763": "Ира", "202856": "Лена", "154181": "Лиза"}
+    out: dict[str, dict] = {}
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                "SELECT author_id, author_name, phone, text FROM wazzup_outbox "
+                "WHERE substr(ts,1,10)=?", (d,)).fetchall()
+        except Exception:
+            return {"день": d, "ошибка": "в журнале ещё нет колонки автора — "
+                    "она появилась 13.09, за прежние дни данных нет"}
+    for aid, aname, phone, text in rows:
+        who = MGR.get(str(aid or "")) or ("автопилот и рассылки"
+                                          if (aname or "") == "Admin" else f"id {aid or '—'}")
+        r = out.setdefault(who, {"сообщений": 0, "чатов": set()})
+        r["сообщений"] += 1
+        r["чатов"].add((phone or "")[-10:])
+    return {"день": d, "всего": len(rows),
+            "кто": {k: {"сообщений": v["сообщений"], "чатов": len(v["чатов"])}
+                    for k, v in sorted(out.items(), key=lambda x: -x[1]["сообщений"])}}
+
+
 @app.get("/api/chaty/plan", dependencies=AUTH)
 def api_chaty_plan():
     """Кому и что уйдёт: приглашения в чаты учебных групп. Ничего не шлёт."""
@@ -3075,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-13.16"
+APP_VERSION = "2026-09-13.17"
 
 
 @app.get("/api/net")
