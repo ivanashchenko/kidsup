@@ -30,6 +30,9 @@
   --indigo:#312783; --sky:#1DA7E0; --green:#7DB928; --amber:#F59C00; --red:#E30613;
   --ink:#1B1D2B; --muted:#5F6478; --paper:#FFFDF8; --card:#FFFFFF; --line:#EAE6DC;
   --amber-soft:#FFF3DE; --green-soft:#EFF7E0; --sky-soft:#E5F4FC;
+  /* для текста и кнопок — затемнённые варианты фирменных: белое на
+     #7DB928 и голубой #1DA7E0 на белом по контрасту не проходят */
+  --green-cta:#5C8C1D; --sky-ink:#0F6E96;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -37,7 +40,7 @@ body{margin:0;background:var(--paper);color:var(--ink);
   font:17px/1.6 Manrope,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
   -webkit-font-smoothing:antialiased}
 img{max-width:100%;display:block}
-a{color:var(--sky)}
+a{color:var(--sky-ink)}
 .wrap{max-width:64rem;margin:0 auto;padding:0 1.15rem}
 
 /* шапка */
@@ -65,7 +68,7 @@ h1{font-size:clamp(2.1rem,6.2vw,3.5rem);line-height:1.05;font-weight:800;letter-
 .when b{display:block;font-size:1.35rem;font-weight:800;letter-spacing:-.02em;line-height:1.15}
 .when span{font-size:.78rem;color:#CFCBE8;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
 .cta{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
-  background:var(--green);color:#fff;font-weight:800;font-size:1.02rem;
+  background:var(--green-cta);color:#fff;font-weight:800;font-size:1.02rem;
   padding:.85rem 1.7rem;border-radius:14px;text-decoration:none;border:0;cursor:pointer;
   box-shadow:0 8px 20px rgba(125,185,40,.3)}
 .cta:hover{filter:brightness(1.06)}
@@ -229,7 +232,7 @@ footer a{color:var(--muted)}
     не показательное, а обычное — с теми детьми, с которыми ребёнок будет заниматься весь год.
     Первое занятие условно-бесплатное: не понравится — платить не нужно, понравится —
     оно войдёт в первый абонемент.</p>
-  <a class="cta" style="background:var(--sky);box-shadow:0 8px 20px rgba(29,167,224,.28)"
+  <a class="cta" style="background:var(--sky-ink);box-shadow:0 8px 20px rgba(29,167,224,.28)"
      href="https://kidsupweek.ru">Расписание Недели открытых уроков →</a>
 </section>
 

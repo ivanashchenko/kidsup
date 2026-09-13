@@ -30,6 +30,9 @@
   --indigo:#312783; --sky:#1DA7E0; --green:#7DB928; --amber:#F59C00; --red:#E30613;
   --ink:#1B1D2B; --muted:#5F6478; --paper:#FBFCFE; --card:#FFFFFF; --line:#E6EAF0;
   --sky-soft:#E5F4FC; --green-soft:#EFF7E0; --amber-soft:#FFF3DE; --indigo-soft:#EAE8F6;
+  /* для текста и кнопок — затемнённые варианты фирменных: белое на
+     #7DB928 и голубой #1DA7E0 на белом по контрасту не проходят */
+  --green-cta:#5C8C1D; --sky-ink:#0F6E96;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -37,7 +40,7 @@ body{margin:0;background:var(--paper);color:var(--ink);
   font:17px/1.6 Manrope,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
 img{max-width:100%;display:block}
-a{color:var(--sky)}
+a{color:var(--sky-ink)}
 .wrap{max-width:66rem;margin:0 auto;padding:0 1.15rem}
 
 .top{position:sticky;top:0;z-index:30;background:rgba(251,252,254,.93);
@@ -64,7 +67,7 @@ h1{font-size:clamp(2rem,6vw,3.4rem);line-height:1.06;font-weight:800;letter-spac
 .stats b{display:block;font-size:1.35rem;font-weight:800;letter-spacing:-.02em;line-height:1.15}
 .stats span{font-size:.77rem;color:#C6C2E4;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
 .cta{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
-  background:var(--green);color:#fff;font-weight:800;font-size:1.02rem;
+  background:var(--green-cta);color:#fff;font-weight:800;font-size:1.02rem;
   padding:.85rem 1.7rem;border-radius:14px;text-decoration:none;border:0;cursor:pointer;
   box-shadow:0 8px 20px rgba(125,185,40,.3)}
 .cta:hover{filter:brightness(1.06)}
@@ -107,7 +110,7 @@ td.t{white-space:nowrap;color:var(--muted)}
 .spots.low{background:var(--amber-soft);color:#8A5A00}
 .spots.no{background:#FBE7E6;color:#9B1219}
 .pickbtn{font:inherit;font-size:.83rem;font-weight:800;padding:.35rem .8rem;border-radius:9px;
-  border:0;background:var(--sky);color:#fff;cursor:pointer;white-space:nowrap}
+  border:0;background:var(--sky-ink);color:#fff;cursor:pointer;white-space:nowrap}
 .pickbtn:hover{filter:brightness(1.07)}
 .loading{padding:1.4rem;color:var(--muted)}
 
@@ -137,7 +140,7 @@ input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{
 .faq details:first-of-type{border-top:0}
 .faq summary{font-weight:800;cursor:pointer;font-size:1.02rem;list-style:none;
   display:flex;justify-content:space-between;gap:1rem}
-.faq summary::after{content:"+";color:var(--sky);font-weight:800}
+.faq summary::after{content:"+";color:var(--sky-ink);font-weight:800}
 .faq details[open] summary::after{content:"−"}
 .faq p{color:var(--muted);margin:.55rem 0 0}
 

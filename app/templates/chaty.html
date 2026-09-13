@@ -2,39 +2,41 @@
 {% block title %}Чаты групп — KidsUP{% endblock %}
 {% block content %}
 <h1>Чаты учебных групп</h1>
-<p class="muted">Приглашение в чат своей группы — родителям тех детей, кто в неё
-ходит. Один родитель получает одно сообщение: у двоих детей в разных группах
-в нём обе ссылки. Сначала WhatsApp и мессенджеры, СМС — только тем, кому
-не доставилось.</p>
+<p class="muted">Восемь чатов групп английского заведены в МойКлассе
+(«Мой Чат»). У родителя чат открывается в личном кабинете — ссылок-приглашений,
+как в WhatsApp, там нет.</p>
 
 <div class="cards">
   <div class="card"><div class="card-value">{{ groups|length }}</div>
-    <div class="card-label">групп английского</div></div>
+    <div class="card-label">чатов групп</div></div>
   <div class="card"><div class="card-value">{{ kids }}</div>
     <div class="card-label">детей ходит</div></div>
-  <div class="card"><div class="card-value">{{ ready }}</div>
-    <div class="card-label">ссылок заполнено</div></div>
+  <div class="card"><div class="card-value">{{ inside }}</div>
+    <div class="card-label">из них уже в чате</div></div>
 </div>
 
-<div class="notice"><b>Где взять ссылку.</b> В WhatsApp: откройте чат группы →
-«Данные группы» → «Пригласить по ссылке» → «Копировать». Вставьте её в поле
-нужной группы и нажмите «Сохранить ссылки». Пока ссылки нет, родителей можно
-добавить в чат руками — кнопка «Скопировать номера» даёт список телефонов
-группы.</p></div>
+<div class="notice"><b>Почему чаты пустые.</b> МойКласс добавляет в чат только
+клиентов, у которых <b>активирован доступ в личный кабинет</b> — в окне
+«Добавить участников» остальных попросту нет в списке. Поэтому позвать родителя
+— это два шага: он заходит в личный кабинет, и только после этого его можно
+добавить в чат группы. Рассылка ниже делает первый шаг: объясняет, что чат
+есть и как войти.</div>
 
-<form id="f-links">
+<p class="muted" style="margin-top:1rem">Состав чатов:
+{% if snap.taken %}снимок от {{ snap.taken[:16]|replace('T', ' ') }}{% else %}
+ещё не считан{% endif %}.
+<button class="btn" onclick="snap()">Обновить состав</button></p>
+
 {% for g in groups %}
 <div class="card" style="margin-bottom:14px">
   <b>{{ g.title }}</b>
-  <span class="muted"> · {{ g.name }} · код {{ g.code }}</span>
-  <div style="margin:.6rem 0">
-    <input name="{{ g.id }}" value="{{ g.link }}" style="width:100%;padding:.5rem .7rem"
-           placeholder="https://chat.whatsapp.com/…" autocomplete="off">
-  </div>
-  <div class="muted" style="font-size:.9rem">
-    {% if g.kids %}
-      {% for k in g.kids %}{{ k.name }} — {{ k.phone }}{% if not loop.last %} · {% endif %}{% endfor %}
-    {% else %}в группе пока никто не числится как «Учится»{% endif %}
+  <span class="muted"> · чат «{{ g.chat }}» · в чате {{ g.in_chat|length }}</span>
+  <div style="margin-top:.5rem;font-size:.93rem">
+    {% for k in g.kids %}
+      <div>{% if k.in_chat %}✅{% else %}⬜{% endif %} {{ k.name }} — {{ k.phone }}</div>
+    {% else %}
+      <span class="muted">в группе пока никто не числится как «Учится»</span>
+    {% endfor %}
   </div>
   {% if g.kids %}
   <button type="button" class="btn" style="margin-top:.6rem"
@@ -44,29 +46,21 @@
   {% endif %}
 </div>
 {% endfor %}
-<button type="submit" class="btn btn-primary">Сохранить ссылки</button>
-</form>
 
 <h2 style="margin-top:1.6rem">Рассылка</h2>
 <p class="muted">«Показать, кому уйдёт» ничего не отправляет — только собирает
 письма. Отправка ставит их в общую очередь: она сама держит окно 9:00–20:00
-и лимиты номера.</p>
+и лимиты номера. СМС уходит только тем, кому сообщение не доставилось.</p>
 <button class="btn" onclick="plan()">Показать, кому уйдёт</button>
 <button class="btn btn-primary" onclick="send()">Отправить приглашения</button>
 <pre id="out" style="white-space:pre-wrap;margin-top:1rem"></pre>
 
 <script>
 const out = document.getElementById('out');
-document.getElementById('f-links').onsubmit = async e => {
-  e.preventDefault();
-  const body = {};
-  new FormData(e.target).forEach((v, k) => body[k] = v);
-  const r = await fetch('/api/chaty/links', {method: 'POST',
-    headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
-  const j = await r.json();
-  out.textContent = j.ok ? `Сохранено ссылок: ${j.saved}` : `Ошибка: ${j.error}`;
-  if (j.ok) location.reload();
-};
+async function snap() {
+  out.textContent = 'Считаю состав чатов — это пара минут, потом обновите страницу.';
+  await fetch('/api/chaty/snapshot', {method: 'POST'});
+}
 async function plan() {
   const j = await (await fetch('/api/chaty/plan')).json();
   if (!j.ok) { out.textContent = j.error; return; }

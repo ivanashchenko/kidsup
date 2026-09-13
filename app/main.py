@@ -2905,24 +2905,22 @@ WA_HELLO = ("Здравствуйте! Пожалуйста, отправьте 
             "ответа. Ваш номер: ")
 
 
-@app.get("/chat/{code}")
-async def go_group_chat(code: str, request: Request):
-    """Короткая ссылка на групповой чат: app.kidsup.ru/chat/g6.
+@app.get("/chaty", response_class=HTMLResponse, dependencies=AUTH)
+def chaty_page(request: Request):
+    """Чаты учебных групп: ссылки-приглашения, состав и рассылка."""
+    from . import chaty
+    gs = chaty.groups()
+    return render(request, "chaty.html", active="chaty", groups=gs,
+                  kids=sum(len(g["kids"]) for g in gs),
+                  inside=sum(1 for g in gs for k in g["kids"] if k["in_chat"]),
+                  snap=chaty.snapshot_status())
 
-    В СМС полная ссылка chat.whatsapp.com съедает половину сообщения,
-    а по короткой видно, сколько родителей перешло."""
-    from . import chaty, autopilot
-    target = chaty.by_code(code)
-    if not target:
-        raise HTTPException(404, "чат не найден")
-    with db.get_conn() as conn:
-        _clicks_init(conn)
-        conn.execute("INSERT INTO messenger_clicks (ts, channel, roistat_visit, utm, referrer) "
-                     "VALUES (?, ?, ?, ?, ?)",
-                     (autopilot._now().isoformat(timespec="seconds"),
-                      f"chat:{code}", "", "",
-                      (request.headers.get("referer") or "")[:300]))
-    return RedirectResponse(target, status_code=302)
+
+@app.post("/api/chaty/links", dependencies=AUTH)
+def api_chaty_links(payload: dict = Body(...)):
+    """Сохранить ссылки-приглашения: {"<id группы>": "<ссылка>"}."""
+    from . import chaty
+    return chaty.save_links(payload)
 
 
 @app.get("/api/chaty/plan", dependencies=AUTH)
@@ -2932,21 +2930,18 @@ def api_chaty_plan():
     return chaty.plan()
 
 
-@app.get("/chaty", response_class=HTMLResponse, dependencies=AUTH)
-def chaty_page(request: Request):
-    """Чаты учебных групп: ссылки-приглашения, состав и рассылка."""
+@app.get("/api/chaty/snapshot", dependencies=AUTH)
+def api_chaty_snapshot():
+    """Кто уже состоит в чатах групп — по последнему снимку."""
     from . import chaty
-    gs = chaty.groups()
-    return render(request, "chaty.html", active="chaty", groups=gs,
-                  kids=sum(len(g["kids"]) for g in gs),
-                  ready=sum(1 for g in gs if g["link"]))
+    return chaty.snapshot_status()
 
 
-@app.post("/api/chaty/links", dependencies=AUTH)
-def api_chaty_links(payload: dict = Body(...)):
-    """Сохранить ссылки-приглашения: {"<id группы>": "<ссылка>"}."""
+@app.post("/api/chaty/snapshot", dependencies=AUTH)
+def api_chaty_snapshot_run():
+    """Пересчитать состав чатов. Идёт через браузерный вход, пара минут."""
     from . import chaty
-    return chaty.save_links(payload)
+    return chaty.snapshot_start()
 
 
 @app.get("/api/chaty/find-links", dependencies=AUTH)
@@ -3064,7 +3059,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-13.7"
+APP_VERSION = "2026-09-13.11"
 
 
 @app.get("/api/net")

@@ -1,30 +1,28 @@
-"""Приглашения в групповые чаты учебных групп.
+"""Чаты учебных групп в МойКлассе («Мой Чат») и приглашение в них родителей.
 
-Зачем. Владелец завёл в WhatsApp по чату на каждую группу английского:
-там расписание, переносы, домашка и фото с занятий. Чат работает, только
-если в нём есть родители, а зовут в него сейчас голосом на ресепшене —
-доходит до половины.
+Что есть на 13.09. В МойКлассе заведены восемь чатов групп английского —
+«АЯ пн-ср 16:00» и так далее. Чат живёт внутри CRM: у родителя он
+появляется в личном кабинете, ссылок-приглашений, как в WhatsApp, там нет.
 
-Как устроено. Ссылки-приглашения живут в настройке `group_chats`:
-{"727741": "https://chat.whatsapp.com/...", ...} — ключ это id группы
-в МойКлассе. Кому писать, берём оттуда же: родители детей со статусом
-записи «Учится» (2) в этих группах. Никаких «всех подряд»: чат группы
-нужен только тем, кто в неё ходит.
+Главное ограничение, ради которого написан этот модуль: **добавить в чат
+можно только клиента с активированным доступом в личный кабинет**. CRM
+говорит об этом прямым текстом в окне «Добавить участников», и список
+доступных учеников там почти пуст. Поэтому «позвать родителей в чат» —
+это не одно действие, а два: сначала родитель заходит в личный кабинет,
+и только потом его видно в списке и можно добавить.
 
-Один родитель — одно сообщение. У двоих детей в разных группах телефон
-общий, и два приглашения подряд читаются как рассылка; вместо этого в
-одном сообщении идут обе ссылки, каждая подписана своей группой.
+Что делает модуль:
+  groups()   — восемь групп с составом: кто учится, у кого какой телефон;
+  snapshot() — кто уже в каждом чате (через браузерный вход mkweb, потому
+               что чаты API не отдаёт), результат кладётся в data/;
+  plan()/send() — приглашение родителям: чат группы есть, вот как войти.
 
 Отправка идёт очередью broadcast_queue — там уже сделано всё, без чего
 писать родителям нельзя: окно 9:00–20:00, лимиты номера, каскад
 WhatsApp → мессенджеры, пропуск тех, кто ждёт ответа админа, и своих
-номеров. СМС отправляем только тем, кому сообщение не доставилось: это
-не реклама, а сервисное уведомление уже записавшимся, и такие СМС закон
+номеров. СМС уходит только тем, кому сообщение не доставилось: это не
+реклама, а сервисное уведомление уже записавшимся, и такие СМС закон
 разрешает (все получатели к тому же ранее платили).
-
-В СМС ссылка идёт короткая — app.kidsup.ru/chat/<код>: полная
-chat.whatsapp.com съедает половину сообщения, а по короткой ещё и видно,
-сколько человек перешло.
 """
 
 from __future__ import annotations
@@ -32,18 +30,28 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
+from datetime import datetime
+from pathlib import Path
 
 from . import db
 
 log = logging.getLogger("kidsup.chaty")
 
 CAMPAIGN = "chat_invite"
-# префикс имени группы в МойКлассе → как называем направление родителю
-KINDS = {"2627_АЯ": "английского"}
+DATA = Path(__file__).resolve().parent.parent / "data"
+SNAP = DATA / "chaty_members.json"
+# где родитель находит чат: личный кабинет МойКласса
+LK_URL = "https://app.moyklass.com/lk"
+INVITE_RE = re.compile(r"https://chat\.whatsapp\.com/[A-Za-z0-9]{10,40}")
 
 
 def links() -> dict[int, str]:
-    """Ссылки-приглашения: id группы → ссылка. Кривые записи отбрасываем."""
+    """Ссылки на чат по группам: id группы → ссылка. Кривые записи отбрасываем.
+
+    Заполняется, только если у чата есть своя ссылка. У «Моего Чата»
+    её нет — там работает общий вход в личный кабинет, LK_URL.
+    """
     try:
         raw = json.loads(db.get_setting("group_chats", "") or "{}")
     except ValueError:
@@ -56,75 +64,6 @@ def links() -> dict[int, str]:
     return out
 
 
-INVITE_RE = re.compile(r"https://chat\.whatsapp\.com/[A-Za-z0-9]{10,40}")
-
-
-def find_links(limit: int = 40) -> dict:
-    """Поискать ссылки-приглашения в истории переписки.
-
-    Чаты заводят с телефона, а ссылку потом кидают родителю в диалог.
-    Значит она уже лежит в переписке — и её не надо просить заново.
-    Кому именно её отправляли, видно по телефону: так понятно, какой
-    группе какая ссылка принадлежит."""
-    found: dict[str, dict] = {}
-    with db.get_conn() as conn:
-        for table in ("wazzup_outbox", "wazzup_inbox"):
-            try:
-                rows = conn.execute(
-                    f"SELECT ts, phone, text FROM {table} "
-                    f"WHERE text LIKE '%chat.whatsapp.com%' ORDER BY ts DESC "
-                    f"LIMIT ?", (int(limit) * 5,)).fetchall()
-            except Exception:
-                continue
-            for ts, phone, text in rows:
-                for url in INVITE_RE.findall(text or ""):
-                    f = found.setdefault(url, {"url": url, "first_seen": ts,
-                                               "phones": [], "where": table})
-                    if phone and phone not in f["phones"]:
-                        f["phones"].append(phone)
-    # телефон получателя → группы, в которых учится его ребёнок
-    who = _phone_classes()
-    for f in found.values():
-        cls: dict[int, str] = {}
-        for ph in f["phones"]:
-            for cid, title in who.get((ph or "")[-10:], []):
-                cls[cid] = title
-        f["classes"] = [{"id": c, "title": t} for c, t in cls.items()]
-    return {"total": len(found), "links": sorted(
-        found.values(), key=lambda f: f["first_seen"] or "", reverse=True)}
-
-
-def _phone_classes() -> dict[str, list[tuple[int, str]]]:
-    """Телефон (10 цифр) → группы его детей среди активных 2627_*."""
-    out: dict[str, list[tuple[int, str]]] = {}
-    with db.get_conn() as conn:
-        rows = conn.execute(
-            """SELECT u.phone, c.id, c.name FROM joins j
-               JOIN users u ON u.id = j.user_id
-               JOIN classes c ON c.id = j.class_id
-               WHERE j.status_id = 2 AND c.status = 'opened'
-                 AND u.phone IS NOT NULL AND u.phone != ''""").fetchall()
-    for phone, cid, name in rows:
-        out.setdefault((phone or "")[-10:], []).append((cid, name))
-    return out
-
-
-def code_of(class_id: int) -> str:
-    """Короткий код группы для ссылки в СМС: «Гр6» из имени → g6."""
-    with db.get_conn() as conn:
-        row = conn.execute("SELECT name FROM classes WHERE id=?", (class_id,)).fetchone()
-    m = re.search(r"\(Гр\s*(\d+)\)", (row[0] if row else "") or "")
-    return f"g{m.group(1)}" if m else f"c{class_id}"
-
-
-def by_code(code: str) -> str:
-    """Ссылка на чат по короткому коду — для редиректа /chat/<код>."""
-    for cid, url in links().items():
-        if code_of(cid) == code:
-            return url
-    return ""
-
-
 def _short(class_id: int) -> str:
     """Как называем группу родителю: «вт-чт 17:00» вместо имени из CRM."""
     with db.get_conn() as conn:
@@ -134,83 +73,14 @@ def _short(class_id: int) -> str:
     return f"{m.group(1)} {m.group(2)}" if m else name
 
 
-def plan() -> dict:
-    """Кому и что отправим. Ничего не отправляет и не пишет в очередь."""
-    ln = links()
-    if not ln:
-        return {"ok": False, "error": "не заданы ссылки: настройка group_chats пуста",
-                "recipients": []}
-    marks = ",".join("?" for _ in ln)
-    with db.get_conn() as conn:
-        rows = conn.execute(
-            f"""SELECT j.class_id, u.id, u.name, u.phone
-                FROM joins j JOIN users u ON u.id = j.user_id
-                WHERE j.class_id IN ({marks}) AND j.status_id = 2
-                  AND u.phone IS NOT NULL AND u.phone != ''""",
-            list(ln)).fetchall()
-    # телефон → что писать: у второго ребёнка в семье тот же номер
-    fam: dict[str, dict] = {}
-    for class_id, uid, name, phone in rows:
-        f = fam.setdefault(phone, {"phone": phone, "uid": uid, "child": name,
-                                   "by_class": {}})
-        # брат и сестра в одной группе — это один чат, а не два: иначе
-        # родитель получает одну и ту же ссылку дважды
-        g = f["by_class"].setdefault(class_id, {
-            "class_id": class_id, "title": _short(class_id),
-            "children": [], "link": ln[class_id], "code": code_of(class_id)})
-        g["children"].append(name)
-    out = []
-    for f in fam.values():
-        f["groups"] = sorted(f.pop("by_class").values(), key=lambda g: g["title"])
-        for g in f["groups"]:
-            g["child"] = ", ".join(_first(n) for n in g["children"])
-        f["text"] = text_for(f["groups"])
-        f["sms"] = sms_for(f["groups"])
-        out.append(f)
-    out.sort(key=lambda f: f["child"] or "")
-    return {"ok": True, "classes": len(ln), "recipients": out, "total": len(out)}
-
-
-def text_for(groups: list[dict]) -> str:
-    """Сообщение в WhatsApp. Одна группа — коротко, две — с подписями."""
-    kind = "английского"
-    if len(groups) == 1:
-        g = groups[0]
-        return (f"Здравствуйте! Это KidsUP. Мы завели чат группы {kind} "
-                f"{g['title']} — там расписание, переносы, домашние задания "
-                f"и фото с занятий. Заходите: {g['link']}\n\n"
-                f"В чате только родители этой группы и педагог. "
-                f"Если что-то не открывается — напишите нам, поможем.")
-    lines = "\n".join(f"· {g['title']} ({g['child']}) — {g['link']}"
-                      for g in groups)
-    return (f"Здравствуйте! Это KidsUP. Мы завели чаты групп {kind} — там "
-            f"расписание, переносы, домашние задания и фото с занятий. "
-            f"Ваши группы:\n{lines}\n\nВ каждом чате только родители этой "
-            f"группы и педагог. Если что-то не открывается — напишите нам, поможем.")
-
-
-def sms_for(groups: list[dict]) -> str:
-    """СМС-версия: коротко и со ссылкой через наш домен."""
-    if len(groups) == 1:
-        return (f"KidsUP: чат группы английского {groups[0]['title']} — "
-                f"app.kidsup.ru/chat/{groups[0]['code']}")
-    return ("KidsUP: чаты ваших групп английского — "
-            + ", ".join(f"app.kidsup.ru/chat/{g['code']}" for g in groups))
-
-
-def _first(name: str) -> str:
-    """Имя ребёнка из «Фамилия Имя» — для подписи, какая группа чья."""
-    parts = (name or "").split()
-    return parts[1] if len(parts) > 1 else (parts[0] if parts else "")
+def chat_title(class_id: int) -> str:
+    """Имя чата в МойКлассе: «АЯ пн-ср 16:00» — по нему его и находим."""
+    return f"АЯ {_short(class_id)}"
 
 
 def groups() -> list[dict]:
-    """Активные группы направления с составом — для страницы /chaty.
-
-    Нужна и до рассылки: пока ссылок нет, админ добавляет родителей
-    в чат руками, и ему нужен точный список телефонов по группе.
-    """
-    ln = links()
+    """Активные группы английского с составом — для страницы /chaty."""
+    ln, snap = links(), _snapshot_data()
     with db.get_conn() as conn:
         # «2627_АЯ_Заявки» — буфер новых обращений, а не учебная группа:
         # чата у неё нет и родителей в ней быть не может
@@ -226,25 +96,148 @@ def groups() -> list[dict]:
                    JOIN users u ON u.id = j.user_id
                    WHERE j.class_id = ? AND j.status_id = 2
                    ORDER BY u.name""", (cid,)).fetchall()
+            title = chat_title(cid)
+            inside = snap.get("chats", {}).get(title, [])
             out.append({"id": cid, "name": name, "title": _short(cid),
-                        "code": code_of(cid), "link": ln.get(cid, ""),
-                        "kids": [{"name": k, "phone": p} for k, p in kids]})
+                        "chat": title, "link": ln.get(cid, ""),
+                        "in_chat": inside,
+                        "kids": [{"name": k, "phone": p,
+                                  "in_chat": _is_in(k, inside)} for k, p in kids]})
     return out
 
 
-def save_links(raw: dict) -> dict:
-    """Сохранить ссылки со страницы. Пустое поле — убрать ссылку группы."""
-    keep = {}
-    for k, v in (raw or {}).items():
-        s = str(v or "").strip()
-        if not str(k).isdigit():
-            continue
-        if s and not s.startswith("https://chat.whatsapp.com/"):
-            return {"ok": False, "error": f"не похоже на ссылку-приглашение: {s[:60]}"}
-        if s:
-            keep[str(k)] = s
-    db.set_setting("group_chats", json.dumps(keep, ensure_ascii=False))
-    return {"ok": True, "saved": len(keep)}
+def _is_in(child: str, inside: list) -> bool:
+    """Тот ли это ребёнок. В чате имя стоит как «Имя Фамилия», в CRM наоборот."""
+    parts = {p.lower() for p in (child or "").split()}
+    return any(parts and parts <= {p.lower() for p in (m or "").split()} for m in inside)
+
+
+def _snapshot_data() -> dict:
+    try:
+        return json.loads(SNAP.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def snapshot_status() -> dict:
+    d = _snapshot_data()
+    return {"ok": bool(d), "taken": d.get("taken", ""),
+            "chats": {k: len(v) for k, v in (d.get("chats") or {}).items()},
+            "error": d.get("error", "")}
+
+
+def snapshot(chats: list[str] | None = None) -> dict:
+    """Считать состав чатов из МойКласса. Идёт через браузер — чаты API
+    не отдаёт вовсе, ни списком, ни по одному."""
+    from . import mkweb
+    titles = chats or [chat_title(g["id"]) for g in groups()]
+    res: dict[str, list] = {}
+    err = ""
+    for t in titles:
+        try:
+            r = mkweb.open_page(
+                "https://app.moyklass.com/moyChat", frame="moychat", wait_ms=6000,
+                actions=[{"click": t}, {"wait": 2500},
+                         {"css": "button[class*=infoBtn]", "click": True},
+                         {"wait": 2000}])
+            res[t] = _parse_members(r.get("text") or "")
+        except Exception as e:  # noqa: BLE001
+            err = f"{t}: {str(e)[:120]}"
+            log.warning("chaty.snapshot %s: %s", t, err)
+    data = {"taken": datetime.now().isoformat(timespec="seconds"),
+            "chats": res, "error": err}
+    DATA.mkdir(parents=True, exist_ok=True)
+    SNAP.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    return snapshot_status()
+
+
+def snapshot_start() -> dict:
+    """Снимок в фоне: восемь чатов через браузер — это пара минут."""
+    threading.Thread(target=snapshot, daemon=True).start()
+    return {"ok": True, "running": True}
+
+
+def _parse_members(text: str) -> list[str]:
+    """Имена из панели «Информация о группе».
+
+    Панель идёт хвостом страницы: «Участники», дальше по строке на человека
+    (перед именем — инициалы аватарки), и заканчивается служебными кнопками.
+    """
+    i = text.rfind("Участники")
+    if i < 0:
+        return []
+    tail = text[i + len("Участники"):]
+    for stop in ("Копировать ссылку группы", "Закрыть", "Управление группой",
+                 "Отменить", "Сохранить"):
+        j = tail.find(stop)
+        if j > 0:
+            tail = tail[:j]
+    out = []
+    for line in (x.strip() for x in tail.splitlines()):
+        if not line or line == "Админ" or len(line) <= 2:
+            continue        # инициалы аватарки и пометка роли — не имена
+        out.append(line)
+    return out
+
+
+def plan() -> dict:
+    """Кому и что отправим. Ничего не отправляет и не пишет в очередь."""
+    ln = links()
+    fam: dict[str, dict] = {}
+    for g in groups():
+        for k in g["kids"]:
+            phone = k["phone"]
+            if not phone:
+                continue
+            f = fam.setdefault(phone, {"phone": phone, "child": k["name"], "groups": []})
+            cur = next((x for x in f["groups"] if x["class_id"] == g["id"]), None)
+            if cur:
+                cur["children"].append(k["name"])
+                continue
+            # брат и сестра в одной группе — это один чат, а не два
+            f["groups"].append({"class_id": g["id"], "title": g["title"],
+                                "children": [k["name"]],
+                                "link": ln.get(g["id"], LK_URL)})
+    out = []
+    for f in fam.values():
+        f["groups"].sort(key=lambda g: g["title"])
+        for g in f["groups"]:
+            g["child"] = ", ".join(_first(n) for n in g["children"])
+        f["text"] = text_for(f["groups"])
+        f["sms"] = sms_for(f["groups"])
+        out.append(f)
+    out.sort(key=lambda f: f["child"] or "")
+    return {"ok": bool(out), "recipients": out, "total": len(out),
+            "error": "" if out else "в группах английского никто не числится «Учится»"}
+
+
+def text_for(groups_: list[dict]) -> str:
+    """Сообщение в WhatsApp: чат живёт в личном кабинете, объясняем вход."""
+    if len(groups_) == 1:
+        where = f"группы {groups_[0]['title']}"
+    else:
+        where = "ваших групп " + " и ".join(g["title"] for g in groups_)
+    # Про механику входа (код, пароль, приложение) в тексте намеренно
+    # ничего: это разные сценарии у разных родителей, и обещать один —
+    # значит отправить половину в тупик. Адрес и «ваш номер» — верно всегда.
+    return (f"Здравствуйте! Это KidsUP. Мы завели чат {where} по английскому — "
+            f"там расписание, переносы, домашние задания и фото с занятий.\n\n"
+            f"Чат открывается в личном кабинете МойКласс: {LK_URL} — заходите "
+            f"по номеру телефона, на который оформлен ребёнок.\n\n"
+            f"Напишите нам, когда войдёте, — добавим вас в чат группы. "
+            f"Если войти не получается, тоже напишите: поможем.")
+
+
+def sms_for(groups_: list[dict]) -> str:
+    """СМС-версия: коротко и со ссылкой на вход."""
+    return ("KidsUP: чат вашей группы английского — в личном кабинете "
+            "app.moyklass.com/lk (вход по вашему номеру). Вопросы: 4951209024")
+
+
+def _first(name: str) -> str:
+    """Имя ребёнка из «Фамилия Имя» — для подписи, какая группа чья."""
+    parts = (name or "").split()
+    return parts[1] if len(parts) > 1 else (parts[0] if parts else "")
 
 
 def send(dry: bool = True) -> dict:
@@ -271,3 +264,44 @@ def send(dry: bool = True) -> dict:
             n += 1
     log.info("chaty: кампания %s — %d получателей (dry=%s)", CAMPAIGN, n, dry)
     return {"ok": True, "dry_run": dry, "queued": n, "total": p["total"]}
+
+
+def save_links(raw: dict) -> dict:
+    """Сохранить ссылки со страницы. Пустое поле — убрать ссылку группы."""
+    keep = {}
+    for k, v in (raw or {}).items():
+        s = str(v or "").strip()
+        if not str(k).isdigit():
+            continue
+        if s and not s.startswith("https://"):
+            return {"ok": False, "error": f"не похоже на ссылку: {s[:60]}"}
+        if s:
+            keep[str(k)] = s
+    db.set_setting("group_chats", json.dumps(keep, ensure_ascii=False))
+    return {"ok": True, "saved": len(keep)}
+
+
+def find_links(limit: int = 40) -> dict:
+    """Поискать ссылки-приглашения WhatsApp в истории переписки.
+
+    Осталось от первой версии, когда чаты считались ватсаповскими: если
+    админ когда-то кидал родителю ссылку на групповой чат, она найдётся.
+    """
+    found: dict[str, dict] = {}
+    with db.get_conn() as conn:
+        for table in ("wazzup_outbox", "wazzup_inbox"):
+            try:
+                rows = conn.execute(
+                    f"SELECT ts, phone, text FROM {table} "
+                    f"WHERE text LIKE '%chat.whatsapp.com%' ORDER BY ts DESC "
+                    f"LIMIT ?", (int(limit) * 5,)).fetchall()
+            except Exception:
+                continue
+            for ts, phone, text in rows:
+                for url in INVITE_RE.findall(text or ""):
+                    f = found.setdefault(url, {"url": url, "first_seen": ts,
+                                               "phones": [], "where": table})
+                    if phone and phone not in f["phones"]:
+                        f["phones"].append(phone)
+    return {"total": len(found), "links": sorted(
+        found.values(), key=lambda f: f["first_seen"] or "", reverse=True)}
