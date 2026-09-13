@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -37,7 +38,9 @@ STATE = DATA / "mk_web_state.json"
 SHOT = DATA / "mkweb_last.png"
 LOGIN_URL = "https://app.moyklass.com/"
 
+log = logging.getLogger("kidsup.mkweb")
 _lock = threading.Lock()
+_lock_h = threading.Lock()
 _setup_running = False
 
 
@@ -377,6 +380,55 @@ def open_public(url: str, wait_ms: int = 6000, max_text: int = 20000,
         out = {"ok": True, "url": pg.url, "title": pg.title(), "text": text, "actions": done}
         b.close()
         return out
+
+
+HIST_OUT = DATA / "mkweb_history.json"
+_hist_state: dict = {"running": False, "step": "", "error": ""}
+
+
+def history_start(**kw) -> dict:
+    """Выгрузка истории в фоне, результат — в data/mkweb_history.json.
+
+    История листается только от сегодняшнего дня назад, страница за
+    страницей: чтобы дойти до начала месяца по активному сотруднику,
+    нужно полторы сотни страниц и больше десяти минут. Любой обычный
+    запрос на этом обрывается по таймауту, поэтому долгие выгрузки
+    идут фоном, а вызывающий забирает готовое.
+    """
+    with _lock_h:
+        if _hist_state["running"]:
+            return {"ok": False, "running": True, "step": _hist_state["step"]}
+        _hist_state.update(running=True, step="старт", error="")
+
+    def _run():
+        try:
+            res = history(**kw)
+            res["запрос"] = kw
+            HIST_OUT.write_text(json.dumps(res, ensure_ascii=False), encoding="utf-8")
+            with _lock_h:
+                _hist_state.update(running=False, step="готово", error="")
+        except Exception as e:  # noqa: BLE001
+            log.exception("history_start")
+            with _lock_h:
+                _hist_state.update(running=False, step="ошибка", error=str(e)[:300])
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "running": True, "запрос": kw}
+
+
+def history_result() -> dict:
+    with _lock_h:
+        st = dict(_hist_state)
+    if not st["running"] and HIST_OUT.exists():
+        try:
+            d = json.loads(HIST_OUT.read_text(encoding="utf-8"))
+            st["события"] = len(d.get("events") or [])
+            st["запрос"] = d.get("запрос")
+            st["страниц"] = d.get("pages_read")
+            st["файл"] = str(HIST_OUT)
+        except Exception as e:  # noqa: BLE001
+            st["error"] = f"файл не читается: {e}"
+    return st
 
 
 def history(period: str = "Сегодня", employee: str = "", event_type: str = "",

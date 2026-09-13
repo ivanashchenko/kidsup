@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-13.17"
+APP_VERSION = "2026-09-13.18"
 
 
 @app.get("/api/net")
@@ -5746,6 +5746,34 @@ def api_mkweb_history(period: str = "Сегодня", employee: str = "", event_
         return mkweb.history(period, employee, event_type, max_pages, date_from, date_to)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"history: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.post("/api/mkweb/history/start", dependencies=OWNER_AUTH)
+def api_mkweb_history_start(payload: dict = Body(default={})):
+    """Долгая выгрузка истории в фоне; результат — /api/mkweb/history/result."""
+    from . import mkweb
+    p = payload or {}
+    return mkweb.history_start(
+        period=str(p.get("period") or "Сегодня"), employee=str(p.get("employee") or ""),
+        event_type=str(p.get("event_type") or ""), max_pages=int(p.get("max_pages") or 40),
+        date_from=str(p.get("date_from") or ""), date_to=str(p.get("date_to") or ""))
+
+
+@app.get("/api/mkweb/history/result", dependencies=OWNER_AUTH)
+def api_mkweb_history_result(by_day: int = 0):
+    """Готова ли фоновая выгрузка. by_day=1 — сводка по дням и типам событий."""
+    from . import mkweb
+    st = mkweb.history_result()
+    if by_day and not st.get("running") and mkweb.HIST_OUT.exists():
+        import collections
+        d = json.loads(mkweb.HIST_OUT.read_text(encoding="utf-8"))
+        by: dict = collections.defaultdict(collections.Counter)
+        for e in d.get("events") or []:
+            by[e["ts"][:10]][e["event"]] += 1
+        st["по_дням"] = {day: {"всего": sum(c.values()), **dict(c.most_common(6))}
+                         for day, c in sorted(by.items(),
+                                              key=lambda x: (x[0][6:10], x[0][3:5], x[0][:2]))}
+    return st
 
 
 @app.get("/api/mkweb/leftovers", dependencies=OWNER_AUTH)
