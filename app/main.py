@@ -2944,6 +2944,13 @@ def api_chaty_snapshot_run():
     return chaty.snapshot_start()
 
 
+@app.post("/api/chaty/deliver", dependencies=AUTH)
+def api_chaty_deliver(limit: int = 3, dry: int = 1):
+    """Отправить приглашения разовыми сообщениями, порциями по limit."""
+    from . import chaty
+    return chaty.deliver(limit=limit, dry=bool(dry))
+
+
 @app.get("/api/chaty/find-links", dependencies=AUTH)
 def api_chaty_find_links(limit: int = 40):
     """Ссылки-приглашения, уже уходившие родителям в переписке."""
@@ -3059,7 +3066,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-13.12"
+APP_VERSION = "2026-09-13.13"
 
 
 @app.get("/api/net")

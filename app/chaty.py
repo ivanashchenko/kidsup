@@ -272,6 +272,57 @@ def send(dry: bool = True) -> dict:
     return {"ok": True, "dry_run": dry, "queued": n, "total": p["total"]}
 
 
+def deliver(limit: int = 3, dry: bool = True) -> dict:
+    """Отправить приглашения как разовые сообщения, а не рассылкой.
+
+    Почему не очередью. Тик очереди считает всё массовым потоком, а
+    массовому WhatsApp положен WABA с утверждённым шаблоном (правило
+    после 22.08: обычный номер на рассылке ушёл в «не авторизован»).
+    Нашего текста в шаблонах Meta нет и не будет — он про наш чат.
+    Тринадцать писем из двадцати четырёх так и встали «ждут шаблона».
+
+    Но это и не рассылка: двадцать четыре сервисных сообщения семьям,
+    которые ходят к нам сейчас и с которыми переписка уже идёт. Это то
+    же самое, что администратор пишет руками, — и уходит так же:
+    обычным номером переписки, по несколько штук за вызов, чтобы поток
+    не читался антиспамом как бот.
+    """
+    from . import wazzup
+    from .autopilot import _now
+    sent, errs = [], []
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, phone, child, text FROM broadcast_queue "
+            "WHERE campaign=? AND status='pending' ORDER BY id LIMIT ?",
+            (CAMPAIGN, max(1, min(10, int(limit))))).fetchall()
+    for rid, phone, child, text in rows:
+        if dry:
+            sent.append({"phone": phone, "child": child, "dry": True})
+            continue
+        try:
+            log_ = wazzup.send_smart(phone, text, dry_run=False, mass=False,
+                                     kind=f"bc:{CAMPAIGN}")
+            ok = any("ok" in x for x in log_)
+        except Exception as e:  # noqa: BLE001
+            ok, log_ = False, [str(e)[:150]]
+        with db.get_conn() as conn:
+            conn.execute(
+                "UPDATE broadcast_queue SET status=?, sent=?, tried=COALESCE(tried,'')||? "
+                "WHERE id=?",
+                ("sent" if ok else "pending",
+                 _now().isoformat(timespec="seconds") if ok else None,
+                 "razovoe=" + ("ok" if ok else "fail") + ";", rid))
+        (sent if ok else errs).append({"phone": phone, "child": child, "log": log_})
+    with db.get_conn() as conn:
+        left = conn.execute(
+            "SELECT COUNT(*) FROM broadcast_queue WHERE campaign=? AND status='pending'",
+            (CAMPAIGN,)).fetchone()[0]
+    log.info("chaty.deliver: отправлено %d, ошибок %d, осталось %d",
+             len(sent), len(errs), left)
+    return {"ok": True, "dry_run": dry, "sent": len(sent), "errors": errs,
+            "left": left, "details": sent}
+
+
 def save_links(raw: dict) -> dict:
     """Сохранить ссылки со страницы. Пустое поле — убрать ссылку группы."""
     keep = {}
