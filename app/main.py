@@ -2951,6 +2951,15 @@ def api_chaty_deliver(limit: int = 3, dry: int = 1):
     return chaty.deliver(limit=limit, dry=bool(dry))
 
 
+@app.post("/api/chaty/reply", dependencies=AUTH)
+def api_chaty_reply(payload: dict = Body(...)):
+    """Ответить тем, кто написал в ответ на приглашение в чат."""
+    from . import chaty
+    return chaty.reply_waiting(phones=(payload or {}).get("phones") or [],
+                               text=str((payload or {}).get("text") or ""),
+                               dry=bool((payload or {}).get("dry", True)))
+
+
 @app.get("/api/chaty/find-links", dependencies=AUTH)
 def api_chaty_find_links(limit: int = 40):
     """Ссылки-приглашения, уже уходившие родителям в переписке."""
@@ -3066,7 +3075,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-13.13"
+APP_VERSION = "2026-09-13.15"
 
 
 @app.get("/api/net")

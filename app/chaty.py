@@ -323,6 +323,43 @@ def deliver(limit: int = 3, dry: bool = True) -> dict:
             "left": left, "details": sent}
 
 
+WAIT_REPLY = ("Спасибо, что написали! Доступ в личный кабинет открываем "
+              "со своей стороны — как откроем, сразу напишем вам здесь. "
+              "В чат группы добавим вас сами, от вас больше ничего "
+              "не потребуется 🌿")
+
+
+def reply_waiting(phones: list[str] | None = None, text: str = "",
+                  dry: bool = True) -> dict:
+    """Ответить тем, кто написал в ответ на приглашение.
+
+    Вопрос вызван нашим же сообщением, диалог открыт, и молчание тут
+    хуже любого ответа: человек написал «откройте доступ» и ждёт. Ответ
+    промежуточный и ничего не обещает по срокам — доступ открывает
+    владелец, не мы.
+    """
+    from . import wazzup
+    msg = (text or WAIT_REPLY).strip()
+    out, errs = [], []
+    for phone in (phones or []):
+        if dry:
+            out.append({"phone": phone, "dry": True})
+            continue
+        try:
+            # именно "reply": человек написал нам сам, диалог открыт.
+            # С любым другим видом предохранитель считает это второй
+            # рекламой за день и отменяет отправку — что для ответа
+            # на вопрос клиента ровно наоборот вредно.
+            log_ = wazzup.send_smart(phone, msg, dry_run=False, mass=False,
+                                     kind="reply")
+            ok = any("ok" in x for x in log_)
+        except Exception as e:  # noqa: BLE001
+            ok, log_ = False, [str(e)[:150]]
+        (out if ok else errs).append({"phone": phone, "log": log_})
+    return {"ok": True, "dry_run": dry, "sent": len(out), "errors": errs,
+            "details": out, "text": msg}
+
+
 def save_links(raw: dict) -> dict:
     """Сохранить ссылки со страницы. Пустое поле — убрать ссылку группы."""
     keep = {}
