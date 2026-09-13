@@ -850,8 +850,12 @@ def _broadcast_tick() -> None:
                     tid, vals = noname, []
             # Телеграму нужен id карточки: у telegram-чата нет телефона,
             # и отправка «на номер» возвращает BAD_CONTACT
+            # kind с именем кампании нужен догону СМС: он смотрит, что
+            # именно не доставилось. Без метки строка рассылки в журнале
+            # неотличима от любой другой отправки.
             ok = wazzup.send_via(tr, phone, msg, dry_run=dry, sender=snd,
                                  template_values=vals, template_id=tid,
+                                 kind=f"bc:{campaign or 'broadcast'}",
                                  uid=_uid_by_phone(phone) if tr == "tgapi" else None)
         except Exception as e:
             log.warning("wazzup %s недоступен: %s", tr, e)

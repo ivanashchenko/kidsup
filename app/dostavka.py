@@ -40,7 +40,8 @@ log = logging.getLogger("kidsup.dostavka")
 
 # Сообщения, ради которых имеет смысл платить за СМС: без них человек
 # просто не придёт. Всё остальное — переписка и новости — молчит.
-CHASE_KINDS = {"confirm", "trial_reminder", "reschedule", "missed"}
+CHASE_KINDS = {"confirm", "trial_reminder", "reschedule", "missed",
+               "bc:chat_invite"}
 WAIT_HOURS = 2          # столько ждём доставки, прежде чем слать СМС
 SMS_FROM, SMS_TO = 9, 20
 
@@ -116,6 +117,11 @@ def sms_text(kind: str, note: str = "") -> str:
         "missed": "KidsUP: звонили вам по набору групп на новый год, "
                   "не дозвонились. Перезвоните: 4951209024",
     }.get(kind, "KidsUP: у нас для вас сообщение. Позвоните: 4951209024")
+    if kind == "bc:chat_invite":
+        # Приглашение в чат своей группы: текст со ссылками собирает
+        # chaty.sms_for() — он знает, в скольких группах ребёнок.
+        return note or ("KidsUP: чат вашей группы — напишите нам, пришлём "
+                        "ссылку: 4951209024")
     return base.replace("{note}", f" — {note}" if note else "")
 
 
@@ -147,16 +153,25 @@ def chase(dry: bool = True, limit: int = 25) -> dict:
                            f"догонять СМС по слепым данным нельзя"}
     rows = undelivered(kinds=CHASE_KINDS)[:limit]
     stat = {"недоставлено": len(rows), "смс": 0, "без оплат": 0, "ошибок": 0}
+    invites = _chat_sms_by_phone() if any(
+        r["kind"] == "bc:chat_invite" for r in rows) else {}
     for r in rows:
         if not _paid_before(r["uid"]):
             stat["без оплат"] += 1
             _mark_chased(r["mid"])          # второй раз не смотрим
             continue
+        note = invites.get((r["phone"] or "")[-10:], "") \
+            if r["kind"] == "bc:chat_invite" else ""
+        if r["kind"] == "bc:chat_invite" and not note:
+            # ссылки на чат для этого номера уже нет (группу закрыли или
+            # сменили приглашение) — слать «пустое» СМС незачем
+            _mark_chased(r["mid"])
+            continue
         if dry:
             stat["смс"] += 1
             continue
         try:
-            if mango.send_sms(r["phone"], sms_text(r["kind"])):
+            if mango.send_sms(r["phone"], sms_text(r["kind"], note)):
                 stat["смс"] += 1
                 _mark_chased(r["mid"])
             else:
@@ -165,6 +180,19 @@ def chase(dry: bool = True, limit: int = 25) -> dict:
             stat["ошибок"] += 1
             log.warning("СМС %s: %s", r["phone"][-4:], str(e)[:80])
     return stat
+
+
+def _chat_sms_by_phone() -> dict[str, str]:
+    """Телефон (10 цифр) → текст СМС с ссылками на чаты его групп."""
+    try:
+        from . import chaty
+        p = chaty.plan()
+    except Exception as e:  # noqa: BLE001
+        log.warning("chaty.plan для СМС-догона: %s", str(e)[:120])
+        return {}
+    if not p.get("ok"):
+        return {}
+    return {(f["phone"] or "")[-10:]: f["sms"] for f in p["recipients"]}
 
 
 def _mark_chased(mid: str) -> None:

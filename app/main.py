@@ -2905,6 +2905,40 @@ WA_HELLO = ("Здравствуйте! Пожалуйста, отправьте 
             "ответа. Ваш номер: ")
 
 
+@app.get("/chat/{code}")
+async def go_group_chat(code: str, request: Request):
+    """Короткая ссылка на групповой чат: app.kidsup.ru/chat/g6.
+
+    В СМС полная ссылка chat.whatsapp.com съедает половину сообщения,
+    а по короткой видно, сколько родителей перешло."""
+    from . import chaty, autopilot
+    target = chaty.by_code(code)
+    if not target:
+        raise HTTPException(404, "чат не найден")
+    with db.get_conn() as conn:
+        _clicks_init(conn)
+        conn.execute("INSERT INTO messenger_clicks (ts, channel, roistat_visit, utm, referrer) "
+                     "VALUES (?, ?, ?, ?, ?)",
+                     (autopilot._now().isoformat(timespec="seconds"),
+                      f"chat:{code}", "", "",
+                      (request.headers.get("referer") or "")[:300]))
+    return RedirectResponse(target, status_code=302)
+
+
+@app.get("/api/chaty/plan", dependencies=AUTH)
+def api_chaty_plan():
+    """Кому и что уйдёт: приглашения в чаты учебных групп. Ничего не шлёт."""
+    from . import chaty
+    return chaty.plan()
+
+
+@app.post("/api/chaty/send", dependencies=AUTH)
+def api_chaty_send(dry: int = 1):
+    """Поставить приглашения в очередь рассылки. dry=1 — только посчитать."""
+    from . import chaty
+    return chaty.send(dry=bool(dry))
+
+
 @app.get("/go/{channel}")
 async def go_messenger(channel: str, request: Request):
     """Кнопка мессенджера на сайте ведёт сюда: фиксируем номер визита Roistat
@@ -3006,7 +3040,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-13.2"
+APP_VERSION = "2026-09-13.4"
 
 
 @app.get("/api/net")
@@ -3043,7 +3077,7 @@ async def health():
             "morning_done": autopilot._has_mark("morning", today)}
 
 
-SETTABLE = {"crm_tasks_off", "auto_join_groups", "admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
+SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
