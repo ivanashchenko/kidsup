@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-14.6"
+APP_VERSION = "2026-09-14.8"
 
 
 @app.get("/api/net")
@@ -5774,6 +5774,33 @@ def api_mkweb_history_result(by_day: int = 0):
                          for day, c in sorted(by.items(),
                                               key=lambda x: (x[0][6:10], x[0][3:5], x[0][:2]))}
     return st
+
+
+@app.post("/api/yaweb/login", dependencies=OWNER_AUTH)
+def api_yaweb_login():
+    """Браузерный вход в Яндекс (Директ) технической учёткой."""
+    from . import mkweb
+    return mkweb.ya_login()
+
+
+@app.post("/api/yaweb/open", dependencies=OWNER_AUTH)
+def api_yaweb_open(payload: dict = Body(...)):
+    """Открыть страницу Директа под сохранённой сессией Яндекса; те же actions, что у mkweb."""
+    from . import mkweb
+    p = payload or {}
+    return mkweb.open_page(str(p.get("url") or "https://direct.yandex.ru/dna/campaigns"),
+                           wait_ms=int(p.get("wait_ms") or 5000), max_text=int(p.get("max_text") or 6000),
+                           click=str(p.get("click") or ""), actions=p.get("actions") or [],
+                           frame=str(p.get("frame") or ""), state="ya")
+
+
+@app.get("/api/yaweb/shot", dependencies=OWNER_AUTH)
+def api_yaweb_shot():
+    from . import mkweb
+    from fastapi.responses import FileResponse
+    if not mkweb.YA_SHOT.exists():
+        raise HTTPException(404, "скриншота нет")
+    return FileResponse(str(mkweb.YA_SHOT), media_type="image/png")
 
 
 @app.get("/api/mkweb/leftovers", dependencies=OWNER_AUTH)

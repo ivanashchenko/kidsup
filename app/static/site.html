@@ -1630,6 +1630,7 @@ document.getElementById('lead').addEventListener('submit', async e => {
     }
     if (j.ok) {
       try { ym(69569509, 'reachGoal', 'lead', {course: c}); } catch (_) {}
+      try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'lead'}); } catch (_) {}
       try { VK.Goal('lead'); } catch (_) {}
       try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
       e.target.setAttribute('role', 'status'); e.target.setAttribute('aria-live', 'polite');
@@ -2065,6 +2066,7 @@ document.addEventListener('click', function(e){
   if(!a) return;
   var ch = (a.getAttribute('href').match(/\/go\/([a-z]+)/)||[])[1] || 'msg';
   try { ym(69569509, 'reachGoal', 'messenger', {channel: ch}); } catch(_){}
+  try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'messenger'}); } catch(_){}
   try { window.VK && VK.Goal && VK.Goal('contact'); } catch(_){}
 }, true);
 </script>

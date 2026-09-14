@@ -183,7 +183,7 @@ def login() -> dict:
 
 
 def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = "", links: bool = False,
-              actions: list | None = None, rows: bool = False, frame: str = "") -> dict:
+              actions: list | None = None, rows: bool = False, frame: str = "", state: str = "mk") -> dict:
     """Открыть страницу под сохранённой сессией; вернуть текст и сделать скриншот.
 
     frame — подстрока адреса вложенного фрейма (например «moychat»): «Мой Чат»
@@ -193,15 +193,16 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
     """
     from playwright.sync_api import sync_playwright
 
-    if not STATE.exists():
-        return {"ok": False, "error": "сессии нет — сначала /api/mkweb/login"}
+    st_file = YA_STATE if state == "ya" else STATE
+    if not st_file.exists():
+        return {"ok": False, "error": f"сессии {state} нет — сначала вход"}
     with _lock, sync_playwright() as p:
         b = _launch(p)
-        ctx = b.new_context(storage_state=str(STATE), viewport={"width": 1400, "height": 900}, locale="ru-RU")
+        ctx = b.new_context(storage_state=str(st_file), viewport={"width": 1400, "height": 900}, locale="ru-RU")
         pg = ctx.new_page()
         pg.goto(url, wait_until="domcontentloaded", timeout=60000)
         pg.wait_for_timeout(wait_ms)
-        if pg.locator("input[type=password]").count() > 0:
+        if state == "mk" and pg.locator("input[type=password]").count() > 0:
             # сессия протухла — перелогиниваемся тем же браузером и идём снова
             b.close()
             res = login()

@@ -37,6 +37,10 @@
       var j = await r.json();
       if (j.ok) {
         try { ym(69569509, 'reachGoal', 'lead', {course: COURSE}); } catch (_) {}
+        // тот же лид — в пиксель VK Рекламы: без события в счётчике 3355457 кампании
+        // ВК нечего оптимизировать, и они неделю платили за «посещение сайта»
+        try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'lead'}); } catch (_) {}
+        try { window.VK && VK.Goal && VK.Goal('lead'); } catch (_) {}
         try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
         form.innerHTML = '<div class="done"><h3 style="color:var(--green-ink)">Заявка принята</h3>' +
           '<p style="color:var(--muted)">Администратор перезвонит в течение 15 минут ' +
@@ -50,4 +54,16 @@
       err.hidden = false;
     }
   });
+
+  // Клик по кнопке мессенджера — для половины родителей это и есть заявка:
+  // они пишут в WhatsApp, а не заполняют форму. Кнопки ведут через
+  // app.kidsup.ru/go/, счётчики сами такой переход целью не считают.
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href*="app.kidsup.ru/go/"]');
+    if (!a) return;
+    var ch = (a.getAttribute('href').match(/\/go\/([a-z]+)/) || [])[1] || 'msg';
+    try { ym(69569509, 'reachGoal', 'messenger', {channel: ch, course: COURSE}); } catch (_) {}
+    try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'messenger'}); } catch (_) {}
+    try { window.VK && VK.Goal && VK.Goal('contact'); } catch (_) {}
+  }, true);
 })();

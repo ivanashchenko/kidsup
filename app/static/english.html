@@ -554,6 +554,7 @@ document.getElementById('lead').addEventListener('submit', async function(e){
     var j = await r.json();
     if (j.ok) {
       try { ym(69569509, 'reachGoal', 'lead', {course: 'Английский язык'}); } catch (_) {}
+      try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'lead'}); } catch (_) {}
       try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
       e.target.innerHTML = '<div class="done"><h3 style="color:var(--green-ink)">Заявка принята</h3>' +
         '<p style="color:var(--muted)">Администратор перезвонит в течение 15 минут в рабочее время ' +
@@ -590,5 +591,13 @@ _tmr.push({id: "3355457", type: "pageView", start: (new Date()).getTime()});
 })(document, window, "tmr-code");
 </script>
 <noscript><div><img src="https://top-fwz1.mail.ru/counter?id=3355457;js=na" style="position:absolute;left:-9999px" alt="Top.Mail.Ru" loading="lazy" decoding="async"></div></noscript>
+<script>
+document.addEventListener('click', function(e){
+  var a = e.target.closest && e.target.closest('a[href*="app.kidsup.ru/go/"]');
+  if(!a) return;
+  try { ym(69569509, 'reachGoal', 'messenger'); } catch(_){}
+  try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'messenger'}); } catch(_){}
+}, true);
+</script>
 </body>
 </html>
