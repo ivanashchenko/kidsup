@@ -1929,6 +1929,27 @@ MISSED_OUR = (
     "Когда удобно созвониться? Или напишите здесь — всё подскажем 😊")
 
 
+# Догон холодному контакту — с курсами под возраст ребёнка из карточки
+# (поручение владельца 14.09: «с рекламой наших курсов по возрасту»).
+# Возраст неизвестен — без этой строки: угадывать хуже, чем промолчать.
+AGE_PITCH = [
+    (3.0, "\n\nДля малышей у нас мини-сад (с 1,3 года) и развивающие занятия 2–4 года."),
+    (5.0, "\n\nВ этом возрасте у нас английский (уровень Starters), подготовка к школе "
+          "с 4 лет, ИЗО и робототехника."),
+    (7.0, "\n\nДля дошкольника — подготовка к школе и нулевой класс, английский, "
+          "шахматы, ментальная арифметика."),
+    (99.0, "\n\nДля школьника — английский по кембриджским уровням, шахматы, "
+           "робототехника, ментальная арифметика, ИЗО."),
+]
+
+
+def _age_pitch(phone: str) -> str:
+    age = _age_by_phone(phone)
+    if age is None:
+        return ""
+    return next(t for lim, t in AGE_PITCH if age < lim)
+
+
 def _missed_kind(mk: MoyklassClient, phone: str) -> tuple[str, str]:
     """Кому мы звонили: своим, действующему клиенту или холодному контакту.
 
@@ -2671,7 +2692,7 @@ def missed_calls(days: list[str] | None = None) -> None:
             if kind == "client":
                 text = MISSED_OUR.format(child=f" по занятиям {_genitive(child)}" if child else "")
             else:
-                text = MISSED_COLD
+                text = MISSED_COLD + _age_pitch(phone)
             delivered = _wa(phone, text, kind="missed")
             # Правило владельца 24.08 (вечер): если с семьёй НЕТ переписки
             # в Telegram и MAX, СМС уходит ВМЕСТЕ с WhatsApp — не как
@@ -3903,6 +3924,52 @@ def chat_watchdog() -> dict:
     return {"waiting": len(waiting), "sent": True, "fresh": len(fresh)}
 
 
+def store_calls(rows: list[dict]) -> int:
+    """Сложить строки mango.calls() в журнал mango_calls.
+
+    До 14.09 poll_calls читал из строк ключи from_extension/to_number —
+    а mango.calls() отдаёт from_ext/to_num. Телефон всегда получался пустым,
+    и за месяц в журнале осталась одна строка от 16.08: SLA, аудит и
+    воронка считали, что мы никому не звонили. state: talked — разговор
+    от TALK_MIN секунд, short — сняли и сбросили, missed — не ответили."""
+    added = 0
+    with db.get_conn() as conn:
+        for r in rows:
+            start = r.get("start")
+            if not start:
+                continue
+            ts = datetime.fromtimestamp(int(start), _now().tzinfo).isoformat(timespec="seconds")
+            ext = str(r.get("from_ext") or "")
+            num = str((r.get("to_num") if ext else r.get("from_num")) or "")
+            phone = "".join(ch for ch in num if ch.isdigit())[-10:]
+            if len(phone) < 10:
+                continue
+            ans = int(r.get("answer") or 0)
+            fin = int(r.get("finish") or 0)
+            state = ("talked" if ans and fin - ans >= mango.TALK_MIN
+                     else "short" if ans else "missed")
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO mango_calls (ts, phone, direction, state, rec_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (ts, phone, "out" if ext else "in", state, str(r.get("rec") or "")))
+            added += cur.rowcount
+    return added
+
+
+def backfill_calls(days: int = 14) -> dict:
+    """Разово догрузить журнал звонков за прошедшие дни (stats/request у
+    Манго с жёстким rate-limit — по дню с паузой)."""
+    total = 0
+    for i in range(days, -1, -1):
+        day = (_today() - timedelta(days=i)).isoformat()
+        try:
+            total += store_calls(mango._day_calls(day))
+        except Exception as e:
+            log.warning("backfill_calls %s: %s", day, e)
+        time.sleep(1.5)
+    return {"ok": True, "добавлено": total, "дней": days + 1}
+
+
 def poll_calls() -> dict:
     """Минутный опрос Mango вместо платных уведомлений.
 
@@ -3930,25 +3997,7 @@ def poll_calls() -> dict:
     except Exception as e:
         log.warning("poll_calls: mango недоступен: %s", e)
         return {"error": str(e)[:120]}
-    added = 0
-    with db.get_conn() as conn:
-        for r in rows:
-            start = r.get("start")
-            if not start:
-                continue
-            ts = datetime.fromtimestamp(int(start), _now().tzinfo).isoformat(timespec="seconds")
-            ext = str(r.get("from_extension") or "")
-            num = str(r.get("to_number") if ext else r.get("from_number") or "")
-            phone = "".join(ch for ch in num if ch.isdigit())[-10:]
-            if len(phone) < 10:
-                continue
-            cur = conn.execute(
-                "INSERT OR IGNORE INTO mango_calls (ts, phone, direction, state, rec_id) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (ts, phone, "out" if ext else "in", "finished",
-                 (r.get("records") or [""])[0] if isinstance(r.get("records"), list)
-                 else str(r.get("records") or "")))
-            added += cur.rowcount
+    added = store_calls(rows)
     if added:
         log.info("poll_calls: добавлено %d звонков", added)
     return {"added": added, "seen": len(rows)}

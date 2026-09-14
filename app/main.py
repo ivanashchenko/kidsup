@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-14.10"
+APP_VERSION = "2026-09-14.14"
 
 
 @app.get("/api/net")
@@ -6799,11 +6799,56 @@ def api_mesta_voronka():
     for day in sorted(by_day):
         cum += by_day[day]
         series.append({"день": day, "новых_оплативших": by_day[day], "накопительно": cum})
+    # последний звонок, сообщение и комментарий админа — по каждой строке
+    from . import voronka
+    for lst in out.values():
+        voronka.enrich(lst)
+        lst.sort(key=lambda r: (r.get("дней_тишины") is None, -(r.get("дней_тишины") or 0)))
     return {"оплачено_в_группах_сезона": len(first_sell),
             "оплачено_уникальных_всего": len(paid_users),
             "без_оплаты": {k: len(v) for k, v in out.items()},
             "динамика": series[-20:],
+            "комментарии_обновлены": db.get_setting("crm_comments_refreshed", ""),
             "списки": out}
+
+
+@app.get("/api/mesta/voronka/diag", dependencies=AUTH)
+def api_mesta_voronka_diag(phone: str = ""):
+    """Только чтение: что лежит в журнале звонков (для отладки страницы)."""
+    p10 = "".join(ch for ch in phone if ch.isdigit())[-10:]
+    with db.get_conn() as conn:
+        has = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE name='mango_calls'").fetchone()[0]
+        if not has:
+            return {"table": False}
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(mango_calls)")]
+        total = conn.execute("SELECT COUNT(*) FROM mango_calls").fetchone()[0]
+        last = [dict(r) for r in conn.execute("SELECT * FROM mango_calls ORDER BY ts DESC LIMIT 5")]
+        mine = [dict(r) for r in conn.execute(
+            "SELECT * FROM mango_calls WHERE substr(phone,-10)=? ORDER BY ts DESC LIMIT 5", (p10,))] if p10 else []
+    return {"table": True, "cols": cols, "total": total, "last": last, "phone": mine}
+
+
+@app.post("/api/calls/backfill", dependencies=AUTH)
+def api_calls_backfill(days: int = 14):
+    """Догрузить журнал звонков mango_calls за прошедшие дни (в фоне)."""
+    from . import autopilot
+    threading.Thread(target=autopilot.backfill_calls, args=(days,), daemon=True).start()
+    return {"ok": True, "started": True, "days": days}
+
+
+@app.post("/api/mesta/voronka/refresh", dependencies=AUTH)
+def api_mesta_voronka_refresh(bg: int = 1):
+    """Подтянуть комментарии карточек из МойКласса (окно с 15.08). В фоне —
+    страница не ждёт API; bg=0 — дождаться и вернуть счётчик."""
+    from . import voronka
+    if bg:
+        voronka.refresh_comments_bg()
+        return {"ok": True, "started": True}
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        return voronka.refresh_comments(mk)
+    finally:
+        mk.close()
 
 
 @app.get("/api/mesta", dependencies=AUTH)

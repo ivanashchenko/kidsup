@@ -4,7 +4,11 @@
 <h1>Кто в группах без оплаты</h1>
 <p class="muted">Каждая строка — ребёнок, записанный в группу сезона, но без оплаченного абонемента.
 Стадия говорит, что делать: <b>ходит без оплаты</b> — счёт сегодня; <b>посетил пробное</b> — звонок и
-предложение; <b>записан на пробное</b> — подтвердить дату на этой неделе; <b>подтвердил заявку</b> — записать на дату.</p>
+предложение; <b>записан на пробное</b> — подтвердить дату на этой неделе; <b>подтвердил заявку</b> — записать на дату.
+Внутри стадии — сначала те, с кем дольше всего не было контакта.</p>
+<p class="muted">Звонки — журнал Манго, сообщения — Wazzup, комментарии — карточки МойКласса
+{% if v.комментарии_обновлены %}(подтянуты {{ v.комментарии_обновлены|replace('T',' ') }}){% endif %}.
+<button class="btn" onclick="fetch('/api/mesta/voronka/refresh',{method:'POST'}).then(function(){this.textContent='Обновляю — через минуту перезагрузите'}.bind(this))">Подтянуть комментарии</button></p>
 
 <div class="cards">
   <div class="card"><div class="card-value">{{ v.оплачено_в_группах_сезона }}</div><div class="card-label">оплачено · цель 311</div></div>
@@ -21,19 +25,24 @@
 
 <table id="t" style="width:100%;border-collapse:collapse;font-size:.93rem">
 <thead><tr style="text-align:left;border-bottom:2px solid #e4e2f2">
-  <th>Ребёнок</th><th>Телефон</th><th>Группа</th><th>Стадия</th><th>Карточка</th></tr></thead>
+  <th>Ребёнок</th><th>Телефон</th><th>Группа</th><th>Стадия</th><th>Тишина</th><th>Последний звонок</th><th>Последнее сообщение</th><th>Комментарий админа</th><th>Карточка</th></tr></thead>
 <tbody>
 {% for stage, rows in v.списки.items() %}{% for r in rows %}
 <tr data-s="{{ stage }}" style="border-bottom:1px solid #eee">
   <td>{{ r.name }}</td>
   <td><a href="https://wa.me/{{ r.phone }}" target="_blank" rel="noopener">{{ r.phone }}</a></td>
   <td>{{ r.group }}</td>
-  <td><span class="pill">{{ stage }}</span></td>
+  <td><span class="pill">{{ stage }}</span>{% if r.статус %}<div class="muted sm">{{ r.статус }}</div>{% endif %}</td>
+  <td>{% if r.дней_тишины is none %}<span class="warn">контакта не было</span>{% elif r.дней_тишины >= 3 %}<span class="warn">{{ r.дней_тишины }} дн.</span>{% else %}{{ r.дней_тишины }} дн.{% endif %}</td>
+  <td class="sm">{% if r.звонок %}{{ r.звонок.когда }} {{ r.звонок.направление }} · {{ r.звонок.итог }}{% if r.звонок.за_7_дней > 1 %} · {{ r.звонок.за_7_дней }} за неделю{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+  <td class="sm">{% if r.сообщение %}{{ r.сообщение.когда }} <b>{{ r.сообщение.кто }}</b>: {{ r.сообщение.текст }}{% if not r.сообщение.родитель_отвечал %} <span class="muted">(без ответа)</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+  <td class="sm">{% if r.комментарий %}{{ r.комментарий.когда }} <b>{{ r.комментарий.кто }}</b>: {{ r.комментарий.текст }}{% else %}<span class="muted">—</span>{% endif %}</td>
   <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td>
 </tr>
 {% endfor %}{% endfor %}
 </tbody></table>
-<style>.pill{display:inline-block;padding:.1rem .55rem;border-radius:99px;background:#EEF3FF;font-size:.82rem}</style>
+<style>.pill{display:inline-block;padding:.1rem .55rem;border-radius:99px;background:#EEF3FF;font-size:.82rem}
+.sm{font-size:.82rem;max-width:260px}.warn{color:#E30613;font-weight:600}#t td{vertical-align:top;padding:.35rem .4rem}</style>
 <script>
 var cur='';
 function filt(s){cur=s;var q=(document.getElementById('q').value||'').toLowerCase();
