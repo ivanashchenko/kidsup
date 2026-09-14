@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Воронка к цели — KidsUP{% endblock %}
+{% block content %}
+<h1>Кто в группах без оплаты</h1>
+<p class="muted">Каждая строка — ребёнок, записанный в группу сезона, но без оплаченного абонемента.
+Стадия говорит, что делать: <b>ходит без оплаты</b> — счёт сегодня; <b>посетил пробное</b> — звонок и
+предложение; <b>записан на пробное</b> — подтвердить дату на этой неделе; <b>подтвердил заявку</b> — записать на дату.</p>
+
+<div class="cards">
+  <div class="card"><div class="card-value">{{ v.оплачено_в_группах_сезона }}</div><div class="card-label">оплачено · цель 311</div></div>
+  {% for k, n in v.без_оплаты.items() %}
+  <div class="card"><div class="card-value">{{ n }}</div><div class="card-label">{{ k }}</div></div>
+  {% endfor %}
+</div>
+
+<p style="margin:.8rem 0">
+  <button class="btn" onclick="filt('')">Все</button>
+  {% for k in v.без_оплаты %}<button class="btn" onclick="filt('{{ k }}')">{{ k }}</button> {% endfor %}
+  <input id="q" placeholder="имя или телефон" oninput="filt(cur)" style="padding:.45rem .7rem;margin-left:.6rem">
+</p>
+
+<table id="t" style="width:100%;border-collapse:collapse;font-size:.93rem">
+<thead><tr style="text-align:left;border-bottom:2px solid #e4e2f2">
+  <th>Ребёнок</th><th>Телефон</th><th>Группа</th><th>Стадия</th><th>Карточка</th></tr></thead>
+<tbody>
+{% for stage, rows in v.списки.items() %}{% for r in rows %}
+<tr data-s="{{ stage }}" style="border-bottom:1px solid #eee">
+  <td>{{ r.name }}</td>
+  <td><a href="https://wa.me/{{ r.phone }}" target="_blank" rel="noopener">{{ r.phone }}</a></td>
+  <td>{{ r.group }}</td>
+  <td><span class="pill">{{ stage }}</span></td>
+  <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td>
+</tr>
+{% endfor %}{% endfor %}
+</tbody></table>
+<style>.pill{display:inline-block;padding:.1rem .55rem;border-radius:99px;background:#EEF3FF;font-size:.82rem}</style>
+<script>
+var cur='';
+function filt(s){cur=s;var q=(document.getElementById('q').value||'').toLowerCase();
+ document.querySelectorAll('#t tbody tr').forEach(function(tr){
+  var ok=(!s||tr.dataset.s===s)&&(!q||tr.textContent.toLowerCase().indexOf(q)>=0);
+  tr.style.display=ok?'':'none';});}
+</script>
+{% endblock %}

@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-14.2"
+APP_VERSION = "2026-09-14.6"
 
 
 @app.get("/api/net")
@@ -6236,6 +6236,80 @@ def api_ads_audience(payload: dict = Body(...)):
         return {"http": r.status_code, "text": r.text[:800]}
 
 
+@app.post("/api/ads/roistat", dependencies=OWNER_AUTH)
+def api_ads_roistat(payload: dict = Body(...)):
+    """Прямой вызов API Roistat под нашим ключом (только владелец).
+
+    {"path": "project/analytics/data", "json": {...}} — POST;
+    {"path": "project/integration/order/list", "method": "get"} — GET.
+    Ключ и проект подставляются здесь и не покидают сервер."""
+    import httpx
+    key = db.get_setting("roistat_key"); proj = db.get_setting("roistat_project")
+    if not key or not proj:
+        raise HTTPException(400, "нет roistat_key / roistat_project")
+    path = str(payload.get("path") or "").lstrip("/")
+    url = f"https://cloud.roistat.com/api/v1/{path}"
+    params = {"project": proj, "key": key, **(payload.get("params") or {})}
+    if (payload.get("method") or "post").lower() == "get":
+        r = httpx.get(url, params=params, timeout=60)
+    else:
+        r = httpx.post(url, params=params, json=payload.get("json") or {}, timeout=60)
+    try:
+        return {"http": r.status_code, "body": r.json()}
+    except ValueError:
+        return {"http": r.status_code, "body": r.text[:2000]}
+
+
+@app.post("/api/ads/metrika", dependencies=OWNER_AUTH)
+def api_ads_metrika(payload: dict = Body(...)):
+    """Прямой вызов API Яндекс.Метрики под нашим токеном (только владелец).
+
+    {"path": "management/v1/counter/69569509/goals"} или
+    {"path": "stat/v1/data", "params": {...}}. Токен не покидает сервер."""
+    import httpx
+    tok = db.get_setting("yandex_metrika_token") or db.get_setting("yandex_direct_token")
+    if not tok:
+        raise HTTPException(400, "нет yandex_metrika_token")
+    path = str(payload.get("path") or "").lstrip("/")
+    hdr = {"Authorization": f"OAuth {tok}"}
+    if (payload.get("method") or "get").lower() == "post":
+        r = httpx.post(f"https://api-metrika.yandex.net/{path}", params=payload.get("params") or {},
+                       json=payload.get("json") or {}, headers=hdr, timeout=60)
+    else:
+        r = httpx.get(f"https://api-metrika.yandex.net/{path}",
+                      params=payload.get("params") or {}, headers=hdr, timeout=60)
+    try:
+        return {"http": r.status_code, "body": r.json()}
+    except ValueError:
+        return {"http": r.status_code, "body": r.text[:2000]}
+
+
+@app.get("/api/clicks/summary", dependencies=AUTH)
+def api_clicks_summary(days: int = 7):
+    """Клики по кнопкам мессенджеров на сайте за N дней: канал, источник
+    (utm/roistat), сколько из них дошло до переписки."""
+    from . import autopilot
+    edge = (autopilot._now() - timedelta(days=int(days))).isoformat(timespec="seconds")
+    with db.get_conn() as conn:
+        _clicks_init(conn)
+        rows = conn.execute(
+            "SELECT ts, channel, roistat_visit, utm, referrer, matched_phone FROM messenger_clicks "
+            "WHERE ts >= ? ORDER BY ts", (edge,)).fetchall()
+    import collections
+    by_ch = collections.Counter(); by_day = collections.Counter(); matched = 0; src = collections.Counter()
+    for ts, ch, rv, utm, ref, mp in rows:
+        by_ch[ch] += 1; by_day[ts[:10]] += 1
+        if mp: matched += 1
+        try:
+            u = json.loads(utm or "{}")
+        except ValueError:
+            u = {}
+        src[(u.get("utm_source") or ("roistat" if rv else "")) or "прямой/органика"] += 1
+    return {"дней": days, "кликов": len(rows), "дошло_до_переписки": matched,
+            "по_каналам": dict(by_ch), "по_дням": dict(sorted(by_day.items())),
+            "по_источникам": dict(src.most_common())}
+
+
 @app.post("/api/ads/vk", dependencies=OWNER_AUTH)
 def api_ads_vk(payload: dict = Body(...)):
     """Прямой вызов VK Ads API под нашим токеном (только владелец).
@@ -6617,6 +6691,13 @@ def api_crm_class(class_id: int, limit: int = 30):
         return {"classId": class_id, "joins": out}
     finally:
         mk.close()
+
+
+@app.get("/voronka", response_class=HTMLResponse, dependencies=AUTH)
+def voronka_page(request: Request):
+    """Клиент — запись — стадия: кто в группах сезона без оплаты и что с ним делать."""
+    v = api_mesta_voronka()
+    return render(request, "voronka.html", active="voronka", v=v)
 
 
 @app.get("/api/mesta/voronka", dependencies=AUTH)

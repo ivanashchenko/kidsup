@@ -2056,6 +2056,17 @@ window.__applyOffer = function(today){
   return 'вечнозелёный';
 };
 window.__applyOffer(new Date());
+// Клик по кнопке мессенджера — это и есть заявка для половины родителей:
+// они пишут в WhatsApp, а не заполняют форму. Метрика сама такой переход
+// не видит (кнопки ведут через app.kidsup.ru/go/), поэтому цель шлём руками —
+// без неё Директ и ВК неделю оптимизировались в пустоту: 1223 визита, 0 целей.
+document.addEventListener('click', function(e){
+  var a = e.target.closest && e.target.closest('a[href*="app.kidsup.ru/go/"]');
+  if(!a) return;
+  var ch = (a.getAttribute('href').match(/\/go\/([a-z]+)/)||[])[1] || 'msg';
+  try { ym(69569509, 'reachGoal', 'messenger', {channel: ch}); } catch(_){}
+  try { window.VK && VK.Goal && VK.Goal('contact'); } catch(_){}
+}, true);
 </script>
 <script>
 (function(){
