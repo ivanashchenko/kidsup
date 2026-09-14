@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-14.20"
+APP_VERSION = "2026-09-14.21"
 
 
 @app.get("/api/net")
@@ -5760,10 +5760,13 @@ def api_mkweb_history_start(payload: dict = Body(default={})):
 
 
 @app.get("/api/mkweb/history/result", dependencies=OWNER_AUTH)
-def api_mkweb_history_result(by_day: int = 0):
-    """Готова ли фоновая выгрузка. by_day=1 — сводка по дням и типам событий."""
+def api_mkweb_history_result(by_day: int = 0, events: int = 0):
+    """Готова ли фоновая выгрузка. by_day=1 — сводка по дням и типам событий;
+    events=1 — сами события (для разбора контроля дня из рабочего контейнера)."""
     from . import mkweb
     st = mkweb.history_result()
+    if events and not st.get("running") and mkweb.HIST_OUT.exists():
+        st["events"] = json.loads(mkweb.HIST_OUT.read_text(encoding="utf-8")).get("events") or []
     if by_day and not st.get("running") and mkweb.HIST_OUT.exists():
         import collections
         d = json.loads(mkweb.HIST_OUT.read_text(encoding="utf-8"))
