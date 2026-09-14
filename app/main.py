@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-13.18"
+APP_VERSION = "2026-09-14.2"
 
 
 @app.get("/api/net")
@@ -6617,6 +6617,69 @@ def api_crm_class(class_id: int, limit: int = 30):
         return {"classId": class_id, "joins": out}
     finally:
         mk.close()
+
+
+@app.get("/api/mesta/voronka", dependencies=AUTH)
+def api_mesta_voronka():
+    """Кто в группах сезона без оплаты — по стадиям воронки.
+
+    В блоке мест «учится» — это все живые записи в группу, включая
+    записанных на пробное. Разница между «учится» и «оплачено» поэтому
+    складывается из четырёх разных состояний, и работа с ними разная:
+    ходит без оплаты — дожим; посетил пробное — продажа; записан на
+    пробное — довести до занятия; подтвердил заявку — записать на дату."""
+    from . import mesta
+    with db.get_conn() as conn:
+        paid_idx = mesta._paid_by_class(conn)
+        paid_users = set().union(*paid_idx.values()) if paid_idx else set()
+        cls = {r[0]: r[1] for r in conn.execute(
+            "SELECT id, name FROM classes WHERE name LIKE '2627_%' AND (status IS NULL OR status='opened')")}
+        rows = conn.execute(
+            "SELECT j.user_id, j.class_id, j.status_id, u.name, u.phone FROM joins j "
+            "LEFT JOIN users u ON u.id=j.user_id WHERE j.status_id IN (2,58132,83760,58131)").fetchall()
+    NAMES = {2: "учится без оплаты", 58131: "посетил пробное", 58132: "записан на пробное",
+             83760: "подтвердил заявку"}
+    out: dict[str, list] = {v: [] for v in NAMES.values()}
+    seen = set()
+    for uid, cid, st, name, phone in rows:
+        cname = cls.get(cid)
+        if not cname or "Заявк" in cname or cname.startswith("2627_ЛГ"):
+            continue
+        if uid in paid_users or (uid, st) in seen:
+            continue
+        seen.add((uid, st))
+        out[NAMES[st]].append({"uid": uid, "name": name, "phone": phone,
+                               "group": cname.replace("2627_", "")[:50]})
+    # динамика к цели: сколько учеников сезона оплатили впервые в каждый
+    # день — по дате продажи первого абонемента сезона, только группы 2627
+    import collections
+    first_sell: dict[int, str] = {}
+    with db.get_conn() as conn:
+        for uid, raw in conn.execute(
+                "SELECT user_id, raw FROM user_subscriptions WHERE begin_date >= ?",
+                (mesta.SEASON_SELL_FROM,)):
+            try:
+                r = json.loads(raw or "{}")
+            except ValueError:
+                continue
+            sd = (r.get("sellDate") or "")[:10]
+            if sd < mesta.SEASON_SELL_FROM or not (r.get("payed") or 0) > 0:
+                continue
+            cids = set(r.get("classIds") or []) | ({r["mainClassId"]} if r.get("mainClassId") else set())
+            if not any(c in cls for c in cids):
+                continue
+            if uid not in first_sell or sd < first_sell[uid]:
+                first_sell[uid] = sd
+    by_day = collections.Counter(first_sell.values())
+    cum, series = 0, []
+    for day in sorted(by_day):
+        cum += by_day[day]
+        series.append({"день": day, "новых_оплативших": by_day[day], "накопительно": cum})
+    return {"оплачено_в_группах_сезона": len(first_sell),
+            "оплачено_уникальных_всего": len(paid_users),
+            "без_оплаты": {k: len(v) for k, v in out.items()},
+            "динамика": series[-20:],
+            "списки": out}
 
 
 @app.get("/api/mesta", dependencies=AUTH)
