@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-14.9"
+APP_VERSION = "2026-09-14.10"
 
 
 @app.get("/api/net")
@@ -6309,6 +6309,22 @@ def api_ads_metrika(payload: dict = Body(...)):
         return {"http": r.status_code, "body": r.json()}
     except ValueError:
         return {"http": r.status_code, "body": r.text[:2000]}
+
+
+@app.get("/api/roistat/visits", dependencies=AUTH)
+def api_roistat_visits(days: int = 14):
+    """Телефон → номер визита Roistat → источник, как мы его поймали сами
+    (первое сообщение в WhatsApp «Ваш номер: NNN», клик по кнопке, форма)."""
+    from . import autopilot
+    edge = (autopilot._now() - timedelta(days=int(days))).isoformat(timespec="seconds")
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute("SELECT phone10, visit, source, ts FROM roistat_visits "
+                                "WHERE ts >= ? ORDER BY ts DESC", (edge,)).fetchall()
+        except Exception:
+            rows = []
+    return {"дней": days, "всего": len(rows),
+            "визиты": [{"phone": p, "visit": v, "source": s, "ts": t} for p, v, s, t in rows]}
 
 
 @app.get("/api/clicks/summary", dependencies=AUTH)
