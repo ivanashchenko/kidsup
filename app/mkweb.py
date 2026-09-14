@@ -982,6 +982,22 @@ def ya_login(reveal: bool = False) -> dict:
             else:
                 pw.press("Enter")
             pg.wait_for_timeout(9000)
+            # Паспорт после пароля вставляет промежуточные экраны: «входить
+            # по отпечатку?», «добавить телефон?», «настроить вход без пароля».
+            # Это не ошибка входа — их надо отклонить и идти дальше. Иначе
+            # сессия не сохраняется и весь вход считается провалом (14.09).
+            for _ in range(4):
+                if "passport.yandex" not in pg.url:
+                    break
+                skipped = False
+                for label in ("Напомнить позже", "Не сейчас", "Пропустить", "Позже", "Нет, спасибо"):
+                    btn = pg.get_by_text(label, exact=True)
+                    if btn.count():
+                        btn.first.click(timeout=8000); steps.append(f"отклонил экран: «{label}»")
+                        pg.wait_for_timeout(5000); skipped = True
+                        break
+                if not skipped:
+                    break
         except Exception as e:  # noqa: BLE001
             pg.screenshot(path=str(YA_SHOT))
             out = {"ok": False, "error": str(e).splitlines()[0][:200], "steps": steps,
