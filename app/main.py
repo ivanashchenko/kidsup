@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-14.17"
+APP_VERSION = "2026-09-14.19"
 
 
 @app.get("/api/net")
@@ -6753,27 +6753,94 @@ def api_mesta_voronka():
     ходит без оплаты — дожим; посетил пробное — продажа; записан на
     пробное — довести до занятия; подтвердил заявку — записать на дату."""
     from . import mesta
+    import re as _re
+    today = date.today().isoformat()
     with db.get_conn() as conn:
         paid_idx = mesta._paid_by_class(conn)
         paid_users = set().union(*paid_idx.values()) if paid_idx else set()
         cls = {r[0]: r[1] for r in conn.execute(
             "SELECT id, name FROM classes WHERE name LIKE '2627_%' AND (status IS NULL OR status='opened')")}
+        # абонемент без привязки к группе (classIds пуст) — засчитываем на любую
+        paid_generic: set[int] = set()
+        ended_by_user: dict[int, str] = {}
+        has_active: set[int] = set()
+        for uid, end, raw in conn.execute(
+                "SELECT user_id, end_date, raw FROM user_subscriptions WHERE begin_date >= ?",
+                (mesta.SEASON_SELL_FROM,)):
+            try:
+                r = json.loads(raw or "{}")
+            except ValueError:
+                continue
+            if not (r.get("payed") or 0) > 0 or (r.get("sellDate") or "") < mesta.SEASON_SELL_FROM:
+                continue
+            if not (r.get("classIds") or r.get("mainClassId")):
+                paid_generic.add(uid)
+            if end and end < today:
+                ended_by_user[uid] = max(ended_by_user.get(uid, ""), end)
+            else:
+                has_active.add(uid)
         rows = conn.execute(
             "SELECT j.user_id, j.class_id, j.status_id, u.name, u.phone FROM joins j "
-            "LEFT JOIN users u ON u.id=j.user_id WHERE j.status_id IN (2,58132,83760,58131)").fetchall()
+            "LEFT JOIN users u ON u.id=j.user_id WHERE j.status_id IN (2,58132,83760,58131,99336)").fetchall()
+        live_any = {r[0] for r in conn.execute(
+            "SELECT user_id FROM joins WHERE status_id IN (2,58131,58132,83760)")}
+        # был на занятии сезона, а живой записи в группу нет (в CRM «Отказался»,
+        # «Новая заявка», «Отработка»): пришёл на пробное и не купил — это
+        # самая тёплая продажа, её нельзя терять из-за статуса записи
+        visited = conn.execute(
+            "SELECT lr.user_id, l.class_id, MAX(l.date) d, COUNT(*) n FROM lesson_records lr "
+            "JOIN lessons l ON l.id=lr.lesson_id WHERE lr.visit=1 AND l.date >= '2026-08-31' AND l.date < ? "
+            "GROUP BY lr.user_id, l.class_id", (today,)).fetchall()
+        jst = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM join_statuses")}
+        jstat = {(r[0], r[1]): r[2] for r in conn.execute("SELECT user_id, class_id, status_id FROM joins")}
+        unames = {}
+        for uid, cid, d, n in visited:
+            if cid in cls and uid not in live_any:
+                u = conn.execute("SELECT name, phone FROM users WHERE id=?", (uid,)).fetchone()
+                unames[(uid, cid)] = (u["name"] if u else None, u["phone"] if u else None, d, n)
+
+    def paid_here(uid: int, cid: int) -> bool:
+        return uid in paid_idx.get(cid, set()) or uid in paid_generic
+
+    def skip(name: str | None) -> bool:
+        return bool(_re.search(r"фейк|тест", (name or "").lower()))
+
     NAMES = {2: "учится без оплаты", 58131: "посетил пробное", 58132: "записан на пробное",
-             83760: "подтвердил заявку"}
+             83760: "подтвердил заявку", 99336: "не пришёл на пробное"}
     out: dict[str, list] = {v: [] for v in NAMES.values()}
+    out["был на пробном, записи нет"] = []
+    out["абонемент закончился"] = []
     seen = set()
     for uid, cid, st, name, phone in rows:
         cname = cls.get(cid)
-        if not cname or "Заявк" in cname or cname.startswith("2627_ЛГ"):
+        if not cname or "Заявк" in cname or cname.startswith("2627_ЛГ") or skip(name):
             continue
-        if uid in paid_users or (uid, st) in seen:
+        if (uid, st) in seen:
+            continue
+        row = {"uid": uid, "name": name, "phone": phone, "class_id": cid,
+               "group": cname.replace("2627_", "")[:50]}
+        if paid_here(uid, cid):
+            # оплачено именно здесь; но если все оплаченные абонементы
+            # закончились и нового нет — продление
+            if st == 2 and uid in ended_by_user and uid not in has_active and ("ended", uid) not in seen:
+                seen.add(("ended", uid))
+                out["абонемент закончился"].append({**row, "конец": ended_by_user[uid]})
             continue
         seen.add((uid, st))
-        out[NAMES[st]].append({"uid": uid, "name": name, "phone": phone, "class_id": cid,
-                               "group": cname.replace("2627_", "")[:50]})
+        if uid in paid_users:
+            row["платил_другое"] = True
+        out[NAMES[st]].append(row)
+    for (uid, cid), (name, phone, d, n) in unames.items():
+        cname = cls[cid]
+        if "Заявк" in cname or cname.startswith("2627_ЛГ") or skip(name) or paid_here(uid, cid):
+            continue
+        if ("visited", uid) in seen:
+            continue
+        seen.add(("visited", uid))
+        out["был на пробном, записи нет"].append({
+            "uid": uid, "name": name, "phone": phone, "class_id": cid,
+            "group": cname.replace("2627_", "")[:50], "был": d, "визитов": n,
+            "запись_crm": jst.get(jstat.get((uid, cid)), "нет записи")})
     # динамика к цели: сколько учеников сезона оплатили впервые в каждый
     # день — по дате продажи первого абонемента сезона, только группы 2627
     import collections
@@ -6800,7 +6867,6 @@ def api_mesta_voronka():
         cum += by_day[day]
         series.append({"день": day, "новых_оплативших": by_day[day], "накопительно": cum})
     # последний звонок, сообщение и комментарий админа — по каждой строке
-    import re as _re
     from . import voronka
     for lst in out.values():
         voronka.enrich(lst)
@@ -6809,11 +6875,16 @@ def api_mesta_voronka():
     # админа, их ждёт автоматика напоминаний. В работу попадают только те,
     # у кого дата прошла без явки, или записи на занятие нет вовсе.
     booked = out.pop("записан на пробное")
-    booked = [r for r in booked if not _re.search(r"фейк|тест", (r.get("name") or "").lower())]
-    out["не пришёл на пробное"] = [r for r in booked if (r.get("пробное") or {}).get("вид") == "не_пришёл"]
+    out["не пришёл на пробное"] += [r for r in booked if (r.get("пробное") or {}).get("вид") == "не_пришёл"]
+    # был на занятии, записан на пробное, будущей записи нет — это уже
+    # «посетил пробное», хоть статус записи и не переставлен
+    out["посетил пробное"] += [r for r in booked if (r.get("пробное") or {}).get("вид") == "был"]
     out["пробное без даты"] = [r for r in booked if (r.get("пробное") or {}).get("вид") in ("без_даты", "нет_данных")]
-    waiting = sorted((r for r in booked if (r.get("пробное") or {}).get("вид") in ("ждём", "был")),
+    waiting = sorted((r for r in booked if (r.get("пробное") or {}).get("вид") == "ждём"),
                      key=lambda r: (r.get("пробное") or {}).get("дата") or "")
+    order = ["учится без оплаты", "абонемент закончился", "посетил пробное", "был на пробном, записи нет",
+             "не пришёл на пробное", "пробное без даты", "подтвердил заявку"]
+    out = {k: out[k] for k in order if k in out}
     return {"оплачено_в_группах_сезона": len(first_sell),
             "оплачено_уникальных_всего": len(paid_users),
             "без_оплаты": {k: len(v) for k, v in out.items()},
@@ -6822,6 +6893,57 @@ def api_mesta_voronka():
             "комментарии_обновлены": db.get_setting("crm_comments_refreshed", ""),
             "списки": out,
             "ждём": waiting}
+
+
+@app.get("/api/mesta/voronka/gaps", dependencies=AUTH)
+def api_mesta_voronka_gaps():
+    """Только чтение: кого воронка могла не собрать (проверка 14.09).
+    1) статусы записей в группы сезона у неоплативших, 2) кто был на занятии
+    сезона без живой записи, 3) чей оплаченный абонемент закончился."""
+    from . import mesta
+    today = date.today().isoformat()
+    with db.get_conn() as conn:
+        paid_idx = mesta._paid_by_class(conn)
+        paid_any = set().union(*paid_idx.values()) if paid_idx else set()
+        cls = {r[0]: r[1] for r in conn.execute(
+            "SELECT id, name FROM classes WHERE name LIKE '2627_%' AND (status IS NULL OR status='opened')")}
+        jst = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM join_statuses")}
+        dist: dict = {}
+        for uid, cid, st in conn.execute("SELECT user_id, class_id, status_id FROM joins"):
+            if cid in cls and uid not in paid_idx.get(cid, set()):
+                dist[f"{st} {jst.get(st, '?')}"] = dist.get(f"{st} {jst.get(st, '?')}", 0) + 1
+        live = {(r[0], r[1]) for r in conn.execute(
+            "SELECT user_id, class_id FROM joins WHERE status_id IN (2,58131,58132,83760)")}
+        visited = conn.execute(
+            "SELECT lr.user_id, l.class_id, MAX(l.date) d, COUNT(*) n FROM lesson_records lr "
+            "JOIN lessons l ON l.id=lr.lesson_id WHERE lr.visit=1 AND l.date >= '2026-08-31' AND l.date < ? "
+            "GROUP BY lr.user_id, l.class_id", (today,)).fetchall()
+        no_join = []
+        paid_other = []
+        for uid, cid, d, n in visited:
+            if cid not in cls or uid in paid_idx.get(cid, set()):
+                continue
+            u = conn.execute("SELECT name, phone FROM users WHERE id=?", (uid,)).fetchone()
+            row = {"uid": uid, "name": u["name"] if u else None, "group": cls[cid].replace("2627_", "")[:45],
+                   "посл_визит": d, "визитов": n, "статус_записи": None}
+            j = conn.execute("SELECT status_id FROM joins WHERE user_id=? AND class_id=?", (uid, cid)).fetchone()
+            row["статус_записи"] = jst.get(j[0], j[0]) if j else "нет записи"
+            if (uid, cid) not in live:
+                no_join.append(row)
+            elif uid in paid_any:
+                paid_other.append(row)   # оплатил другой предмет, этот — ходит без оплаты
+        ended = []
+        for uid, in conn.execute("SELECT DISTINCT user_id FROM joins WHERE status_id=2"):
+            subs = conn.execute("SELECT end_date, raw FROM user_subscriptions WHERE user_id=? AND begin_date >= ?",
+                                (uid, mesta.SEASON_SELL_FROM)).fetchall()
+            paid = [x for x in subs if (json.loads(x["raw"] or "{}").get("payed") or 0) > 0]
+            if paid and all((x["end_date"] or "") < today for x in paid):
+                u = conn.execute("SELECT name FROM users WHERE id=?", (uid,)).fetchone()
+                ended.append({"uid": uid, "name": u["name"] if u else None,
+                              "конец": max(x["end_date"] or "" for x in paid)})
+    return {"статусы_записей_неоплативших": dist, "был_на_занятии_без_живой_записи": no_join,
+            "ходит_без_оплаты_этого_предмета_но_платил_другой": paid_other,
+            "абонемент_закончился": ended}
 
 
 @app.get("/api/mesta/voronka/diag", dependencies=AUTH)
