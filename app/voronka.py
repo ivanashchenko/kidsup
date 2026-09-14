@@ -159,6 +159,43 @@ def _last_comment(conn, uid: int) -> dict | None:
             "текст": (r["text"] or "")[:220], "ts": r["ts"], "человек": bool(human)}
 
 
+def trial_state(conn, uid: int, class_id: int | None) -> dict:
+    """Что с пробным у записанного: ближайшая будущая запись на занятие
+    (lessonRecords — правило владельца 03.09), последняя прошедшая и явка.
+
+    Владелец 14.09: «зачем тут записанные на пробное? мы их ждём, напоминания
+    идут сами». Верно — пока дата впереди, админу делать нечего. Работа
+    появляется в двух случаях: дата прошла и явки нет (не пришёл — перезвонить
+    и перезаписать) или записи на конкретное занятие нет вовсе (записать
+    на дату)."""
+    today = date.today().isoformat()
+    q = ("SELECT l.date, l.begin_time, lr.visit, l.class_id FROM lesson_records lr "
+         "JOIN lessons l ON l.id = lr.lesson_id WHERE lr.user_id=? ")
+    args: list = [uid]
+    if class_id:
+        q += "AND l.class_id=? "
+        args.append(class_id)
+    try:
+        rows = conn.execute(q + "ORDER BY l.date, l.begin_time", args).fetchall()
+    except Exception:
+        return {"вид": "нет_данных"}
+    if not rows and class_id:
+        return trial_state(conn, uid, None)
+    future = [r for r in rows if r["date"] >= today]
+    past = [r for r in rows if r["date"] < today]
+    if future:
+        d, t = future[0]["date"], (future[0]["begin_time"] or "")[:5]
+        return {"вид": "ждём", "дата": d, "время": t,
+                "через_дней": (date.fromisoformat(d) - date.today()).days}
+    if past:
+        last = past[-1]
+        if last["visit"]:
+            return {"вид": "был", "дата": last["date"]}
+        return {"вид": "не_пришёл", "дата": last["date"],
+                "дней_назад": (date.today() - date.fromisoformat(last["date"])).days}
+    return {"вид": "без_даты"}
+
+
 def enrich(rows: list[dict]) -> None:
     """Дописать в каждую строку статус карточки, последний звонок, последнее
     сообщение и последний комментарий админа. Меняет rows на месте."""
@@ -173,6 +210,7 @@ def enrich(rows: list[dict]) -> None:
             except ValueError:
                 st = None
             r["статус"] = STATUS.get(st, "")
+            r["пробное"] = trial_state(conn, uid, r.get("class_id")) if uid else None
             r["звонок"] = _last_call(conn, p10) if p10 else None
             r["сообщение"] = _last_msg(conn, p10) if p10 else None
             r["комментарий"] = _last_comment(conn, uid) if uid else None

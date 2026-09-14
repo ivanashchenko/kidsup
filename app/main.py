@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-14.15"
+APP_VERSION = "2026-09-14.17"
 
 
 @app.get("/api/net")
@@ -6772,7 +6772,7 @@ def api_mesta_voronka():
         if uid in paid_users or (uid, st) in seen:
             continue
         seen.add((uid, st))
-        out[NAMES[st]].append({"uid": uid, "name": name, "phone": phone,
+        out[NAMES[st]].append({"uid": uid, "name": name, "phone": phone, "class_id": cid,
                                "group": cname.replace("2627_", "")[:50]})
     # динамика к цели: сколько учеников сезона оплатили впервые в каждый
     # день — по дате продажи первого абонемента сезона, только группы 2627
@@ -6800,16 +6800,28 @@ def api_mesta_voronka():
         cum += by_day[day]
         series.append({"день": day, "новых_оплативших": by_day[day], "накопительно": cum})
     # последний звонок, сообщение и комментарий админа — по каждой строке
+    import re as _re
     from . import voronka
     for lst in out.values():
         voronka.enrich(lst)
         lst.sort(key=lambda r: (r.get("дней_тишины") is None, -(r.get("дней_тишины") or 0)))
+    # Владелец 14.09: записанные на пробное с датой впереди — не работа
+    # админа, их ждёт автоматика напоминаний. В работу попадают только те,
+    # у кого дата прошла без явки, или записи на занятие нет вовсе.
+    booked = out.pop("записан на пробное")
+    booked = [r for r in booked if not _re.search(r"фейк|тест", (r.get("name") or "").lower())]
+    out["не пришёл на пробное"] = [r for r in booked if (r.get("пробное") or {}).get("вид") == "не_пришёл"]
+    out["пробное без даты"] = [r for r in booked if (r.get("пробное") or {}).get("вид") in ("без_даты", "нет_данных")]
+    waiting = sorted((r for r in booked if (r.get("пробное") or {}).get("вид") in ("ждём", "был")),
+                     key=lambda r: (r.get("пробное") or {}).get("дата") or "")
     return {"оплачено_в_группах_сезона": len(first_sell),
             "оплачено_уникальных_всего": len(paid_users),
             "без_оплаты": {k: len(v) for k, v in out.items()},
+            "ждём_на_пробное": len(waiting),
             "динамика": series[-20:],
             "комментарии_обновлены": db.get_setting("crm_comments_refreshed", ""),
-            "списки": out}
+            "списки": out,
+            "ждём": waiting}
 
 
 @app.get("/api/mesta/voronka/diag", dependencies=AUTH)
