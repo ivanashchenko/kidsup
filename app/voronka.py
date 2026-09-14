@@ -150,10 +150,13 @@ def _last_comment(conn, uid: int) -> dict | None:
         (uid,)).fetchall()
     if not rows:
         return None
-    human = next((r for r in rows if not str(r["text"] or "").startswith(("Клод", "🤖", "Автопилот", "Робот"))), None)
+    # человеческий — от админа из списка; остальное (технический аккаунт,
+    # «📞 …», «Авто: …», «🤖 Клод …») — автопилот
+    human = next((r for r in rows if r["manager_id"] in MANAGERS
+                  and not str(r["text"] or "").startswith(("Клод", "🤖", "Авто", "📞"))), None)
     r = human or rows[0]
-    return {"когда": _fmt_ts(r["ts"]), "кто": MANAGERS.get(r["manager_id"], "автопилот" if not human else "—"),
-            "текст": (r["text"] or "")[:220], "ts": r["ts"]}
+    return {"когда": _fmt_ts(r["ts"]), "кто": MANAGERS.get(r["manager_id"], "автопилот") if human else "автопилот",
+            "текст": (r["text"] or "")[:220], "ts": r["ts"], "человек": bool(human)}
 
 
 def enrich(rows: list[dict]) -> None:
