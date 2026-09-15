@@ -32,6 +32,7 @@
 from __future__ import annotations
 
 import logging
+import json
 from datetime import datetime, timedelta
 
 from . import db
@@ -42,7 +43,14 @@ log = logging.getLogger("kidsup.dostavka")
 # просто не придёт. Всё остальное — переписка и новости — молчит.
 CHASE_KINDS = {"confirm", "trial_reminder", "reschedule", "missed",
                "bc:chat_invite"}
+# Решение владельца 15.09.2026: после НАШЕГО звонка, до которого не
+# дозвонились, СМС уходит всем, а не только платившим — это не реклама,
+# а ответ на собственный звонок («звонили вам, не дозвонились»). Скрин
+# Бориса: у 79207666546 нет WhatsApp, догон 14.09 16:03 повис с ошибкой,
+# а СМС не ушло, потому что клиент не платил.
+SMS_ALL_KINDS = {"missed"}
 WAIT_HOURS = 2          # столько ждём доставки, прежде чем слать СМС
+ERROR_WAIT_MIN = 10     # явный «error» от Wazzup — не ждать два часа
 SMS_FROM, SMS_TO = 9, 20
 
 
@@ -74,20 +82,42 @@ def undelivered(hours: int = WAIT_HOURS, kinds: set | None = None) -> list[dict]
     не ушло никуда."""
     _table()
     edge = (_now() - timedelta(hours=hours)).isoformat(timespec="seconds")
+    edge_err = (_now() - timedelta(minutes=ERROR_WAIT_MIN)).isoformat(timespec="seconds")
+    # явная ошибка доставки (номера нет в WhatsApp) — догоняем через 10
+    # минут, а не через два часа: человек только что не взял трубку
     q = """SELECT s.message_id, s.ts, s.phone, s.uid, s.transport, s.kind,
                   COALESCE(st.status, '—')
              FROM wazzup_sent s
         LEFT JOIN wazzup_status st ON st.message_id = s.message_id
-            WHERE s.ts <= ? AND s.chased = 0
-              AND (st.status IS NULL OR st.status = 'error')
+            WHERE s.chased = 0
+              AND ((st.status IS NULL AND s.ts <= ?)
+                   OR (st.status = 'error' AND s.ts <= ?))
          ORDER BY s.ts"""
     with db.get_conn() as conn:
-        rows = conn.execute(q, (edge,)).fetchall()
+        rows = conn.execute(q, (edge, edge_err)).fetchall()
     out = [{"mid": r[0], "ts": r[1], "phone": r[2], "uid": r[3],
             "transport": r[4], "kind": r[5], "status": r[6]} for r in rows]
     if kinds is not None:
         out = [r for r in out if r["kind"] in kinds]
     return out
+
+
+def _no_contact(uid: str, phone: str = "") -> bool:
+    """Статус клиента «не писать / не звонить» или «отказ» — молчим.
+    У догонов недозвона uid пустой — ищем карточки по номеру."""
+    p10 = "".join(ch for ch in str(phone or "") if ch.isdigit())[-10:]
+    try:
+        with db.get_conn() as conn:
+            if uid:
+                rows = conn.execute("SELECT raw FROM users WHERE id = ?", (uid,)).fetchall()
+            elif p10:
+                rows = conn.execute("SELECT raw FROM users WHERE substr(phone,-10) = ?", (p10,)).fetchall()
+            else:
+                return False
+        sts = {json.loads(r["raw"] or "{}").get("clientStateId") for r in rows}
+        return bool(sts & {146328, 125957})
+    except Exception:
+        return False
 
 
 def _paid_before(uid: str) -> bool:
@@ -114,8 +144,9 @@ def sms_text(kind: str, note: str = "") -> str:
                           "Рокоссовского 6к1В. Вопросы: 4951209024",
         "reschedule": "KidsUP: изменение по занятию{note}. "
                       "Позвоните нам: 4951209024",
-        "missed": "KidsUP: звонили вам по набору групп на новый год, "
-                  "не дозвонились. Перезвоните: 4951209024",
+        "missed": "KidsUP: звонили вам, не дозвонились. Идёт набор групп "
+                  "2026/27, первое занятие условно-бесплатное. "
+                  "Перезвоните: 4951209024",
     }.get(kind, "KidsUP: у нас для вас сообщение. Позвоните: 4951209024")
     if kind == "bc:chat_invite":
         # Приглашение в чат своей группы: текст со ссылками собирает
@@ -155,11 +186,18 @@ def chase(dry: bool = True, limit: int = 25) -> dict:
     stat = {"недоставлено": len(rows), "смс": 0, "без оплат": 0, "ошибок": 0}
     invites = _chat_sms_by_phone() if any(
         r["kind"] == "bc:chat_invite" for r in rows) else {}
+    stat["список"] = []
     for r in rows:
-        if not _paid_before(r["uid"]):
+        if r["kind"] not in SMS_ALL_KINDS and not _paid_before(r["uid"]):
             stat["без оплат"] += 1
             _mark_chased(r["mid"])          # второй раз не смотрим
             continue
+        if r["kind"] in SMS_ALL_KINDS and _no_contact(r["uid"], r["phone"]):
+            # «не писать» / «отказ» — СМС после звонка тоже не шлём
+            stat["не писать"] = stat.get("не писать", 0) + 1
+            _mark_chased(r["mid"])
+            continue
+        stat["список"].append({"phone": r["phone"], "uid": r["uid"], "ts": r["ts"][:16], "kind": r["kind"]})
         note = invites.get((r["phone"] or "")[-10:], "") \
             if r["kind"] == "bc:chat_invite" else ""
         if r["kind"] == "bc:chat_invite" and not note:
@@ -180,6 +218,23 @@ def chase(dry: bool = True, limit: int = 25) -> dict:
             stat["ошибок"] += 1
             log.warning("СМС %s: %s", r["phone"][-4:], str(e)[:80])
     return stat
+
+
+def rechase(kind: str = "missed", since: str = "") -> int:
+    """Снять отметку «догнали» с недоставленных сообщений вида kind с даты
+    since — чтобы chase() посмотрел на них заново (разовая операция после
+    смены правила 15.09: недоставленные догоны 14.09 не получили СМС из-за
+    фильтра «только платившим»)."""
+    _table()
+    with db.get_conn() as conn:
+        cur = conn.execute(
+            """UPDATE wazzup_sent SET chased = 0
+                WHERE kind = ? AND ts >= ? AND chased = 1
+                  AND message_id IN (SELECT s.message_id FROM wazzup_sent s
+                       LEFT JOIN wazzup_status st ON st.message_id = s.message_id
+                       WHERE st.status IS NULL OR st.status = 'error')""",
+            (kind, since or _now().date().isoformat()))
+        return cur.rowcount
 
 
 def _chat_sms_by_phone() -> dict[str, str]:

@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.5"
+APP_VERSION = "2026-09-15.8"
 
 
 @app.get("/api/net")
@@ -5007,6 +5007,15 @@ tr.off{{opacity:.45}} .q{{color:#444;font-style:italic}}
 <table><tr><th>Когда</th><th>Кто</th><th>Что написали</th>
 <th>Как связали с семьёй</th><th>Статус</th></tr>
 {''.join(body) or '<tr><td colspan=5>Пока пусто</td></tr>'}</table>"""
+
+
+@app.post("/api/dostavka/rechase", dependencies=OWNER_AUTH)
+def api_dostavka_rechase(kind: str = "missed", since: str = "", dry: int = 1):
+    """Разово пересмотреть недоставленные догоны вида kind с даты since и
+    прогнать chase (dry=1 — только посчитать)."""
+    from . import dostavka
+    n = dostavka.rechase(kind, since)
+    return {"снято_отметок": n, "chase": dostavka.chase(dry=bool(dry), limit=100)}
 
 
 @app.get("/api/dostavka", dependencies=AUTH)
