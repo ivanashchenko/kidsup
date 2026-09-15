@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.20"
+APP_VERSION = "2026-09-15.23"
 
 
 @app.get("/api/net")
@@ -3152,7 +3152,7 @@ async def health():
 
 
 SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
-            "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps",
+            "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps", "vk_lead_forms",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",
             "anthropic_proxy_secret", "work_hours", "ext_by_day",
@@ -5021,6 +5021,26 @@ def api_dostavka_phone(phone: str):
         out = [dict(r) for r in conn.execute(
             "SELECT ts, text, author_name FROM wazzup_outbox WHERE substr(phone,-10)=? ORDER BY ts DESC LIMIT 10", (p10,))]
     return {"sent": [dict(r) for r in rows], "outbox": out}
+
+
+@app.post("/api/vk/leads/sync", dependencies=AUTH)
+def api_vk_leads_sync(days: int = 7, dry: int = 0, form: str = ""):
+    """Забрать заявки из лид-форм ВК и довести до CRM (см. app/vklead.py).
+    form — разовая проверка конкретной формы, не меняя настройку."""
+    from . import vklead
+    return vklead.sync(days=int(days), dry=bool(dry), forms=[form] if form else None)
+
+
+@app.get("/api/vk/leads", dependencies=AUTH)
+def api_vk_leads(limit: int = 50):
+    """Журнал заявок из лид-форм ВК."""
+    from . import vklead
+    with db.get_conn() as conn:
+        vklead._ensure(conn)
+        rows = [dict(r) for r in conn.execute(
+            "SELECT id, form, lead_ts, phone, name, ts, status FROM vk_leads "
+            "ORDER BY id DESC LIMIT ?", (int(limit),))]
+    return {"всего": len(rows), "заявки": rows}
 
 
 @app.post("/api/dostavka/rechase", dependencies=OWNER_AUTH)

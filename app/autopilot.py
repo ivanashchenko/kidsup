@@ -4132,6 +4132,16 @@ def _loop() -> None:
                         incoming_missed()
                     except Exception:
                         log.exception("недозвоны входящих упали — продолжаем")
+                # заявки из лид-форм ВК — раз в 10 минут: лид без звонка
+                # в первые минуты остывает, а API ВК их не отдаёт (15.09)
+                if 8 <= now.hour <= 21 and _mark("slot_vklead", f"{_today()}:{now.hour}:{now.minute // 10}"):
+                    try:
+                        from . import vklead
+                        r = vklead.sync(days=2)
+                        if r.get("новых"):
+                            log.info("лид-формы ВК: %s", r)
+                    except Exception:
+                        log.exception("заявки лид-форм ВК — продолжаем")
                 # комментарии карточек — в кэш crm_comments раз в 20 минут:
                 # страница /voronka считает по ним «сделано/осталось»
                 if 8 <= now.hour <= 21 and _mark("slot_comments", f"{_today()}:{now.hour}:{now.minute // 20}"):
