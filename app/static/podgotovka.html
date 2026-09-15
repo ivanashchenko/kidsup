@@ -45,6 +45,15 @@
     </div>
     <a class="cta" href="#signup">Записаться на первое занятие</a>
     <a class="cta ghost" href="#road">Что будет уметь по месяцам</a>
+    <form class="mini-lead hero-mini" data-mini="1" action="https://app.kidsup.ru/api/public/lead" method="post">
+      <b>Оставьте номер — администратор перезвонит и подберёт группу.</b>
+      <input name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
+      <input type="hidden" name="course" value="Подготовка к школе">
+      <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
+      <button type="submit">Перезвоните мне</button>
+      <p class="consent-note">Нажимая «Перезвоните мне», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a>.</p>
+      <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅</span>
+    </form>
     <p class="note">Учебный год идёт с 31 августа — присоединиться можно в любой месяц.
     Уровень педагог определит на первом занятии.</p>
   </div>

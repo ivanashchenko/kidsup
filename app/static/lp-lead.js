@@ -96,3 +96,33 @@
     if (!sheet.hidden && !sheet.contains(e.target) && e.target.id !== 'sb-msg') sheet.hidden = true;
   });
 })();
+
+// Мини-форма «только телефон» на первом экране (15.09): форма внизу страницы
+// теряет 72% мобильных визитов, которые до неё не доходят.
+document.querySelectorAll('.mini-lead').forEach(function (f) {
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = f.querySelector('button'), ok = f.querySelector('.ok-msg');
+    var rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
+    btn.disabled = true; btn.textContent = 'Отправляем…';
+    fetch(f.action, {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({phone: f.phone.value, course: f.course.value,
+                            website: f.website.value, roistat: rv,
+                            note: 'мини-форма ' + location.pathname})})
+      .then(function (r) { return r.json() })
+      .then(function (d) {
+        if (d.ok) {
+          btn.hidden = true; f.phone.hidden = true; ok.hidden = false;
+          try { ym(69569509, 'reachGoal', 'lead', {form: 'mini'}); } catch (_) {}
+          try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'lead'}); } catch (_) {}
+          try { VK.Goal('lead'); } catch (_) {}
+        } else {
+          btn.disabled = false; btn.textContent = 'Перезвоните мне';
+          alert(d.error || 'Проверьте номер');
+        }
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = 'Перезвоните мне';
+        alert('Не получилось — позвоните нам: +7 495 120-90-24');
+      });
+  });
+});

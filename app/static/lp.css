@@ -189,3 +189,15 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 /* ——— согласие текстом под кнопкой (15.09: обязательная галочка снижала отправки) ——— */
 .consent-note{font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:10px}
 .consent-note a{color:var(--blue-ink,#0F6E96);text-decoration:underline}
+
+/* ——— мини-форма «только телефон» на первом экране ——— */
+.mini-lead{background:#fff;border:2px solid var(--blue);border-radius:16px;padding:16px 18px;
+  display:flex;flex-wrap:wrap;gap:10px;align-items:center;max-width:620px;margin:6px 0 16px;
+  box-shadow:0 10px 30px rgba(49,39,131,.12)}
+.mini-lead b{font-weight:800;font-size:1.02rem;line-height:1.35;color:var(--ink);flex-basis:100%}
+.mini-lead input[type=tel]{flex:1 1 190px;border:1px solid #d6d3ea;border-radius:10px;
+  padding:.72rem .85rem;font-size:1rem;background:#fff;color:var(--ink);width:auto}
+.mini-lead button{border:0;background:var(--green-cta);color:#fff;border-radius:10px;
+  padding:.72rem 1.25rem;font-weight:700;font-size:1rem;cursor:pointer}
+.mini-lead .consent-note{flex-basis:100%;margin-top:2px}
+.mini-lead .ok-msg{color:var(--green-ink,#2e7d32);font-weight:700;flex-basis:100%}

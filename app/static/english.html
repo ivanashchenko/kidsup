@@ -213,6 +213,18 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
   .sb-sheet i{width:14px;height:14px;border-radius:50%;flex:0 0 auto}
   body{padding-bottom:52px}
 }
+
+/* ——— мини-форма «только телефон» на первом экране ——— */
+.mini-lead{background:#fff;border:2px solid var(--blue,#1DA7E0);border-radius:16px;padding:16px 18px;
+  display:flex;flex-wrap:wrap;gap:10px;align-items:center;max-width:620px;margin:6px 0 16px;
+  box-shadow:0 10px 30px rgba(49,39,131,.12)}
+.mini-lead b{font-weight:800;font-size:1.02rem;line-height:1.35;color:var(--ink);flex-basis:100%}
+.mini-lead input[type=tel]{flex:1 1 190px;border:1px solid #d6d3ea;border-radius:10px;
+  padding:.72rem .85rem;font-size:1rem;background:#fff;color:var(--ink);width:auto}
+.mini-lead button{border:0;background:var(--green-cta);color:#fff;border-radius:10px;
+  padding:.72rem 1.25rem;font-weight:700;font-size:1rem;cursor:pointer}
+.mini-lead .consent-note{flex-basis:100%;margin-top:2px}
+.mini-lead .ok-msg{color:var(--green-ink,#2e7d32);font-weight:700;flex-basis:100%}
 </style>
 </head>
 <body>
@@ -231,6 +243,15 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
     </div>
     <a class="cta" href="#signup">Записаться на первое занятие</a>
     <a class="cta ghost" href="#road">Что ребёнок будет уметь по месяцам</a>
+    <form class="mini-lead hero-mini" data-mini="1" action="https://app.kidsup.ru/api/public/lead" method="post">
+      <b>Оставьте номер — администратор перезвонит и подберёт группу.</b>
+      <input name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
+      <input type="hidden" name="course" value="Английский язык">
+      <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
+      <button type="submit">Перезвоните мне</button>
+      <p class="consent-note">Нажимая «Перезвоните мне», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a>.</p>
+      <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅</span>
+    </form>
     <p class="note">Учебный год идёт с 31 августа — присоединиться можно в любой месяц,
     педагог определит уровень на первом занятии.</p>
   </div>
@@ -645,6 +666,37 @@ s.addEventListener('click',function(e){if(!e.target.closest('a'))return;
  try{(window._tmr=window._tmr||[]).push({type:'reachGoal',id:'3355457',goal:'messenger'});}catch(_){}
  try{VK.Goal('contact');}catch(_){} s.hidden=true;});
 document.addEventListener('click',function(e){if(!s.hidden&&!s.contains(e.target)&&e.target.id!=='sb-msg')s.hidden=true;});})();
+</script>
+<script>
+// Мини-форма «только телефон» на первом экране (15.09): форма внизу страницы
+// теряет 72% мобильных визитов, которые до неё не доходят.
+document.querySelectorAll('.mini-lead').forEach(function (f) {
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = f.querySelector('button'), ok = f.querySelector('.ok-msg');
+    var rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
+    btn.disabled = true; btn.textContent = 'Отправляем…';
+    fetch(f.action, {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({phone: f.phone.value, course: f.course.value,
+                            website: f.website.value, roistat: rv,
+                            note: 'мини-форма ' + location.pathname})})
+      .then(function (r) { return r.json() })
+      .then(function (d) {
+        if (d.ok) {
+          btn.hidden = true; f.phone.hidden = true; ok.hidden = false;
+          try { ym(69569509, 'reachGoal', 'lead', {form: 'mini'}); } catch (_) {}
+          try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'lead'}); } catch (_) {}
+          try { VK.Goal('lead'); } catch (_) {}
+        } else {
+          btn.disabled = false; btn.textContent = 'Перезвоните мне';
+          alert(d.error || 'Проверьте номер');
+        }
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = 'Перезвоните мне';
+        alert('Не получилось — позвоните нам: +7 495 120-90-24');
+      });
+  });
+});
 </script>
 </body>
 </html>
