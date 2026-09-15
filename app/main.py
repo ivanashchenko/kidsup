@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.2"
+APP_VERSION = "2026-09-15.3"
 
 
 @app.get("/api/net")
@@ -6902,10 +6902,22 @@ def api_mesta_voronka():
     order = ["учится без оплаты", "абонемент закончился", "посетил пробное", "был на пробном, записи нет",
              "не пришёл на пробное", "пробное без даты", "подтвердил заявку"]
     out = {k: out[k] for k in order if k in out}
+    # «сделано» — админ прокомментировал карточку с начала прохода по воронке
+    # (владелец 15.09: пусть Лена доделает всё до конца, страница показывает,
+    # что осталось). Сделанные — вниз стадии и серым.
+    start = db.get_setting("voronka_start", "2026-09-14")
+    done_n = 0
+    for lst in out.values():
+        for r in lst:
+            c = r.get("комментарий") or {}
+            r["сделано"] = bool(c.get("человек") and (c.get("ts") or "") >= start)
+            done_n += r["сделано"]
+        lst.sort(key=lambda r: (r["сделано"], r.get("дней_тишины") is None, -(r.get("дней_тишины") or 0)))
     return {"оплачено_в_группах_сезона": len(first_sell),
             "оплачено_уникальных_всего": len(paid_users),
             "без_оплаты": {k: len(v) for k, v in out.items()},
             "ждём_на_пробное": len(waiting),
+            "сделано": done_n, "осталось": sum(len(v) for v in out.values()) - done_n, "с_даты": start,
             "динамика": series[-20:],
             "комментарии_обновлены": db.get_setting("crm_comments_refreshed", ""),
             "списки": out,
