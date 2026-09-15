@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.8"
+APP_VERSION = "2026-09-15.9"
 
 
 @app.get("/api/net")
@@ -5007,6 +5007,20 @@ tr.off{{opacity:.45}} .q{{color:#444;font-style:italic}}
 <table><tr><th>Когда</th><th>Кто</th><th>Что написали</th>
 <th>Как связали с семьёй</th><th>Статус</th></tr>
 {''.join(body) or '<tr><td colspan=5>Пока пусто</td></tr>'}</table>"""
+
+
+@app.get("/api/dostavka/phone", dependencies=AUTH)
+def api_dostavka_phone(phone: str):
+    """Только чтение: наши отправки по номеру и статусы доставки Wazzup."""
+    p10 = "".join(ch for ch in phone if ch.isdigit())[-10:]
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            """SELECT s.ts, s.kind, s.transport, s.chased, COALESCE(st.status,'—') st, st.ts sts
+                 FROM wazzup_sent s LEFT JOIN wazzup_status st ON st.message_id = s.message_id
+                WHERE substr(s.phone,-10)=? ORDER BY s.ts DESC LIMIT 20""", (p10,)).fetchall()
+        out = [dict(r) for r in conn.execute(
+            "SELECT ts, text, author_name FROM wazzup_outbox WHERE substr(phone,-10)=? ORDER BY ts DESC LIMIT 10", (p10,))]
+    return {"sent": [dict(r) for r in rows], "outbox": out}
 
 
 @app.post("/api/dostavka/rechase", dependencies=OWNER_AUTH)
