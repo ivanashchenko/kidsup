@@ -89,6 +89,8 @@ def parse(text: str) -> list[dict]:
     for r in rows:
         phone = ""
         name = ""
+        age = ""
+        course = ""
         extra = []
         for k, v in r.items():
             kl = (k or "").strip().lower()
@@ -99,13 +101,24 @@ def parse(text: str) -> list[dict]:
                 phone = _digits(v)
             elif kl in ("имя", "name", "фио"):
                 name = v
+            elif "лет вашему" in kl or "возраст" in kl or kl == "age":
+                # дежурному нужен возраст сразу — от него зависит группа.
+                # В свободное поле пишут что угодно, вплоть до жалоб: берём
+                # только короткий ответ с цифрой, остальное живёт в примечании
+                if any(c.isdigit() for c in v) and len(v) <= 20:
+                    age = v
+                extra.append(f"{k.strip()}: {v}")
+            elif "курс" in kl or "направлен" in kl or "интересует" in kl:
+                if len(v) <= 60:
+                    course = v
+                extra.append(f"{k.strip()}: {v}")
             elif kl.startswith("id ") or "время лида" in kl:
                 continue
             else:
                 extra.append(f"{k.strip()}: {v}")
         if len(phone) != 11:
             continue
-        out.append({"phone": phone, "name": name,
+        out.append({"phone": phone, "name": name, "age": age, "course": course,
                     "lead_ts": (r.get("Время лида") or "").strip()[:19],
                     "extra": " · ".join(extra),
                     "campaign": (r.get("ID Кампании") or "").strip(),
@@ -140,7 +153,8 @@ def sync(days: int = 7, dry: bool = False, forms: list | None = None) -> dict:
                     if not seen:
                         new += 1
                         stat.setdefault("образец", []).append(
-                            {k: ld[k] for k in ("phone", "name", "lead_ts", "extra")})
+                            {k: ld[k] for k in ("phone", "name", "age",
+                                                "course", "lead_ts", "extra")})
                     continue
                 cur = conn.execute(
                     "INSERT OR IGNORE INTO vk_leads (form, lead_ts, phone, name, raw, ts, status) "
@@ -182,9 +196,12 @@ def _to_crm(form: str, ld: dict) -> None:
         cur = conn.execute(
             "INSERT INTO site_leads (ts, phone, child, age, course, note, roistat, ip, crm_status) "
             "VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?)",
-            (ld["phone"], ld.get("name") or "", "", "Заявка из ВК",
+            (ld["phone"], ld.get("name") or "", ld.get("age") or "",
+             ld.get("course") or "Заявка из ВК",
              note, f"vk_leadform_{form}", "vk", "pending"))
         lead_id = cur.lastrowid
     _lead_to_crm({"phone": ld["phone"], "child": ld.get("name") or "",
-                  "age": "", "course": "Заявка из ВК", "note": note,
+                  "age": ld.get("age") or "",
+                  "course": ld.get("course") or "Заявка из ВК", "note": note,
+                  "source": "из лид-формы ВКонтакте",
                   "roistat": f"vk_leadform_{form}", "lead_id": lead_id})

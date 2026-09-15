@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.23"
+APP_VERSION = "2026-09-15.25"
 
 
 @app.get("/api/net")
@@ -3604,7 +3604,8 @@ def _lead_to_crm(lead: dict) -> None:
         dphone = (phones.get(str(duty["managerId"])) if duty else None) or db.get_setting("digest_phone")
         if dphone:
             wazzup.send_via("tgapi", dphone,
-                            f"🔥 Заявка с сайта kidsup.ru: {child or 'имя не указано'}, +{phone}"
+                            f"🔥 Заявка {lead.get('source') or 'с сайта kidsup.ru'}: "
+                            f"{child or 'имя не указано'}, +{phone}"
                             + (f", {course}" if course else "")
                             + (f", {lead['age']}" if lead.get("age") else "")
                             + ". Звоним в течение 5 минут! — Клод", dry_run=False)
