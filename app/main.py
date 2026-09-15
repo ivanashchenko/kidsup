@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.29"
+APP_VERSION = "2026-09-15.32"
 
 
 @app.get("/api/net")
@@ -7226,6 +7226,20 @@ def mesta_page(request: Request):
     """Места в группах: норма — ходят — ждём на пробное — свободно."""
     from . import mesta
     return render(request, "mesta.html", active="mesta", t=mesta.tablica())
+
+
+@app.get("/nabor", response_class=HTMLResponse, dependencies=AUTH)
+def nabor_page(request: Request):
+    """Где рвётся цепочка набора и с кем работать прямо сейчас."""
+    from . import nabor
+    return render(request, "nabor.html", active="nabor", a=nabor.analiz())
+
+
+@app.get("/api/nabor/analiz", dependencies=AUTH)
+def api_nabor_analiz():
+    """Где рвётся набор: воронка по предметам и тёплые списки (см. app/nabor.py)."""
+    from . import nabor
+    return nabor.analiz()
 
 
 @app.get("/api/mesta/tablica", dependencies=AUTH)
