@@ -174,10 +174,15 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 
 /* ——— фотогалерея занятия ——— */
 .gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:20px}
+.gal{align-items:start}
 .gal figure{margin:0;border-radius:var(--r);overflow:hidden;background:#eef2f8;
      box-shadow:0 10px 28px rgba(49,39,131,.12)}
-.gal img{width:100%;height:260px;object-fit:cover;display:block}
-@media (max-width:560px){.gal img{height:220px}}
+.gal img{width:100%;height:auto;display:block}
+.tbl{width:100%;border-collapse:collapse;font-size:15px;margin-top:18px}
+.tbl th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--muted);padding:10px 12px;border-bottom:2px solid var(--line);vertical-align:bottom}
+.tbl td{padding:12px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl tr:last-child td{border-bottom:0}
 /* ——— отзывы родителей с Яндекс Карт ——— */
 .revs{columns:3;column-gap:16px;margin-top:22px}
 @media (max-width:980px){.revs{columns:2}}
@@ -265,6 +270,37 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
     <div><b>3–12</b><span>лет — своя дорожка для каждого возраста</span></div>
   </div>
 </div>
+
+<section id="vozrast">
+  <div class="wrap">
+    <h2>Три возраста — три разные программы</h2>
+    <p class="lead">Четырёхлетке и десятилетнему нужен разный английский, и это не разговоры
+    про «индивидуальный подход»: у них по-разному устроено само занятие и по-разному входят буквы.
+    Вот чем группы отличаются на деле.</p>
+    <div class="scroll"><table class="tbl">
+      <tr><th>Возраст</th><th>Как устроено занятие</th><th>Когда появляются буквы</th><th>Экзамен</th></tr>
+      <tr><td><b>3–5 лет</b></td>
+        <td>Букв нет вообще. Слушание, речь, песни, движение, пальчиковые игры. Ребёнок в этом
+        возрасте понимает телом раньше, чем головой, поэтому он почти не сидит.</td>
+        <td>Не в этом возрасте</td>
+        <td>Нет, и мы не будем делать вид, что он нужен</td></tr>
+      <tr><td><b>5–8 лет</b></td>
+        <td>Стихи и песни наизусть, игры, где надо говорить, сказки. С января — те же стихи
+        напечатанными: ребёнок ведёт пальцем по строке и «читает» то, что уже понимает.</td>
+        <td>Сентябрь второго года — как подписи к словам, которые ребёнок уже год говорит.
+        Прописи не вводим</td>
+        <td>Cambridge Starters в апреле второго года</td></tr>
+      <tr><td><b>8–12 лет с нуля</b></td>
+        <td>Отдельная дорожка. Эти дети уже пишут по-русски и ждут того же на английском —
+        спорить с этим бессмысленно, поэтому здесь и звуки, и письмо идут с первого месяца.</td>
+        <td>С первого месяца</td>
+        <td>Starters в апреле первого года, дальше Movers</td></tr>
+    </table></div>
+    <p class="lead" style="margin-top:16px">Что общее у всех трёх: занятие целиком по-английски,
+    без перевода; группа до 8 детей; ребёнок говорит вслух не меньше 12 раз за 50 минут — это
+    педагог считает, а не прикидывает на глаз.</p>
+  </div>
+</section>
 
 <section id="road">
   <div class="wrap">
@@ -475,9 +511,9 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
     <h2>Как это выглядит</h2>
     <p class="lead">Занятие идёт целиком на английском — дети отвечают хором и по одному, а не сидят молча.</p>
     <div class="gal">
-      <figure><img src="/static/img/lp/english_1.jpg" alt="Как это выглядит — KidsUP" loading="lazy" width="1000" height="700"></figure>
-      <figure><img src="/static/img/lp/english_2.jpg" alt="Как это выглядит — KidsUP" loading="lazy" width="1000" height="700"></figure>
-      <figure><img src="/static/img/lp/english_3.jpg" alt="Как это выглядит — KidsUP" loading="lazy" width="1000" height="700"></figure>
+      <figure><img src="/static/img/lp/english_1.jpg" alt="Как это выглядит — KidsUP" loading="lazy" width="1000" height="750"></figure>
+      <figure><img src="/static/img/lp/english_2.jpg" alt="Как это выглядит — KidsUP" loading="lazy" width="750" height="1000"></figure>
+      <figure><img src="/static/img/lp/english_3.jpg" alt="Как это выглядит — KidsUP" loading="lazy" width="750" height="1000"></figure>
     </div>
   </div>
 </section>
