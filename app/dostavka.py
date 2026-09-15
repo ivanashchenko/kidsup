@@ -224,7 +224,10 @@ def chase(dry: bool = True, limit: int = 25) -> dict:
                 stat["смс"] += 1
                 _mark_chased(r["mid"], sms=True)
             else:
+                # предохранитель отказал (дубль за неделю, лимит, стоп-лист)
+                # — решение на сегодня не изменится, второй раз не смотрим
                 stat["ошибок"] += 1
+                _mark_chased(r["mid"])
         except Exception as e:
             stat["ошибок"] += 1
             log.warning("СМС %s: %s", r["phone"][-4:], str(e)[:80])
