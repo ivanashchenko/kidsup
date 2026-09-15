@@ -272,6 +272,11 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
                         loc.fill(str(st["fill"]))
                     if st.get("press"):
                         loc.press(st["press"])
+                elif "upload" in st:
+                    # загрузка файла в input[type=file] — для кабинетов, где
+                    # картинку нельзя выбрать иначе (лид-формы ВК, 15.09)
+                    loc = tgt.locator(st.get("css") or "input[type=file]").nth(int(st.get("nth", 0)))
+                    loc.set_input_files(str(st["upload"]))
                 elif st.get("press") and st.get("css"):
                     tgt.locator(st["css"]).first.press(st["press"])
                 elif st.get("css"):
