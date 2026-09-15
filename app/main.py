@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.32"
+APP_VERSION = "2026-09-15.33"
 
 
 @app.get("/api/net")
@@ -6447,7 +6447,14 @@ def api_ads_vk(payload: dict = Body(...)):
 
     {"path": "ad_plans/30377205.json", "method": "post", "json": {...}} либо
     {"path": "banners.json", "method": "get", "params": {...}}. Токен живёт здесь.
+
+    Тело запроса читается ТОЛЬКО из "json". Если положить его в "body",
+    к ВК уйдёт пустой объект, а он ответит 204 и молча ничего не изменит —
+    15.09 на этом потерялся час: правки бюджета «проходили» и не применялись.
     """
+    if "body" in payload and "json" not in payload:
+        raise HTTPException(400, "тело запроса кладётся в 'json', а не в 'body': "
+                                 "с 'body' ВК получит пустой объект и молча ничего не изменит")
     import httpx
     path = str(payload.get("path") or "").lstrip("/")
     if ".." in path or not path:
