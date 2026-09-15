@@ -4132,6 +4132,14 @@ def _loop() -> None:
                         incoming_missed()
                     except Exception:
                         log.exception("недозвоны входящих упали — продолжаем")
+                # комментарии карточек — в кэш crm_comments раз в 20 минут:
+                # страница /voronka считает по ним «сделано/осталось»
+                if 8 <= now.hour <= 21 and _mark("slot_comments", f"{_today()}:{now.hour}:{now.minute // 20}"):
+                    try:
+                        from . import voronka as _vor
+                        _vor.refresh_comments_bg()
+                    except Exception:
+                        log.exception("обновление комментариев упало — продолжаем")
                 if 10 <= now.hour <= 20 and _mark("slot_hourly_missed", _hour):
                     # Манго жёстко ограничивает stats/request; один 429 в
                     # этом вызове 24.08 убивал весь тик — и вместе с ним все
