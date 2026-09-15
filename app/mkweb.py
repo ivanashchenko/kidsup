@@ -260,14 +260,18 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
                         loc.select_option(label=val)
                     else:
                         loc.select_option(val)
-                elif "fill" in st:
+                elif "fill" in st or "type" in st:
                     loc = (tgt.locator(st["css"]) if st.get("css") else
                            tgt.get_by_placeholder(st["placeholder"]) if st.get("placeholder") else
                            tgt.get_by_label(st["label"]))
-                    loc.first.click(timeout=10000)
-                    loc.first.fill(str(st["fill"]))
+                    loc = loc.nth(int(st.get("nth", 0)))   # до 15.09 nth игнорировался — попадало в первое поле
+                    loc.click(timeout=10000)
+                    if "type" in st:
+                        loc.press_sequentially(str(st["type"]), delay=40)
+                    else:
+                        loc.fill(str(st["fill"]))
                     if st.get("press"):
-                        loc.first.press(st["press"])
+                        loc.press(st["press"])
                 elif st.get("press") and st.get("css"):
                     tgt.locator(st["css"]).first.press(st["press"])
                 elif st.get("css"):
