@@ -1229,3 +1229,107 @@ def ya_sms_status() -> dict:
     return {"state": _SMS["state"], "log": _SMS["log"][-8:],
             "alive": bool(_SMS["thread"] and _SMS["thread"].is_alive()),
             "session": YA_STATE.exists()}
+
+
+# ───────────────────────── Вход в VK ID (ВК Реклама) ─────────────────────────
+# Код из СМС приходит владельцу; браузер держит страницу ввода кода открытой
+# до пяти минут и ждёт, пока код положат через vk_login_code().
+_VK = {"running": False, "step": "", "error": "", "code": "", "log": []}
+_vk_lock = threading.Lock()
+
+
+def vk_login_code(code: str) -> dict:
+    with _vk_lock:
+        _VK["code"] = "".join(ch for ch in str(code) if ch.isdigit())
+    return {"ok": True, "принят": bool(_VK["code"])}
+
+
+def vk_login_status() -> dict:
+    with _vk_lock:
+        return {k: (v[-8:] if k == "log" else v) for k, v in _VK.items() if k != "code"} | {
+            "session": VK_STATE.exists()}
+
+
+def vk_login_start(phone: str, password: str = "", wait_code_sec: int = 300) -> dict:
+    from playwright.sync_api import sync_playwright
+    with _vk_lock:
+        if _VK["running"]:
+            return {"ok": False, "running": True, "step": _VK["step"]}
+        _VK.update(running=True, step="старт", error="", code="", log=[])
+
+    def _log(msg: str) -> None:
+        with _vk_lock:
+            _VK["step"] = msg
+            _VK["log"].append(f"{time.strftime('%H:%M:%S')} {msg}")
+
+    def _run() -> None:
+        digits = "".join(ch for ch in phone if ch.isdigit())[-10:]
+        try:
+            with _lock, sync_playwright() as p:
+                b = _launch(p)
+                ctx = b.new_context(viewport={"width": 1400, "height": 900}, locale="ru-RU")
+                pg = ctx.new_page()
+                pg.goto("https://ads.vk.ru/hq/dashboard", wait_until="domcontentloaded", timeout=60000)
+                pg.wait_for_timeout(7000)
+                _log("форма входа")
+                pg.locator("input[name=login]").first.fill(digits)
+                pg.wait_for_timeout(500)
+                pg.get_by_text("Продолжить", exact=True).first.click(timeout=15000)
+                pg.wait_for_timeout(6000)
+                pg.screenshot(path=str(VK_SHOT))
+                if pg.locator("input[name=otp-cell]").count() == 0 and pg.locator("input[type=password]").count() > 0 and password:
+                    _log("пароль")
+                    pg.locator("input[type=password]").first.fill(password)
+                    pg.get_by_text("Продолжить", exact=True).first.click(timeout=15000)
+                    pg.wait_for_timeout(6000)
+                if pg.locator("input[name=otp-cell]").count() > 0:
+                    _log("жду код из СМС")
+                    deadline = time.monotonic() + wait_code_sec
+                    code = ""
+                    while time.monotonic() < deadline:
+                        with _vk_lock:
+                            code = _VK["code"]
+                        if code:
+                            break
+                        pg.wait_for_timeout(2000)
+                    if not code:
+                        raise RuntimeError("код не пришёл за отведённое время")
+                    _log("ввожу код")
+                    cells = pg.locator("input[name=otp-cell]")
+                    if cells.count() >= len(code):
+                        for i, ch in enumerate(code):
+                            cells.nth(i).fill(ch)
+                            pg.wait_for_timeout(120)
+                    else:
+                        cells.first.fill(code)
+                    pg.wait_for_timeout(7000)
+                    pg.screenshot(path=str(VK_SHOT))
+                    if pg.locator("input[type=password]").count() > 0 and password:
+                        _log("пароль после кода")
+                        pg.locator("input[type=password]").first.fill(password)
+                        pg.get_by_text("Продолжить", exact=True).first.click(timeout=15000)
+                        pg.wait_for_timeout(7000)
+                # экраны «сохранить вход», «разрешить доступ» и т.п.
+                for label in ("Продолжить", "Разрешить", "Продолжить как", "Не сейчас", "Пропустить"):
+                    try:
+                        btn = pg.get_by_text(label, exact=False)
+                        if btn.count() > 0 and "id.vk" in pg.url:
+                            btn.first.click(timeout=4000)
+                            pg.wait_for_timeout(5000)
+                    except Exception:  # noqa: BLE001
+                        pass
+                pg.wait_for_timeout(5000)
+                pg.screenshot(path=str(VK_SHOT))
+                txt = pg.inner_text("body")[:300].replace("\n", " | ")
+                _log(f"итог: {pg.url[:80]} — {txt[:160]}")
+                ctx.storage_state(path=str(VK_STATE))
+                b.close()
+            with _vk_lock:
+                _VK.update(running=False, error="")
+        except Exception as e:  # noqa: BLE001
+            log.exception("vk_login")
+            with _vk_lock:
+                _VK.update(running=False, error=str(e)[:300], step="ошибка")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "running": True}

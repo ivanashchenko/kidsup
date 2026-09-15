@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.13"
+APP_VERSION = "2026-09-15.14"
 
 
 @app.get("/api/net")
@@ -5829,6 +5829,27 @@ def api_vkweb_open(payload: dict = Body(...)):
                            wait_ms=int(p.get("wait_ms") or 5000), max_text=int(p.get("max_text") or 6000),
                            click=str(p.get("click") or ""), actions=p.get("actions") or [],
                            frame=str(p.get("frame") or ""), state="vk")
+
+
+@app.post("/api/vkweb/login/start", dependencies=OWNER_AUTH)
+def api_vkweb_login_start(payload: dict = Body(default={})):
+    """Вход в VK ID: телефон → браузер ждёт код из СМС (до 5 минут) → сессия сохраняется."""
+    from . import mkweb
+    p = payload or {}
+    return mkweb.vk_login_start(str(p.get("phone") or db.get_setting("vk_web_phone", "")),
+                                str(p.get("password") or db.get_setting("vk_web_password", "")))
+
+
+@app.post("/api/vkweb/login/code", dependencies=OWNER_AUTH)
+def api_vkweb_login_code(payload: dict = Body(...)):
+    from . import mkweb
+    return mkweb.vk_login_code(str((payload or {}).get("code") or ""))
+
+
+@app.get("/api/vkweb/login/status", dependencies=OWNER_AUTH)
+def api_vkweb_login_status():
+    from . import mkweb
+    return mkweb.vk_login_status()
 
 
 @app.get("/api/vkweb/shot", dependencies=OWNER_AUTH)
