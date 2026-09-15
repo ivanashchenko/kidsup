@@ -65,6 +65,10 @@ def _table() -> None:
             transport TEXT, kind TEXT, chased INTEGER DEFAULT 0)""")
         conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_status (
             message_id TEXT PRIMARY KEY, status TEXT, rank INTEGER, ts TEXT)""")
+        try:
+            conn.execute("ALTER TABLE wazzup_sent ADD COLUMN sms_ts TEXT")
+        except Exception:
+            pass
 
 
 def undelivered(hours: int = WAIT_HOURS, kinds: set | None = None) -> list[dict]:
@@ -211,7 +215,7 @@ def chase(dry: bool = True, limit: int = 25) -> dict:
         try:
             if mango.send_sms(r["phone"], sms_text(r["kind"], note)):
                 stat["смс"] += 1
-                _mark_chased(r["mid"])
+                _mark_chased(r["mid"], sms=True)
             else:
                 stat["ошибок"] += 1
         except Exception as e:
@@ -229,7 +233,7 @@ def rechase(kind: str = "missed", since: str = "") -> int:
     with db.get_conn() as conn:
         cur = conn.execute(
             """UPDATE wazzup_sent SET chased = 0
-                WHERE kind = ? AND ts >= ? AND chased = 1
+                WHERE kind = ? AND ts >= ? AND chased = 1 AND sms_ts IS NULL
                   AND message_id IN (SELECT s.message_id FROM wazzup_sent s
                        LEFT JOIN wazzup_status st ON st.message_id = s.message_id
                        WHERE st.status IS NULL OR st.status = 'error')""",
@@ -250,9 +254,13 @@ def _chat_sms_by_phone() -> dict[str, str]:
     return {(f["phone"] or "")[-10:]: f["sms"] for f in p["recipients"]}
 
 
-def _mark_chased(mid: str) -> None:
+def _mark_chased(mid: str, sms: bool = False) -> None:
     with db.get_conn() as conn:
-        conn.execute("UPDATE wazzup_sent SET chased = 1 WHERE message_id = ?", (mid,))
+        if sms:
+            conn.execute("UPDATE wazzup_sent SET chased = 1, sms_ts = ? WHERE message_id = ?",
+                         (_now().isoformat(timespec="seconds"), mid))
+        else:
+            conn.execute("UPDATE wazzup_sent SET chased = 1 WHERE message_id = ?", (mid,))
 
 
 def channel_health(hours: int = 1, ripe_min: int = 30) -> list[dict]:
