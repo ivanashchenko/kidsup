@@ -359,6 +359,7 @@ document.getElementById('lead').addEventListener('submit', async function (e) {
     var j = await r.json();
     if (j.ok) {
       try { ym(69569509, 'reachGoal', 'lead', {course: i, event: 'dod'}); } catch (_) {}
+      try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'lead'}); } catch (_) {}
       try { VK.Goal('lead'); } catch (_) {}
       try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
       f.setAttribute('role', 'status'); f.setAttribute('aria-live', 'polite');

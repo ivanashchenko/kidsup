@@ -67,3 +67,34 @@
     try { window.VK && VK.Goal && VK.Goal('contact'); } catch (_) {}
   }, true);
 })();
+
+// Липкая панель на телефоне (владелец 15.09: форма на лендингах стоит в самом низу,
+// 72% визитов — со смартфонов). Ссылки идут через /go/, чтобы клики по мессенджерам
+// считались как цель messenger и получали визит Roistat.
+(function () {
+  if (document.querySelector('.stickybar')) return;
+  var page = (location.pathname.replace(/^\//, '') || 'main').replace(/[^a-z0-9_-]/gi, '');
+  var src = page + '_bar';
+  var bar = document.createElement('div');
+  bar.className = 'stickybar'; bar.setAttribute('role', 'navigation'); bar.setAttribute('aria-label', 'Быстрые действия');
+  bar.innerHTML = '<a href="tel:+74951209024">📞 Позвонить</a><a href="#" id="sb-msg">💬 Написать</a>' +
+                  '<a class="sb-main" href="#signup">Записаться</a>';
+  var sheet = document.createElement('div');
+  sheet.className = 'sb-sheet'; sheet.id = 'sb-sheet'; sheet.hidden = true;
+  sheet.innerHTML =
+    '<a href="https://app.kidsup.ru/go/whatsapp?src=' + src + '" target="_blank" rel="noopener"><i style="background:#25D366"></i>WhatsApp</a>' +
+    '<a href="https://app.kidsup.ru/go/telegram?src=' + src + '" target="_blank" rel="noopener"><i style="background:#2AABEE"></i>Telegram</a>' +
+    '<a href="https://app.kidsup.ru/go/max?src=' + src + '" target="_blank" rel="noopener"><i style="background:#8A2BE2"></i>MAX</a>';
+  document.body.appendChild(bar); document.body.appendChild(sheet);
+  bar.querySelector('#sb-msg').addEventListener('click', function (e) { e.preventDefault(); sheet.hidden = !sheet.hidden; });
+  sheet.addEventListener('click', function (e) {
+    var a = e.target.closest('a'); if (!a) return;
+    try { ym(69569509, 'reachGoal', 'messenger', {src: src}); } catch (_) {}
+    try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'messenger'}); } catch (_) {}
+    try { VK.Goal('contact'); } catch (_) {}
+    sheet.hidden = true;
+  });
+  document.addEventListener('click', function (e) {
+    if (!sheet.hidden && !sheet.contains(e.target) && e.target.id !== 'sb-msg') sheet.hidden = true;
+  });
+})();

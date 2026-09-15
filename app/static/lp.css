@@ -162,3 +162,26 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 .revs-all{margin-top:20px;font-size:15px}
 .revs-all a{color:var(--blue-ink);font-weight:600;text-decoration:none;border-bottom:1px solid rgba(29,167,224,.35)}
 .revs-all a:hover{border-bottom-color:currentColor}
+
+/* ——— оффер из объявления на первом экране (15.09) ——— */
+.offer-badges{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 18px}
+.offer-badges span{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;
+  background:rgba(255,255,255,.92);color:var(--indigo);font-weight:700;font-size:14px;line-height:1.25;
+  box-shadow:0 4px 14px rgba(49,39,131,.12)}
+.hero:not(.warm) .offer-badges span{background:rgba(255,255,255,.95)}
+/* ——— липкая панель на телефоне: позвонить · написать · записаться ——— */
+.stickybar{display:none}
+@media (max-width:760px){
+  .stickybar{position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;background:#fff;
+    box-shadow:0 -4px 18px rgba(49,39,131,.16)}
+  .stickybar a{flex:1;text-align:center;padding:.85rem .3rem;font-weight:700;font-size:.84rem;
+    text-decoration:none;color:var(--indigo)}
+  .stickybar a.sb-main{background:var(--green-cta);color:#fff}
+  .sb-sheet{position:fixed;left:12px;right:12px;bottom:62px;z-index:81;background:#fff;border-radius:16px;
+    box-shadow:0 -6px 30px rgba(49,39,131,.28);overflow:hidden}
+  .sb-sheet a{display:flex;align-items:center;gap:.7rem;padding:.95rem 1.1rem;font-weight:700;font-size:1rem;
+    color:var(--ink);text-decoration:none;border-bottom:1px solid var(--line)}
+  .sb-sheet a:last-child{border-bottom:none}
+  .sb-sheet i{width:14px;height:14px;border-radius:50%;flex:0 0 auto}
+  body{padding-bottom:52px}
+}

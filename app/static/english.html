@@ -187,6 +187,29 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 .revs-all{margin-top:20px;font-size:15px}
 .revs-all a{color:var(--blue-ink);font-weight:600;text-decoration:none;border-bottom:1px solid rgba(29,167,224,.35)}
 .revs-all a:hover{border-bottom-color:currentColor}
+
+/* ——— оффер из объявления на первом экране (15.09) ——— */
+.offer-badges{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 18px}
+.offer-badges span{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;
+  background:rgba(255,255,255,.92);color:var(--indigo);font-weight:700;font-size:14px;line-height:1.25;
+  box-shadow:0 4px 14px rgba(49,39,131,.12)}
+.hero:not(.warm) .offer-badges span{background:rgba(255,255,255,.95)}
+/* ——— липкая панель на телефоне: позвонить · написать · записаться ——— */
+.stickybar{display:none}
+@media (max-width:760px){
+  .stickybar{position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;background:#fff;
+    box-shadow:0 -4px 18px rgba(49,39,131,.16)}
+  .stickybar a{flex:1;text-align:center;padding:.85rem .3rem;font-weight:700;font-size:.84rem;
+    text-decoration:none;color:var(--indigo)}
+  .stickybar a.sb-main{background:var(--green-cta,#5C8C1D);color:#fff}
+  .sb-sheet{position:fixed;left:12px;right:12px;bottom:62px;z-index:81;background:#fff;border-radius:16px;
+    box-shadow:0 -6px 30px rgba(49,39,131,.28);overflow:hidden}
+  .sb-sheet a{display:flex;align-items:center;gap:.7rem;padding:.95rem 1.1rem;font-weight:700;font-size:1rem;
+    color:var(--ink,#221F3B);text-decoration:none;border-bottom:1px solid var(--line,#E6E9F2)}
+  .sb-sheet a:last-child{border-bottom:none}
+  .sb-sheet i{width:14px;height:14px;border-radius:50%;flex:0 0 auto}
+  body{padding-bottom:52px}
+}
 </style>
 </head>
 <body>
@@ -198,6 +221,11 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
     <p>Занятие идёт целиком на английском, без перевода на русский, с первой минуты. До 8 детей
     в группе — каждый говорит вслух не меньше 12 раз за занятие. Кембриджская лестница:
     Starters → Movers → Flyers.</p>
+    <div class="offer-badges">
+      <span>🌿 Первое занятие — условно-бесплатное: не понравится — платить не нужно</span>
+      <span>🎁 −15% на первый абонемент в день первого занятия</span>
+      <span>📍 5 минут от м. Бульвар Рокоссовского</span>
+    </div>
     <a class="cta" href="#signup">Записаться на первое занятие</a>
     <a class="cta ghost" href="#road">Что ребёнок будет уметь по месяцам</a>
     <p class="note">Учебный год идёт с 31 августа — присоединиться можно в любой месяц,
@@ -598,6 +626,26 @@ document.addEventListener('click', function(e){
   try { ym(69569509, 'reachGoal', 'messenger'); } catch(_){}
   try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'messenger'}); } catch(_){}
 }, true);
+</script>
+
+<div class="stickybar" role="navigation" aria-label="Быстрые действия">
+  <a href="tel:+74951209024">📞 Позвонить</a>
+  <a href="#" id="sb-msg">💬 Написать</a>
+  <a class="sb-main" href="#signup">Записаться</a>
+</div>
+<div class="sb-sheet" id="sb-sheet" hidden>
+  <a href="https://app.kidsup.ru/go/whatsapp?src=english_bar" target="_blank" rel="noopener"><i style="background:#25D366"></i>WhatsApp</a>
+  <a href="https://app.kidsup.ru/go/telegram?src=english_bar" target="_blank" rel="noopener"><i style="background:#2AABEE"></i>Telegram</a>
+  <a href="https://app.kidsup.ru/go/max?src=english_bar" target="_blank" rel="noopener"><i style="background:#8A2BE2"></i>MAX</a>
+</div>
+<script>
+(function(){var s=document.getElementById('sb-sheet'),b=document.getElementById('sb-msg');if(!s||!b)return;
+b.addEventListener('click',function(e){e.preventDefault();s.hidden=!s.hidden;});
+s.addEventListener('click',function(e){if(!e.target.closest('a'))return;
+ try{ym(69569509,'reachGoal','messenger',{src:'english_bar'});}catch(_){}
+ try{(window._tmr=window._tmr||[]).push({type:'reachGoal',id:'3355457',goal:'messenger'});}catch(_){}
+ try{VK.Goal('contact');}catch(_){} s.hidden=true;});
+document.addEventListener('click',function(e){if(!s.hidden&&!s.contains(e.target)&&e.target.id!=='sb-msg')s.hidden=true;});})();
 </script>
 </body>
 </html>
