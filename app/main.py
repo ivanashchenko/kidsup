@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.33"
+APP_VERSION = "2026-09-15.35"
 
 
 @app.get("/api/net")
@@ -7233,6 +7233,34 @@ def mesta_page(request: Request):
     """Места в группах: норма — ходят — ждём на пробное — свободно."""
     from . import mesta
     return render(request, "mesta.html", active="mesta", t=mesta.tablica())
+
+
+@app.get("/english/karta", response_class=HTMLResponse, dependencies=AUTH)
+def english_karta_page(request: Request):
+    """Карточка речи: форма к разделу 10 методички (см. app/karta.py)."""
+    from . import karta
+    return render(request, "karta.html", active="karta", k=karta.rows())
+
+
+@app.get("/api/english/karta", dependencies=AUTH)
+def api_english_karta():
+    from . import karta
+    return karta.rows()
+
+
+@app.post("/api/english/karta", dependencies=AUTH)
+def api_english_karta_save(payload: dict = Body(...)):
+    """Отметки по одному ребёнку и одной точке замера."""
+    from . import karta
+    try:
+        return karta.save(int(payload.get("user_id") or 0),
+                          str(payload.get("tochka") or ""),
+                          payload.get("marks") or {},
+                          str(payload.get("video_date") or ""),
+                          str(payload.get("note") or ""),
+                          str(payload.get("author") or ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/nabor", response_class=HTMLResponse, dependencies=AUTH)

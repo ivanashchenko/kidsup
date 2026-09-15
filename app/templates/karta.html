@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Карточка речи — KidsUP{% endblock %}
+{% block content %}
+<h1>Карточка речи: английский</h1>
+<p class="muted">Форма к разделу 10 методички. Шесть пунктов на ребёнка, каждый — «да / почти / пока нет».
+Формулировки поведенческие: не «знает лексику», а то, что видно глазом. Заполняется внутри обычного
+занятия, ребёнок не должен понимать, что его проверяют.</p>
+<p class="muted"><b>Два «пока нет» подряд на двух точках</b> — сигнал посмотреть посещаемость и домашнее
+аудио, и только потом обсуждать перевод в другую группу.</p>
+
+<div class="cards">
+  <div class="card"><div class="card-value">{{ k.всего }}</div><div class="card-label">детей в группах английского</div></div>
+  <div class="card"><div class="card-value">{{ k.без_видео }}</div><div class="card-label">без единого видео</div></div>
+</div>
+
+{% for d in k.дети %}
+<div class="card" style="margin:14px 0">
+  <div style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:baseline;justify-content:space-between">
+    <div><b style="font-size:17px">{{ d.имя }}</b>
+      <span class="muted" style="margin-left:.5rem">{{ d.группа }}</span></div>
+    <div class="muted" style="font-size:13px">
+      заполнено точек: {{ d.заполнено }} из {{ k.точки|length }} ·
+      видео: {% if d.последнее_видео %}{{ d.последнее_видео }}{% else %}<b style="color:#E30613">не снимали</b>{% endif %}
+    </div>
+  </div>
+  <div class="scroll" style="margin-top:.6rem">
+  <table>
+    <tr><th>Пункт</th>{% for key, when, what in k.точки %}<th>{{ when }}</th>{% endfor %}</tr>
+    {% for pk, ptext in k.пункты %}
+    <tr><td style="font-size:13.5px">{{ ptext }}</td>
+      {% for key, when, what in k.точки %}
+      <td>
+        <select data-uid="{{ d.user_id }}" data-tochka="{{ key }}" data-punkt="{{ pk }}" class="m">
+          <option value=""{% if not d.точки[key].get('marks',{}).get(pk) %} selected{% endif %}>—</option>
+          {% for o in k.ответы %}
+          <option value="{{ o }}"{% if d.точки[key].get('marks',{}).get(pk) == o %} selected{% endif %}>{{ o }}</option>
+          {% endfor %}
+        </select>
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    <tr><td><b>Видео снято</b></td>
+      {% for key, when, what in k.точки %}
+      <td><input type="date" class="v" data-uid="{{ d.user_id }}" data-tochka="{{ key }}"
+                 value="{{ d.точки[key].get('video_date','') }}"></td>
+      {% endfor %}
+    </tr>
+  </table>
+  </div>
+  <div style="margin-top:.5rem">
+    <input class="n" data-uid="{{ d.user_id }}" style="width:100%" placeholder="Заметка педагога: что мешает, что получилось"
+           value="{{ d.точки['t1'].get('note','') }}">
+  </div>
+</div>
+{% endfor %}
+
+<p id="out" class="muted" style="position:sticky;bottom:0;background:#fff;padding:.5rem 0"></p>
+<script>
+const out = document.getElementById('out');
+function collect(uid, tochka) {
+  const marks = {};
+  document.querySelectorAll(`select.m[data-uid="${uid}"][data-tochka="${tochka}"]`).forEach(s => {
+    if (s.value) marks[s.dataset.punkt] = s.value;
+  });
+  const v = document.querySelector(`input.v[data-uid="${uid}"][data-tochka="${tochka}"]`);
+  const n = document.querySelector(`input.n[data-uid="${uid}"]`);
+  return {user_id: +uid, tochka: tochka, marks: marks,
+          video_date: v ? v.value : '', note: n ? n.value : ''};
+}
+async function save(uid, tochka) {
+  out.textContent = 'Сохраняю…';
+  const r = await fetch('/api/english/karta', {method: 'POST',
+    headers: {'Content-Type': 'application/json'}, body: JSON.stringify(collect(uid, tochka))});
+  const j = await r.json();
+  out.textContent = j.ok ? 'Сохранено ' + new Date().toLocaleTimeString('ru-RU') : 'Не сохранилось';
+}
+document.querySelectorAll('select.m, input.v').forEach(e =>
+  e.addEventListener('change', () => save(e.dataset.uid, e.dataset.tochka)));
+document.querySelectorAll('input.n').forEach(e =>
+  e.addEventListener('change', () => save(e.dataset.uid, 't1')));
+</script>
+{% endblock %}
