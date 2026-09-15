@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.1"
+APP_VERSION = "2026-09-15.2"
 
 
 @app.get("/api/net")
@@ -6979,6 +6979,28 @@ def api_kontrol_progress(since: str = ""):
         for uid, ts, mid in conn.execute("SELECT user_id, ts, manager_id FROM crm_comments WHERE ts >= ?", (since,)):
             byday[ts[:10]][_v.MANAGERS.get(mid, "авто")] += 1
         out["комментарии_по_дням"] = {d: dict(c) for d, c in sorted(byday.items())}
+        # что стало с карточками, которые админ прокомментировал: текущий
+        # статус клиента — итог прозвона (записался / отказ / остался недозвон)
+        per: dict = {}
+        for uid, ts, mid, text in conn.execute(
+                "SELECT user_id, ts, manager_id, text FROM crm_comments WHERE ts >= ?", (since,)):
+            who = _v.MANAGERS.get(mid)
+            if not who:
+                continue
+            day = ts[:10]
+            slot = per.setdefault(who, {}).setdefault(day, {"карточек": set(), "статусы": collections.Counter(),
+                                                              "недозвон_в_тексте": 0})
+            slot["карточек"].add(uid)
+            low = (text or "").lower()
+            if any(k in low for k in ("недозвон", "не берут", "не берет", "не взял", "автоответ", "сброс")):
+                slot["недозвон_в_тексте"] += 1
+        for who, days in per.items():
+            for day, slot in days.items():
+                for uid in slot["карточек"]:
+                    slot["статусы"][st_names.get(users.get(uid, (None, "", None))[2], "?")] += 1
+                slot["карточек"] = len(slot["карточек"])
+                slot["статусы"] = dict(slot["статусы"].most_common(8))
+        out["комментарии_по_админам"] = per
         cb = collections.defaultdict(collections.Counter)
         for ts, d, state in conn.execute("SELECT ts, direction, state FROM mango_calls WHERE ts >= ?", (since,)):
             cb[ts[:10]][f"{d}:{state}"] += 1
