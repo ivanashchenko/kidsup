@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Места в группах — KidsUP{% endblock %}
+{% block content %}
+<h1>Места в группах сезона 2026/27</h1>
+<p class="muted">Считается по записям CRM в момент открытия страницы, синхронизация идёт каждые 5 минут.
+<b>Ходят</b> — статус записи «Учится». <b>Записаны на пробное</b> — «Подтвердил заявку» и «Записался на пробное»:
+их ждём, место за ними уже держим. <b>Были на пробном</b> — пришли, но абонемент не купили; это не новички,
+а несостоявшиеся оплаты, работа по ним идёт на странице <a href="/voronka">Без оплаты</a>.
+<b>Свободно</b> — норма минус все живые записи, включая записанных на пробное: иначе в группу запишут больше,
+чем в неё помещается.</p>
+<p class="muted">В таблицах считаются <b>места</b>, а в карточках выше — <b>дети</b>. Ребёнок, который ходит на
+два предмета, занимает два места, но человек он один, поэтому сумма по группам всегда больше числа детей.</p>
+<p class="muted">Счёт к цели 311 живёт на странице <a href="/voronka">Без оплаты</a> и он больше здешнего:
+логопеды — индивидуальные слоты, а не групповые места, поэтому в таблицу мест они не входят, но оплату эти
+семьи внесли. Сейчас логопеда оплатили {{ t.итого.детей_вне_таблицы }} детей.</p>
+
+<div class="cards">
+  <div class="card"><div class="card-value">{{ t.итого.свободно }}</div><div class="card-label">свободных мест в {{ t.групп }} группах</div></div>
+  <div class="card"><div class="card-value">{{ t.итого.детей_оплатили }}</div><div class="card-label">детей оплатили в этих группах</div></div>
+  <div class="card"><div class="card-value">{{ t.итого.детей_ходят }}</div><div class="card-label">детей ходят</div></div>
+  <div class="card"><div class="card-value">{{ t.итого.детей_на_пробное }}</div><div class="card-label">детей ждём на пробное</div></div>
+  <div class="card"><div class="card-value">{{ t.итого.были_на_пробном }}</div><div class="card-label">были на пробном, не оплатили</div></div>
+  <div class="card"><div class="card-value">{{ t.итого.мест_всего }}</div><div class="card-label">мест всего</div></div>
+</div>
+
+<h2>По предметам</h2>
+<div class="scroll"><table>
+  <tr><th>Предмет</th><th class="num">групп</th><th class="num">мест всего</th><th class="num">ходят</th>
+      <th class="num">оплатили</th><th class="num">на пробное</th><th class="num">были на пробном</th><th class="num">свободно</th></tr>
+  {% for name, d in t.по_предметам.items() %}
+  <tr><td><b>{{ name }}</b></td><td class="num">{{ d.групп }}</td><td class="num">{{ d.мест_всего }}</td>
+      <td class="num">{{ d.ходят }}</td><td class="num">{{ d.оплатили }}</td>
+      <td class="num">{{ d.записаны_на_пробное }}</td><td class="num">{{ d.были_на_пробном }}</td>
+      <td class="num"><b style="color:{{ '#E30613' if d.свободно >= 8 else '#4e8a12' }}">{{ d.свободно }}</b></td></tr>
+  {% endfor %}
+  <tr style="border-top:2px solid #312783"><td><b>Итого</b></td><td class="num"><b>{{ t.групп }}</b></td>
+      <td class="num"><b>{{ t.итого.мест_всего }}</b></td><td class="num"><b>{{ t.итого.ходят }}</b></td>
+      <td class="num"><b>{{ t.итого.оплатили }}</b></td><td class="num"><b>{{ t.итого.записаны_на_пробное }}</b></td>
+      <td class="num"><b>{{ t.итого.были_на_пробном }}</b></td><td class="num"><b>{{ t.итого.свободно }}</b></td></tr>
+</table></div>
+
+<h2>По группам</h2>
+<div class="scroll"><table>
+  <tr><th>Группа</th><th class="num">мест всего</th><th class="num">ходят</th><th class="num">оплатили</th>
+      <th class="num">записаны на пробное</th><th class="num">были на пробном</th><th class="num">свободно</th><th>примечание</th></tr>
+  {% for r in t.группы %}
+  <tr{% if r.замена or r.пауза %} style="background:#fff6f6"{% endif %}>
+    <td style="font-size:13px">{{ r.name }}</td>
+    <td class="num">{{ r.мест_всего }}</td>
+    <td class="num">{{ r.ходят }}</td>
+    <td class="num" style="color:{{ '#4e8a12' if r.оплатили else '#6c6a86' }}">{{ r.оплатили }}</td>
+    <td class="num" style="color:{{ '#1DA7E0' if r.записаны_на_пробное else '#6c6a86' }}">{{ r.записаны_на_пробное }}</td>
+    <td class="num" style="color:{{ '#F59C00' if r.были_на_пробном else '#6c6a86' }}">{{ r.были_на_пробном }}</td>
+    <td class="num">
+      {%- if r.перебор %}<b style="color:#E30613">−{{ r.перебор }} перебор</b>
+      {%- elif r.свободно >= 4 %}<b style="color:#E30613">{{ r.свободно }}</b>
+      {%- elif r.свободно %}<b style="color:#4e8a12">{{ r.свободно }}</b>
+      {%- else %}<span class="muted">0</span>{% endif %}
+    </td>
+    <td style="font-size:12.5px;color:#6c6a86">
+      {%- if r.пауза %}<b style="color:#b00010">⛔ пауза:</b> {{ r.пауза }}
+      {%- elif r.замена %}<b style="color:#b00010">не записывать:</b> {{ r.замена }}
+      {%- elif r.лист %}<b style="color:#a35f00">полная:</b> {{ r.лист }}{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table></div>
+<h2>Логопеды — вне таблицы мест</h2>
+<p class="muted">Индивидуальные слоты: свободное место здесь — это свободное окно в расписании педагога,
+а не место в группе. Показаны слоты с оплатой.</p>
+<div class="scroll"><table>
+  <tr><th>Слот</th><th class="num">оплатили</th></tr>
+  {% for r in t.вне_таблицы %}<tr><td style="font-size:13px">{{ r.name }}</td><td class="num">{{ r.оплатили }}</td></tr>{% endfor %}
+</table></div>
+
+<p class="muted">Норма мини-сада и нулевого класса — 10 детей: в CRM стоит 15, но по факту больше десяти
+в группу не берём, вместо этого открываем ещё одну. Группы с пометкой «пауза» и «не записывать» в свободные
+места не считаем на словах — цифра в строке справочная.</p>
+{% endblock %}

@@ -106,6 +106,115 @@ def rows() -> list[dict]:
         return out
 
 
+# Статусы записи в группе: что означает каждая колонка таблицы мест.
+ST_UCHITSYA = 2          # «Учится» — ребёнок ходит в группу
+ST_ZAPISAN = (83760, 58132)   # «Подтвердил заявку» и «Записался на пробное»
+ST_BYL = 58131           # «Посетил пробное» — пришёл, абонемент ещё не купил
+
+
+def tablica() -> dict:
+    """Места по группам с разбивкой: сколько ходят, сколько ждём на пробное,
+    сколько мест реально свободно.
+
+    Свободное место — это норма минус ВСЕ живые записи: ребёнок, записанный
+    на пробное, место уже занимает, иначе в группу запишут больше, чем в неё
+    помещается. Отдельно показываем «были на пробном, но не оплатили» — это
+    не новички, это несостоявшиеся оплаты, за ними идёт работа в /voronka.
+    """
+    with db.get_conn() as conn:
+        cls = conn.execute("SELECT id, name, max_students FROM classes WHERE name LIKE '2627_%' "
+                           "AND (status IS NULL OR status = 'opened')").fetchall()
+        paid_idx = _paid_by_class(conn)
+        out = []
+        # ребёнок на двух предметах занимает два места, но ребёнок он один:
+        # места считаем по записям, детей — по карточкам, иначе цель 311 врёт
+        deti = {"ходят": set(), "оплатили": set(), "записаны_на_пробное": set()}
+        for c in cls:
+            n = c["name"] or ""
+            if "Заявк" in n or "лагер" in n.lower() or "летн" in n.lower() or n.startswith("2627_ЛГ"):
+                continue
+            def ids(states):
+                q = ",".join("?" * len(states))
+                return {r[0] for r in conn.execute(
+                    f"SELECT user_id FROM joins WHERE class_id=? AND status_id IN ({q})",
+                    (c["id"], *states))}
+            u_uch, u_zap, u_byl = ids((ST_UCHITSYA,)), ids(ST_ZAPISAN), ids((ST_BYL,))
+            uch, zap, byl = len(u_uch), len(u_zap), len(u_byl)
+            deti["ходят"] |= u_uch
+            deti["записаны_на_пробное"] |= u_zap
+            deti["оплатили"] |= paid_idx.get(c["id"], set())
+            cap = c["max_students"] or 8
+            short = re.sub(r"^2627_", "", n)
+            for k, v in CAP_OVERRIDE.items():
+                if short.startswith(k):
+                    cap = v
+            out.append({
+                "id": c["id"], "name": short, "предмет": _subject(short), "мест_всего": cap,
+                "ходят": uch, "оплатили": len(paid_idx.get(c["id"], set())),
+                "записаны_на_пробное": zap, "были_на_пробном": byl,
+                "занято": uch + zap + byl, "свободно": max(cap - uch - zap - byl, 0),
+                "перебор": max(uch + zap + byl - cap, 0),
+                "замена": next((v for k, v in MERGE.items() if k in n), ""),
+                "лист": next((v for k, v in WAITLIST.items() if k in n), ""),
+                "пауза": next((v for k, v in HOLD.items() if k in n), ""),
+            })
+
+        def key(r):
+            for i, p in enumerate(ORDER):
+                if r["name"].startswith(p) or p in r["name"][:12]:
+                    return (i, r["name"])
+            return (len(ORDER), r["name"])
+        out.sort(key=key)
+        fields = ("мест_всего", "ходят", "оплатили", "записаны_на_пробное",
+                  "были_на_пробном", "занято", "свободно")
+        itogo = {f: sum(r[f] for r in out) for f in fields}
+        # по предметам — чтобы видеть, где набор идёт, а где стоит
+        по_предметам = {}
+        for r in out:
+            d = по_предметам.setdefault(r["предмет"], {f: 0 for f in fields})
+            for f in fields:
+                d[f] += r[f]
+            d["групп"] = d.get("групп", 0) + 1
+        # Группы сезона, которых в таблице мест нет: логопеды (индивидуальные
+        # слоты), заявочные и летние. Дети оттуда оплату внесли, и на /voronka
+        # к цели 311 они считаются — иначе две страницы дают разные числа и
+        # непонятно, какому верить.
+        вне = []
+        for c in cls:
+            n = c["name"] or ""
+            if not ("Заявк" in n or "лагер" in n.lower() or "летн" in n.lower()
+                    or n.startswith("2627_ЛГ")):
+                continue
+            u = paid_idx.get(c["id"], set())
+            if u:
+                вне.append({"name": re.sub(r"^2627_", "", n), "оплатили": len(u)})
+                deti.setdefault("вне_таблицы", set()).update(u)
+        itogo["детей_вне_таблицы"] = len(deti.get("вне_таблицы", set()))
+        itogo["детей_ходят"] = len(deti["ходят"])
+        itogo["детей_оплатили"] = len(deti["оплатили"])
+        itogo["детей_на_пробное"] = len(deti["записаны_на_пробное"])
+        return {"группы": out, "итого": itogo, "по_предметам": по_предметам,
+                "вне_таблицы": sorted(вне, key=lambda r: -r["оплатили"]),
+                "групп": len(out), "обновлено": db.get_state("last_sync") or ""}
+
+
+SUBJECTS = (
+    ("Первая школа", "Подготовка к школе"), ("ПШ", "Подготовка к школе"),
+    ("АЯ", "Английский"), ("Английский", "Английский"),
+    ("Музыка и речь", "Раннее развитие"), ("РР", "Раннее развитие"),
+    ("ИЗО", "ИЗО"), ("МА", "Ментальная арифметика"), ("ШАХ", "Шахматы"),
+    ("Робот", "Робототехника"), ("Мини-сад", "Мини-сад"), ("Нулевой", "Нулевой класс"),
+    ("Логопед", "Логопед"), ("ЛГ", "Логопед"),
+)
+
+
+def _subject(short_name: str) -> str:
+    for pref, title in SUBJECTS:
+        if short_name.startswith(pref):
+            return title
+    return short_name.split("_")[0]
+
+
 def block() -> str:
     try:
         rs = rows()
