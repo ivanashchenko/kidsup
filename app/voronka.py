@@ -196,6 +196,62 @@ def trial_state(conn, uid: int, class_id: int | None) -> dict:
     return {"вид": "без_даты"}
 
 
+DEAD_STATES = {345759, 125957, 146328, 125954, 215202, 146330, 146513}
+_MONTHS = {"январ": 1, "феврал": 2, "март": 3, "апрел": 4, "ма[йя]": 5, "июн": 6, "июл": 7,
+           "август": 8, "сентябр": 9, "октябр": 10, "ноябр": 11, "декабр": 12}
+
+
+def snooze_until(text: str, when: str) -> str | None:
+    """Дата из комментария админа, до которой карточку трогать не надо:
+    «перезвонить 01.10», «позвоню им 26», «хотят в октябре», «на след неделе»,
+    «в конце сентября». Возвращает ISO-дату в будущем или None.
+
+    Лена 15.09: «там у многих есть комментарии, а они всё равно в списке» —
+    договорённость «позже» должна убирать строку из работы до срока."""
+    import re
+    if not text:
+        return None
+    low = text.lower()
+    base = date.fromisoformat(when[:10]) if when else date.today()
+    today = date.today()
+    cands: list[date] = []
+    for m in re.finditer(r"(?<!\d)(\d{1,2})[.\-/](\d{1,2})(?:[.\-/](\d{2,4}))?(?!\d)", low):
+        d, mo = int(m.group(1)), int(m.group(2))
+        if 1 <= d <= 31 and 1 <= mo <= 12:
+            try:
+                cands.append(date(base.year, mo, d))
+            except ValueError:
+                pass
+    m = re.search(r"(перезвон\w*|позвон\w*|звонить|связ\w*|набрать)\D{0,12}(\d{1,2})(?:-?го)?(?!\d|:|[.\-/]\d)", low)
+    if m:
+        d = int(m.group(2))
+        if 1 <= d <= 31:
+            mo = base.month if d >= base.day else base.month % 12 + 1
+            try:
+                cands.append(date(base.year + (1 if mo < base.month else 0), mo, d))
+            except ValueError:
+                pass
+    for pat, mo in _MONTHS.items():
+        if re.search(r"(в|до|с|на|после)\s+(конце\s+|начале\s+|середине\s+)?" + pat, low):
+            day = 1
+            if re.search(r"конце\s+" + pat, low):
+                day = 25
+            elif re.search(r"середине\s+" + pat, low):
+                day = 15
+            y = base.year + (1 if mo < base.month else 0)
+            cands.append(date(y, mo, day))
+    if re.search(r"(след\w*|следующ\w*)\s+недел", low):
+        cands.append(base + timedelta(days=7))
+    if re.search(r"через\s+(две|2)\s+недел", low):
+        cands.append(base + timedelta(days=14))
+    elif re.search(r"через\s+недел", low):
+        cands.append(base + timedelta(days=7))
+    if re.search(r"через\s+месяц", low):
+        cands.append(base + timedelta(days=30))
+    fut = [c for c in cands if c > today]
+    return min(fut).isoformat() if fut else None
+
+
 def enrich(rows: list[dict]) -> None:
     """Дописать в каждую строку статус карточки, последний звонок, последнее
     сообщение и последний комментарий админа. Меняет rows на месте."""
@@ -210,11 +266,15 @@ def enrich(rows: list[dict]) -> None:
             except ValueError:
                 st = None
             r["статус"] = STATUS.get(st, "")
+            r["статус_id"] = st
+            r["мёртвый_статус"] = st in DEAD_STATES
             r["пробное"] = trial_state(conn, uid, r.get("class_id")) if uid else None
             r["звонок"] = _last_call(conn, p10) if p10 else None
             r["сообщение"] = _last_msg(conn, p10) if p10 else None
             r["комментарий"] = _last_comment(conn, uid) if uid else None
             last = max((x["ts"] for x in (r["звонок"], r["сообщение"], r["комментарий"]) if x and x.get("ts")),
                        default="")
+            c = r["комментарий"] or {}
+            r["отложено_до"] = snooze_until(c.get("текст", ""), c.get("ts", "")) if c.get("человек") else None
             r["последний_контакт"] = last[:10]
             r["дней_тишины"] = (date.today() - date.fromisoformat(last[:10])).days if last[:10] else None

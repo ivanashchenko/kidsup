@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.4"
+APP_VERSION = "2026-09-15.5"
 
 
 @app.get("/api/net")
@@ -6907,17 +6907,36 @@ def api_mesta_voronka():
     # что осталось). Сделанные — вниз стадии и серым.
     start = db.get_setting("voronka_start", "2026-09-14")
     done_n = 0
-    for lst in out.values():
+    # Лена 15.09: карточки с отказом и с договорённостью «позже» не должны
+    # висеть в работе. Статус клиента отказ/не писать/некачественный/архив —
+    # строка уходит совсем (кроме тех, кто ходит: их статус не важен, они
+    # у нас на занятиях). Дата в комментарии («перезвонить 01.10», «в
+    # октябре») — строка в «отложено» до этой даты.
+    removed: list = []
+    snoozed: list = []
+    for k, lst in out.items():
+        keep = []
+        for r in lst:
+            if r.get("мёртвый_статус") and k not in ("учится без оплаты", "абонемент закончился"):
+                removed.append({**r, "стадия": k})
+                continue
+            if r.get("отложено_до"):
+                snoozed.append({**r, "стадия": k})
+                continue
+            keep.append(r)
+        lst[:] = keep
         for r in lst:
             c = r.get("комментарий") or {}
             r["сделано"] = bool(c.get("человек") and (c.get("ts") or "") >= start)
             done_n += r["сделано"]
         lst.sort(key=lambda r: (r["сделано"], r.get("дней_тишины") is None, -(r.get("дней_тишины") or 0)))
+    snoozed.sort(key=lambda r: r["отложено_до"])
     return {"оплачено_в_группах_сезона": len(first_sell),
             "оплачено_уникальных_всего": len(paid_users),
             "без_оплаты": {k: len(v) for k, v in out.items()},
             "ждём_на_пробное": len(waiting),
             "сделано": done_n, "осталось": sum(len(v) for v in out.values()) - done_n, "с_даты": start,
+            "отложено": snoozed, "убрано_по_статусу": len(removed),
             "динамика": series[-20:],
             "комментарии_обновлены": db.get_setting("crm_comments_refreshed", ""),
             "списки": out,
