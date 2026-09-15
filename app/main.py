@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-14.21"
+APP_VERSION = "2026-09-15.1"
 
 
 @app.get("/api/net")
@@ -6763,8 +6763,13 @@ def api_mesta_voronka():
         paid_users = set().union(*paid_idx.values()) if paid_idx else set()
         cls = {r[0]: r[1] for r in conn.execute(
             "SELECT id, name FROM classes WHERE name LIKE '2627_%' AND (status IS NULL OR status='opened')")}
-        # абонемент без привязки к группе (classIds пуст) — засчитываем на любую
+        # абонемент без привязки к группе (classIds пуст) — засчитываем на любую;
+        # абонемент того же предмета в другой группе (перевели из Гр7 в Гр11) —
+        # тоже оплата: Лена 14.09 про Шамраева «купил абонемент 31.08»
         paid_generic: set[int] = set()
+        paid_subj: dict[int, set[str]] = {}
+        def _subj(cname: str) -> str:
+            return (cname or "").split("_")[1].split(" ")[0] if "_" in (cname or "") else ""
         ended_by_user: dict[int, str] = {}
         has_active: set[int] = set()
         for uid, end, raw in conn.execute(
@@ -6778,6 +6783,10 @@ def api_mesta_voronka():
                 continue
             if not (r.get("classIds") or r.get("mainClassId")):
                 paid_generic.add(uid)
+            if not (end and end < today):
+                for c in set(r.get("classIds") or []) | ({r["mainClassId"]} if r.get("mainClassId") else set()):
+                    if c in cls:
+                        paid_subj.setdefault(uid, set()).add(_subj(cls[c]))
             if end and end < today:
                 ended_by_user[uid] = max(ended_by_user.get(uid, ""), end)
             else:
@@ -6803,7 +6812,8 @@ def api_mesta_voronka():
                 unames[(uid, cid)] = (u["name"] if u else None, u["phone"] if u else None, d, n)
 
     def paid_here(uid: int, cid: int) -> bool:
-        return uid in paid_idx.get(cid, set()) or uid in paid_generic
+        return (uid in paid_idx.get(cid, set()) or uid in paid_generic
+                or _subj(cls.get(cid, "")) in paid_subj.get(uid, set()))
 
     def skip(name: str | None) -> bool:
         return bool(_re.search(r"фейк|тест", (name or "").lower()))
@@ -6900,6 +6910,80 @@ def api_mesta_voronka():
             "комментарии_обновлены": db.get_setting("crm_comments_refreshed", ""),
             "списки": out,
             "ждём": waiting}
+
+
+@app.get("/api/kontrol/progress", dependencies=AUTH)
+def api_kontrol_progress(since: str = ""):
+    """Только чтение: продвижение по задачам владельца для админов (14–15.09):
+    статусы записей 83760/99336/58131 в группах сезона, клиенты в статусах
+    «новый лид», «от промоутера», «праздник», «недозвон (в работе)» — сколько
+    всего, сколько тронуто (комментарий crm_comments или исходящий звонок
+    mango_calls) с даты since, комментарии по сотрудникам по дням."""
+    from . import voronka as _v
+    since = since or date.today().isoformat()
+    out: dict = {"since": since}
+    with db.get_conn() as conn:
+        _v._ensure(conn)
+        st_names = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM client_statuses")}
+        out["статусы_клиентов"] = st_names
+        users = {}
+        for uid, name, phone, raw in conn.execute("SELECT id, name, phone, raw FROM users"):
+            try:
+                st = json.loads(raw or "{}").get("clientStateId")
+            except ValueError:
+                st = None
+            users[uid] = (name, "".join(ch for ch in (phone or "") if ch.isdigit())[-10:], st)
+        commented = {}
+        for uid, ts, mid in conn.execute(
+                "SELECT user_id, ts, manager_id FROM crm_comments WHERE ts >= ?", (since,)):
+            commented.setdefault(uid, []).append((ts, _v.MANAGERS.get(mid, "авто")))
+        called = {}
+        for ph, ts, state in conn.execute(
+                "SELECT phone, ts, state FROM mango_calls WHERE direction='out' AND ts >= ?", (since,)):
+            called.setdefault(ph[-10:], []).append((ts, state))
+        def touched(uid):
+            name, p10, st = users.get(uid, (None, "", None))
+            c = [x for x in commented.get(uid, []) if x[1] != "авто"]
+            k = called.get(p10, [])
+            return bool(c), bool(k), c, k
+        targets = {}
+        for sid, nm in st_names.items():
+            low = nm.lower()
+            if any(k in low for k in ("новый лид", "промоутер", "праздник", "недозвон")):
+                targets[sid] = nm
+        res = {}
+        for sid, nm in targets.items():
+            ids = [u for u, (n, p, st) in users.items() if st == sid]
+            rows = [(u, *touched(u)) for u in ids]
+            res[nm] = {"всего": len(ids),
+                       "с_комментарием_админа": sum(1 for r in rows if r[1]),
+                       "с_исходящим_звонком": sum(1 for r in rows if r[2]),
+                       "тронуто_хоть_как": sum(1 for r in rows if r[1] or r[2]),
+                       "нетронутых": sum(1 for r in rows if not (r[1] or r[2])),
+                       "звонок_без_комментария": sum(1 for r in rows if r[2] and not r[1])}
+        out["клиенты_по_статусам"] = res
+        cls = {r[0]: r[1] for r in conn.execute(
+            "SELECT id, name FROM classes WHERE name LIKE '2627_%' AND (status IS NULL OR status='opened')")}
+        jst = {r[0]: r[1] for r in conn.execute("SELECT id, name FROM join_statuses")}
+        jres = {}
+        for sid in (83760, 99336, 58131, 50509):
+            ids = {u for u, c in conn.execute("SELECT user_id, class_id FROM joins WHERE status_id=?", (sid,)) if c in cls and "Заявк" not in cls[c]}
+            rows = [(u, *touched(u)) for u in ids]
+            jres[jst.get(sid, sid)] = {"всего": len(ids),
+                                       "с_комментарием_админа": sum(1 for r in rows if r[1]),
+                                       "с_исходящим_звонком": sum(1 for r in rows if r[2]),
+                                       "нетронутых": sum(1 for r in rows if not (r[1] or r[2]))}
+        out["записи_по_статусам"] = jres
+        import collections
+        byday = collections.defaultdict(collections.Counter)
+        for uid, ts, mid in conn.execute("SELECT user_id, ts, manager_id FROM crm_comments WHERE ts >= ?", (since,)):
+            byday[ts[:10]][_v.MANAGERS.get(mid, "авто")] += 1
+        out["комментарии_по_дням"] = {d: dict(c) for d, c in sorted(byday.items())}
+        cb = collections.defaultdict(collections.Counter)
+        for ts, d, state in conn.execute("SELECT ts, direction, state FROM mango_calls WHERE ts >= ?", (since,)):
+            cb[ts[:10]][f"{d}:{state}"] += 1
+        out["звонки_по_дням"] = {d: dict(c) for d, c in sorted(cb.items())}
+    return out
 
 
 @app.get("/api/mesta/voronka/gaps", dependencies=AUTH)
