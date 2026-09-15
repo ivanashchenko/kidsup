@@ -3114,7 +3114,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-15.12"
+APP_VERSION = "2026-09-15.13"
 
 
 @app.get("/api/net")
@@ -5818,6 +5818,26 @@ def api_yaweb_open(payload: dict = Body(...)):
                            wait_ms=int(p.get("wait_ms") or 5000), max_text=int(p.get("max_text") or 6000),
                            click=str(p.get("click") or ""), actions=p.get("actions") or [],
                            frame=str(p.get("frame") or ""), state="ya")
+
+
+@app.post("/api/vkweb/open", dependencies=OWNER_AUTH)
+def api_vkweb_open(payload: dict = Body(...)):
+    """Открыть страницу ВК Рекламы под сессией ВК (вход — шагами через actions)."""
+    from . import mkweb
+    p = payload or {}
+    return mkweb.open_page(str(p.get("url") or "https://ads.vk.ru/hq/dashboard"),
+                           wait_ms=int(p.get("wait_ms") or 5000), max_text=int(p.get("max_text") or 6000),
+                           click=str(p.get("click") or ""), actions=p.get("actions") or [],
+                           frame=str(p.get("frame") or ""), state="vk")
+
+
+@app.get("/api/vkweb/shot", dependencies=OWNER_AUTH)
+def api_vkweb_shot():
+    from . import mkweb
+    from fastapi.responses import FileResponse
+    if not mkweb.VK_SHOT.exists():
+        raise HTTPException(404, "скриншота нет")
+    return FileResponse(str(mkweb.VK_SHOT), media_type="image/png")
 
 
 @app.get("/api/yaweb/shot", dependencies=OWNER_AUTH)

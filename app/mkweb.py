@@ -193,12 +193,16 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
     """
     from playwright.sync_api import sync_playwright
 
-    st_file = YA_STATE if state == "ya" else STATE
-    if not st_file.exists():
+    st_file = {"ya": YA_STATE, "vk": VK_STATE}.get(state, STATE)
+    shot_file = {"ya": YA_SHOT, "vk": VK_SHOT}.get(state, SHOT)
+    if not st_file.exists() and state != "vk":
         return {"ok": False, "error": f"сессии {state} нет — сначала вход"}
     with _lock, sync_playwright() as p:
         b = _launch(p)
-        ctx = b.new_context(storage_state=str(st_file), viewport={"width": 1400, "height": 900}, locale="ru-RU")
+        # ВК: сессии может ещё не быть — вход делается шагами через actions
+        # (телефон → код из СМС → пароль), состояние сохраняется после каждого вызова
+        kw = {"storage_state": str(st_file)} if st_file.exists() else {}
+        ctx = b.new_context(viewport={"width": 1400, "height": 900}, locale="ru-RU", **kw)
         pg = ctx.new_page()
         pg.goto(url, wait_until="domcontentloaded", timeout=60000)
         pg.wait_for_timeout(wait_ms)
@@ -277,7 +281,7 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
                 if st.get("required", True):
                     break
         text = tgt.inner_text("body")[:max_text]
-        pg.screenshot(path=str(SHOT), full_page=False)
+        pg.screenshot(path=str(shot_file), full_page=False)
         out = {"ok": True, "url": pg.url, "title": pg.title(), "text": text, "actions": done}
         if rows:
             # строки таблиц целиком, по ячейкам — так читаем «Историю» и склад без угадывания по тексту
@@ -286,9 +290,11 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
         if links:
             out["links"] = [{"text": (a.inner_text() or "").strip()[:60], "href": a.get_attribute("href")}
                             for a in pg.query_selector_all("a[href]")][:200]
-        # сессия могла обновиться (cookies) — сохраняем
+        # сессия могла обновиться (cookies) — сохраняем В СВОЙ файл. До 15.09
+        # писалось всегда в STATE (МойКласс): вызовы под Яндексом затирали
+        # сессию МойКласса яндексовыми cookies — отсюда зависания «Истории».
         try:
-            ctx.storage_state(path=str(STATE))
+            ctx.storage_state(path=str(st_file))
         except Exception:  # noqa: BLE001
             pass
         b.close()
@@ -883,6 +889,8 @@ def delete_supply(date_ddmmyy: str, product: str, qty: int, filial: str = "Kids 
 # нельзя, это разные домены и разные аккаунты.
 
 YA_STATE = DATA / "ya_web_state.json"
+VK_STATE = DATA / "vk_web_state.json"
+VK_SHOT = DATA / "vk_web_last.png"
 YA_SHOT = DATA / "ya_web_last.png"
 # снимок с открытым паролем — отдельным файлом, иначе финальный экран его затрёт
 YA_SHOT_PW = DATA / "ya_web_password.png"
