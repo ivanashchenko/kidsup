@@ -20,9 +20,7 @@
     var p = normPhone(document.getElementById('f-phone').value);
     if (!p) { err.hidden = false; document.getElementById('f-phone').focus(); return; }
     err.hidden = true;
-    var ok = document.getElementById('f-ok');
-    if (ok && !ok.checked) { ok.focus(); return; }
-    var btn = form.querySelector('button[type="submit"]');
+      var btn = form.querySelector('button[type="submit"]');
     btn.disabled = true; btn.textContent = 'Отправляем…';
     var rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
     try {

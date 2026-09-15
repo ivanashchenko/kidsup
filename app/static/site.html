@@ -174,6 +174,9 @@ section{scroll-margin-top:76px;padding:56px 0}
 .form-box .consent{display:flex;gap:.55rem;align-items:flex-start;margin-top:1rem;font-size:.86rem;color:var(--muted);line-height:1.4}
 .form-box .consent input{width:auto;margin-top:.15rem;flex:0 0 auto}
 .form-box .consent a{color:var(--indigo);font-weight:600}
+.consent-note{font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:10px}
+.consent-note a{color:var(--indigo);text-decoration:underline}
+
 .f-err{color:var(--red-ink);font-size:.8rem;margin-top:.3rem;font-weight:600}
 .form-box .alt a{color:var(--indigo);font-weight:600}
 /* faq */
@@ -993,6 +996,7 @@ body.js .reveal.in{opacity:1;transform:none}
     <input type="hidden" name="course" value="мини-форма-1">
     <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
     <button type="submit">Перезвоните мне</button>
+      <p class="consent-note">Нажимая «Отправить заявку», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a> и на обработку данных для записи на занятие.</p>
     <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅</span>
   </form></div>
 
@@ -1091,9 +1095,6 @@ body.js .reveal.in{opacity:1;transform:none}
         <option>Подобрать под ребёнка</option>
       </select>
       <input class="hp" id="f-web" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <label class="consent"><input type="checkbox" id="f-ok" name="consent" required>
-        <span>Соглашаюсь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки
-        персональных данных</a> и на обработку моих данных для записи на занятие</span></label>
       <button class="btn btn-green" type="submit">Отправить заявку</button>
       <p class="alt">Позвоним в рабочее время в течение 15 минут.<br>
       Удобнее самим? <a href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">WhatsApp</a> ·
@@ -1607,10 +1608,8 @@ document.getElementById('lead').addEventListener('submit', async e => {
   const p = document.getElementById('f-phone').value.trim();
   const c = sel.value;
   const err = document.getElementById('f-phone-err');
-  const ok = document.getElementById('f-ok');
   if (!normPhone(p)) { err.hidden = false; document.getElementById('f-phone').focus(); return; }
   err.hidden = true;
-  if (ok && !ok.checked) { ok.focus(); return; }
   const btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true; btn.textContent = 'Отправляем…';
   const rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';

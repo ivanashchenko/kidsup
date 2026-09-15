@@ -135,6 +135,9 @@ label{display:block;font-size:13.5px;font-weight:600;margin:12px 0 5px}
 input,select{width:100%;padding:12px 13px;border:1px solid #cfd6e4;border-radius:11px;font:inherit;font-size:16px}
 input:focus,select:focus{outline:2px solid var(--blue);outline-offset:1px;border-color:var(--blue)}
 .consent{display:flex;gap:9px;align-items:flex-start;font-weight:400;font-size:13px;color:var(--muted);margin-top:14px}
+.consent-note{font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:10px}
+.consent-note a{color:var(--indigo);text-decoration:underline}
+
 .consent input{width:auto;margin-top:3px}
 button{width:100%;margin-top:16px;background:var(--green-cta);color:#fff;border:0;border-radius:999px;
        padding:14px;font:700 16px Rubik,sans-serif;cursor:pointer}
@@ -513,10 +516,8 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
       <label for="f-age">Возраст ребёнка</label>
       <input id="f-age" name="age" placeholder="5 лет">
       <input class="hp" id="f-web" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <label class="consent"><input type="checkbox" id="f-ok" name="consent" required>
-        <span>Соглашаюсь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки
-        персональных данных</a> и на обработку моих данных для записи на занятие</span></label>
       <button type="submit">Отправить заявку</button>
+      <p class="consent-note">Нажимая «Отправить заявку», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a> и на обработку данных для записи на занятие.</p>
       <p class="alt">Удобнее самим?
       <a href="https://app.kidsup.ru/go/whatsapp?src=english" target="_blank" rel="noopener">WhatsApp</a> ·
       <a href="tel:+74951209024">+7 495 120-90-24</a> · ежедневно с 9:00</p>
@@ -566,8 +567,6 @@ document.getElementById('lead').addEventListener('submit', async function(e){
   var p = normPhone(document.getElementById('f-phone').value);
   if (!p) { err.hidden = false; document.getElementById('f-phone').focus(); return; }
   err.hidden = true;
-  var ok = document.getElementById('f-ok');
-  if (ok && !ok.checked) { ok.focus(); return; }
   var btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true; btn.textContent = 'Отправляем…';
   var rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
