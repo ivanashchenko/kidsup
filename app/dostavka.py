@@ -49,6 +49,10 @@ CHASE_KINDS = {"confirm", "trial_reminder", "reschedule", "missed",
 # Бориса: у 79207666546 нет WhatsApp, догон 14.09 16:03 повис с ошибкой,
 # а СМС не ушло, потому что клиент не платил.
 SMS_ALL_KINDS = {"missed"}
+# Владелец 15.09 (уточнение): СМС не шлём ТОЛЬКО трём статусам —
+# «0.1. Не писать / не звонить», «0.2. Не работаем с ним», «Некачественный
+# лид». Всем остальным (включая «Отказ») — шлём.
+NO_SMS_STATES = {146328, 215202, 125954}
 WAIT_HOURS = 2          # столько ждём доставки, прежде чем слать СМС
 ERROR_WAIT_MIN = 10     # явный «error» от Wazzup — не ждать два часа
 SMS_FROM, SMS_TO = 9, 20
@@ -107,7 +111,7 @@ def undelivered(hours: int = WAIT_HOURS, kinds: set | None = None) -> list[dict]
 
 
 def _no_contact(uid: str, phone: str = "") -> bool:
-    """Статус клиента «не писать / не звонить» или «отказ» — молчим.
+    """Статус клиента из NO_SMS_STATES — молчим.
     У догонов недозвона uid пустой — ищем карточки по номеру."""
     p10 = "".join(ch for ch in str(phone or "") if ch.isdigit())[-10:]
     try:
@@ -119,7 +123,7 @@ def _no_contact(uid: str, phone: str = "") -> bool:
             else:
                 return False
         sts = {json.loads(r["raw"] or "{}").get("clientStateId") for r in rows}
-        return bool(sts & {146328, 125957})
+        return bool(sts & NO_SMS_STATES)
     except Exception:
         return False
 
@@ -192,11 +196,14 @@ def chase(dry: bool = True, limit: int = 25) -> dict:
         r["kind"] == "bc:chat_invite" for r in rows) else {}
     stat["список"] = []
     for r in rows:
-        if r["kind"] not in SMS_ALL_KINDS and not _paid_before(r["uid"]):
+        # Владелец 15.09: подтверждения записи, напоминания о пробном,
+        # переносы и догон недозвона — сервисные, идут всем. Фильтр «только
+        # платившим» остаётся лишь для рекламных рассылок (bc:*).
+        if r["kind"].startswith("bc:") and not _paid_before(r["uid"]):
             stat["без оплат"] += 1
             _mark_chased(r["mid"])          # второй раз не смотрим
             continue
-        if r["kind"] in SMS_ALL_KINDS and _no_contact(r["uid"], r["phone"]):
+        if _no_contact(r["uid"], r["phone"]):
             # «не писать» / «отказ» — СМС после звонка тоже не шлём
             stat["не писать"] = stat.get("не писать", 0) + 1
             _mark_chased(r["mid"])
