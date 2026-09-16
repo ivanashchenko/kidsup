@@ -3136,7 +3136,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-16.20"
+APP_VERSION = "2026-09-16.22"
 
 
 @app.get("/api/net")
@@ -7378,6 +7378,13 @@ def nabor_page(request: Request):
     """Где рвётся цепочка набора и с кем работать прямо сейчас."""
     from . import nabor
     return render(request, "nabor.html", active="nabor", a=nabor.analiz())
+
+
+@app.get("/api/nabor/diag", dependencies=AUTH)
+def api_nabor_diag():
+    """Чем отличить несостоявшееся занятие от состоявшегося — только чтение."""
+    from . import nabor
+    return nabor.diag_zanyatiy()
 
 
 @app.get("/api/nabor/analiz", dependencies=AUTH)
