@@ -2969,6 +2969,21 @@ def api_chaty_plan():
     return chaty.plan()
 
 
+@app.get("/nezvonili", response_class=HTMLResponse, dependencies=AUTH)
+def nezvonili_page(request: Request, since: str = "", until: str = ""):
+    """Кому с прошлого года и лета так и не позвонили."""
+    from . import nezvonili
+    d = nezvonili.spisok(since or nezvonili.OKNO_S, until or nezvonili.OKNO_PO)
+    return render(request, "nezvonili.html", active="nezvonili", d=d)
+
+
+@app.get("/api/nezvonili", dependencies=AUTH)
+def api_nezvonili(since: str = "", until: str = "", limit: int = 0):
+    """Список семей без единого звонка за окно (по умолчанию 01.09.25–31.08.26)."""
+    from . import nezvonili
+    return nezvonili.spisok(since or nezvonili.OKNO_S, until or nezvonili.OKNO_PO, limit)
+
+
 @app.get("/api/chaty/lk", dependencies=AUTH)
 def api_chaty_lk():
     """Кто готов к регистрации в личном кабинете: есть ли в карточке e-mail."""
@@ -3121,7 +3136,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-16.13"
+APP_VERSION = "2026-09-16.16"
 
 
 @app.get("/api/net")
@@ -7210,6 +7225,24 @@ def api_mesta_voronka_diag(phone: str = ""):
         mine = [dict(r) for r in conn.execute(
             "SELECT * FROM mango_calls WHERE substr(phone,-10)=? ORDER BY ts DESC LIMIT 5", (p10,))] if p10 else []
     return {"table": True, "cols": cols, "total": total, "last": last, "phone": mine}
+
+
+@app.get("/api/calls/probe", dependencies=AUTH)
+def api_calls_probe(day: str = ""):
+    """Есть ли у Манго статистика за конкретный день. Только чтение.
+
+    Нужен, чтобы не гадать, как глубоко тянется история: наш журнал начинается
+    16.08.2026, а вопрос владельца — про весь прошлый учебный год. Прежде чем
+    запускать многочасовую догрузку по дню, проверяем один день.
+    """
+    from . import mango
+    d = day or (date.today() - timedelta(days=365)).isoformat()
+    try:
+        rows = mango._day_calls(d)
+    except Exception as e:  # noqa: BLE001
+        return {"день": d, "ok": False, "ошибка": f"{type(e).__name__}: {str(e)[:250]}"}
+    return {"день": d, "ok": True, "звонков": len(rows),
+            "пример": rows[0] if rows else None}
 
 
 @app.post("/api/calls/backfill", dependencies=AUTH)

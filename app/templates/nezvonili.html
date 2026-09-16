@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Кому не звонили — KidsUP{% endblock %}
+{% block content %}
+<h1>Кому так и не позвонили</h1>
+<p class="muted">Карточки, заведённые с {{ d.окно.с[8:] }}.{{ d.окно.с[5:7] }}.{{ d.окно.с[:4] }}
+по {{ d.окно.по[8:] }}.{{ d.окно.по[5:7] }}.{{ d.окно.по[:4] }} — прошлый учебный год и лето.
+Человек оставил номер, а разговора так и не случилось. Считаем по семьям: звонок на номер —
+это разговор со всей семьёй, даже если детей на нём трое.</p>
+
+{% if not d.покрытие_журнала.есть %}
+<div class="notice warn"><b>Журнала звонков нет</b> — {{ d.покрытие_журнала.почему }}.
+Пока его нет, сказать «не звонили» нельзя ни про кого.</div>
+{% else %}
+<div class="notice"><b>Чем ограничен список.</b> Журнал Манго у нас есть с
+<b>{{ d.покрытие_журнала.с[8:] }}.{{ d.покрытие_журнала.с[5:7] }}.{{ d.покрытие_журнала.с[:4] }}</b>
+по {{ d.покрытие_журнала.по[8:] }}.{{ d.покрытие_журнала.по[5:7] }}.{{ d.покрытие_журнала.по[:4] }},
+всего {{ d.покрытие_журнала.всего }} звонков. Всё, что было раньше, мы не видим.
+Поэтому карточки, заведённые до этой даты, в обзвон не идут — они внизу страницы, отдельно.
+Иначе админ позвонит со словами «мы вам ни разу не звонили» человеку, которому звонили.</div>
+{% endif %}
+
+<div class="cards">
+  <div class="card"><div class="card-value">{{ d.семей_без_звонка }}</div><div class="card-label">семей без единого звонка</div></div>
+  <div class="card"><div class="card-value" style="color:#E30613">{{ d.из_них_звонили_нам_и_не_дозвонились }}</div><div class="card-label">звонили нам сами — мы не взяли</div></div>
+  <div class="card"><div class="card-value">{{ d.из_них_платили }}</div><div class="card-label">из них когда-то платили</div></div>
+  <div class="card"><div class="card-value">{{ d.из_них_отвечали }}</div><div class="card-label">писали нам в WhatsApp</div></div>
+  <div class="card"><div class="card-value">{{ d.из_них_вообще_без_касаний }}</div><div class="card-label">ни звонка, ни переписки</div></div>
+  <div class="card" style="opacity:.7"><div class="card-value">{{ d.не_проверить_семей }}</div><div class="card-label">старше журнала — не проверить</div></div>
+</div>
+
+<p class="muted" style="margin-top:.8rem">Всего карточек в окне {{ d.итоги.карточек_в_окне }}:
+звонили {{ d.итоги.звонили }}, не звонили {{ d.итоги.не_звонили }},
+без телефона {{ d.итоги.без_телефона }},
+в статусах «не писать» / «не работаем» / «некачественный лид» {{ d.итоги.мёртвый_статус }} — этих не трогаем.</p>
+
+<h2>По месяцам, когда появилась карточка</h2>
+<div class="scroll"><table>
+  <tr>{% for m in d.по_месяцам %}<th>{{ m[5:7] }}.{{ m[2:4] }}</th>{% endfor %}</tr>
+  <tr>{% for m, n in d.по_месяцам.items() %}<td class="num">{{ n }}</td>{% endfor %}</tr>
+</table></div>
+
+<h2>Кому звонить — {{ d.семьи|length }}</h2>
+<p class="muted">Сверху те, кто <b>звонил нам сам и не дозвонился</b> — это не холодный обзвон,
+а возврат долга: человек тянулся к нам, и мы не ответили. Дальше те, кто уже платил: они нас знают,
+и разговор начинается не с нуля. Затем отвечавшие в переписке. Потом остальные, свежие сверху.
+Первая фраза не «вы оставляли заявку» — человек этого не помнит. Лучше так: «вы у нас интересовались занятиями
+для ребёнка, расскажу, что сейчас есть по возрасту». Тем, кто звонил и не дозвонился, — «вы нам звонили,
+а мы не успели ответить, извините».</p>
+<p style="margin:.6rem 0">
+  <input id="q" placeholder="имя или телефон" oninput="filt()" style="padding:.45rem .7rem">
+  <button class="btn" onclick="only('платил')">Только платившие</button>
+  <button class="btn" onclick="only('отвечал')">Только отвечавшие</button>
+  <button class="btn" onclick="only('')">Все</button>
+</p>
+<div class="scroll"><table id="t">
+  <thead><tr><th>Ребёнок</th><th>Телефон</th><th class="num">возраст</th><th>Карточка с</th>
+    <th>Звонил нам</th><th>Платил</th><th>Писали</th><th>Отвечал</th><th>CRM</th></tr></thead>
+  <tbody>
+  {% for f in d.семьи %}
+  <tr data-p="{{ 1 if f.платил else 0 }}" data-o="{{ 1 if f.отвечал else 0 }}">
+    <td>{{ f.дети|join(', ') }}</td>
+    <td><a href="tel:+{{ f.телефон }}">+{{ f.телефон }}</a> ·
+        <a href="https://wa.me/{{ f.телефон }}" target="_blank" rel="noopener">WA</a></td>
+    <td class="num">{{ f.возраст if f.возраст else '—' }}</td>
+    <td class="sm">{{ f.создан[8:] }}.{{ f.создан[5:7] }}.{{ f.создан[2:4] }}</td>
+    <td class="sm">{% if f.звонил_не_взяли %}<b class="warn">{{ f.звонил_не_взяли[8:] }}.{{ f.звонил_не_взяли[5:7] }} не взяли</b>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="sm">{% if f.платил %}<b style="color:#4e8a12">да</b>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="sm">{% if f.писали %}{{ f.писали[8:] }}.{{ f.писали[5:7] }}{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="sm">{% if f.отвечал %}<b>{{ f.отвечал[8:] }}.{{ f.отвечал[5:7] }}</b>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td><a href="https://app.moyklass.com/user/?phone={{ f.телефон }}" target="_blank" rel="noopener">→</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+
+{% if d.не_проверить %}
+<h2 style="margin-top:1.8rem">Старше журнала — проверить нельзя, {{ d.не_проверить_семей }}</h2>
+<p class="muted">Эти карточки появились до того, как у нас начался журнал звонков.
+Звонков в наших данных по ним нет, но это ничего не доказывает: журнала за тот период просто не существует.
+Чтобы их обзванивать, нужно сначала догрузить историю Манго за более ранний период.</p>
+<details><summary class="btn" style="display:inline-block;cursor:pointer">Показать</summary>
+<div class="scroll"><table>
+  <thead><tr><th>Ребёнок</th><th>Телефон</th><th class="num">возраст</th><th>Карточка с</th><th>Платил</th></tr></thead>
+  <tbody>
+  {% for f in d.не_проверить %}
+  <tr><td>{{ f.дети|join(', ') }}</td>
+      <td><a href="tel:+{{ f.телефон }}">+{{ f.телефон }}</a></td>
+      <td class="num">{{ f.возраст if f.возраст else '—' }}</td>
+      <td class="sm">{{ f.создан[8:] }}.{{ f.создан[5:7] }}.{{ f.создан[2:4] }}</td>
+      <td class="sm">{% if f.платил %}да{% else %}<span class="muted">—</span>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></details>
+{% endif %}
+
+<style>.sm{font-size:.84rem}#t td{padding:.35rem .4rem;vertical-align:top}</style>
+<script>
+var mode='';
+function filt(){var q=(document.getElementById('q').value||'').toLowerCase();
+ document.querySelectorAll('#t tbody tr').forEach(function(tr){
+  var ok=(!q||tr.textContent.toLowerCase().indexOf(q)>=0)
+       &&(mode!=='платил'||tr.dataset.p==='1')
+       &&(mode!=='отвечал'||tr.dataset.o==='1');
+  tr.style.display=ok?'':'none';});}
+function only(m){mode=m;filt();}
+</script>
+{% endblock %}
