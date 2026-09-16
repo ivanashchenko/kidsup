@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import time
 from datetime import date, timedelta
@@ -144,6 +145,23 @@ def _last_msg(conn, p10: str) -> dict | None:
     return best
 
 
+_CALL_LOG = re.compile(r"^\d{1,2}\.\d{2} \d{2}:\d{2}(?: и \d{2}:\d{2})?, (?:вход|исход)")
+
+
+def _robot(text) -> bool:
+    """Комментарий написан не человеком, а нашей автоматикой.
+
+    Разбор звонков пишет в карточку от имени того же аккаунта, что и админы,
+    поэтому по manager_id его не отличить. Раньше отличали по началу строки
+    («Клод», «🤖», «Авто», «📞»), но 16.09 разбор звонков пару часов писал
+    без значка — и такие записи засчитывались воронке как работа админа,
+    то есть тихо убирали живые строки из списка Лены. Ловим ещё и форму
+    самого журнала: «16.09 13:55, исходящий…».
+    """
+    t = str(text or "").lstrip()
+    return t.startswith(("Клод", "🤖", "Авто", "📞")) or bool(_CALL_LOG.match(t))
+
+
 def _last_comment(conn, uid: int) -> dict | None:
     rows = conn.execute(
         "SELECT ts, manager_id, text FROM crm_comments WHERE user_id=? ORDER BY ts DESC LIMIT 6",
@@ -153,7 +171,7 @@ def _last_comment(conn, uid: int) -> dict | None:
     # человеческий — от админа из списка; остальное (технический аккаунт,
     # «📞 …», «Авто: …», «🤖 Клод …») — автопилот
     human = next((r for r in rows if r["manager_id"] in MANAGERS
-                  and not str(r["text"] or "").startswith(("Клод", "🤖", "Авто", "📞"))), None)
+                  and not _robot(r["text"])), None)
     r = human or rows[0]
     return {"когда": _fmt_ts(r["ts"]), "кто": MANAGERS.get(r["manager_id"], "автопилот") if human else "автопилот",
             "текст": (r["text"] or "")[:220], "ts": r["ts"], "человек": bool(human)}
