@@ -83,9 +83,11 @@
 пока ребёнок не пропустит занятие — тогда он поднимется в таблицу выше.</p>
 {% set безфлага = v.ждём|selectattr('пробное.флаг_пробного', 'defined')|rejectattr('пробное.флаг_пробного')|list %}
 {% if безфлага %}
-<p class="warn">У {{ безфлага|length }} записей не стоит галочка «пробное занятие» — напоминание накануне
-этим семьям <u>не уйдёт</u>. Открыть запись в CRM и поставить галочку:
-{% for r in безфлага %}<a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">{{ r.name }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+<p class="warn">У {{ безфлага|length }} разовых записей не стоит галочка «пробное занятие» — напоминание
+накануне этим семьям <u>не уйдёт</u> совсем: автоматика ищет только записи с этой галочкой.
+Открыть запись в журнале занятий и поставить её (детей, поставленных сразу на всю серию занятий,
+здесь нет — они уже ученики, галочка им не нужна):
+{% for r in безфлага %}<a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">{{ r.name }}</a> <span class="muted">{{ r.пробное.дата[5:]|replace('-','.') }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</p>
 {% endif %}
 <details><summary class="btn" style="display:inline-block;cursor:pointer">Показать список</summary>
 <table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:.6rem">
