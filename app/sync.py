@@ -199,6 +199,26 @@ def light_sync() -> None:
                                                         params={"sellDate": [since3, today]}))
         except Exception:
             log.exception("лёгкий синк: оплаты/абонементы не обновились")
+        # Записи на занятия. До 16.09 они обновлялись только полным синком раз
+        # в сутки, и /voronka показывала админу работу, которой нет: ребёнка
+        # записали вечером на пробное, а страница утром по-прежнему числила его
+        # «не пришёл» или «без даты». Семь строк из пятнадцати были такими.
+        # Окно узкое — от вчера до двух недель вперёд: этого хватает и воронке,
+        # и напоминаниям, а весит немного.
+        try:
+            lessons = client.fetch_all(
+                "/v1/company/lessons", ["lessons"],
+                params={"date[]": [(_dt.date.today() - _dt.timedelta(days=1)).isoformat(),
+                                   (_dt.date.today() + _dt.timedelta(days=14)).isoformat()],
+                        "includeRecords": "true"})
+            db.save_lessons(lessons)
+            if lessons and not any(l.get("records") for l in lessons):
+                db.save_lesson_records(client.fetch_optional(
+                    "/v1/company/lessonRecords", ["lessonRecords", "records"],
+                    params={"date[]": [(_dt.date.today() - _dt.timedelta(days=1)).isoformat(),
+                                       (_dt.date.today() + _dt.timedelta(days=14)).isoformat()]}))
+        except Exception:
+            log.exception("лёгкий синк: записи на занятия не обновились")
         db.set_state("last_light_sync", __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     finally:
         client.close()
