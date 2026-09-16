@@ -13,16 +13,16 @@
 {% if v.комментарии_обновлены %}(подтянуты {{ v.комментарии_обновлены|replace('T',' ') }}){% endif %}.
 <button class="btn" onclick="fetch('/api/mesta/voronka/refresh',{method:'POST'}).then(function(){this.textContent='Обновляю — через минуту перезагрузите'}.bind(this))">Подтянуть комментарии</button></p>
 
-<div class="notice" style="margin:.6rem 0 1rem"><b>Осталось {{ v.осталось }} из {{ v.осталось + v.сделано }}.</b>
-Строка считается сделанной, когда после звонка в карточке появился комментарий админа (с {{ v.с_даты[8:] }}.{{ v.с_даты[5:7] }}).
-Сделанные уходят вниз стадии и сереют. Идти сверху вниз: сначала деньги и «посетил пробное».<br>
+<div class="notice" style="margin:.6rem 0 1rem"><b>В таблице только то, что осталось: {{ v.осталось }} из {{ v.осталось + v.сделано }}.</b>
+Строка считается сделанной, когда после звонка в карточке появился комментарий админа (с {{ v.с_даты[8:] }}.{{ v.с_даты[5:7] }}) —
+и сразу пропадает отсюда. Сделанные лежат свёрнутым списком в самом низу страницы.
+Идти сверху вниз: сначала деньги и «посетил пробное».<br>
 <b>Как убрать строку из списка:</b> статус клиента «Отказ» / «Не писать» / «Некачественный лид» — строка исчезает;
 дата в комментарии («перезвонить 01.10», «позвоню 26», «хотят в октябре», «на следующей неделе») — строка уходит в «Отложено» до этой даты;
-запись на занятие — переходит в «Ждём на пробное»; оплата — уходит. Комментарии подтягиваются каждые 20 минут, кнопка ниже — сразу.
-<button class="btn" id="hideDone" onclick="toggleDone()" style="margin-left:.6rem">Скрыть сделанные</button></div>
+запись на занятие — переходит в «Ждём на пробное»; оплата — уходит. Комментарии подтягиваются каждые 20 минут, кнопка выше — сразу.</div>
 <div class="cards">
   <div class="card"><div class="card-value">{{ v.осталось }}</div><div class="card-label">осталось сделать</div></div>
-  <div class="card"><div class="card-value">{{ v.сделано }}</div><div class="card-label">сделано</div></div>
+  <div class="card" style="opacity:.7"><div class="card-value">{{ v.сделано }}</div><div class="card-label">сделано — убрано из таблицы</div></div>
   <div class="card"><div class="card-value">{{ v.оплачено_в_группах_сезона }}</div><div class="card-label">оплачено · цель 311</div></div>
   {% for k, n in v.без_оплаты.items() %}
   <div class="card"><div class="card-value">{{ n }}</div><div class="card-label">{{ k }}</div></div>
@@ -41,8 +41,8 @@
   <th>Ребёнок</th><th>Телефон</th><th>Группа</th><th>Стадия</th><th>Тишина</th><th>Последний звонок</th><th>Последнее сообщение</th><th>Комментарий админа</th><th>Карточка</th></tr></thead>
 <tbody>
 {% for stage, rows in v.списки.items() %}{% for r in rows %}
-<tr data-s="{{ stage }}" data-done="{{ 1 if r.сделано else 0 }}" class="{{ 'done' if r.сделано else '' }}" style="border-bottom:1px solid #eee">
-  <td>{% if r.сделано %}✅ {% else %}⬜ {% endif %}{{ r.name }}</td>
+<tr data-s="{{ stage }}" style="border-bottom:1px solid #eee">
+  <td>⬜ {{ r.name }}</td>
   <td><a href="https://wa.me/{{ r.phone }}" target="_blank" rel="noopener">{{ r.phone }}</a></td>
   <td>{{ r.group }}</td>
   <td><span class="pill">{{ stage }}</span>{% if r.статус %}<div class="muted sm">{{ r.статус }}</div>{% endif %}
@@ -103,15 +103,33 @@
 </tr>
 {% endfor %}
 </tbody></table></details>
+<h2 style="margin-top:1.8rem">Сделано с {{ v.с_даты[8:] }}.{{ v.с_даты[5:7] }} — {{ v.сделано }}</h2>
+<p class="muted">Эти строки убраны из таблицы выше: по ним админ уже позвонил и написал в карточку.
+Список нужен только чтобы проверить, что именно закрыли и кто.</p>
+{% if v.сделанные %}
+<details><summary class="btn" style="display:inline-block;cursor:pointer">Показать сделанные</summary>
+<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:.6rem">
+<thead><tr style="text-align:left;border-bottom:2px solid #e4e2f2"><th>Ребёнок</th><th>Стадия</th><th>Кто закрыл</th><th>Комментарий</th><th>Карточка</th></tr></thead>
+<tbody>
+{% for r in v.сделанные %}
+<tr style="border-bottom:1px solid #eee;color:#8a8a9a">
+  <td>✅ {{ r.name }}</td>
+  <td class="sm">{{ r.стадия }}</td>
+  <td class="sm">{% if r.комментарий %}{{ r.комментарий.когда }} <b>{{ r.комментарий.кто }}</b>{% endif %}</td>
+  <td class="sm">{% if r.комментарий %}{{ r.комментарий.текст[:140] }}{% endif %}</td>
+  <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td>
+</tr>
+{% endfor %}
+</tbody></table></details>
+{% endif %}
+
 <style>.pill{display:inline-block;padding:.1rem .55rem;border-radius:99px;background:#EEF3FF;font-size:.82rem}
-.sm{font-size:.82rem;max-width:260px}.warn{color:#E30613;font-weight:600}#t td{vertical-align:top;padding:.35rem .4rem}
-tr.done td{color:#8a8a9a;background:#fafafd}tr.done .warn{color:#b0aeb8;font-weight:400}</style>
+.sm{font-size:.82rem;max-width:260px}.warn{color:#E30613;font-weight:600}#t td{vertical-align:top;padding:.35rem .4rem}</style>
 <script>
-var cur='', hide=false;
+var cur='';
 function filt(s){cur=s;var q=(document.getElementById('q').value||'').toLowerCase();
  document.querySelectorAll('#t tbody tr').forEach(function(tr){
-  var ok=(!s||tr.dataset.s===s)&&(!q||tr.textContent.toLowerCase().indexOf(q)>=0)&&(!hide||tr.dataset.done!=='1');
+  var ok=(!s||tr.dataset.s===s)&&(!q||tr.textContent.toLowerCase().indexOf(q)>=0);
   tr.style.display=ok?'':'none';});}
-function toggleDone(){hide=!hide;document.getElementById('hideDone').textContent=hide?'Показать сделанные':'Скрыть сделанные';filt(cur);}
 </script>
 {% endblock %}
