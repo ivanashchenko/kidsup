@@ -104,6 +104,12 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
         platili = {r[0] for r in conn.execute(
             "SELECT DISTINCT user_id FROM payments WHERE user_id IS NOT NULL")}
 
+        try:
+            st_names = {r[0]: r[1] for r in conn.execute(
+                "SELECT id, name FROM client_statuses")}
+        except Exception:
+            st_names = {}
+
         rows = conn.execute(
             "SELECT id, name, phone, client_state_id, created_at, raw FROM users "
             "WHERE created_at >= ? AND created_at <= ? ORDER BY created_at",
@@ -127,6 +133,7 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
             continue
         bd = nabor._birthday(raw)
         rec = {"телефон": "7" + p, "дети": [], "статус": st,
+               "статус_текст": st_names.get(st, ""),
                "создан": (created or "")[:10],
                "возраст": nabor._age(bd, today),
                "платил": False, "писали": "", "отвечал": "",
@@ -159,8 +166,11 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
     if limit:
         spisok_ = spisok_[:limit]
     po_mesyacam: dict[str, int] = {}
+    po_statusam: dict[str, int] = {}
     for f in semyi.values():
         po_mesyacam[f["создан"][:7]] = po_mesyacam.get(f["создан"][:7], 0) + 1
+        k = f["статус_текст"] or str(f["статус"] or "без статуса")
+        po_statusam[k] = po_statusam.get(k, 0) + 1
 
     return {
         "окно": {"с": since, "по": until},
@@ -175,6 +185,7 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
         "из_них_вообще_без_касаний": sum(
             1 for f in semyi.values() if not f["писали"] and not f["отвечал"]),
         "по_месяцам": dict(sorted(po_mesyacam.items())),
+        "по_статусам": dict(sorted(po_statusam.items(), key=lambda kv: -kv[1])),
         "семьи": spisok_,
         "не_проверить_семей": len(ne_proverit),
         "не_проверить": sorted(ne_proverit.values(), key=lambda f: f["создан"]),

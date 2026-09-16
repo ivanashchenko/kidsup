@@ -443,7 +443,7 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 {HOWTO}
 <div class='who'>{cols}</div>
 <div class='links card'><b>Рабочие списки</b> — открываются из задачи в колонке, отдельно заходить не нужно:
-<a href='/nabor'>где теряем набор</a> · <a href='/voronka'>кто без оплаты</a> · <a href='/mesta'>свободные места</a> · <a href='/spiski'>списки занятий</a> · <a href='/karta'>карта развития</a><br>
+<a href='/nabor'>где теряем набор</a> · <a href='/voronka'>кто без оплаты</a> · <a href='/nezvonili'>кому не звонили</a> · <a href='/mesta'>свободные места</a> · <a href='/spiski'>списки занятий</a> · <a href='/karta'>карта развития</a><br>
 <b>Справочное:</b> <a href='/base/{slug}'>план и списки семей</a> · <a href='/base/gruppy_reshenia'>куда зовём, какие группы сливаем</a> · <a href='/base/skripty_v3'>скрипты</a> · <a href='/base'>вся база</a></div>
 <div class='card' style='border-left:4px solid #312783'>
 <b>Где работать.</b> Смотришь только эту страницу. Всё остальное открывается по ссылке из задачи:
