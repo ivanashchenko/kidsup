@@ -2969,6 +2969,13 @@ def api_chaty_plan():
     return chaty.plan()
 
 
+@app.get("/api/chaty/lk", dependencies=AUTH)
+def api_chaty_lk():
+    """Кто готов к регистрации в личном кабинете: есть ли в карточке e-mail."""
+    from . import chaty
+    return chaty.lk_readiness()
+
+
 @app.get("/api/chaty/snapshot", dependencies=AUTH)
 def api_chaty_snapshot():
     """Кто уже состоит в чатах групп — по последнему снимку."""
@@ -3114,7 +3121,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-16.5"
+APP_VERSION = "2026-09-16.6"
 
 
 @app.get("/api/net")

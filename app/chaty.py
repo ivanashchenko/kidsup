@@ -399,3 +399,88 @@ def find_links(limit: int = 40) -> dict:
                         f["phones"].append(phone)
     return {"total": len(found), "links": sorted(
         found.values(), key=lambda f: f["first_seen"] or "", reverse=True)}
+
+
+# ── готовность к личному кабинету ──────────────────────────────────────
+# Владелец 16.09: «подготовь инструкции клиентам, как зарегистрироваться».
+# Первый шаг инструкции зависит от того, есть ли в карточке e-mail: с ним
+# родителю достаточно запросить пароль самому, без него он сначала должен
+# продиктовать почту админу. Значит инструкций нужно две, и надо знать,
+# кому какая. Только чтение.
+
+SEASON_PREFIX = "2627_"
+ST_UCHITSYA = 2
+
+
+def _lk_flag(raw: str) -> bool | None:
+    """Признак активированного личного кабинета, если МойКласс его отдаёт.
+
+    13.09 выяснили, что в чат группы можно добавить только клиента с
+    активированным кабинетом. Флаг в выгрузке карточки может называться
+    по-разному, поэтому перебираем известные варианты и честно возвращаем
+    None, когда поля нет вовсе, — вместо того чтобы молча считать «нет».
+    """
+    try:
+        u = json.loads(raw or "{}")
+    except ValueError:
+        return None
+    for k in ("hasLogin", "isLoginAllowed", "loginAllowed", "clientAccess",
+              "hasAccess", "lkAccess", "canLogin"):
+        if k in u:
+            return bool(u[k])
+    return None
+
+
+def lk_readiness() -> dict:
+    """Кто из клиентов готов к регистрации в личном кабинете.
+
+    Отдельно группы английского (там заведены чаты) и весь платящий сезон.
+    """
+    with db.get_conn() as conn:
+        cls = conn.execute(
+            "SELECT id, name FROM classes WHERE status='opened' "
+            "AND name LIKE ? AND name NOT LIKE '%Заявки%' ORDER BY name",
+            (SEASON_PREFIX + "%",)).fetchall()
+        ay, other, seen = [], [], set()
+        keys: set[str] = set()
+        for cid, name in cls:
+            rows = conn.execute(
+                "SELECT u.id, u.name, u.phone, u.email, u.raw FROM joins j "
+                "JOIN users u ON u.id = j.user_id "
+                "WHERE j.class_id=? AND j.status_id=? ORDER BY u.name",
+                (cid, ST_UCHITSYA)).fetchall()
+            kids = [{"uid": r[0], "ребёнок": r[1], "телефон": r[2] or "",
+                     "почта": (r[3] or "").strip(), "кабинет": _lk_flag(r[4])}
+                    for r in rows]
+            for r in rows:
+                try:
+                    keys |= set(json.loads(r[4] or "{}").keys())
+                except ValueError:
+                    pass
+            item = {"class_id": cid, "группа": name.replace(SEASON_PREFIX, ""),
+                    "детей": len(kids),
+                    "с_почтой": sum(1 for k in kids if k["почта"]),
+                    "дети": kids}
+            (ay if "_АЯ_" in name else other).append(item)
+            for k in kids:
+                seen.add((k["uid"], k["ребёнок"], k["телефон"], k["почта"]))
+        # семьи считаем по номеру телефона: у брата и сестры он один
+        fam_all, fam_mail = set(), set()
+        for _uid, _n, phone, mail in seen:
+            if not phone:
+                continue
+            fam_all.add(phone)
+            if mail:
+                fam_mail.add(phone)
+    ay_kids = [k for g in ay for k in g["дети"]]
+    ay_fam = {k["телефон"] for k in ay_kids if k["телефон"]}
+    ay_mail = {k["телефон"] for k in ay_kids if k["телефон"] and k["почта"]}
+    return {
+        "английский": {"групп": len(ay), "детей": len(ay_kids),
+                       "семей": len(ay_fam), "семей_с_почтой": len(ay_mail),
+                       "группы": ay},
+        "весь_сезон": {"групп": len(ay) + len(other), "детей": len(seen),
+                       "семей": len(fam_all), "семей_с_почтой": len(fam_mail)},
+        "остальные_группы": other,
+        "поля_карточки": sorted(keys),
+    }
