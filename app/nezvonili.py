@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 
 from . import db, nabor
@@ -38,6 +39,34 @@ DEAD = {146328,   # 0.1. Не писать / не звонить
 
 def _p10(x) -> str:
     return "".join(ch for ch in str(x or "") if ch.isdigit())[-10:]
+
+
+# Имена, которые CRM ставит сама, когда человека опознать не успели
+_BEZ_IMENI = re.compile(
+    r"^(звонок|пропущен|заявка|без имени|номер)|^[\d\s+()\-]+$", re.I)
+_SLUZHEBNOE = re.compile(r"дубл|тест|не важно|проверка", re.I)
+
+
+def _kachestvo(name: str, p10: str) -> str:
+    """Насколько по карточке вообще можно звонить.
+
+    Из 186 семей, которым ни разу не позвонили, у сорока вместо имени стоит
+    «Звонок от 7…», ещё у сорока четырёх — просто номер, а среди остальных
+    попались эвакуатор, три салона красоты и «Заявка Тест». Отдать это одним
+    списком — значит заставить админа самого отделять людей от мусора.
+
+    Мобильный у нас всегда 9xxxxxxxxx после кода страны: городской номер в
+    базе детского центра почти всегда чужая организация, а 7777777777 —
+    заглушка, которую админ поставил, чтобы сохранить карточку.
+    """
+    n = (name or "").strip()
+    if _SLUZHEBNOE.search(n):
+        return "служебная"
+    if not p10.startswith("9"):
+        return "не мобильный"
+    if not n or _BEZ_IMENI.match(n):
+        return "имя не заполнено"
+    return "можно звонить"
 
 
 def pokrytie(conn) -> dict:
@@ -70,7 +99,8 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
         #                           тянулся к нам сам, и мы не ответили.
         zvonili_my: dict[str, str] = {}
         govorili: dict[str, str] = {}
-        ne_vzyali: dict[str, str] = {}
+        ne_otvetili: dict[str, str] = {}    # входящий, трубку не сняли вовсе
+        sbrosili: dict[str, str] = {}       # сняли и разговор короче 20 секунд
         if pokr.get("есть"):
             for ts, phone, direction, state in conn.execute(
                     "SELECT ts, phone, direction, state FROM mango_calls"):
@@ -78,12 +108,15 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
                 if not p:
                     continue
                 day = str(ts)[:10]
+                st_ = str(state or "")
                 if str(direction).startswith(("out", "исх")):
                     d = zvonili_my
-                elif str(state or "") == "talked":
+                elif st_ == "talked":
                     d = govorili
+                elif st_ == "missed":
+                    d = ne_otvetili
                 else:
-                    d = ne_vzyali
+                    d = sbrosili
                 if day > d.get(p, ""):
                     d[p] = day
 
@@ -137,7 +170,8 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
                "создан": (created or "")[:10],
                "возраст": nabor._age(bd, today),
                "платил": False, "писали": "", "отвечал": "",
-               "звонил_не_взяли": ne_vzyali.get(p, "")}
+               "не_ответили": ne_otvetili.get(p, ""),
+               "сбросили": sbrosili.get(p, "")}
         # карточка старше журнала — про неё нельзя сказать «не звонили»
         kuda = ne_proverit if (gorizont and (created or "")[:10] < gorizont) else semyi
         f = kuda.setdefault(p, rec)
@@ -148,7 +182,8 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
         f["создан"] = min(f["создан"], (created or "")[:10]) if f["создан"] else (created or "")[:10]
         f["писали"] = pisali.get(p, "")
         f["отвечал"] = otvechali.get(p, "")
-        f["звонил_не_взяли"] = ne_vzyali.get(p, "")
+        f["не_ответили"] = ne_otvetili.get(p, "")
+        f["сбросили"] = sbrosili.get(p, "")
 
     itogo["не_звонили"] = sum(len(f["дети"]) for f in semyi.values())
     itogo["не_проверить"] = sum(len(f["дети"]) for f in ne_proverit.values())
@@ -157,12 +192,13 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
         # сверху те, кто звонил нам сам и не дозвонился: это не холодный
         # обзвон, а возврат долга. Дальше платившие, потом отвечавшие в
         # переписке, потом по свежести карточки
-        return (not f["звонил_не_взяли"], not f["платил"],
+        return (not f["не_ответили"], not f["сбросили"], not f["платил"],
                 not bool(f["отвечал"]), f["создан"] or "")
 
     spisok_ = sorted(semyi.values(), key=_sort, reverse=False)
     for f in spisok_:
         f["дети"] = sorted(set(f["дети"]))
+        f["качество"] = _kachestvo(", ".join(f["дети"]), _p10(f["телефон"]))
     if limit:
         spisok_ = spisok_[:limit]
     po_mesyacam: dict[str, int] = {}
@@ -177,8 +213,10 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
         "покрытие_журнала": pokr,
         "итоги": itogo,
         "семей_без_звонка": len(semyi),
-        "из_них_звонили_нам_и_не_дозвонились": sum(
-            1 for f in semyi.values() if f["звонил_не_взяли"]),
+        "из_них_звонили_мы_не_ответили": sum(
+            1 for f in semyi.values() if f["не_ответили"]),
+        "из_них_сняли_и_сбросили": sum(
+            1 for f in semyi.values() if f["сбросили"] and not f["не_ответили"]),
         "из_них_платили": sum(1 for f in semyi.values() if f["платил"]),
         "из_них_писали_в_whatsapp": sum(1 for f in semyi.values() if f["писали"]),
         "из_них_отвечали": sum(1 for f in semyi.values() if f["отвечал"]),
@@ -186,6 +224,9 @@ def spisok(since: str = OKNO_S, until: str = OKNO_PO, limit: int = 0) -> dict:
             1 for f in semyi.values() if not f["писали"] and not f["отвечал"]),
         "по_месяцам": dict(sorted(po_mesyacam.items())),
         "по_статусам": dict(sorted(po_statusam.items(), key=lambda kv: -kv[1])),
+        "по_качеству": {k: sum(1 for f in spisok_ if f.get("качество") == k)
+                        for k in ("можно звонить", "имя не заполнено",
+                                  "не мобильный", "служебная")},
         "семьи": spisok_,
         "не_проверить_семей": len(ne_proverit),
         "не_проверить": sorted(ne_proverit.values(), key=lambda f: f["создан"]),

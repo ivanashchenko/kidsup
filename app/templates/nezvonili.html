@@ -21,7 +21,8 @@
 
 <div class="cards">
   <div class="card"><div class="card-value">{{ d.семей_без_звонка }}</div><div class="card-label">семей без единого звонка</div></div>
-  <div class="card"><div class="card-value" style="color:#E30613">{{ d.из_них_звонили_нам_и_не_дозвонились }}</div><div class="card-label">звонили нам сами — мы не взяли</div></div>
+  <div class="card"><div class="card-value" style="color:#E30613">{{ d.из_них_звонили_мы_не_ответили }}</div><div class="card-label">звонили нам — трубку не сняли</div></div>
+  <div class="card"><div class="card-value" style="color:#F59C00">{{ d.из_них_сняли_и_сбросили }}</div><div class="card-label">сняли и сбросили короче 20 с</div></div>
   <div class="card"><div class="card-value">{{ d.из_них_платили }}</div><div class="card-label">из них когда-то платили</div></div>
   <div class="card"><div class="card-value">{{ d.из_них_отвечали }}</div><div class="card-label">писали нам в WhatsApp</div></div>
   <div class="card"><div class="card-value">{{ d.из_них_вообще_без_касаний }}</div><div class="card-label">ни звонка, ни переписки</div></div>
@@ -46,15 +47,32 @@
   {% for k, n in d.по_статусам.items() %}<tr><td>{{ k }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
 </table></div>
 
+<h2>Насколько по карточке можно звонить</h2>
+<p class="muted">Список сырой: у части семей вместо имени стоит «Звонок от 7…», которое CRM подставила сама,
+а среди остальных попались городские номера чужих организаций и служебные карточки вроде «Заявка Тест».
+Звонить имеет смысл по первой строке; вторую сначала надо опознать.</p>
+<div class="scroll"><table>
+  <tr><th>Что за карточка</th><th class="num">семей</th><th>Что с ней делать</th></tr>
+  <tr><td><b>Можно звонить</b></td><td class="num">{{ d.по_качеству['можно звонить'] }}</td>
+      <td class="sm">имя есть, номер мобильный — это и есть рабочий список</td></tr>
+  <tr><td>Имя не заполнено</td><td class="num">{{ d.по_качеству['имя не заполнено'] }}</td>
+      <td class="sm">карточку завела автоматика по пропущенному звонку; звонить можно, но представляться придётся с нуля</td></tr>
+  <tr><td>Не мобильный</td><td class="num">{{ d.по_качеству['не мобильный'] }}</td>
+      <td class="sm">городской номер — почти всегда чужая организация, в обзвон не брать</td></tr>
+  <tr><td>Служебная</td><td class="num">{{ d.по_качеству['служебная'] }}</td>
+      <td class="sm">дубли и тестовые карточки, пометить и не трогать</td></tr>
+</table></div>
+
 <h2>Кому звонить — {{ d.семьи|length }}</h2>
-<p class="muted">Сверху те, кто <b>звонил нам сам и не дозвонился</b> — это не холодный обзвон,
-а возврат долга: человек тянулся к нам, и мы не ответили. Дальше те, кто уже платил: они нас знают,
+<p class="muted">Сверху те, кто <b>звонил нам сам, а трубку не сняли</b> — это не холодный обзвон,
+а возврат долга: человек тянулся к нам, и мы не ответили. За ними — кому сняли и сбросили короче 20 секунд. Дальше те, кто уже платил: они нас знают,
 и разговор начинается не с нуля. Затем отвечавшие в переписке. Потом остальные, свежие сверху.
 Первая фраза не «вы оставляли заявку» — человек этого не помнит. Лучше так: «вы у нас интересовались занятиями
-для ребёнка, расскажу, что сейчас есть по возрасту». Тем, кто звонил и не дозвонился, — «вы нам звонили,
+для ребёнка, расскажу, что сейчас есть по возрасту». Тем, кто звонил, а мы не сняли, — «вы нам звонили,
 а мы не успели ответить, извините».</p>
 <p style="margin:.6rem 0">
   <input id="q" placeholder="имя или телефон" oninput="filt()" style="padding:.45rem .7rem">
+  <button class="btn" onclick="only('можно')">Только те, кому можно звонить</button>
   <button class="btn" onclick="only('платил')">Только платившие</button>
   <button class="btn" onclick="only('отвечал')">Только отвечавшие</button>
   <button class="btn" onclick="only('')">Все</button>
@@ -64,13 +82,13 @@
     <th>Звонил нам</th><th>Платил</th><th>Писали</th><th>Отвечал</th><th>CRM</th></tr></thead>
   <tbody>
   {% for f in d.семьи %}
-  <tr data-p="{{ 1 if f.платил else 0 }}" data-o="{{ 1 if f.отвечал else 0 }}">
-    <td>{{ f.дети|join(', ') }}</td>
+  <tr data-p="{{ 1 if f.платил else 0 }}" data-o="{{ 1 if f.отвечал else 0 }}" data-k="{{ f.качество }}">
+    <td>{{ f.дети|join(', ') }}{% if f.качество != 'можно звонить' %}<div class="muted sm">{{ f.качество }}</div>{% endif %}</td>
     <td><a href="tel:+{{ f.телефон }}">+{{ f.телефон }}</a> ·
         <a href="https://wa.me/{{ f.телефон }}" target="_blank" rel="noopener">WA</a></td>
     <td class="num">{{ f.возраст if f.возраст else '—' }}</td>
     <td class="sm">{{ f.создан[8:] }}.{{ f.создан[5:7] }}.{{ f.создан[2:4] }}<div class="muted">{{ f.статус_текст }}</div></td>
-    <td class="sm">{% if f.звонил_не_взяли %}<b class="warn">{{ f.звонил_не_взяли[8:] }}.{{ f.звонил_не_взяли[5:7] }} не взяли</b>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="sm">{% if f.не_ответили %}<b class="warn">{{ f.не_ответили[8:] }}.{{ f.не_ответили[5:7] }} не сняли</b>{% elif f.сбросили %}<b style="color:#F59C00">{{ f.сбросили[8:] }}.{{ f.сбросили[5:7] }} сбросили</b>{% else %}<span class="muted">—</span>{% endif %}</td>
     <td class="sm">{% if f.платил %}<b style="color:#4e8a12">да</b>{% else %}<span class="muted">—</span>{% endif %}</td>
     <td class="sm">{% if f.писали %}{{ f.писали[8:] }}.{{ f.писали[5:7] }}{% else %}<span class="muted">—</span>{% endif %}</td>
     <td class="sm">{% if f.отвечал %}<b>{{ f.отвечал[8:] }}.{{ f.отвечал[5:7] }}</b>{% else %}<span class="muted">—</span>{% endif %}</td>
@@ -106,6 +124,7 @@ var mode='';
 function filt(){var q=(document.getElementById('q').value||'').toLowerCase();
  document.querySelectorAll('#t tbody tr').forEach(function(tr){
   var ok=(!q||tr.textContent.toLowerCase().indexOf(q)>=0)
+       &&(mode!=='можно'||tr.dataset.k==='можно звонить')
        &&(mode!=='платил'||tr.dataset.p==='1')
        &&(mode!=='отвечал'||tr.dataset.o==='1');
   tr.style.display=ok?'':'none';});}
