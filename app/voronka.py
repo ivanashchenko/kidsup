@@ -169,7 +169,7 @@ def trial_state(conn, uid: int, class_id: int | None) -> dict:
     и перезаписать) или записи на конкретное занятие нет вовсе (записать
     на дату)."""
     today = date.today().isoformat()
-    q = ("SELECT l.date, l.begin_time, lr.visit, l.class_id FROM lesson_records lr "
+    q = ("SELECT l.date, l.begin_time, lr.visit, l.class_id, lr.raw FROM lesson_records lr "
          "JOIN lessons l ON l.id = lr.lesson_id WHERE lr.user_id=? ")
     args: list = [uid]
     if class_id:
@@ -184,8 +184,17 @@ def trial_state(conn, uid: int, class_id: int | None) -> dict:
     future = [r for r in rows if r["date"] >= today]
     past = [r for r in rows if r["date"] < today]
     if future:
-        d, t = future[0]["date"], (future[0]["begin_time"] or "")[:5]
-        return {"вид": "ждём", "дата": d, "время": t,
+        f = future[0]
+        d, t = f["date"], (f["begin_time"] or "")[:5]
+        # Флаг «пробное» на записи ставит админ руками. Без него автонапоминание
+        # накануне не уходит вовсе: 16.09 из семи записанных вперёд флага не было
+        # у шести, и ни одна семья не получила бы напоминания. Показываем прямо
+        # в списке — это единственное, что здесь может потребовать работы.
+        try:
+            test = bool(json.loads(f["raw"] or "{}").get("test"))
+        except (ValueError, TypeError, IndexError, KeyError):
+            test = True          # не смогли прочитать — не пугаем админа зря
+        return {"вид": "ждём", "дата": d, "время": t, "флаг_пробного": test,
                 "через_дней": (date.fromisoformat(d) - date.today()).days}
     if past:
         last = past[-1]

@@ -81,13 +81,19 @@
 <h2 style="margin-top:1.8rem">Ждём на пробное — {{ v.ждём|length }}</h2>
 <p class="muted">Дата занятия впереди, напоминания родителям уходят сами. Админу здесь ничего делать не нужно,
 пока ребёнок не пропустит занятие — тогда он поднимется в таблицу выше.</p>
+{% set безфлага = v.ждём|selectattr('пробное.флаг_пробного', 'defined')|rejectattr('пробное.флаг_пробного')|list %}
+{% if безфлага %}
+<p class="warn">У {{ безфлага|length }} записей не стоит галочка «пробное занятие» — напоминание накануне
+этим семьям <u>не уйдёт</u>. Открыть запись в CRM и поставить галочку:
+{% for r in безфлага %}<a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">{{ r.name }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+{% endif %}
 <details><summary class="btn" style="display:inline-block;cursor:pointer">Показать список</summary>
 <table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:.6rem">
 <thead><tr style="text-align:left;border-bottom:2px solid #e4e2f2"><th>Пробное</th><th>Ребёнок</th><th>Группа</th><th>Комментарий админа</th><th>Карточка</th></tr></thead>
 <tbody>
 {% for r in v.ждём %}
 <tr style="border-bottom:1px solid #eee">
-  <td>{% if r.пробное.вид == 'ждём' %}{{ r.пробное.дата[5:]|replace('-', '.') }} {{ r.пробное.время }}{% if r.пробное.через_дней > 14 %} <span class="muted">(через {{ r.пробное.через_дней }} дн.)</span>{% endif %}{% else %}был {{ r.пробное.дата[5:]|replace('-', '.') }}{% endif %}</td>
+  <td>{% if r.пробное.вид == 'ждём' %}{{ r.пробное.дата[5:]|replace('-', '.') }} {{ r.пробное.время }}{% if r.пробное.флаг_пробного is defined and not r.пробное.флаг_пробного %} <span class="warn" title="нет галочки «пробное» — напоминание не уйдёт">!</span>{% endif %}{% if r.пробное.через_дней > 14 %} <span class="muted">(через {{ r.пробное.через_дней }} дн.)</span>{% endif %}{% else %}был {{ r.пробное.дата[5:]|replace('-', '.') }}{% endif %}</td>
   <td>{{ r.name }}</td>
   <td class="sm">{{ r.group }}</td>
   <td class="sm">{% if r.комментарий %}{{ r.комментарий.когда }} <b>{{ r.комментарий.кто }}</b>: {{ r.комментарий.текст[:120] }}{% else %}<span class="muted">—</span>{% endif %}</td>
