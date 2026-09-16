@@ -3136,7 +3136,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-16.19"
+APP_VERSION = "2026-09-16.20"
 
 
 @app.get("/api/net")
@@ -5507,6 +5507,58 @@ def api_zayavki_audit(limit: int = 0):
         return {"ok": False, "error": str(e)[:300], "trace": traceback.format_exc()[-1200:]}
 
 
+def _crm_missing() -> set:
+    """Кого мы уже проверяли и не нашли в МойКлассе."""
+    try:
+        with db.get_conn() as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS crm_missing ("
+                         "user_id INTEGER PRIMARY KEY, checked TEXT, note TEXT)")
+            return {r[0] for r in conn.execute("SELECT user_id FROM crm_missing")}
+    except Exception:
+        return set()
+
+
+@app.post("/api/crm/verify", dependencies=AUTH)
+def api_crm_verify(payload: dict = Body(...)):
+    """Проверить, живы ли карточки в МойКлассе: {"uids": [1, 2, 3]}.
+
+    Локальная копия только пополняется: удалённую или слитую карточку из неё
+    ничто не убирает, и она продолжает висеть в рабочих списках. Проверяем
+    точечно по списку, результат храним — страницы читают его без обращений
+    к API. Ничего не удаляем, только помечаем.
+    """
+    from .moyklass_client import MoyklassClient
+    uids = [int(x) for x in (payload.get("uids") or []) if str(x).isdigit()][:200]
+    if not uids:
+        raise HTTPException(400, "нужен список uids")
+    mk = MoyklassClient(sync.get_api_key())
+    missing, alive = [], []
+    try:
+        with db.get_conn() as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS crm_missing ("
+                         "user_id INTEGER PRIMARY KEY, checked TEXT, note TEXT)")
+            for uid in uids:
+                try:
+                    u = mk.get(f"/v1/company/users/{uid}")
+                    ok = bool(u and u.get("id"))
+                    note = ""
+                except Exception as e:  # noqa: BLE001
+                    ok, note = False, f"{type(e).__name__}: {str(e)[:120]}"
+                if ok:
+                    alive.append(uid)
+                    conn.execute("DELETE FROM crm_missing WHERE user_id=?", (uid,))
+                else:
+                    missing.append({"uid": uid, "почему": note})
+                    conn.execute(
+                        "INSERT OR REPLACE INTO crm_missing (user_id, checked, note) "
+                        "VALUES (?,?,?)", (uid, date.today().isoformat(), note[:200]))
+                time.sleep(0.3)
+    finally:
+        mk.close()
+    return {"ok": True, "проверено": len(uids), "живых": len(alive),
+            "нет_в_crm": missing}
+
+
 @app.get("/api/crm/user", dependencies=AUTH)
 def api_crm_user(phone: str = "", user_id: int = 0, days: int = 14):
     """Карточки по телефону (или одна по id) с ближайшими записями и группами.
@@ -7032,9 +7084,19 @@ def api_mesta_voronka():
     # октябре») — строка в «отложено» до этой даты.
     removed: list = []
     snoozed: list = []
+    # Карточки, которых в МойКлассе уже нет. Синхронизация только добавляет и
+    # обновляет, удалённое из CRM в локальной копии остаётся навсегда — и
+    # висит в работе у админа. 16.09 такой оказалась Чистякова Арина: строка
+    # на странице есть, а карточки нет ни по id, ни по телефону, и доделать
+    # её физически нечем. Проверка — POST /api/crm/verify.
+    prizraki = _crm_missing()
+    ghosts: list = []
     for k, lst in out.items():
         keep = []
         for r in lst:
+            if r.get("uid") in prizraki:
+                ghosts.append({**r, "стадия": k})
+                continue
             if r.get("мёртвый_статус") and k not in ("учится без оплаты", "абонемент закончился"):
                 removed.append({**r, "стадия": k})
                 continue
@@ -7058,6 +7120,7 @@ def api_mesta_voronka():
             "сделано": done_n, "сделанные": done_rows,
             "осталось": sum(len(v) for v in out.values()), "с_даты": start,
             "отложено": snoozed, "убрано_по_статусу": len(removed),
+            "нет_в_crm": ghosts,
             "динамика": series[-20:],
             "комментарии_обновлены": db.get_setting("crm_comments_refreshed", ""),
             "списки": out,
