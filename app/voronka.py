@@ -167,24 +167,30 @@ def trial_state(conn, uid: int, class_id: int | None) -> dict:
     идут сами». Верно — пока дата впереди, админу делать нечего. Работа
     появляется в двух случаях: дата прошла и явки нет (не пришёл — перезвонить
     и перезаписать) или записи на конкретное занятие нет вовсе (записать
-    на дату)."""
+    на дату).
+
+    Будущую запись ищем по ВСЕМ группам, а не только по той, в которой висит
+    заявка. 16.09 Козлова Ангелина числилась «не пришла 10.09» в группе 3–5
+    лет, хотя накануне её записали на 18.09 в другую группу: время не подошло,
+    админ перезаписал. Работа сделана, а страница звала звонить ещё раз.
+    Прошлое, наоборот, смотрим по своей группе — там важно, на что именно
+    ребёнок не пришёл."""
     today = date.today().isoformat()
-    q = ("SELECT l.date, l.begin_time, lr.visit, l.class_id, lr.raw FROM lesson_records lr "
-         "JOIN lessons l ON l.id = lr.lesson_id WHERE lr.user_id=? ")
-    args: list = [uid]
-    if class_id:
-        q += "AND l.class_id=? "
-        args.append(class_id)
     try:
-        rows = conn.execute(q + "ORDER BY l.date, l.begin_time", args).fetchall()
+        rows = conn.execute(
+            "SELECT l.date, l.begin_time, lr.visit, l.class_id, lr.raw, c.name AS cls "
+            "FROM lesson_records lr JOIN lessons l ON l.id = lr.lesson_id "
+            "LEFT JOIN classes c ON c.id = l.class_id "
+            "WHERE lr.user_id=? ORDER BY l.date, l.begin_time", (uid,)).fetchall()
     except Exception:
         return {"вид": "нет_данных"}
-    if not rows and class_id:
-        return trial_state(conn, uid, None)
     future = [r for r in rows if r["date"] >= today]
-    past = [r for r in rows if r["date"] < today]
+    past = [r for r in rows if r["date"] < today
+            and (not class_id or r["class_id"] == class_id)]
+    if not past and class_id:
+        past = [r for r in rows if r["date"] < today]
     if future:
-        f = future[0]
+        f = next((r for r in future if class_id and r["class_id"] == class_id), future[0])
         d, t = f["date"], (f["begin_time"] or "")[:5]
         # Флаг «пробное» на записи ставит админ руками. Без него автонапоминание
         # накануне не уходит вовсе: 16.09 из семи записанных вперёд флага не было
@@ -194,8 +200,11 @@ def trial_state(conn, uid: int, class_id: int | None) -> dict:
             test = bool(json.loads(f["raw"] or "{}").get("test"))
         except (ValueError, TypeError, IndexError, KeyError):
             test = True          # не смогли прочитать — не пугаем админа зря
-        return {"вид": "ждём", "дата": d, "время": t, "флаг_пробного": test,
-                "через_дней": (date.fromisoformat(d) - date.today()).days}
+        out = {"вид": "ждём", "дата": d, "время": t, "флаг_пробного": test,
+               "через_дней": (date.fromisoformat(d) - date.today()).days}
+        if class_id and f["class_id"] != class_id:
+            out["другая_группа"] = (f["cls"] or "").replace("2627_", "")
+        return out
     if past:
         last = past[-1]
         if last["visit"]:
