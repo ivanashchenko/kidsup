@@ -3228,7 +3228,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-17.21"
+APP_VERSION = "2026-09-17.22"
 
 
 @app.get("/api/net")
@@ -5363,6 +5363,51 @@ def api_plan_inbox_add(payload: dict = Body(...)):
                       str(payload.get("who") or "Аня")[:20], str(payload.get("text") or "")[:400],
                       str(payload.get("phone") or "")[:20], str(payload.get("source") or "")[:40]))
     return {"ok": True}
+
+
+@app.post("/api/plan/inbox/move", dependencies=AUTH)
+def api_plan_inbox_move(payload: dict = Body(...)):
+    """Передать незакрытые дела другому админу и/или на другой день.
+
+    Смена меняется, а дело остаётся: 17.09 половина пунктов лежала на Аню,
+    а назавтра в смене оказалась одна Ира — и на её странице плана эти
+    пункты просто не появились бы, потому что они привязаны ко вчерашнему
+    дню. {"from_who": ["Аня","Лена"], "day": "2026-09-17",
+    "to_who": "Ира", "to_day": "2026-09-18"} — переносит только
+    незакрытые; done не трогаем, сделанное остаётся в истории дня.
+    """
+    frm = payload.get("from_who") or []
+    if isinstance(frm, str):
+        frm = [frm]
+    frm = [str(x)[:20] for x in frm]
+    to_who = str(payload.get("to_who") or "").strip()[:20]
+    day = str(payload.get("day") or "")[:10]
+    to_day = str(payload.get("to_day") or "")[:10]
+    ids = [int(x) for x in (payload.get("ids") or []) if str(x).isdigit()]
+    if not to_who and not to_day:
+        raise HTTPException(400, "нужно to_who и/или to_day")
+    sets, args = [], []
+    if to_who:
+        sets.append("who=?"); args.append(to_who)
+    if to_day:
+        sets.append("day=?"); args.append(to_day)
+    where, wargs = ["done=0"], []
+    if ids:
+        where.append("id IN (%s)" % ",".join("?" * len(ids))); wargs += ids
+    else:
+        if not day:
+            raise HTTPException(400, "нужен day или ids")
+        where.append("day=?"); wargs.append(day)
+        if frm:
+            where.append("who IN (%s)" % ",".join("?" * len(frm))); wargs += frm
+    with db.get_conn() as conn:
+        _inbox_init(conn)
+        rows = conn.execute("SELECT id, who, text FROM plan_inbox WHERE " + " AND ".join(where),
+                            wargs).fetchall()
+        conn.execute("UPDATE plan_inbox SET " + ", ".join(sets) + " WHERE " + " AND ".join(where),
+                     args + wargs)
+    return {"ok": True, "moved": len(rows),
+            "items": [{"id": r["id"], "who": r["who"], "text": r["text"][:80]} for r in rows]}
 
 
 @app.get("/api/segment/english-unpaid", dependencies=AUTH)
