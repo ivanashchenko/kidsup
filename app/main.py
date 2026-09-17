@@ -2991,6 +2991,20 @@ def nezvonili_page(request: Request, since: str = "", until: str = ""):
     return render(request, "nezvonili.html", active="nezvonili", d=d)
 
 
+@app.get("/obzvon", response_class=HTMLResponse, dependencies=AUTH)
+def obzvon_page(request: Request):
+    """Кто ходил в прошлом сезоне и летом, ушёл, и кому мы не звонили."""
+    from . import obzvon
+    return render(request, "obzvon.html", active="obzvon", d=obzvon.spisok())
+
+
+@app.get("/api/obzvon", dependencies=AUTH)
+def api_obzvon():
+    """То же машинным форматом."""
+    from . import obzvon
+    return obzvon.spisok()
+
+
 @app.get("/api/nezvonili", dependencies=AUTH)
 def api_nezvonili(since: str = "", until: str = "", limit: int = 0):
     """Список семей без единого звонка за окно (по умолчанию 01.09.25–31.08.26)."""
@@ -3150,7 +3164,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-17.6"
+APP_VERSION = "2026-09-17.9"
 
 
 @app.get("/api/net")

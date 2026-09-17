@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Вернуть тех, кто ходил — KidsUP{% endblock %}
+{% block content %}
+<h1>Вернуть тех, кто ходил</h1>
+<p class="muted">Дети, которые занимались у нас с {{ d.окно.с[8:] }}.{{ d.окно.с[5:7] }}.{{ d.окно.с[:4] }}
+по {{ d.окно.по[8:] }}.{{ d.окно.по[5:7] }}.{{ d.окно.по[:4] }} — прошлый учебный год и лето, — сейчас не ходят,
+и <b>ни одного разговора с их родителями за это время не состоялось</b>. Не «оставили заявку», а
+<b>сидели в нашем классе</b>: педагог отмечал их в журнале, родители платили.
+{{ d.никогда_не_набирали }} номеров мы не набирали вообще, ещё {{ d.не_дозвонились }} набирали,
+но трубку так и не взяли.</p>
+
+<div class="notice"><b>Чем этот список отличается от «Кому не звонили».</b> Тот построен по карточкам:
+человек оставил номер — и всё. Оттуда сорок строк «Звонок от 79…» и городские номера чужих
+организаций: имени нет, потому что разговора не было. Здесь список построен по посещённым занятиям,
+поэтому имя есть у каждого — без имени ребёнка в группу не записывают. Это самая тёплая база,
+какая у нас есть: разговор начинается не с «вы оставляли заявку», а с «ваш ребёнок у нас занимался».</div>
+
+<div class="cards">
+  <div class="card"><div class="card-value" style="color:#7DB928">{{ d.детей }}</div><div class="card-label">детей вернуть</div></div>
+  <div class="card"><div class="card-value">{{ d.семей }}</div><div class="card-label">звонков сделать</div></div>
+  <div class="card"><div class="card-value">{{ d.никогда_не_набирали }}</div><div class="card-label">номер ни разу не набирали</div></div>
+  <div class="card"><div class="card-value" style="color:#F59C00">{{ d.не_дозвонились }}</div><div class="card-label">набирали, но не дозвонились</div></div>
+  <div class="card"><div class="card-value">{{ d.платили }}</div><div class="card-label">из них платили нам</div></div>
+  <div class="card" style="opacity:.75"><div class="card-value">{{ d.итоги.поговорили }}</div><div class="card-label">ходили, и с ними поговорили</div></div>
+  <div class="card" style="opacity:.75"><div class="card-value">{{ d.итоги.ходят_сейчас }}</div><div class="card-label">ходят и сейчас — не трогаем</div></div>
+</div>
+
+<div class="notice"><b>Почему «не прозвонен» считается по разговору, а не по набору номера.</b>
+Первая версия списка дала четырнадцать человек: всех остальных она сочла прозвоненными по факту
+набранного номера. Но телефон, который прозвонил и который никто не взял, для семьи не произошёл —
+там не знают, что мы звонили. Журнал Манго различает исходы, и мы берём разговор: <b>talked</b> —
+поговорили от двадцати секунд. Если мы набирали и не дозвонились, ребёнок остаётся в списке,
+и в таблице это видно в столбце «набирали». Такому родителю первая фраза другая:
+«мы вам звонили, не застали — вот зачем звонили».</div>
+
+<p class="muted" style="margin-top:.8rem">Всего занимавшихся в окне {{ d.итоги.ходили_всего }}.
+Из них не попали в список: ходят сейчас {{ d.итоги.ходят_сейчас }},
+с ними уже поговорили {{ d.итоги.поговорили }},
+без телефона в карточке {{ d.итоги.без_телефона }},
+в статусах «не писать» / «не работаем» / «некачественный лид» {{ d.итоги.мёртвый_статус }}.
+{% if d.покрытие_журнала.есть %}Журнал звонков у нас с
+{{ d.покрытие_журнала.с[8:] }}.{{ d.покрытие_журнала.с[5:7] }}.{{ d.покрытие_журнала.с[:4] }} —
+окно он покрывает целиком, так что «не звонили» здесь сказано уверенно.{% endif %}</p>
+
+<div class="notice"><b>С чего начать разговор.</b> Первая фраза называет ребёнка и предмет:
+«Здравствуйте, это KidsUP на Бульваре Рокоссовского. У нас <i>имя</i> занимался <i>предметом</i> —
+хотела узнать, как у него дела и не думаете ли вернуться в этом году».
+Не продавать в первой фразе: сначала узнать, почему ушли. Если ушли из-за времени или педагога —
+это решаемо, и именно это надо услышать. Если переехали — записать и закрыть карточку честно.
+<b>Столбец «ушёл» — самое важное:</b> тот, кто был у нас в мае, помнит нас и педагога;
+тот, кто последний раз был в сентябре прошлого года, — уже нет, с ним разговор длиннее.</div>
+
+<h2 style="margin-top:1.4rem">Кому звонить — {{ d.дети|length }} детей, {{ d.семей }} номеров</h2>
+<p style="margin:.6rem 0">
+  <input id="q" placeholder="имя, фамилия или телефон" oninput="filt()" style="padding:.45rem .7rem">
+  <button class="btn" onclick="only('платил')">Только платившие</button>
+  <button class="btn" onclick="only('ниразу')">Номер ни разу не набирали</button>
+  <button class="btn" onclick="only('недозвон')">Набирали, но не дозвонились</button>
+  <button class="btn" onclick="only('')">Все</button>
+  <span class="muted sm" id="cnt"></span>
+</p>
+<div class="scroll"><table id="t">
+  <thead><tr><th>Ребёнок</th><th class="num">возраст</th><th>Ходил на</th>
+    <th class="num">занятий</th><th>Ушёл</th><th>Платил</th><th>Набирали</th><th>Статус в CRM</th><th>Телефон</th><th>CRM</th></tr></thead>
+  <tbody>
+  {% for r in d.дети %}
+  <tr data-p="{{ 1 if r.платил else 0 }}" data-n="{{ 1 if r.набирали else 0 }}">
+    <td><b>{{ r.имя }}</b>
+        {% if r.братья %}<div class="muted sm">на этом же номере: {{ r.братья|join(', ') }}</div>{% endif %}</td>
+    <td class="num">{{ r.возраст if r.возраст else '—' }}</td>
+    <td class="sm">{{ r.предметы|join(', ') or '—' }}</td>
+    <td class="num">{{ r.занятий }}</td>
+    <td class="sm">{{ r.последнее[8:] }}.{{ r.последнее[5:7] }}.{{ r.последнее[2:4] }}</td>
+    <td class="sm">{% if r.платил %}<b style="color:#4e8a12">да</b>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="sm">{% if r.набирали %}<b style="color:#F59C00">{{ r.набирали[8:] }}.{{ r.набирали[5:7] }} не дозвонились</b>{% else %}<span class="muted">ни разу</span>{% endif %}</td>
+    <td class="sm">{{ r.статус_текст or '—' }}</td>
+    <td><a href="tel:+{{ r.телефон }}">+{{ r.телефон }}</a> ·
+        <a href="https://wa.me/{{ r.телефон }}" target="_blank" rel="noopener">WA</a></td>
+    <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">→</a></td>
+  </tr>
+  {% else %}<tr><td colspan="10" class="muted">пусто</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+
+{% if d.по_предметам %}
+<h2 style="margin-top:1.6rem">На что ходили</h2>
+<p class="muted">Полезно перед звонком: если ребёнок ходил на английский, его зовут обратно
+в английский, а не «на занятия вообще».</p>
+<div class="scroll"><table>
+  <tr><th>Предмет</th><th class="num">детей</th></tr>
+  {% for k, n in d.по_предметам.items() %}<tr><td>{{ k }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+{% if d.по_месяцам %}
+<h2 style="margin-top:1.6rem">Когда были у нас в последний раз</h2>
+<p class="muted">Верхние строки — самые тёплые: нас ещё помнят.</p>
+<div class="scroll"><table>
+  <tr>{% for m in d.по_месяцам %}<th>{{ m[5:7] }}.{{ m[2:4] }}</th>{% endfor %}</tr>
+  <tr>{% for m, n in d.по_месяцам.items() %}<td class="num">{{ n }}</td>{% endfor %}</tr>
+</table></div>
+{% endif %}
+
+{% if d.ходят_сейчас %}
+<h2 style="margin-top:1.8rem">Ходят и сейчас — не звонить, {{ d.ходят_сейчас|length }}</h2>
+<p class="muted">Эти дети занимались в прошлом сезоне и продолжают ходить в этом. Им тоже ни разу
+не звонили, но звонить со словами «ваш ребёнок у нас занимался» действующему клиенту нельзя.
+Блок здесь только затем, чтобы было видно: их не потеряли и в обзвон не отдали по ошибке.</p>
+<details><summary class="btn" style="display:inline-block;cursor:pointer">Показать</summary>
+<div class="scroll"><table style="margin-top:.5rem">
+  <thead><tr><th>Ребёнок</th><th class="num">возраст</th><th>Ходил на</th><th class="num">занятий</th></tr></thead>
+  <tbody>
+  {% for r in d.ходят_сейчас %}
+  <tr><td>{{ r.имя }}</td><td class="num">{{ r.возраст if r.возраст else '—' }}</td>
+      <td class="sm">{{ r.предметы|join(', ') or '—' }}</td><td class="num">{{ r.занятий }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></details>
+{% endif %}
+
+<style>.sm{font-size:.84rem}#t td{padding:.35rem .4rem;vertical-align:top}</style>
+<script>
+var mode='';
+function filt(){var q=(document.getElementById('q').value||'').toLowerCase(),n=0;
+ document.querySelectorAll('#t tbody tr').forEach(function(tr){
+  var ok=(!q||tr.textContent.toLowerCase().indexOf(q)>=0)
+       &&(mode!=='платил'||tr.dataset.p==='1')
+       &&(mode!=='ниразу'||tr.dataset.n==='0')
+       &&(mode!=='недозвон'||tr.dataset.n==='1');
+  tr.style.display=ok?'':'none'; if(ok)n++;});
+ document.getElementById('cnt').textContent='показано: '+n;}
+function only(m){mode=m;filt();}
+filt();
+</script>
+{% endblock %}
