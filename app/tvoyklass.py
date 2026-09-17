@@ -207,6 +207,13 @@ def deliver(limit: int = 5, dry: bool = True) -> dict:
         return {"ok": False, "error": "вне окна 9:00–20:00", "sent": 0}
     sent, errs = [], []
     with db.get_conn() as conn:
+        # Номер, который дважды не принял сообщение, откладываем: иначе он
+        # занимает место в каждой пачке и остальные ждут (17.09: два номера
+        # пять пачек подряд «fail», остальные — по три вместо пяти).
+        conn.execute(
+            "UPDATE broadcast_queue SET status='hold' WHERE campaign=? AND status='pending' "
+            "AND (LENGTH(COALESCE(tried,'')) - LENGTH(REPLACE(COALESCE(tried,''),'fail',''))) >= 8",
+            (CAMPAIGN,))
         rows = conn.execute(
             "SELECT id, phone, child, text FROM broadcast_queue "
             "WHERE campaign=? AND status='pending' ORDER BY id LIMIT ?",
