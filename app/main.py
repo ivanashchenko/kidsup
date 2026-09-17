@@ -3228,7 +3228,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-17.20"
+APP_VERSION = "2026-09-17.21"
 
 
 @app.get("/api/net")
@@ -6136,6 +6136,23 @@ def api_crm_comment(payload: dict = Body(...)):
     try:
         mk.post("/v1/company/userComments", {"userId": uid, "comment": text[:4000], "showToUser": False})
         return {"ok": True}
+    finally:
+        mk.close()
+
+
+@app.post("/api/crm/email", dependencies=AUTH)
+def api_crm_email(payload: dict = Body(...)):
+    """Почта в карточку: {"userId": 123, "email": "a@b.ru"} — через safe_update_user
+    (GET → merge → POST), голый POST /users/{id} стирает карточку."""
+    from .moyklass_client import MoyklassClient
+    uid = int(payload.get("userId") or 0)
+    email = str(payload.get("email") or "").strip().lower()
+    if not uid or not re.fullmatch(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", email):
+        raise HTTPException(400, "нужны userId и корректный email")
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        mk.safe_update_user(uid, email=email)
+        return {"ok": True, "userId": uid, "email": email}
     finally:
         mk.close()
 

@@ -1621,6 +1621,16 @@ def welcome_series(mk: MoyklassClient) -> None:
             user = mk.get(f"/v1/company/users/{uid}")
         except Exception:
             continue
+        # 17.09: «Спасибо, что выбрали KidsUP, место закреплено» ушло семье,
+        # которая за час до этого написала «мы больше не посещаем» и уже
+        # стояла в «0.1 Не писать». Приход по карточке — не повод писать
+        # тому, кто просил не писать, или кто ушёл.
+        if user.get("clientStateId") in DEAD_STATES:
+            for st in ("welcome1", "welcome2", "welcome3", "welcome4"):
+                _mark(st, f"{uid}:{pay_day}")
+            log.info("welcome: %s в статусе %s — серию не начинаем",
+                     (user.get("phone") or "")[-4:], user.get("clientStateId"))
+            continue
         phone = user.get("phone") or ""
         child = _child_name(user.get("name") or "") or "ребёнка"
         f = _group_facts(mk, uid)
@@ -1667,6 +1677,14 @@ def welcome_series(mk: MoyklassClient) -> None:
         try:
             user = mk.get(f"/v1/company/users/{uid}")
         except Exception:
+            continue
+        # семья ушла или просила не писать после первого сообщения серии —
+        # остальные три не нужны (Беляев, 17.09)
+        if user.get("clientStateId") in DEAD_STATES:
+            for st in ("welcome2", "welcome3", "welcome4"):
+                _mark(st, f"{uid}:{day}")
+            log.info("welcome %d: %s в статусе %s — серию останавливаем",
+                     stage, (user.get("phone") or "")[-4:], user.get("clientStateId"))
             continue
         phone = user.get("phone") or ""
         child = _child_name(user.get("name") or "") or "ребёнка"
