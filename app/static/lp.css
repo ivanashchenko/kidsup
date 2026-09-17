@@ -124,6 +124,7 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 @media (max-width:560px){
   .step{grid-template-columns:1fr;gap:3px}
   .cta.ghost{margin-left:0;margin-top:10px}
+  .hero p{font-size:15px} .hero h1{font-size:27px}
 }
 
 /* ——— педагоги на страницах курсов ——— */
@@ -201,3 +202,10 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
   padding:.72rem 1.25rem;font-weight:700;font-size:1rem;cursor:pointer}
 .mini-lead .consent-note{flex-basis:100%;margin-top:2px}
 .mini-lead .ok-msg{color:var(--green-ink,#2e7d32);font-weight:700;flex-basis:100%}
+
+/* 17.09: WhatsApp в один тап из мини-формы; форма внутри липкого листа */
+.wa-inline{flex-basis:100%;font-size:14px;color:var(--green-ink,#4E7A18);font-weight:700;text-decoration:none}
+.mini-lead .ok-msg a{color:var(--green-ink,#4E7A18)}
+.sb-sheet .mini-lead{border:0;box-shadow:none;margin:0;border-radius:0}
+.sb-sheet .mini-lead a{display:inline;padding:0;border:0;font:inherit;font-size:12.5px;color:var(--blue-ink,#0F6E96);text-decoration:underline}
+.sb-sheet .mini-lead .ok-msg a{font-size:inherit;color:var(--green-ink,#4E7A18)}

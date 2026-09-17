@@ -26,7 +26,9 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%A9%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap"></noscript>
 <style>
 html,body{overflow-x:clip}
 :root{
@@ -376,6 +378,15 @@ body.js .reveal.in{opacity:1;transform:none}
   .fab{display:none!important}
 }
 
+/* 17.09: WhatsApp в один тап из мини-формы; форма внутри липкого листа */
+.wa-inline{flex-basis:100%;font-size:14px;color:var(--green-ink,#4E7A18);font-weight:700;text-decoration:none}
+.mini-lead .ok-msg a{color:var(--green-ink,#4E7A18)}
+.sb-sheet .mini-lead{border:0;box-shadow:none;margin:0;border-radius:0}
+.sb-sheet .mini-lead a{display:inline;padding:0;border:0;font:inherit;font-size:12.5px;color:var(--blue-ink,#0F6E96);text-decoration:underline}
+.sb-sheet .mini-lead .ok-msg a{font-size:inherit;color:var(--green-ink,#4E7A18)}
+@media(max-width:560px){ .hero .sub{font-size:15px} .mini-lead .consent-note{font-size:12px} }
+
+
 .vstrip{background:var(--soft)}
 .v-strip{display:flex;gap:14px;overflow-x:auto;padding:1rem 0 .5rem;
   scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
@@ -434,7 +445,7 @@ body.js .reveal.in{opacity:1;transform:none}
 
 <header class="top">
   <div class="wrap">
-    <img src="/static/img/c83c6b5de853.png" alt="KidsUP — детский центр" loading="lazy" decoding="async">
+    <img src="/static/img/c83c6b5de853.png" alt="KidsUP — детский центр" fetchpriority="high" decoding="async">
     <nav id="mainnav">
       <a href="#courses">Занятия и цены</a>
       <a href="#schedule">Расписание</a>
@@ -456,12 +467,22 @@ body.js .reveal.in{opacity:1;transform:none}
         <span class="badge hot" id="offer-badge">Первое занятие — условно-бесплатное</span>
         <span class="badge">от 1,3 до 12 лет</span>
         <span class="badge">группы 6–8 детей</span>
+        <span class="badge">📍 Богородское · у м. Бульвар Рокоссовского</span>
         <span class="badge" id="live-enrolled" hidden></span>
       </div>
       <h1>Читает за 3 месяца — на подготовке к школе.<br>Говорит по-английски за год.</h1>
-      <p class="sub">Детский центр и английский сад KidsUP на Бульваре Рокоссовского.
-      Учебный год уже идёт — выберите занятие и приходите на первое:
-      оно условно-бесплатное, с диагностикой от педагога.</p>
+      <p class="sub">Детский центр и английский сад на Бульваре Рокоссовского.
+      Первое занятие — условно-бесплатное, с диагностикой от педагога.</p>
+      <form class="mini-lead" data-mini="0" action="https://app.kidsup.ru/api/public/lead" method="post">
+      <b>Оставьте номер — подберём занятие и время за один звонок.</b>
+      <input id="hero-phone" name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
+      <input type="hidden" name="course" value="мини-форма-hero">
+      <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
+      <button type="submit">Перезвоните мне</button>
+      <a class="wa-inline" href="https://app.kidsup.ru/go/whatsapp?src=site_hero&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">или напишите в WhatsApp →</a>
+      <p class="consent-note">Нажимая «Перезвоните мне», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a>.</p>
+      <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅ Хотите быстрее — <a href="https://app.kidsup.ru/go/whatsapp?src=site_hero_ok&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">напишите в WhatsApp</a></span>
+    </form>
       <div class="age-row" aria-label="Выберите возраст ребёнка">
         <span class="age-lbl">Сколько лет ребёнку?</span>
         <a class="age-chip" href="#quiz" data-wk="0">1–3</a>
@@ -470,7 +491,7 @@ body.js .reveal.in{opacity:1;transform:none}
         <a class="age-chip" href="#quiz" data-wk="3">7–12</a>
       </div>
       <div class="cta-row">
-        <a class="btn btn-green" href="#signup">Выбрать занятие</a>
+        <a class="btn btn-green" href="#courses">Выбрать занятие</a>
         <a class="btn btn-line" href="#events">📚 Неделя открытых уроков</a>
       </div>
       <p class="hero-geo">📍 б-р Маршала Рокоссовского, 6 к1В · 5 минут от метро
@@ -996,8 +1017,9 @@ body.js .reveal.in{opacity:1;transform:none}
     <input type="hidden" name="course" value="мини-форма-1">
     <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
     <button type="submit">Перезвоните мне</button>
+    <a class="wa-inline" href="https://app.kidsup.ru/go/whatsapp?src=site_mini1&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">или напишите в WhatsApp →</a>
     <p class="consent-note">Нажимая «Перезвоните мне», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a> и на обработку данных для записи на занятие.</p>
-    <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅</span>
+    <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅ Хотите быстрее — <a href="https://app.kidsup.ru/go/whatsapp?src=site_mini1_ok&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">напишите в WhatsApp</a></span>
   </form></div>
 
 <section class="sched" id="schedule">
@@ -1216,7 +1238,9 @@ body.js .reveal.in{opacity:1;transform:none}
     <input type="hidden" name="course" value="мини-форма-2">
     <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
     <button type="submit">Перезвоните мне</button>
-    <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅</span>
+    <a class="wa-inline" href="https://app.kidsup.ru/go/whatsapp?src=site_mini2&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">или напишите в WhatsApp →</a>
+    <p class="consent-note">Нажимая «Перезвоните мне», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a>.</p>
+    <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅ Хотите быстрее — <a href="https://app.kidsup.ru/go/whatsapp?src=site_mini2_ok&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">напишите в WhatsApp</a></span>
   </form></div>
 
 
@@ -1824,11 +1848,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const now = new Date(MSK);
   const past = (m, d) => now > new Date(2026, m - 1, d, 23, 59);
   if (past(8, 31)) {
+    // 17.09: раньше здесь переписывалась вся карточка и удалялся бейдж оффера —
+    // из-за этого __applyOffer ниже не находил #offer-badge и первый экран с 1 сентября
+    // не подтверждал «условно-бесплатное» из объявлений. Прячем только счётчик.
     const c = document.getElementById('cnt');
-    if (c) c.closest('.hero-card').innerHTML =
-      '<h3>Учебный год идёт</h3><p class="note">Группы 2026/27 уже занимаются — свободные места ' +
-      'смотрите в расписании ниже, присоединиться можно в любой момент.</p>';
-    document.querySelectorAll('.badge.hot').forEach(b => b.remove());
+    if (c) c.hidden = true;
   }
   const evs = [['#events .ev:nth-child(1)', 8, 29], ['#events .ev:nth-child(2)', 8, 30]];
   evs.forEach(([sel2, m, d]) => { if (past(m, d)) { const el = document.querySelector(sel2); if (el) el.remove(); } });
@@ -1995,22 +2019,7 @@ document.addEventListener('click', function(e){
 });
 </script>
 
-<script>
-document.querySelectorAll('.mini-lead').forEach(function(f){
-  f.addEventListener('submit', function(e){
-    e.preventDefault();
-    var btn=f.querySelector('button'), ok=f.querySelector('.ok-msg');
-    btn.disabled=true; btn.textContent='Отправляем…';
-    fetch(f.action,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({phone:f.phone.value, course:f.course.value, website:f.website.value})})
-      .then(function(r){return r.json()})
-      .then(function(d){
-        if(d.ok){ btn.hidden=true; f.phone.hidden=true; ok.hidden=false; }
-        else { btn.disabled=false; btn.textContent='Перезвоните мне'; alert(d.error||'Проверьте номер'); }
-      }).catch(function(){ btn.disabled=false; btn.textContent='Перезвоните мне'; alert('Не получилось — позвоните нам: +7 495 120-90-24'); });
-  });
-});
-</script>
+
 
 <div class="stickybar" role="navigation" aria-label="Быстрые действия">
   <a href="tel:+74951209024">📞 Позвонить</a>
@@ -2042,7 +2051,7 @@ window.__applyOffer = function(today){
     badge.textContent='Неделя открытых уроков — 14–20 сентября';
     title.textContent='📚 Неделя открытых уроков';
     if(cnt) cnt.hidden=true;
-    card.querySelector('.note').innerHTML='С 14 по 20 сентября можно прийти на обычное '+
+    var n1=card.querySelector('.note'); if(n1) n1.innerHTML='С 14 по 20 сентября можно прийти на обычное '+
       'занятие своей группы. Первое занятие — условно-бесплатное: не понравится — '+
       'платить не нужно.';
     return 'неделя уроков';
@@ -2050,7 +2059,7 @@ window.__applyOffer = function(today){
   badge.textContent='Первое занятие — условно-бесплатное';
   title.textContent='🌿 Присоединяйтесь в течение года';
   if(cnt) cnt.hidden=true;
-  card.querySelector('.note').innerHTML='Группы идут весь учебный год — '+
+  var n2=card.querySelector('.note'); if(n2) n2.innerHTML='Группы идут весь учебный год — '+
     'присоединиться можно в любой месяц. Первое занятие условно-бесплатное, '+
     'с диагностикой уровня от педагога.';
   return 'вечнозелёный';
@@ -2078,6 +2087,82 @@ document.addEventListener('click', function(e){
     if(!sh.hidden && !sh.contains(e.target) && e.target!==b) sh.hidden=true;
   });
 })();
+</script>
+<script>
+
+/* 17.09: sticky «Записаться» открывает форму из одного поля на месте, а не уводит на форму
+   в 14–18 тыс. px ниже (замер офлайн-рендера 390×844). */
+(function(){
+  var main=document.querySelector('.stickybar .sb-main'); if(!main) return;
+  main.setAttribute('href','#'); main.id='sb-lead';
+  var course=(window.__LP_COURSE||'') || (document.querySelector('.mini-lead input[name=course]')||{}).value || 'мини-форма-sticky';
+  var page=(location.pathname.replace(/^\//,'')||'main').replace(/[^a-z0-9_-]/gi,'');
+  var fs=document.createElement('div'); fs.className='sb-sheet'; fs.id='sb-form'; fs.hidden=true;
+  fs.innerHTML='<form class="mini-lead" data-mini="sticky" action="https://app.kidsup.ru/api/public/lead" method="post">'+
+    '<b>Оставьте номер — перезвоним и подберём группу</b>'+
+    '<input name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">'+
+    '<input type="hidden" name="course" value="'+course.replace(/"/g,'')+'">'+
+    '<input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">'+
+    '<button type="submit">Перезвоните мне</button>'+
+    '<p class="consent-note">Нажимая «Перезвоните мне», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a>.</p>'+
+    '<span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅ Хотите быстрее — <a href="https://app.kidsup.ru/go/whatsapp?src='+page+'_bar_ok&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">напишите в WhatsApp</a></span></form>';
+  var bar=document.querySelector('.stickybar'); bar.parentNode.insertBefore(fs, bar);
+  function toggle(e){ e.preventDefault(); var msg=document.getElementById('sb-sheet'); if(msg) msg.hidden=true; fs.hidden=!fs.hidden; if(!fs.hidden){ var i=fs.querySelector('input[name=phone]'); try{i.focus({preventScroll:true});}catch(_){} } }
+  main.addEventListener('click', toggle);
+  var hb=document.querySelector('header .btn.btn-green[href="#signup"], header a.nav-cta[href="#signup"]');
+  if(hb) hb.addEventListener('click', function(e){ if(window.matchMedia('(max-width:760px)').matches) toggle(e); });
+  document.addEventListener('click', function(e){ if(!fs.hidden && !fs.contains(e.target) && e.target!==main && !main.contains(e.target)) fs.hidden=true; });
+})();
+/* кнопка «Записаться» в hero ведёт в мини-форму рядом, а не на форму в конце страницы */
+document.querySelectorAll('a[href="#hero-phone"]').forEach(function(a){
+  a.addEventListener('click', function(e){ e.preventDefault(); var i=document.getElementById('hero-phone');
+    if(i){ i.scrollIntoView({block:'center',behavior:'smooth'}); setTimeout(function(){ try{i.focus({preventScroll:true});}catch(_){ i.focus(); } },350); } });
+});
+/* номер визита Roistat и метки — во все ссылки мессенджеров (иначе заявка из WhatsApp
+   не привязывается к кампании) */
+window.addEventListener('DOMContentLoaded', function(){
+  setTimeout(function(){
+    var rv=(document.cookie.match(/roistat_visit=([^;]+)/)||[])[1]||'';
+    var utm=(location.search||'').replace(/^\?/,'');
+    document.querySelectorAll('a[href*="app.kidsup.ru/go/"]').forEach(function(a){
+      if(/[?&]rv=/.test(a.href)) return;
+      var extra=(rv?'&rv='+encodeURIComponent(rv):'')+(utm?'&'+utm:'');
+      if(extra) a.href=a.href+extra;
+    });
+  },1200);
+});
+
+document.querySelectorAll('.mini-lead').forEach(function (f) {
+  if (f.dataset.bound) return; f.dataset.bound = '1';
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = f.querySelector('button'), ok = f.querySelector('.ok-msg');
+    var rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
+    var kind = f.dataset.mini === '0' ? 'hero' : (f.dataset.mini === 'sticky' ? 'sticky' : 'mini');
+    btn.disabled = true; btn.textContent = 'Отправляем…';
+    fetch(f.action, {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({phone: f.phone.value, course: f.course.value,
+                            website: f.website.value, roistat: rv,
+                            note: ('мини-форма ' + kind + ' ' + location.pathname + ' | ' + (location.search || '').slice(1)).slice(0, 250)})})
+      .then(function (r) { return r.json() })
+      .then(function (d) {
+        if (d.ok) {
+          btn.hidden = true; f.phone.hidden = true; ok.hidden = false;
+          var wa = f.querySelector('.wa-inline'); if (wa) wa.hidden = true;
+          try { ym(69569509, 'reachGoal', 'lead', {form: kind}); } catch (_) {}
+          try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'lead'}); } catch (_) {}
+          try { window.VK && VK.Goal && VK.Goal('lead'); } catch (_) {}
+          try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
+        } else {
+          btn.disabled = false; btn.textContent = 'Перезвоните мне';
+          alert(d.error || 'Проверьте номер');
+        }
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = 'Перезвоните мне';
+        alert('Не получилось — позвоните нам: +7 495 120-90-24');
+      });
+  });
+});
 </script>
 </body>
 </html>

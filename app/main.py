@@ -30,6 +30,10 @@ logging.basicConfig(level=logging.INFO,
 db.init_db()
 
 app = FastAPI(title="KidsUp Analytics")
+# 17.09: сайт отдаётся uvicorn напрямую, без прокси — главная уходила в телефон 196 КБ
+# несжатой (gzip даёт 54 КБ). 70% рекламного трафика — смартфоны, отказы считаются по 15 с.
+from starlette.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 from . import autopilot  # noqa: E402  (нужен db.init_db выше)
 autopilot.start()
@@ -3186,7 +3190,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-17.13"
+APP_VERSION = "2026-09-17.14"
 
 
 @app.get("/api/net")

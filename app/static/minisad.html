@@ -26,7 +26,8 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%A9%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap"></noscript>
 <link rel="stylesheet" href="/static/lp.css">
 </head>
 <body>
@@ -34,21 +35,26 @@
 <header class="hero leaf">
   <div class="wrap">
     <div class="brand">KidsUP · Бульвар Рокоссовского</div>
-    <h1>Полдня, за которые ребёнок успевает больше,<br>чем за целый день в обычном саду.</h1>
-    <p>Мини-сад для 2–4 лет: будни с 9:00 до 13:00, маленькая группа, четыре занятия каждый
-    день. Не присмотр, а программа — и мягкий вход в сад без слёз, потому что день короткий,
-    а детей мало.</p>
-    <a class="cta" href="#signup">Прийти на бесплатный пробный день</a>
-    <a class="cta ghost" href="#day">Как устроен день</a>
+    <h1>Мини-сад 9:00–13:00: полдня, за которые ребёнок успевает больше, чем за день в обычном саду.</h1>
+    <p>Для 2–4 лет: маленькая группа, четыре занятия каждый день. Не присмотр, а программа —
+    и мягкий вход в сад без слёз, потому что день короткий, а детей мало.</p>
+    <div class="offer-badges">
+      <span>📍 5 минут от м. Бульвар Рокоссовского · Богородское</span>
+      <span>🌿 Бесплатный пробный день, дальше пробная неделя в зачёт месяца</span>
+      <span>👶 2–4 года · будни 9:00–13:00</span>
+    </div>
     <form class="mini-lead hero-mini" data-mini="1" action="https://app.kidsup.ru/api/public/lead" method="post">
       <b>Оставьте номер — администратор перезвонит и подберёт группу.</b>
-      <input name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
+      <input id="hero-phone" name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
       <input type="hidden" name="course" value="Мини-сад">
       <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
       <button type="submit">Перезвоните мне</button>
+      <a class="wa-inline" href="https://app.kidsup.ru/go/whatsapp?src=minisad_hero&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">или напишите в WhatsApp →</a>
       <p class="consent-note">Нажимая «Перезвоните мне», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a>.</p>
-      <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅</span>
+      <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅ Хотите быстрее — <a href="https://app.kidsup.ru/go/whatsapp?src=minisad_hero_ok&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">напишите в WhatsApp</a></span>
     </form>
+    <a class="cta" href="#hero-phone">Прийти на бесплатный пробный день</a>
+    <a class="cta ghost" href="#day">Как устроен день</a>
     <p class="note">От 2 до 5 дней в неделю — можно начать с двух и добрать,
     когда ребёнок втянется.</p>
   </div>
