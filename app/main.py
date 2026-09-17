@@ -3007,6 +3007,33 @@ def istochniki_page(request: Request, since: str = "", until: str = ""):
                   d=istochniki.otchet(since, until))
 
 
+@app.get("/api/tvoyklass/plan", dependencies=AUTH)
+def api_tvoyklass_plan():
+    """Кому и что уйдёт про личный кабинет. Чтение."""
+    from . import tvoyklass
+    return tvoyklass.plan()
+
+
+@app.post("/api/tvoyklass/enqueue", dependencies=AUTH)
+def api_tvoyklass_enqueue(payload: dict = Body(default={})):
+    """{"send": 1, "only_ay": 0} — поставить в очередь разовых сообщений."""
+    from . import tvoyklass
+    return tvoyklass.enqueue(dry=not payload.get("send"), only_ay=bool(payload.get("only_ay")))
+
+
+@app.post("/api/tvoyklass/deliver", dependencies=AUTH)
+def api_tvoyklass_deliver(payload: dict = Body(default={})):
+    """{"send": 1, "limit": 5} — отправить пачку разовыми сообщениями."""
+    from . import tvoyklass
+    return tvoyklass.deliver(limit=int(payload.get("limit") or 5), dry=not payload.get("send"))
+
+
+@app.get("/api/tvoyklass/status", dependencies=AUTH)
+def api_tvoyklass_status():
+    from . import tvoyklass
+    return tvoyklass.status()
+
+
 @app.get("/api/istochniki", dependencies=AUTH)
 def api_istochniki(since: str = "", until: str = ""):
     """Откуда пришли заявки и что из них вышло. Чтение."""
@@ -3192,9 +3219,16 @@ def _wazzup_process(payload: dict) -> None:
         _fwd_store(payload)  # автопилот дошлёт позже
         logging.getLogger("kidsup.wazzup").warning("пересылка в МойКласс не удалась — в очередь")
     _wazzup_tag(payload)
+    try:
+        # 17.09: семья, у которой спросили почту для «Твой Класс», прислала адрес —
+        # вписать в карточку и ответить инструкцией входа
+        from . import tvoyklass
+        tvoyklass.on_inbound(payload)
+    except Exception:
+        logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-17.17"
+APP_VERSION = "2026-09-17.19"
 
 
 @app.get("/api/net")
