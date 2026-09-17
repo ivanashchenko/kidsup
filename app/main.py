@@ -2969,6 +2969,20 @@ def api_chaty_plan():
     return chaty.plan()
 
 
+@app.get("/segodnya", response_class=HTMLResponse, dependencies=AUTH)
+def segodnya_page(request: Request):
+    """Одна страница на день: что горит, с именами и телефонами."""
+    from . import segodnya
+    return render(request, "segodnya.html", active="segodnya", d=segodnya.dela())
+
+
+@app.get("/api/segodnya", dependencies=AUTH)
+def api_segodnya():
+    """То же машиночитаемо."""
+    from . import segodnya
+    return segodnya.dela()
+
+
 @app.get("/nezvonili", response_class=HTMLResponse, dependencies=AUTH)
 def nezvonili_page(request: Request, since: str = "", until: str = ""):
     """Кому с прошлого года и лета так и не позвонили."""
@@ -3136,7 +3150,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-16.22"
+APP_VERSION = "2026-09-17.6"
 
 
 @app.get("/api/net")

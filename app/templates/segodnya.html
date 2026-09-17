@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Что горит сегодня — KidsUP{% endblock %}
+{% block content %}
+<h1>Что горит сегодня</h1>
+<p class="muted">Всё, что требует действия прямо сейчас, с именами и телефонами. Считается на лету,
+ничего никуда не отправляет. Сделали — строка исчезнет сама на следующем открытии.</p>
+
+<div class="cards">
+  <div class="card"><div class="card-value" style="color:#E30613">{{ d.итоги.без_галочки }}</div><div class="card-label">записей без галочки «Пробное»</div></div>
+  <div class="card"><div class="card-value" style="color:#E30613">{{ d.итоги.ждут }}</div><div class="card-label">ждут ответа в переписке</div></div>
+  <div class="card"><div class="card-value" style="color:#E30613">{{ d.итоги.чаты }}</div><div class="card-label">ждут ответа про чаты с 13.09</div></div>
+  <div class="card"><div class="card-value">{{ d.итоги.новые_лиды }}</div><div class="card-label">новых лидов без касания</div></div>
+  <div class="card"><div class="card-value">{{ d.итоги.занятий_без_явки }}</div><div class="card-label">занятий без единой отметки</div></div>
+</div>
+
+<h2 style="margin-top:1.6rem">1. Поставить галочку «Пробное» — {{ d.без_галочки|length }}</h2>
+<div class="notice"><b>Почему это первым делом.</b> Напоминание накануне и за два часа уходит только
+по записям с этой галочкой — автоматика ищет записи с ней и больше ничего. Без галочки эти семьи
+не получат ни одного напоминания и с большой вероятностью не придут.<br>
+<b>Где ставить:</b> открыть занятие → вкладка «Запись» → поставить галочку <b>«Пробное»</b>
+(и «Бесплатно», если занятие бесплатное) → кликнуть в ячейку ученика. В ячейке появится «П».<br>
+<b>Чтобы это не повторялось:</b> в настройках группы включить
+<b>«Использовать по умолчанию для записи на пробные занятия»</b> — тогда галочка будет ставиться сама.</div>
+<div class="scroll"><table>
+  <tr><th>Когда пробное</th><th>Ребёнок</th><th>Группа</th><th>Телефон</th><th>Карточка</th></tr>
+  {% for r in d.без_галочки %}
+  <tr>
+    <td><b>{{ r.дата[8:] }}.{{ r.дата[5:7] }}</b> {{ r.время }}
+        {% if r.через_дней is not none and r.через_дней <= 1 %}<span class="warn"> — {{ 'сегодня' if r.через_дней == 0 else 'завтра' }}</span>{% endif %}</td>
+    <td>{{ r.имя }}</td>
+    <td class="sm">{{ r.группа }}</td>
+    <td><a href="tel:+{{ r.телефон }}">{{ r.телефон }}</a></td>
+    <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="muted">пусто — галочки стоят везде</td></tr>{% endfor %}
+</table></div>
+
+<h2 style="margin-top:1.6rem">2. Ответить в переписке — {{ d.ждут|length }}</h2>
+<p class="muted">Последнее слово за клиентом, мы не ответили, и написано это за последние трое суток.
+Сверху те, у кого ребёнок идёт на занятие сегодня или завтра — им ответ нужен до занятия,
+иначе семья просто не придёт; дальше по давности. Короткие «спасибо» и законченные отказы вынесены вниз — на них
+отвечать не нужно. Разговоры старше трёх суток сюда не попадают: там нужен не ответ, а новый повод.</p>
+<div class="scroll"><table>
+  <tr><th>Ждёт</th><th>Ребёнок</th><th>Последнее сообщение</th><th>Написать</th></tr>
+  {% for r in d.ждут %}
+  <tr>
+    <td class="num"><b class="{{ 'warn' if r.ждёт_часов and r.ждёт_часов >= 4 }}">{{ r.ждёт_часов }} ч</b>
+        {% if r.занятие %}<div class="sm" style="color:#E30613;font-weight:600">занятие {{ r.занятие }}</div>{% endif %}</td>
+    <td>{{ r.имя or '—' }}<div class="muted sm">{{ r.телефон }}</div></td>
+    <td class="sm">{{ r.текст }}</td>
+    <td><a href="https://wa.me/{{ r.телефон }}" target="_blank" rel="noopener">WhatsApp →</a>
+        {% if r.uid %}<div class="sm"><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM</a></div>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="4" class="muted">пусто — всем ответили</td></tr>{% endfor %}
+</table></div>
+{% if d.ждут_вежливость %}
+<details style="margin-top:.6rem"><summary class="btn" style="display:inline-block;cursor:pointer">Не требуют ответа — {{ d.ждут_вежливость|length }}: смайлики, «спасибо», отказы и чужие рассылки</summary>
+<div class="scroll"><table style="margin-top:.5rem">
+  {% for r in d.ждут_вежливость %}
+  <tr><td class="sm">{{ r.имя or r.телефон }}</td><td class="sm">{{ r.текст[:60] }}</td></tr>
+  {% endfor %}
+</table></div></details>
+{% endif %}
+
+{% if d.чаты %}
+<h2 style="margin-top:1.6rem">3. Чаты групп — ответить {{ d.чаты|length }} семьям</h2>
+<div class="notice warn"><b>Что там произошло.</b> 13 сентября по группам английского ушло приглашение
+в чат, и текст в нём был неверный: он звал заходить «по номеру телефона» и вёл на
+<b>app.moyklass.com/lk</b> — это кабинет сотрудника, клиент туда войти не может в принципе.
+Семьи попробовали, не смогли и написали «откройте доступ». Им ответили «как откроем — сразу напишем
+вам здесь». <b>Открывать нечего: доступ открыт всем с самого начала</b> — не хватало только e-mail
+в карточке ученика. Люди ждут четвёртый день обещания, которое нельзя выполнить, потому что
+выполнять нечего.<br>
+<b>Правильный вход:</b> <b>kidsup.tvoyklass.com</b>, логин — <b>e-mail ученика</b> (не телефон),
+пароль — через «Восстановить пароль», письмо придёт от <i>lk-noreply@tvoyklass.com</i>
+от отправителя «Личный кабинет». Приложение называется <b>«Твой Класс»</b>.
+Пароль: минимум 6 символов, заглавная, строчная, цифра и спецсимвол.<br>
+<b>Что нужно от нас:</b> получить у семьи адрес почты и вписать его в карточку ученика в МойКлассе —
+после этого вход работает сразу.</div>
+<div class="scroll"><table>
+  <tr><th>Ждёт</th><th>Ребёнок</th><th>Что написал</th><th>Почта в карточке</th><th>Написать</th></tr>
+  {% for r in d.чаты %}
+  <tr>
+    <td class="num"><b class="warn">{{ r.ждёт_часов }} ч</b><div class="muted sm">{{ r.написал[5:] }}</div>
+        {% if r.обещали %}<div class="sm" style="color:#F59C00">обещали открыть {{ r.обещали[5:10] }}</div>{% endif %}</td>
+    <td>{{ r.имя or '—' }}<div class="muted sm">{{ r.телефон }}</div></td>
+    <td class="sm">{{ r.текст }}</td>
+    <td class="sm">{% if r.почта %}{{ r.почта }}{% else %}<b class="warn">нет — это и есть причина</b>{% endif %}</td>
+    <td><a href="https://wa.me/{{ r.телефон }}" target="_blank" rel="noopener">WhatsApp →</a>
+        {% if r.uid %}<div class="sm"><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM</a></div>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table></div>
+<details style="margin-top:.6rem" open><summary class="btn" style="display:inline-block;cursor:pointer">Готовый текст ответа</summary>
+<div class="notice" style="margin-top:.5rem;white-space:pre-line">Здравствуйте! Прошу прощения — мы отправили вам неверную инструкцию, и вы из-за неё не смогли войти. Доступ у вас есть и был всё это время, открывать ничего не нужно.
+
+Личный кабинет находится на kidsup.tvoyklass.com, вход по адресу электронной почты ученика, а не по номеру телефона. Подскажите, пожалуйста, на какую почту вам удобно — я внесу её в карточку, и вход заработает.
+
+Дальше на странице входа нажмите «Восстановить пароль»: письмо придёт с адреса lk-noreply@tvoyklass.com, отправитель «Личный кабинет». Пароль нужен не короче 6 символов, с заглавной и строчной буквой, цифрой и спецсимволом. Приложение в магазине называется «Твой Класс».</div></details>
+{% endif %}
+
+<h2 style="margin-top:1.6rem">4. Новые лиды без единого касания — {{ d.новые_лиды|length }}</h2>
+<p class="muted">Статус «Новый лид», и по ним нет ни исходящего звонка, ни сообщения, ни комментария админа.
+Человек оставил заявку и до сих пор не услышал нас ни разу. Свежие сверху — с ними разговор проще всего.</p>
+<div class="scroll"><table>
+  <tr><th>Заявка от</th><th>Ребёнок</th><th>Телефон</th><th>Карточка</th></tr>
+  {% for r in d.новые_лиды %}
+  <tr><td class="sm">{{ r.создан[8:] }}.{{ r.создан[5:7] }}</td>
+      <td>{{ r.имя or '—' }}</td>
+      <td><a href="tel:+{{ r.телефон }}">{{ r.телефон }}</a> · <a href="https://wa.me/{{ r.телефон }}" target="_blank" rel="noopener">WA</a>{% if r.писали %}<div class="muted sm">рассылка уходила</div>{% endif %}</td>
+      <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td></tr>
+  {% else %}<tr><td colspan="4" class="muted">пусто — все тронуты</td></tr>{% endfor %}
+</table></div>
+
+<h2 style="margin-top:1.6rem">5. Проставить явку — {{ d.явка|length }} занятий, {{ d.итоги.детей_без_явки }} детей</h2>
+<p class="muted">На этих занятиях есть записанные дети, но не отмечен ни один. Пока явки нет, мы не знаем,
+кто дошёл до пробного, и доходимость считается вслепую — а это главная цифра набора.</p>
+<div class="scroll"><table>
+  <tr><th>Дата</th><th>Время</th><th>Группа</th><th class="num">детей</th></tr>
+  {% for r in d.явка %}
+  <tr><td>{{ r.дата[8:] }}.{{ r.дата[5:7] }}</td><td>{{ r.время }}</td>
+      <td class="sm">{{ r.группа }}</td><td class="num">{{ r.детей }}</td></tr>
+  {% else %}<tr><td colspan="4" class="muted">пусто — явка проставлена везде</td></tr>{% endfor %}
+</table></div>
+
+<style>.sm{font-size:.84rem}.warn{color:#E30613;font-weight:600}table td{padding:.35rem .4rem;vertical-align:top}</style>
+{% endblock %}
