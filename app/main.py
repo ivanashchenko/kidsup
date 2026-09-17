@@ -30,10 +30,6 @@ logging.basicConfig(level=logging.INFO,
 db.init_db()
 
 app = FastAPI(title="KidsUp Analytics")
-# 17.09: сайт отдаётся uvicorn напрямую, без прокси — главная уходила в телефон 196 КБ
-# несжатой (gzip даёт 54 КБ). 70% рекламного трафика — смартфоны, отказы считаются по 15 с.
-from starlette.middleware.gzip import GZipMiddleware
-app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 from . import autopilot  # noqa: E402  (нужен db.init_db выше)
 autopilot.start()
@@ -95,6 +91,14 @@ async def _public_hosts(request, call_next):
         from fastapi.responses import RedirectResponse
         return RedirectResponse("https://kidsup.ru/#schedule", status_code=301)
     return await call_next(request)
+
+
+# 17.09: сайт отдаётся uvicorn напрямую, без сжатия на прокси — главная уходила в телефон
+# 206 КБ. GZip регистрируем ПОСЛЕ хостового middleware выше: в Starlette последний
+# добавленный — внешний, а главная kidsup.ru возвращается прямо из того middleware
+# и внутренние слои не проходит. Зарегистрированный раньше, gzip её не видел.
+from starlette.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 _security = HTTPBasic(auto_error=False)
 
@@ -3190,7 +3194,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-17.14"
+APP_VERSION = "2026-09-17.15"
 
 
 @app.get("/api/net")
