@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Откуда заявки — KidsUP{% endblock %}
+{% block content %}
+<h1>Откуда заявки и что из них вышло</h1>
+<p class="muted">Карточки, заведённые с {{ d.окно.с[8:] }}.{{ d.окно.с[5:7] }} по
+{{ d.окно.по[8:] }}.{{ d.окно.по[5:7] }}. Данные на {{ d.обновлено }}.
+Считаем не по числу заявок, а по тому, что из них вышло: канал с тридцатью карточками и нулём
+записей хуже канала с пятью карточками и тремя оплатами, хотя в отчёте кабинета выглядит лучше.</p>
+
+<div class="cards">
+  <div class="card"><div class="card-value">{{ d.итого.карточек }}</div><div class="card-label">новых карточек</div></div>
+  <div class="card"><div class="card-value" style="color:#1DA7E0">{{ d.итого.записались }}</div><div class="card-label">записались на пробное</div></div>
+  <div class="card"><div class="card-value">{{ d.итого.дошли }}</div><div class="card-label">дошли до занятия</div></div>
+  <div class="card"><div class="card-value" style="color:#7DB928">{{ d.итого.оплатили }}</div><div class="card-label">оплатили</div></div>
+  <div class="card" style="opacity:.75"><div class="card-value">{{ d.итого.мусор }}</div><div class="card-label">мусорных карточек</div></div>
+</div>
+
+<div class="scroll" style="margin-top:1rem"><table>
+  <tr><th>Источник заявки</th><th class="num">карточек</th><th class="num">записались</th>
+      <th class="num">дошли</th><th class="num">оплатили</th><th class="num">отказ</th>
+      <th class="num">мусор</th><th class="num">ещё не тронуты</th></tr>
+  {% for s in d.источники %}
+  <tr><td><b>{{ s.источник }}</b></td>
+      <td class="num">{{ s.карточек }}</td>
+      <td class="num">{{ s.записались }}</td>
+      <td class="num">{{ s.дошли }}</td>
+      <td class="num"><b style="color:#4e8a12">{{ s.оплатили }}</b></td>
+      <td class="num">{{ s.отказ }}</td>
+      <td class="num">{{ s.мусор }}</td>
+      <td class="num">{{ s.новый_лид }}</td></tr>
+  {% else %}<tr><td colspan="8" class="muted">пусто</td></tr>{% endfor %}
+</table></div>
+
+<div class="notice"><b>Как это читать и чего здесь не хватает.</b> «Источник заявки» — единственное
+поле про происхождение, которое есть в карточке МойКласса. <b>CRM</b> значит, что карточку завёл
+администратор руками — по звонку или на ресепшене; откуда человек про нас узнал, в этом случае
+не записано нигде. <b>Wazzup</b> — написал нам в WhatsApp. <b>Простые звонки</b> — карточку создала
+телефония по входящему. <b>Roistat</b> — единственная строка, про которую точно известно, что
+человек пришёл с сайта по рекламе.<br>
+Поэтому прямо сказать «ВКонтакте дал столько-то, а Директ столько-то» по этой таблице нельзя:
+у большинства карточек канала просто не записано. Это не свойство отчёта, а дыра в учёте.</div>
+
+<style>table td{padding:.35rem .5rem}</style>
+{% endblock %}

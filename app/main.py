@@ -2991,6 +2991,28 @@ def nezvonili_page(request: Request, since: str = "", until: str = ""):
     return render(request, "nezvonili.html", active="nezvonili", d=d)
 
 
+@app.get("/istochniki", response_class=HTMLResponse, dependencies=AUTH)
+def istochniki_page(request: Request, since: str = "", until: str = ""):
+    """Откуда заявки и что из них вышло."""
+    from . import istochniki
+    return render(request, "istochniki.html", active="istochniki",
+                  d=istochniki.otchet(since, until))
+
+
+@app.get("/api/istochniki", dependencies=AUTH)
+def api_istochniki(since: str = "", until: str = ""):
+    """Откуда пришли заявки и что из них вышло. Чтение."""
+    from . import istochniki
+    return istochniki.otchet(since, until)
+
+
+@app.post("/api/istochniki/spravochnik", dependencies=AUTH)
+def api_istochniki_spravochnik():
+    """Подтянуть справочник источников заявок из МойКласса."""
+    from . import istochniki
+    return istochniki.obnovit_spravochnik()
+
+
 @app.get("/obzvon", response_class=HTMLResponse, dependencies=AUTH)
 def obzvon_page(request: Request):
     """Кто ходил в прошлом сезоне и летом, ушёл, и кому мы не звонили."""
@@ -3164,7 +3186,7 @@ def _wazzup_process(payload: dict) -> None:
     _wazzup_tag(payload)
 
 
-APP_VERSION = "2026-09-17.11"
+APP_VERSION = "2026-09-17.13"
 
 
 @app.get("/api/net")
