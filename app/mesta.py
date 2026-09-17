@@ -140,9 +140,17 @@ def tablica() -> dict:
                     (c["id"], *states))}
             u_uch, u_zap, u_byl = ids((ST_UCHITSYA,)), ids(ST_ZAPISAN), ids((ST_BYL,))
             uch, zap, byl = len(u_uch), len(u_zap), len(u_byl)
+            u_paid = paid_idx.get(c["id"], set())
+            # «Оплатили» и «ходят» считаются по разным признакам (абонемент
+            # против статуса записи), поэтому вычитать одно число из другого
+            # нельзя: 17.09 так вышло «минус тринадцать неплательщиков».
+            # Долг — это ребёнок со статусом «Учится», у которого на ЭТУ
+            # группу нет оплаченного абонемента сезона.
+            u_dolg = u_uch - u_paid
             deti["ходят"] |= u_uch
             deti["записаны_на_пробное"] |= u_zap
-            deti["оплатили"] |= paid_idx.get(c["id"], set())
+            deti["оплатили"] |= u_paid
+            deti.setdefault("ходят_без_оплаты", set()).update(u_dolg)
             cap = c["max_students"] or 8
             short = re.sub(r"^2627_", "", n)
             for k, v in CAP_OVERRIDE.items():
@@ -150,7 +158,8 @@ def tablica() -> dict:
                     cap = v
             out.append({
                 "id": c["id"], "name": short, "предмет": _subject(short), "мест_всего": cap,
-                "ходят": uch, "оплатили": len(paid_idx.get(c["id"], set())),
+                "ходят": uch, "оплатили": len(u_paid),
+                "ходят_без_оплаты": len(u_dolg),
                 "записаны_на_пробное": zap, "были_на_пробном": byl,
                 "занято": uch + zap + byl, "свободно": max(cap - uch - zap - byl, 0),
                 "перебор": max(uch + zap + byl - cap, 0),
@@ -165,8 +174,8 @@ def tablica() -> dict:
                     return (i, r["name"])
             return (len(ORDER), r["name"])
         out.sort(key=key)
-        fields = ("мест_всего", "ходят", "оплатили", "записаны_на_пробное",
-                  "были_на_пробном", "занято", "свободно")
+        fields = ("мест_всего", "ходят", "оплатили", "ходят_без_оплаты",
+                  "записаны_на_пробное", "были_на_пробном", "занято", "свободно")
         itogo = {f: sum(r[f] for r in out) for f in fields}
         # по предметам — чтобы видеть, где набор идёт, а где стоит
         по_предметам = {}
@@ -193,6 +202,7 @@ def tablica() -> dict:
         itogo["детей_ходят"] = len(deti["ходят"])
         itogo["детей_оплатили"] = len(deti["оплатили"])
         itogo["детей_на_пробное"] = len(deti["записаны_на_пробное"])
+        itogo["детей_без_оплаты"] = len(deti.get("ходят_без_оплаты", set()) - deti["оплатили"])
         return {"группы": out, "итого": itogo, "по_предметам": по_предметам,
                 "вне_таблицы": sorted(вне, key=lambda r: -r["оплатили"]),
                 "групп": len(out), "обновлено": db.get_state("last_sync") or ""}

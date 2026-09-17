@@ -18,6 +18,7 @@
   <div class="card"><div class="card-value">{{ t.итого.свободно }}</div><div class="card-label">свободных мест в {{ t.групп }} группах</div></div>
   <div class="card"><div class="card-value">{{ t.итого.детей_оплатили }}</div><div class="card-label">детей оплатили в этих группах</div></div>
   <div class="card"><div class="card-value">{{ t.итого.детей_ходят }}</div><div class="card-label">детей ходят</div></div>
+  <div class="card"><div class="card-value" style="color:{{ '#E30613' if t.итого.детей_без_оплаты else '#312783' }}">{{ t.итого.детей_без_оплаты }}</div><div class="card-label">ходят, но не оплатили</div></div>
   <div class="card"><div class="card-value">{{ t.итого.детей_на_пробное }}</div><div class="card-label">детей ждём на пробное</div></div>
   <div class="card"><div class="card-value">{{ t.итого.были_на_пробном }}</div><div class="card-label">были на пробном, не оплатили</div></div>
   <div class="card"><div class="card-value">{{ t.итого.мест_всего }}</div><div class="card-label">мест всего</div></div>
@@ -26,29 +27,33 @@
 <h2>По предметам</h2>
 <div class="scroll"><table>
   <tr><th>Предмет</th><th class="num">групп</th><th class="num">мест всего</th><th class="num">ходят</th>
-      <th class="num">оплатили</th><th class="num">на пробное</th><th class="num">были на пробном</th><th class="num">свободно</th></tr>
+      <th class="num">оплатили</th><th class="num">ходят без оплаты</th><th class="num">на пробное</th><th class="num">были на пробном</th><th class="num">свободно</th></tr>
   {% for name, d in t.по_предметам.items() %}
   <tr><td><b>{{ name }}</b></td><td class="num">{{ d.групп }}</td><td class="num">{{ d.мест_всего }}</td>
       <td class="num">{{ d.ходят }}</td><td class="num">{{ d.оплатили }}</td>
+      <td class="num" style="color:{{ '#E30613' if d.ходят_без_оплаты else '#6c6a86' }}"><b>{{ d.ходят_без_оплаты }}</b></td>
       <td class="num">{{ d.записаны_на_пробное }}</td><td class="num">{{ d.были_на_пробном }}</td>
       <td class="num"><b style="color:{{ '#E30613' if d.свободно >= 8 else '#4e8a12' }}">{{ d.свободно }}</b></td></tr>
   {% endfor %}
   <tr style="border-top:2px solid #312783"><td><b>Итого</b></td><td class="num"><b>{{ t.групп }}</b></td>
       <td class="num"><b>{{ t.итого.мест_всего }}</b></td><td class="num"><b>{{ t.итого.ходят }}</b></td>
-      <td class="num"><b>{{ t.итого.оплатили }}</b></td><td class="num"><b>{{ t.итого.записаны_на_пробное }}</b></td>
+      <td class="num"><b>{{ t.итого.оплатили }}</b></td>
+      <td class="num"><b style="color:{{ '#E30613' if t.итого.ходят_без_оплаты else '#6c6a86' }}">{{ t.итого.ходят_без_оплаты }}</b></td>
+      <td class="num"><b>{{ t.итого.записаны_на_пробное }}</b></td>
       <td class="num"><b>{{ t.итого.были_на_пробном }}</b></td><td class="num"><b>{{ t.итого.свободно }}</b></td></tr>
 </table></div>
 
 <h2>По группам</h2>
 <div class="scroll"><table>
   <tr><th>Группа</th><th class="num">мест всего</th><th class="num">ходят</th><th class="num">оплатили</th>
-      <th class="num">записаны на пробное</th><th class="num">были на пробном</th><th class="num">свободно</th><th>примечание</th></tr>
+      <th class="num">ходят без оплаты</th><th class="num">записаны на пробное</th><th class="num">были на пробном</th><th class="num">свободно</th><th>примечание</th></tr>
   {% for r in t.группы %}
   <tr{% if r.замена or r.пауза %} style="background:#fff6f6"{% endif %}>
     <td style="font-size:13px">{{ r.name }}</td>
     <td class="num">{{ r.мест_всего }}</td>
     <td class="num">{{ r.ходят }}</td>
     <td class="num" style="color:{{ '#4e8a12' if r.оплатили else '#6c6a86' }}">{{ r.оплатили }}</td>
+    <td class="num" style="color:{{ '#E30613' if r.ходят_без_оплаты else '#6c6a86' }}"><b>{{ r.ходят_без_оплаты }}</b></td>
     <td class="num" style="color:{{ '#1DA7E0' if r.записаны_на_пробное else '#6c6a86' }}">{{ r.записаны_на_пробное }}</td>
     <td class="num" style="color:{{ '#F59C00' if r.были_на_пробном else '#6c6a86' }}">{{ r.были_на_пробном }}</td>
     <td class="num">
