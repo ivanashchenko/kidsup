@@ -51,7 +51,7 @@
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from . import db, nabor
 
@@ -101,6 +101,12 @@ def spisok() -> dict:
         zvonili: dict[str, str] = {}      # набирали, но не дозвонились
         govorili: dict[str, str] = {}     # разговор состоялся, в любую сторону
         ranshe: dict[str, str] = {}       # разговор был, но ДО кампании
+        # Что случилось по номеру СЕГОДНЯ, с точностью до минуты. Нужно, чтобы
+        # админ видел свою работу сразу: строка не просто исчезает из списка,
+        # а переезжает в «сделано сегодня» с временем и исходом. И чтобы не
+        # набирать повторно номер, который уже пробовали полчаса назад.
+        segodnya: dict[str, list[dict]] = {}
+        today_s = today.isoformat()
         pokrytie = {"есть": False}
         try:
             row = conn.execute(
@@ -115,6 +121,13 @@ def spisok() -> dict:
                         continue
                     day = str(ts)[:10]
                     govoril = str(state or "") == "talked"
+                    ish = str(direction).startswith(("out", "исх"))
+                    if day == today_s:
+                        segodnya.setdefault(p, []).append({
+                            "время": str(ts)[11:16],
+                            "что": ("поговорили" if govoril
+                                    else "набирали — не взяли" if ish
+                                    else "звонили нам — не сняли")})
                     if day < NABOR_S:
                         # разговор до набора — не контакт по этому поводу,
                         # но админу полезно знать, что человек уже общался
@@ -124,7 +137,7 @@ def spisok() -> dict:
                     if govoril:
                         if day > govorili.get(p, ""):
                             govorili[p] = day
-                    elif str(direction).startswith(("out", "исх")):
+                    elif ish:
                         if day > zvonili.get(p, ""):
                             zvonili[p] = day
         except Exception:
@@ -142,8 +155,13 @@ def spisok() -> dict:
                 continue
             for ts, phone in rows_w:
                 p = _p10(phone)
-                if p and str(ts)[:10] > store.get(p, ""):
+                if not p:
+                    continue
+                if str(ts)[:10] > store.get(p, ""):
                     store[p] = str(ts)[:10]
+                if str(ts)[:10] == today_s and store is otvechali:
+                    segodnya.setdefault(p, []).append(
+                        {"время": str(ts)[11:16], "что": "написали нам сами"})
 
         # Посещения в двух окнах: ребёнок, дата, предмет
         hodil: dict[int, dict] = {}
@@ -191,6 +209,7 @@ def spisok() -> dict:
              "нет_карточки": 0}
     deti: list[dict] = []
     aktivnye: list[dict] = []
+    sdelano: list[dict] = []
     for uid, h in hodil.items():
         u = users.get(uid)
         if not u:
@@ -225,21 +244,37 @@ def spisok() -> dict:
         if st in DEAD:
             itogo["мёртвый_статус"] += 1
             continue
+        rec["события_сегодня"] = sorted(segodnya.get(p, []),
+                                        key=lambda e: e["время"])
         if p in govorili:
             itogo["поговорили"] += 1
+            # Связались именно сегодня — это работа текущей смены. Такую
+            # строку не прячем молча: админ должен видеть, что сделал.
+            if govorili[p] == today_s:
+                rec["итог"] = "поговорили"
+                sdelano.append(rec)
             continue
         if p in otvechali:
             itogo["написали_нам"] += 1
+            if otvechali[p] == today_s:
+                rec["итог"] = "написали нам сами"
+                sdelano.append(rec)
             continue
         rec["набирали"] = zvonili.get(p, "")
         rec["рассылка"] = pisali.get(p, "")
         rec["говорили_раньше"] = ranshe.get(p, "")
+        rec["пробовали_сегодня"] = bool(rec["события_сегодня"])
         deti.append(rec)
 
     # Сортировка под разговор, а не под отчёт. Сверху те, кто ушёл недавно:
     # у них свежая память о нас и о педагоге, и разговор начинается сам собой.
     # Дальше — кто ходил дольше (больше занятий = больше причин вернуться).
     deti.sort(key=lambda r: (r["последнее"], r["занятий"]), reverse=True)
+    # Кого уже пробовали сегодня — вниз: перезванивать через полчаса бессмысленно.
+    # Сортировка устойчивая, поэтому порядок внутри каждой группы сохраняется.
+    deti.sort(key=lambda r: r["пробовали_сегодня"])
+    sdelano.sort(key=lambda r: (r["события_сегодня"][0]["время"]
+                                if r["события_сегодня"] else ""), reverse=True)
 
     # Один номер — одна семья. Аня звонит на телефон, а не ребёнку: если на
     # номере двое детей, это один звонок, и знать про обоих надо заранее.
@@ -264,6 +299,9 @@ def spisok() -> dict:
 
     return {
         "дата": today.isoformat(),
+        "обновлено": datetime.now().strftime("%H:%M"),
+        "сделано_сегодня": sdelano,
+        "пробовали_сегодня": sum(1 for r in deti if r["пробовали_сегодня"]),
         "окно": {"год_с": GOD_S, "год_по": GOD_PO,
                  "лето_с": LETO_S, "лето_по": LETO_PO,
                  "набор_с": NABOR_S, "набор_по": today.isoformat()},

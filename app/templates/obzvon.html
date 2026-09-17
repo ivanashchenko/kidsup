@@ -2,6 +2,9 @@
 {% block title %}Вернуть тех, кто ходил — KidsUP{% endblock %}
 {% block content %}
 <h1>Вернуть тех, кто ходил</h1>
+<p class="muted" style="margin-bottom:.4rem">Данные на <b id="upd">{{ d.обновлено }}</b>,
+страница сама обновляется раз в пять минут — как только с семьёй поговорили, строка уезжает
+в «сделано сегодня». <span id="tick" class="sm"></span></p>
 <p class="muted">Дети, которые занимались у нас в прошлом учебном году
 (01.09.2025 – 31.05.2026) или летом (01.06 – 30.08.2026), сейчас не ходят, и
 <b>за всю кампанию набора — с 01.08.2026 по сегодня — мы с их семьёй так и не связались</b>.
@@ -15,7 +18,8 @@
 какая у нас есть: разговор начинается не с «вы оставляли заявку», а с «ваш ребёнок у нас занимался».</div>
 
 <div class="cards">
-  <div class="card"><div class="card-value" style="color:#7DB928">{{ d.детей }}</div><div class="card-label">детей вернуть</div></div>
+  <div class="card"><div class="card-value" style="color:#7DB928">{{ d.детей }}</div><div class="card-label">осталось обзвонить</div></div>
+  <div class="card"><div class="card-value" style="color:#1DA7E0">{{ d.сделано_сегодня|length }}</div><div class="card-label">связались сегодня</div></div>
   <div class="card"><div class="card-value">{{ d.семей }}</div><div class="card-label">звонков сделать</div></div>
   <div class="card"><div class="card-value">{{ d.никогда_не_набирали }}</div><div class="card-label">номер за набор не набирали</div></div>
   <div class="card"><div class="card-value" style="color:#F59C00">{{ d.не_дозвонились }}</div><div class="card-label">набирали, но не дозвонились</div></div>
@@ -56,7 +60,30 @@
 <b>Столбец «ушёл» — самое важное:</b> тот, кто был у нас в мае, помнит нас и педагога;
 тот, кто последний раз был в сентябре прошлого года, — уже нет, с ним разговор длиннее.</div>
 
+{% if d.сделано_сегодня %}
+<h2 style="margin-top:1.6rem" id="sdelano">Сделано сегодня — {{ d.сделано_сегодня|length }}</h2>
+<p class="muted">С этими семьями сегодня связались: либо поговорили по телефону, либо они сами
+написали. Строки попадают сюда автоматически из журнала звонков, отмечать ничего руками не нужно.
+Что сказали в разговоре — в карточке, ссылка справа.</p>
+<div class="scroll"><table>
+  <tr><th>Во сколько</th><th>Ребёнок</th><th>Ходил на</th><th>Чем кончилось</th><th>Карточка</th></tr>
+  {% for r in d.сделано_сегодня %}
+  <tr style="background:rgba(125,185,40,.08)">
+    <td class="sm">{% for e in r.события_сегодня %}{{ e.время }} {{ e.что }}<br>{% endfor %}</td>
+    <td><b>{{ r.имя }}</b><div class="muted sm">{{ r.телефон }}</div></td>
+    <td class="sm">{{ r.предметы|join(', ') or '—' }}</td>
+    <td class="sm"><b style="color:#4e8a12">{{ r.итог }}</b></td>
+    <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% endif %}
+
 <h2 style="margin-top:1.4rem">Кому звонить — {{ d.дети|length }} детей, {{ d.семей }} номеров</h2>
+{% if d.пробовали_сегодня %}
+<p class="muted">{{ d.пробовали_сегодня }} номеров сегодня уже набирали и не застали — они сдвинуты
+в конец списка: перезванивать через полчаса бессмысленно, лучше ближе к вечеру.</p>
+{% endif %}
 <p style="margin:.6rem 0">
   <input id="q" placeholder="имя, фамилия или телефон" oninput="filt()" style="padding:.45rem .7rem">
   <button class="btn" onclick="only('платил')">Только платившие</button>
@@ -71,8 +98,10 @@
     <th>Что уже делали за набор</th><th>Статус в CRM</th><th>Телефон</th><th>CRM</th></tr></thead>
   <tbody>
   {% for r in d.дети %}
-  <tr data-p="{{ 1 if r.платил else 0 }}" data-n="{{ 1 if r.набирали else 0 }}">
+  <tr data-p="{{ 1 if r.платил else 0 }}" data-n="{{ 1 if r.набирали else 0 }}"
+      {% if r.пробовали_сегодня %}style="opacity:.6"{% endif %}>
     <td><b>{{ r.имя }}</b>
+        {% for e in r.события_сегодня %}<div class="sm" style="color:#F59C00">сегодня {{ e.время }} — {{ e.что }}</div>{% endfor %}
         {% if r.братья %}<div class="muted sm">на этом же номере: {{ r.братья|join(', ') }}</div>{% endif %}</td>
     <td class="num">{{ r.возраст if r.возраст else '—' }}</td>
     <td class="sm">{{ r.предметы|join(', ') or '—' }}</td>
@@ -131,6 +160,13 @@
 
 <style>.sm{font-size:.84rem}#t td{padding:.35rem .4rem;vertical-align:top}</style>
 <script>
+// Страница живая: журнал звонков пишется вебхуком Манго в ту же секунду, когда
+// админ кладёт трубку, поэтому через пять минут список уже другой. Перезагружаем
+// сами, чтобы на экране в зале не висел вчерашний срез.
+setTimeout(function(){location.reload();}, 300000);
+(function(){var left=300;setInterval(function(){left--;if(left<0)left=0;
+ var m=Math.floor(left/60),s=left%60;
+ document.getElementById('tick').textContent='· обновится через '+m+':'+(s<10?'0':'')+s;},1000);})();
 var mode='';
 function filt(){var q=(document.getElementById('q').value||'').toLowerCase(),n=0;
  document.querySelectorAll('#t tbody tr').forEach(function(tr){
