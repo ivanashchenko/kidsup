@@ -104,7 +104,7 @@ window.__LP_COURSE = (document.currentScript && document.currentScript.dataset.c
 (function(){
   var main=document.querySelector('.stickybar .sb-main'); if(!main) return;
   main.setAttribute('href','#'); main.id='sb-lead';
-  var course=(window.__LP_COURSE||'') || (document.querySelector('.mini-lead input[name=course]')||{}).value || 'мини-форма-sticky';
+  var course=(window.__LP_COURSE||'') || 'мини-форма-sticky';
   var page=(location.pathname.replace(/^\//,'')||'main').replace(/[^a-z0-9_-]/gi,'');
   var fs=document.createElement('div'); fs.className='sb-sheet'; fs.id='sb-form'; fs.hidden=true;
   fs.innerHTML='<form class="mini-lead" data-mini="sticky" action="https://app.kidsup.ru/api/public/lead" method="post">'+

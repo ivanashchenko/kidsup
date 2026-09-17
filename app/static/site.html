@@ -384,7 +384,7 @@ body.js .reveal.in{opacity:1;transform:none}
 .sb-sheet .mini-lead{border:0;box-shadow:none;margin:0;border-radius:0}
 .sb-sheet .mini-lead a{display:inline;padding:0;border:0;font:inherit;font-size:12.5px;color:var(--blue-ink,#0F6E96);text-decoration:underline}
 .sb-sheet .mini-lead .ok-msg a{font-size:inherit;color:var(--green-ink,#4E7A18)}
-@media(max-width:560px){ .hero .sub{font-size:15px} .mini-lead .consent-note{font-size:12px} }
+@media(max-width:560px){ .hero .sub{display:none} .hero .mini-lead{margin-top:1rem} .mini-lead .consent-note{font-size:12px} }
 
 
 .vstrip{background:var(--soft)}
@@ -471,8 +471,6 @@ body.js .reveal.in{opacity:1;transform:none}
         <span class="badge" id="live-enrolled" hidden></span>
       </div>
       <h1>Читает за 3 месяца — на подготовке к школе.<br>Говорит по-английски за год.</h1>
-      <p class="sub">Детский центр и английский сад на Бульваре Рокоссовского.
-      Первое занятие — условно-бесплатное, с диагностикой от педагога.</p>
       <form class="mini-lead" data-mini="0" action="https://app.kidsup.ru/api/public/lead" method="post">
       <b>Оставьте номер — подберём занятие и время за один звонок.</b>
       <input id="hero-phone" name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
@@ -483,6 +481,8 @@ body.js .reveal.in{opacity:1;transform:none}
       <p class="consent-note">Нажимая «Перезвоните мне», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a>.</p>
       <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅ Хотите быстрее — <a href="https://app.kidsup.ru/go/whatsapp?src=site_hero_ok&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">напишите в WhatsApp</a></span>
     </form>
+      <p class="sub">Детский центр и английский сад на Бульваре Рокоссовского.
+      Первое занятие — условно-бесплатное, с диагностикой от педагога.</p>
       <div class="age-row" aria-label="Выберите возраст ребёнка">
         <span class="age-lbl">Сколько лет ребёнку?</span>
         <a class="age-chip" href="#quiz" data-wk="0">1–3</a>
@@ -1852,7 +1852,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // из-за этого __applyOffer ниже не находил #offer-badge и первый экран с 1 сентября
     // не подтверждал «условно-бесплатное» из объявлений. Прячем только счётчик.
     const c = document.getElementById('cnt');
-    if (c) c.hidden = true;
+    if (c) c.style.display = 'none';   // у .count свой display:flex, атрибут hidden он перебивает
   }
   const evs = [['#events .ev:nth-child(1)', 8, 29], ['#events .ev:nth-child(2)', 8, 30]];
   evs.forEach(([sel2, m, d]) => { if (past(m, d)) { const el = document.querySelector(sel2); if (el) el.remove(); } });
@@ -2050,7 +2050,7 @@ window.__applyOffer = function(today){
   if (today <= d(9,20)) {
     badge.textContent='Неделя открытых уроков — 14–20 сентября';
     title.textContent='📚 Неделя открытых уроков';
-    if(cnt) cnt.hidden=true;
+    if(cnt) cnt.style.display='none';
     var n1=card.querySelector('.note'); if(n1) n1.innerHTML='С 14 по 20 сентября можно прийти на обычное '+
       'занятие своей группы. Первое занятие — условно-бесплатное: не понравится — '+
       'платить не нужно.';
@@ -2058,7 +2058,7 @@ window.__applyOffer = function(today){
   }
   badge.textContent='Первое занятие — условно-бесплатное';
   title.textContent='🌿 Присоединяйтесь в течение года';
-  if(cnt) cnt.hidden=true;
+  if(cnt) cnt.style.display='none';
   var n2=card.querySelector('.note'); if(n2) n2.innerHTML='Группы идут весь учебный год — '+
     'присоединиться можно в любой месяц. Первое занятие условно-бесплатное, '+
     'с диагностикой уровня от педагога.';
@@ -2095,7 +2095,7 @@ document.addEventListener('click', function(e){
 (function(){
   var main=document.querySelector('.stickybar .sb-main'); if(!main) return;
   main.setAttribute('href','#'); main.id='sb-lead';
-  var course=(window.__LP_COURSE||'') || (document.querySelector('.mini-lead input[name=course]')||{}).value || 'мини-форма-sticky';
+  var course=(window.__LP_COURSE||'') || 'мини-форма-sticky';
   var page=(location.pathname.replace(/^\//,'')||'main').replace(/[^a-z0-9_-]/gi,'');
   var fs=document.createElement('div'); fs.className='sb-sheet'; fs.id='sb-form'; fs.hidden=true;
   fs.innerHTML='<form class="mini-lead" data-mini="sticky" action="https://app.kidsup.ru/api/public/lead" method="post">'+
