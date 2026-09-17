@@ -3228,7 +3228,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-17.24"
+APP_VERSION = "2026-09-17.25"
 
 
 @app.get("/api/net")
@@ -7490,6 +7490,13 @@ def api_mesta():
     """Свободные места по группам сезона (см. app/mesta.py) — то же, что блок на плане дня."""
     from . import mesta
     return mesta.rows()
+
+
+@app.get("/api/mesta/raskhozhdenie", dependencies=AUTH)
+def api_mesta_raskhozhdenie():
+    """Кто оплатил, но в группе не числится «Учится» — почему «оплатили» > «ходят»."""
+    from . import mesta
+    return mesta.raskhozhdenie()
 
 
 @app.get("/mesta", response_class=HTMLResponse, dependencies=AUTH)

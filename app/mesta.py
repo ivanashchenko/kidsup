@@ -259,3 +259,50 @@ def block() -> str:
             f"Красным — группы, куда записываем первыми; «не записывать» — сливаются 14–18.09, вместо них соседняя группа. Мини-сад и нулевой класс — норма 10 (больше — открываем ещё группу).</div>"
             f"<div class='scroll'><table><tr><th>Группа</th><th class='num'>живых / норма</th><th class='num'>оплатили</th><th>места</th></tr>"
             + "".join(td(r) for r in rs) + "</table></div></details>")
+
+
+def raskhozhdenie() -> dict:
+    """Почему «оплатили» больше, чем «ходят».
+
+    17.09 Борис: «почему в колонке ходят меньше, чем оплатили?» Два числа
+    считаются по разным таблицам: «ходят» — это записи в группу со статусом
+    «Учится», «оплатили» — абонементы сезона, привязанные к группе. Когда
+    семья заплатила, а запись осталась в статусе «Записался на пробное»
+    или её вообще нет, ребёнок платит, но в наполнении группы не виден —
+    и место под него не держится. Здесь поимённо: кто оплатил и с каким
+    статусом записи числится.
+    """
+    with db.get_conn() as conn:
+        cls = conn.execute("SELECT id, name, max_students FROM classes WHERE name LIKE '2627_%' "
+                           "AND (status IS NULL OR status = 'opened')").fetchall()
+        paid_idx = _paid_by_class(conn)
+        st_names = {}
+        try:
+            for r in conn.execute("SELECT id, name FROM join_statuses").fetchall():
+                st_names[r["id"]] = r["name"]
+        except Exception:
+            pass
+        names = {r["id"]: (r["name"] or "") for r in
+                 conn.execute("SELECT id, name FROM users").fetchall()}
+        phones = {r["id"]: (r["phone"] or "") for r in
+                  conn.execute("SELECT id, phone FROM users").fetchall()}
+        out, svod = [], {}
+        for c in cls:
+            n = c["name"] or ""
+            if "Заявк" in n or "лагер" in n.lower() or "летн" in n.lower() or n.startswith("2627_ЛГ"):
+                continue
+            uch = {r[0] for r in conn.execute(
+                "SELECT user_id FROM joins WHERE class_id=? AND status_id=?",
+                (c["id"], ST_UCHITSYA))}
+            for uid in sorted(paid_idx.get(c["id"], set()) - uch):
+                row = conn.execute(
+                    "SELECT status_id FROM joins WHERE class_id=? AND user_id=? LIMIT 1",
+                    (c["id"], uid)).fetchone()
+                sid = row["status_id"] if row else None
+                st = st_names.get(sid, str(sid)) if sid else "записи в группе нет"
+                out.append({"uid": uid, "ребёнок": names.get(uid, str(uid)),
+                            "телефон": phones.get(uid, ""),
+                            "группа": re.sub(r"^2627_", "", n), "статус_записи": st})
+                svod[st] = svod.get(st, 0) + 1
+        out.sort(key=lambda r: (r["группа"], r["ребёнок"]))
+    return {"всего": len(out), "по_статусам": svod, "строки": out}
