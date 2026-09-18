@@ -242,6 +242,23 @@ def deliver(limit: int = 5, dry: bool = True) -> dict:
     return {"ok": True, "dry_run": dry, "sent": len(sent), "errors": errs, "left": left, "details": sent}
 
 
+def unhold() -> dict:
+    """Вернуть отложенные номера в очередь и обнулить счётчик неудач.
+
+    Номер уходит в hold, когда сообщение дважды не приняли за один день:
+    почти всегда причина — суточный предохранитель отправки, а не сам
+    номер. Назавтра он снова годится, и держать его в стороне незачем.
+    """
+    with db.get_conn() as conn:
+        _ensure(conn)
+        rows = conn.execute("SELECT id, phone, child FROM broadcast_queue "
+                            "WHERE campaign=? AND status='hold'", (CAMPAIGN,)).fetchall()
+        conn.execute("UPDATE broadcast_queue SET status='pending', tried='' "
+                     "WHERE campaign=? AND status='hold'", (CAMPAIGN,))
+    return {"ok": True, "вернули": len(rows),
+            "номера": [{"телефон": r[1], "ребёнок": r[2]} for r in rows]}
+
+
 def status() -> dict:
     with db.get_conn() as conn:
         _ensure(conn)
