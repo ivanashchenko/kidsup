@@ -188,13 +188,31 @@ def tablica() -> dict:
         # слоты), заявочные и летние. Дети оттуда оплату внесли, и на /voronka
         # к цели 311 они считаются — иначе две страницы дают разные числа и
         # непонятно, какому верить.
-        вне = []
+        # Логопед — индивидуальные слоты, места в них не считаются, но детей
+        # там столько же, сколько в иной группе: 18.09 Борис спросил «а где
+        # логопед?». Поэтому отдельным разделом, с тем же счётом.
+        вне, logoped = [], []
+        log_deti = {"ходят": set(), "пробные": set()}
         for c in cls:
             n = c["name"] or ""
             if not ("Заявк" in n or "лагер" in n.lower() or "летн" in n.lower()
                     or n.startswith("2627_ЛГ")):
                 continue
             u = paid_idx.get(c["id"], set())
+            if n.startswith("2627_ЛГ"):
+                def ids_l(states):
+                    q = ",".join("?" * len(states))
+                    return {r[0] for r in conn.execute(
+                        f"SELECT user_id FROM joins WHERE class_id=? AND status_id IN ({q})",
+                        (c["id"], *states))}
+                u_uch, u_zap = ids_l((ST_UCHITSYA,)), ids_l(ST_ZAPISAN)
+                log_deti["ходят"] |= u_uch
+                log_deti["пробные"] |= u_zap
+                if u_uch or u_zap or u:
+                    logoped.append({"name": re.sub(r"^2627_", "", n),
+                                    "ходят": len(u_uch),
+                                    "записаны_на_пробное": len(u_zap),
+                                    "оплатили": len(u)})
             if u:
                 вне.append({"name": re.sub(r"^2627_", "", n), "оплатили": len(u)})
                 deti.setdefault("вне_таблицы", set()).update(u)
@@ -203,7 +221,16 @@ def tablica() -> dict:
         itogo["детей_оплатили"] = len(deti["оплатили"])
         itogo["детей_на_пробное"] = len(deti["записаны_на_пробное"])
         itogo["детей_без_оплаты"] = len(deti.get("ходят_без_оплаты", set()) - deti["оплатили"])
+        itogo["логопед_ходят"] = len(log_deti["ходят"])
+        itogo["логопед_на_пробное"] = len(log_deti["пробные"])
+        # «Всего по центру» — то, что владелец спрашивает первым: группы плюс
+        # индивидуальные слоги логопеда, без двойного счёта одного ребёнка
+        itogo["всего_детей_ходят"] = len(deti["ходят"] | log_deti["ходят"])
+        itogo["всего_детей_на_пробное"] = len(
+            deti["записаны_на_пробное"] | log_deti["пробные"])
+        logoped.sort(key=lambda r: r["name"])
         return {"группы": out, "итого": itogo, "по_предметам": по_предметам,
+                "логопед": logoped,
                 "вне_таблицы": sorted(вне, key=lambda r: -r["оплатили"]),
                 "групп": len(out), "обновлено": db.get_state("last_sync") or ""}
 
