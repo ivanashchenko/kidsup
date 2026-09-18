@@ -3249,7 +3249,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-18.08"
+APP_VERSION = "2026-09-18.09"
 
 
 @app.get("/api/net")
@@ -6798,6 +6798,21 @@ def kamery_page(request: Request):
     if kamery.ok_token(request.cookies.get(kamery.COOKIE) or ""):
         return HTMLResponse(kamery.page())
     return HTMLResponse(kamery.login_page())
+
+
+@app.get("/kamery/nastroyka", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+def kamery_nastroyka(request: Request):
+    """Форма владельца: вставить ссылки на трансляции камер."""
+    from . import kamery
+    return HTMLResponse(kamery.nastroyka())
+
+
+@app.post("/kamery/nastroyka", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+async def kamery_nastroyka_save(request: Request):
+    from . import kamery
+    form = await request.form()
+    res = kamery.save(dict(form))
+    return HTMLResponse(kamery.nastroyka(saved=res["камер"]))
 
 
 @app.post("/kamery", response_class=HTMLResponse)

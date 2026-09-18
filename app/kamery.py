@@ -14,6 +14,7 @@ from __future__ import annotations
 import html as _html
 import hmac
 import json
+import re
 
 from . import db
 
@@ -75,6 +76,11 @@ figcaption{padding:11px 14px;font-weight:600;font-size:15px}
 .login button{width:100%;margin-top:14px;padding:12px 16px;font:600 16px Inter,sans-serif;
               color:#fff;background:var(--indigo);border:0;border-radius:11px;cursor:pointer}
 .login button:hover{background:#3b2f9b}
+.ok{background:#eef8e6;border:1px solid #cfe7b5;color:#3f6a12;padding:10px 12px;border-radius:12px;margin:12px 0}
+.nast .row{margin:10px 0}
+.nast label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.nast input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font:15px Inter,sans-serif}
+.nast hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 .err{margin-top:12px;padding:10px 12px;border-radius:11px;background:#FDECEC;
      color:#A3201A;font-size:14px}
 .note{margin-top:26px;padding:16px 18px;background:var(--soft);border:1px solid #DCE6F5;
@@ -123,4 +129,63 @@ def page() -> str:
 <div class=note>Пароль личный: пожалуйста, не пересылайте его в чаты и
 посторонним. Если видео не запускается — обновите страницу или откройте
 её в другом браузере. Не работает и там: напишите нам в WhatsApp.</div>
+{FOOT}"""
+
+def save(raw: dict) -> dict:
+    """Сохранить список камер из формы настройки.
+
+    Приходит {"name_1": "...", "src_1": "...", ...}: строка попадает в список,
+    только если заполнены оба поля и ссылка начинается с https. Пустые строки
+    выбрасываются — так строка удаляется простым стиранием полей.
+    """
+    pairs = {}
+    for k, v in (raw or {}).items():
+        if "_" not in str(k):
+            continue
+        kind, _, idx = str(k).partition("_")
+        if kind not in ("name", "src"):
+            continue
+        pairs.setdefault(idx, {})[kind] = str(v or "").strip()
+    out = []
+    for idx in sorted(pairs, key=lambda x: (len(x), x)):
+        it = pairs[idx]
+        src, name = it.get("src", ""), it.get("name", "")
+        if not src:
+            continue
+        if not src.startswith("https://"):
+            # из кабинета часто копируют целиком <iframe src="...">
+            m = re.search(r'src=["\']([^"\']+)["\']', src)
+            src = m.group(1) if m else ""
+        if src.startswith("https://"):
+            out.append({"name": name or "Камера", "src": src})
+    db.set_setting("cam_embeds", json.dumps(out, ensure_ascii=False))
+    return {"ok": True, "камер": len(out), "список": out}
+
+
+def nastroyka(saved: int | None = None) -> str:
+    """Форма владельца: вставить ссылки на камеры без правки JSON руками."""
+    cams = _cameras() + [{"name": "", "src": ""}] * 3
+    rows = "".join(
+        f'<div class=row><label>Название кабинета</label>'
+        f'<input name="name_{i}" value="{_html.escape(c["name"])}" '
+        f'placeholder="Например: Кабинет 2, английский"></div>'
+        f'<div class=row><label>Ссылка на трансляцию</label>'
+        f'<input name="src_{i}" value="{_html.escape(c["src"])}" '
+        f'placeholder="https://... или весь код &lt;iframe src=...&gt;"></div><hr>'
+        for i, c in enumerate(cams, 1))
+    msg = (f'<div class=ok>Сохранено: камер — {saved}. '
+           f'<a href="/kamery">Открыть страницу камер</a></div>'
+           if saved is not None else "")
+    return f"""{HEAD}
+<h1>Настройка камер</h1>
+<p class=lead>Вставьте ссылку на трансляцию каждой камеры. В кабинете
+видеонаблюдения это «Поделиться» → «Встроить на сайт»: можно скопировать
+весь код, адрес я выну сам. Пустая строка удаляет камеру.</p>
+{msg}
+<form method=post action="/kamery/nastroyka" class=nast>
+{rows}
+<button type=submit>Сохранить</button>
+</form>
+<div class=note>Родителям страница открывается по адресу app.kidsup.ru/kamery
+и просит пароль. Пароль меняется в настройках сервера (cam_password).</div>
 {FOOT}"""
