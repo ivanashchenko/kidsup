@@ -3028,6 +3028,13 @@ def api_tvoyklass_deliver(payload: dict = Body(default={})):
     return tvoyklass.deliver(limit=int(payload.get("limit") or 5), dry=not payload.get("send"))
 
 
+@app.post("/api/tvoyklass/dosly", dependencies=AUTH)
+def api_tvoyklass_dosly(payload: dict = Body(default={})):
+    """Дослать инструкцию тем, чей ответ на присланную почту не ушёл."""
+    from . import tvoyklass
+    return tvoyklass.dosly(dry=not payload.get("send"))
+
+
 @app.post("/api/tvoyklass/unhold", dependencies=AUTH)
 def api_tvoyklass_unhold():
     """Вернуть отложенные номера рассылки «Твой Класс» в очередь."""
@@ -3235,7 +3242,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-18.01"
+APP_VERSION = "2026-09-18.03"
 
 
 @app.get("/api/net")

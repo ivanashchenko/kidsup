@@ -259,6 +259,61 @@ def unhold() -> dict:
             "номера": [{"телефон": r[1], "ребёнок": r[2]} for r in rows]}
 
 
+def dosly(dry: bool = True) -> dict:
+    """Дослать инструкцию тем, чей ответ не ушёл с первого раза.
+
+    Почта приходит когда угодно, в том числе до девяти утра, а ответ в
+    такой час предохранитель отменяет. Семья остаётся с чувством, что
+    её сообщение ушло в пустоту. Здесь мы возвращаемся к ним, как только
+    окно открылось.
+    """
+    from . import wazzup
+    from .autopilot import _now
+    now = _now()
+    if not dry and not (9 <= now.hour < 20):
+        return {"ok": False, "error": "вне окна 9:00–20:00", "sent": 0}
+    # Верить записи в журнале нельзя: до 18.09 «ответ отправлен» ставилось
+    # и тогда, когда предохранитель отправку отменил. Проверяем по факту —
+    # была ли успешная отправка этому номеру после того, как он прислал
+    # почту (wazzup_guard пишется только при успехе).
+    with db.get_conn() as conn:
+        _ensure(conn)
+        rows = []
+        for r in conn.execute(
+                "SELECT phone, uids, children, ay, email, note, answered_at "
+                "FROM lk_email_asked WHERE email IS NOT NULL AND email != ''").fetchall():
+            since = (r[6] or "")[:19]
+            try:
+                done = conn.execute(
+                    "SELECT 1 FROM wazzup_guard WHERE phone=? AND kind='reply' "
+                    "AND ts>=? LIMIT 1", (r[0][-10:], since)).fetchone()
+            except Exception:
+                done = None
+            if not done:
+                rows.append(r[:6])
+    sent, errs = [], []
+    for phone, uids, children, ay, email, note in rows:
+        kids = json.loads(children or "[]")
+        text = reply_after_email(kids, email, bool(ay))
+        if dry:
+            sent.append({"телефон": "7" + phone, "дети": kids, "почта": email})
+            continue
+        try:
+            log_ = wazzup.send_smart("7" + phone, text, dry_run=False, mass=False,
+                                     kind="reply")
+            ok = any("ok" in x for x in log_)
+        except Exception as e:  # noqa: BLE001
+            ok, log_ = False, [str(e)[:120]]
+        if ok:
+            with db.get_conn() as conn:
+                conn.execute("UPDATE lk_email_asked SET note=? WHERE phone=?",
+                             ((note or "") + "; ответ отправлен (досылка)", phone))
+            sent.append({"телефон": "7" + phone, "дети": kids, "почта": email})
+        else:
+            errs.append({"телефон": "7" + phone, "log": log_})
+    return {"ok": True, "dry_run": dry, "sent": len(sent), "details": sent, "errors": errs}
+
+
 def status() -> dict:
     with db.get_conn() as conn:
         _ensure(conn)
@@ -311,13 +366,18 @@ def on_inbound(payload: dict) -> None:
         children = json.loads(row[2] or "[]")
         ay = bool(row[3])
         note = _write_email(uids, email)
+        # 18.09: две семьи прислали почту в 07:12 и 08:32, предохранитель
+        # отменил ответ («вне окна 9-20»), а в журнале всё равно стояло
+        # «ответ отправлен» — результат отправки никто не смотрел.
+        # Теперь смотрим и, если не ушло, оставляем на досылку.
         try:
             from . import wazzup
-            wazzup.send_smart("7" + phone, reply_after_email(children, email, ay),
-                              dry_run=False, mass=False, kind="reply")
-            note += "; ответ отправлен"
+            log_ = wazzup.send_smart("7" + phone, reply_after_email(children, email, ay),
+                                     dry_run=False, mass=False, kind="reply")
+            note += ("; ответ отправлен" if any("ok" in x for x in log_)
+                     else "; ОТВЕТ НЕ УШЁЛ: " + "; ".join(log_)[:120])
         except Exception as e:  # noqa: BLE001
-            note += f"; ответ не ушёл: {str(e)[:80]}"
+            note += f"; ОТВЕТ НЕ УШЁЛ: {str(e)[:80]}"
         with db.get_conn() as conn:
             conn.execute("UPDATE lk_email_asked SET answered_at=?, email=?, note=? WHERE phone=?",
                          (datetime.now().isoformat(timespec="seconds"), email, note, phone))
