@@ -291,6 +291,93 @@ def _yavka() -> list[dict]:
     return out
 
 
+def _pervye() -> list[dict]:
+    """Кто идёт на первое занятие сегодня, завтра и послезавтра.
+
+    18.09 Борис: «нужно же кто идёт на шахматы и робототехнику прозвонить».
+    Пробное, которое не подтвердили голосом, срывается чаще всего: семья
+    записалась неделю назад и забыла, а группа стартует только при четырёх
+    оплатах — один не пришедший ребёнок решает судьбу всей группы.
+    Показываем, звонили ли мы этой семье за последние сутки и писали ли.
+    """
+    today = date.today()
+    gr = {}
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT l.date, l.begin_time, c.name, u.id, u.name, u.phone, lr.raw, l.class_id "
+            "FROM lesson_records lr JOIN lessons l ON l.id = lr.lesson_id "
+            "JOIN classes c ON c.id = l.class_id JOIN users u ON u.id = lr.user_id "
+            "WHERE l.date BETWEEN ? AND ? AND c.name LIKE '2627_%' "
+            "ORDER BY l.date, l.begin_time",
+            (today.isoformat(), (today + timedelta(days=2)).isoformat())).fetchall()
+        # звонок или сообщение за последние сутки — признак, что уже коснулись
+        sutki = (datetime.now() - timedelta(hours=26)).isoformat(timespec="seconds")
+        zvonili, pisali = set(), set()
+        try:
+            for (ph,) in conn.execute(
+                    "SELECT DISTINCT substr(phone,-10) FROM mango_calls "
+                    "WHERE ts >= ? AND state='talked'", (sutki,)):
+                zvonili.add(ph)
+        except Exception:
+            pass
+        try:
+            for (ph,) in conn.execute(
+                    "SELECT DISTINCT substr(phone,-10) FROM wazzup_outbox WHERE ts >= ?",
+                    (sutki,)):
+                pisali.add(ph)
+        except Exception:
+            pass
+        # первое занятие: у ребёнка в этой группе раньше посещений не было
+        for d_, t_, cname, uid, uname, phone, raw, class_id in rows:
+            # Именно записи, а не отметки о посещении: явку админы ставят
+            # с опозданием (18.09 её не было вообще), и по visit=1 «первым»
+            # оказалось бы каждое занятие в центре.
+            was = conn.execute(
+                "SELECT 1 FROM lesson_records lr JOIN lessons l ON l.id = lr.lesson_id "
+                "WHERE lr.user_id=? AND l.class_id=? AND l.date < ? LIMIT 1",
+                (uid, class_id, d_)).fetchone()
+            if was:
+                continue
+            # флаг «Пробное» приходит в сыром JSON записи полем test
+            try:
+                trial = bool((json.loads(raw or "{}") or {}).get("test"))
+            except ValueError:
+                trial = False
+            p = _p10(phone)
+            g = (cname or "").replace("2627_", "")
+            key = (d_, (t_ or "")[:5], g)
+            deti = gr.setdefault(key, {})
+            # у ребёнка бывает две записи на одно занятие (и две карточки на
+            # номер) — в списке для обзвона он должен быть один раз
+            if uid in deti:
+                deti[uid]["галочка"] = deti[uid]["галочка"] or bool(trial)
+                continue
+            deti[uid] = {
+                "uid": uid, "имя": uname, "телефон": phone or "",
+                "галочка": bool(trial),
+                "звонили": p in zvonili, "писали": p in pisali}
+    out = []
+    for (d_, t_, g), det in sorted(gr.items()):
+        deti = sorted(det.values(), key=lambda r: r["имя"] or "")
+        out.append({"дата": d_, "время": t_, "группа": g, "дети": deti,
+                    "детей": len(deti),
+                    "без_касания": sum(1 for x in deti
+                                       if not x["звонили"] and not x["писали"])})
+    return out
+
+
+def _dela_dnya() -> list[dict]:
+    """Список дел дежурного на сегодня — тот же, что в плане дня."""
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                "SELECT id, ts, who, text, phone, done FROM plan_inbox "
+                "WHERE day=? ORDER BY done, id", (date.today().isoformat(),)).fetchall()
+        except Exception:
+            return []
+    return [dict(r) for r in rows]
+
+
 def dela() -> dict:
     g = _bez_galochki()
     z = _zhdut()
@@ -300,15 +387,22 @@ def dela() -> dict:
     # семью из раздела про чаты незачем показывать дважды: там разговор
     # предметный и с готовым текстом, здесь была бы та же строка без контекста
     v_chatah = {r["телефон"] for r in ch}
+    pv = _pervye()
+    dd = _dela_dnya()
     return {
         "дата": date.today().isoformat(),
+        "первые": pv,
+        "дела": dd,
         "без_галочки": g,
         "ждут": [r for r in z if not r["вежливость"] and r["телефон"] not in v_chatah],
         "ждут_вежливость": [r for r in z if r["вежливость"]],
         "чаты": ch,
         "новые_лиды": l,
         "явка": y,
-        "итоги": {"без_галочки": len(g),
+        "итоги": {"первые_занятия": sum(r["детей"] for r in pv),
+                  "первые_без_касания": sum(r["без_касания"] for r in pv),
+                  "дел_открыто": sum(1 for r in dd if not r["done"]),
+                  "без_галочки": len(g),
                   "ждут": sum(1 for r in z if not r["вежливость"]
                               and r["телефон"] not in v_chatah),
                   "чаты": len(ch),

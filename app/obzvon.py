@@ -51,7 +51,7 @@
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from . import db, nabor
 
@@ -210,6 +210,8 @@ def spisok() -> dict:
     deti: list[dict] = []
     aktivnye: list[dict] = []
     sdelano: list[dict] = []
+    vchera_s = (date.today() - timedelta(days=1)).isoformat()
+    vchera: list[dict] = []
     for uid, h in hodil.items():
         u = users.get(uid)
         if not u:
@@ -253,12 +255,19 @@ def spisok() -> dict:
             if govorili[p] == today_s:
                 rec["итог"] = "поговорили"
                 sdelano.append(rec)
+            elif govorili[p] == vchera_s:
+                # 18.09 Борис: «оставь только невыполненное». Вчерашние
+                # разговоры из списка уже ушли, но владельцу нужно видеть,
+                # что смена отработала, — поэтому отдельным блоком.
+                vchera.append({**rec, "итог": "поговорили"})
             continue
         if p in otvechali:
             itogo["написали_нам"] += 1
             if otvechali[p] == today_s:
                 rec["итог"] = "написали нам сами"
                 sdelano.append(rec)
+            elif otvechali[p] == vchera_s:
+                vchera.append({**rec, "итог": "написали нам сами"})
             continue
         rec["набирали"] = zvonili.get(p, "")
         rec["рассылка"] = pisali.get(p, "")
@@ -301,6 +310,7 @@ def spisok() -> dict:
         "дата": today.isoformat(),
         "обновлено": datetime.now().strftime("%H:%M"),
         "сделано_сегодня": sdelano,
+        "сделано_вчера": vchera,
         "пробовали_сегодня": sum(1 for r in deti if r["пробовали_сегодня"]),
         "окно": {"год_с": GOD_S, "год_по": GOD_PO,
                  "лето_с": LETO_S, "лето_по": LETO_PO,

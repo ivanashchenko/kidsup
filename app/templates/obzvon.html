@@ -79,6 +79,24 @@
 </table></div>
 {% endif %}
 
+{% if d.сделано_вчера %}
+<h2 style="margin-top:1.6rem">Сделано вчера — {{ d.сделано_вчера|length }}</h2>
+<p class="muted">Эти семьи из списка уже ушли: с ними связались вчера. Блок нужен, чтобы видеть
+работу прошлой смены, звонить им заново не надо.</p>
+<div class="scroll"><table>
+  <tr><th>Ребёнок</th><th>Ходил на</th><th>Чем кончилось</th><th>Статус</th><th>Карточка</th></tr>
+  {% for r in d.сделано_вчера %}
+  <tr style="opacity:.7">
+    <td><b>{{ r.имя }}</b><div class="muted sm">{{ r.телефон }}</div></td>
+    <td class="sm">{{ r.предметы|join(', ') or '—' }}</td>
+    <td class="sm"><b style="color:#4e8a12">{{ r.итог }}</b></td>
+    <td class="sm">{{ r.статус_текст }}</td>
+    <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% endif %}
+
 <h2 style="margin-top:1.4rem">Кому звонить — {{ d.дети|length }} детей, {{ d.семей }} номеров</h2>
 {% if d.пробовали_сегодня %}
 <p class="muted">{{ d.пробовали_сегодня }} номеров сегодня уже набирали и не застали — они сдвинуты

@@ -3249,7 +3249,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-18.04"
+APP_VERSION = "2026-09-18.08"
 
 
 @app.get("/api/net")
@@ -6953,6 +6953,59 @@ def api_crm_raw_joins(user_id: int):
     finally:
         mk.close()
     return j
+
+
+@app.post("/api/crm/email-fix", dependencies=AUTH)
+def api_crm_email_fix(payload: dict = Body(default={})):
+    """Перенести почту из поля «Email 2» в основное.
+
+    18.09, Ира: «внесена почта, но не отображается, и из-за этого мама
+    Феликса не может войти». Вход в «Твой Класс» идёт по ОСНОВНОЙ почте
+    карточки; почта, вписанная в дополнительный атрибут «Email 2», для
+    входа не существует. Здесь мы находим такие карточки по локальной
+    копии базы и переносим значение в основное поле, ничего не стирая.
+    """
+    import json as _json
+    from .moyklass_client import MoyklassClient
+    dry = not payload.get("send")
+    nashli, out, errs = [], [], []
+    with db.get_conn() as conn:
+        rows = conn.execute("SELECT id, name, phone, email, raw FROM users").fetchall()
+    for r in rows:
+        if (r["email"] or "").strip():
+            continue
+        try:
+            raw = _json.loads(r["raw"] or "{}")
+        except ValueError:
+            continue
+        e2 = ""
+        for a_ in raw.get("attributes") or []:
+            if a_.get("attributeAlias") in ("email_2", "email_3"):
+                v = str(a_.get("value") or "").strip()
+                if v and v.lower() != "null" and "@" in v:
+                    e2 = v
+                    break
+        if not e2:
+            continue
+        nashli.append({"uid": r["id"], "имя": r["name"], "телефон": r["phone"], "почта": e2})
+    if dry:
+        return {"ok": True, "dry_run": True, "найдено": len(nashli), "строки": nashli}
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        for it in nashli:
+            try:
+                mk.safe_update_user(int(it["uid"]), email=it["почта"])
+                mk.post("/v1/company/userComments",
+                        {"userId": int(it["uid"]), "showToUser": False,
+                         "comment": f"Почта {it['почта']} перенесена из поля «Email 2» в основное: "
+                                    f"вход в личный кабинет «Твой Класс» работает только по "
+                                    f"основной почте карточки."})
+                out.append(it)
+            except Exception as e:  # noqa: BLE001
+                errs.append({**it, "ошибка": str(e)[:120]})
+    finally:
+        mk.close()
+    return {"ok": True, "dry_run": False, "перенесено": len(out), "строки": out, "ошибки": errs}
 
 
 @app.get("/api/crm/raw-user", dependencies=OWNER_AUTH)
