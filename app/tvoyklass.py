@@ -193,7 +193,7 @@ def enqueue(dry: bool = True, only_ay: bool = False) -> dict:
     return {"ok": True, "dry_run": dry, "queued": n, **{k: v for k, v in p.items() if k != "recipients"}}
 
 
-def deliver(limit: int = 5, dry: bool = True) -> dict:
+def deliver(limit: int = 5, dry: bool = True, only_ay: bool = False) -> dict:
     """Отправить пачку как разовые сообщения (см. chaty.deliver — та же логика).
 
     Разово, по несколько за вызов и только в рабочие часы: обычный номер
@@ -214,10 +214,23 @@ def deliver(limit: int = 5, dry: bool = True) -> dict:
             "UPDATE broadcast_queue SET status='hold' WHERE campaign=? AND status='pending' "
             "AND (LENGTH(COALESCE(tried,'')) - LENGTH(REPLACE(COALESCE(tried,''),'fail',''))) >= 8",
             (CAMPAIGN,))
-        rows = conn.execute(
-            "SELECT id, phone, child, text FROM broadcast_queue "
-            "WHERE campaign=? AND status='pending' ORDER BY id LIMIT ?",
-            (CAMPAIGN, max(1, min(15, int(limit))))).fetchall()
+        # Английский идёт первым: у этих семей в кабинете живёт чат группы,
+        # и без входа родитель не видит ни домашних заданий, ни фотографий.
+        ay_phones = ()
+        if only_ay:
+            ay_phones = tuple(r[0] for r in conn.execute(
+                "SELECT phone FROM lk_email_asked WHERE ay=1"))
+        if only_ay and ay_phones:
+            rows = conn.execute(
+                "SELECT id, phone, child, text FROM broadcast_queue "
+                "WHERE campaign=? AND status='pending' AND substr(phone,-10) IN (%s) "
+                "ORDER BY id LIMIT ?" % ",".join("?" * len(ay_phones)),
+                (CAMPAIGN, *ay_phones, max(1, min(15, int(limit))))).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, phone, child, text FROM broadcast_queue "
+                "WHERE campaign=? AND status='pending' ORDER BY id LIMIT ?",
+                (CAMPAIGN, max(1, min(15, int(limit))))).fetchall()
     for rid, phone, child, text in rows:
         if dry:
             sent.append({"phone": phone, "child": child, "dry": True})
@@ -240,6 +253,36 @@ def deliver(limit: int = 5, dry: bool = True) -> dict:
                             (CAMPAIGN,)).fetchone()[0]
     log.info("tvoyklass.deliver: отправлено %d, ошибок %d, осталось %d", len(sent), len(errs), left)
     return {"ok": True, "dry_run": dry, "sent": len(sent), "errors": errs, "left": left, "details": sent}
+
+
+def ay_status() -> dict:
+    """Семьи английского: кому рассылка ушла, кто ещё ждёт, у кого нет почты.
+
+    18.09 решение владельца: английский — первый приоритет, потому что
+    там чат группы в кабинете заменяет отдельный мессенджер и без входа
+    родитель не увидит ни домашних заданий, ни фотографий с занятия.
+    """
+    p = plan()
+    fam = {f["phone"]: f for f in p["recipients"] if f["ay"]}
+    with db.get_conn() as conn:
+        _ensure(conn)
+        q = {r[0]: (r[1], r[2]) for r in conn.execute(
+            "SELECT phone, status, sent FROM broadcast_queue WHERE campaign=?", (CAMPAIGN,))}
+        mail = {r[0]: (r[1], r[2]) for r in conn.execute(
+            "SELECT phone, email, answered_at FROM lk_email_asked")}
+    out = []
+    for phone, f in fam.items():
+        st, sent = q.get(phone, ("не в очереди", None))
+        em = f["email"] or (mail.get(phone[-10:]) or ("", None))[0] or ""
+        out.append({"телефон": "7" + phone[-10:], "дети": f["children"],
+                    "группы": f.get("groups") or [], "почта": em,
+                    "рассылка": st, "когда": sent})
+    out.sort(key=lambda r: (r["рассылка"] != "pending", r["дети"][0] if r["дети"] else ""))
+    svod = {}
+    for r in out:
+        svod[r["рассылка"]] = svod.get(r["рассылка"], 0) + 1
+    return {"семей_английского": len(out), "по_статусу": svod,
+            "без_почты": sum(1 for r in out if not r["почта"]), "строки": out}
 
 
 def unhold() -> dict:
