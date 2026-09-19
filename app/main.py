@@ -3076,6 +3076,17 @@ def obzvon_page(request: Request):
     return render(request, "obzvon.html", active="obzvon", d=obzvon.spisok())
 
 
+@app.post("/api/obzvon/done", dependencies=AUTH)
+def api_obzvon_done(payload: dict = Body(...)):
+    """Отметить «обзвонили»: {"uid": 123, "done": true, "who": "Аня"}."""
+    from . import obzvon
+    uid = int(payload.get("uid") or 0)
+    if not uid:
+        raise HTTPException(400, "нужен uid")
+    return obzvon.otmetit(uid, bool(payload.get("done", True)),
+                          str(payload.get("who") or ""), str(payload.get("note") or ""))
+
+
 @app.get("/api/obzvon", dependencies=AUTH)
 def api_obzvon():
     """То же машинным форматом."""
@@ -3249,7 +3260,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-18.10"
+APP_VERSION = "2026-09-19.01"
 
 
 @app.get("/api/net")

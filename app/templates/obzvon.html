@@ -79,6 +79,31 @@
 </table></div>
 {% endif %}
 
+{% if d.отмечено %}
+<h2 style="margin-top:1.6rem">Отмечено вручную — {{ d.отмечено|length }}</h2>
+<p class="muted">Эти строки закрыли галочкой. Если отметили по ошибке, снимите галочку — строка вернётся в список.</p>
+<div class="scroll"><table>
+  <tr><th>✓</th><th>Ребёнок</th><th>Ходил на</th><th>Когда отметили</th><th>Телефон</th><th>CRM</th></tr>
+  {% for r in d.отмечено %}
+  <tr style="opacity:.6">
+    <td><input type="checkbox" checked onchange="vernut(this, {{ r.uid }})"></td>
+    <td><b>{{ r.имя }}</b></td>
+    <td class="sm">{{ r.предметы|join(', ') or '—' }}</td>
+    <td class="sm">{{ r.отметка.когда[8:10] }}.{{ r.отметка.когда[5:7] }} {{ r.отметка.когда[11:16] }}</td>
+    <td class="sm"><a href="tel:+{{ r.телефон }}">+{{ r.телефон }}</a></td>
+    <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">→</a></td>
+  </tr>
+  {% endfor %}
+</table></div>
+<script>
+function vernut(box, uid){
+  fetch('/api/obzvon/done', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({uid: uid, done: false})})
+   .then(function(){ location.reload(); });
+}
+</script>
+{% endif %}
+
 {% if d.сделано_вчера %}
 <h2 style="margin-top:1.6rem">Сделано вчера — {{ d.сделано_вчера|length }}</h2>
 <p class="muted">Эти семьи из списка уже ушли: с ними связались вчера. Блок нужен, чтобы видеть
@@ -97,7 +122,9 @@
 </table></div>
 {% endif %}
 
-<h2 style="margin-top:1.4rem">Кому звонить — {{ d.дети|length }} детей, {{ d.семей }} номеров</h2>
+<h2 style="margin-top:1.4rem" id="zagolovok">Кому звонить — {{ d.дети|length }} детей, {{ d.семей }} номеров</h2>
+<p class="muted">Поговорили — поставьте галочку слева, строка уйдёт из списка сразу и не вернётся.
+Строки уходят и сами, когда разговор виден в журнале звонков или семья пишет нам в чат.</p>
 {% if d.пробовали_сегодня %}
 <p class="muted">{{ d.пробовали_сегодня }} номеров сегодня уже набирали и не застали — они сдвинуты
 в конец списка: перезванивать через полчаса бессмысленно, лучше ближе к вечеру.</p>
@@ -111,13 +138,15 @@
   <span class="muted sm" id="cnt"></span>
 </p>
 <div class="scroll"><table id="t">
-  <thead><tr><th>Ребёнок</th><th class="num">возраст</th><th>Ходил на</th>
+  <thead><tr><th title="Отметить, что с семьёй поговорили">✓</th><th>Ребёнок</th><th class="num">возраст</th><th>Ходил на</th>
     <th>Когда ходил</th><th class="num">занятий</th><th>Ушёл</th><th>Платил</th>
     <th>Что уже делали за набор</th><th>Статус в CRM</th><th>Телефон</th><th>CRM</th></tr></thead>
   <tbody>
   {% for r in d.дети %}
   <tr data-p="{{ 1 if r.платил else 0 }}" data-n="{{ 1 if r.набирали else 0 }}"
       {% if r.пробовали_сегодня %}style="opacity:.6"{% endif %}>
+    <td><input type="checkbox" title="поговорили — убрать из списка"
+        onchange="gotovo(this, {{ r.uid }})"></td>
     <td><b>{{ r.имя }}</b>
         {% for e in r.события_сегодня %}<div class="sm" style="color:#F59C00">сегодня {{ e.время }} — {{ e.что }}</div>{% endfor %}
         {% if r.братья %}<div class="muted sm">на этом же номере: {{ r.братья|join(', ') }}</div>{% endif %}</td>
@@ -136,9 +165,27 @@
         <a href="https://wa.me/{{ r.телефон }}" target="_blank" rel="noopener">WA</a></td>
     <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">→</a></td>
   </tr>
-  {% else %}<tr><td colspan="11" class="muted">пусто</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="12" class="muted">пусто</td></tr>{% endfor %}
   </tbody>
 </table></div>
+<script>
+function gotovo(box, uid){
+  var tr = box.closest('tr');
+  tr.style.transition = 'opacity .25s';
+  tr.style.opacity = box.checked ? '.25' : '1';
+  fetch('/api/obzvon/done', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({uid: uid, done: box.checked, who: 'Аня'})})
+   .then(function(r){ return r.json(); })
+   .then(function(){ if (box.checked) { setTimeout(function(){ tr.remove(); schet(); }, 250); } })
+   .catch(function(){ box.checked = !box.checked; tr.style.opacity = '1';
+                      alert('Не сохранилось, попробуйте ещё раз'); });
+}
+function schet(){
+  var n = document.querySelectorAll('#t tbody tr').length;
+  var h = document.getElementById('zagolovok');
+  if (h) h.textContent = 'Кому звонить — ' + n + ' ' + (n % 10 === 1 && n % 100 !== 11 ? 'ребёнок' : 'детей');
+}
+</script>
 
 {% if d.по_предметам %}
 <h2 style="margin-top:1.6rem">На что ходили</h2>

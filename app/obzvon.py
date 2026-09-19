@@ -86,6 +86,40 @@ def _predmet(cls: str) -> str:
     return s[:40]
 
 
+def _done_init(conn) -> None:
+    conn.execute("""CREATE TABLE IF NOT EXISTS obzvon_done (
+        uid INTEGER PRIMARY KEY, ts TEXT, who TEXT, note TEXT)""")
+
+
+def otmetki() -> dict[int, dict]:
+    """Ручные отметки «сделано» по детям из списка обзвона."""
+    with db.get_conn() as conn:
+        _done_init(conn)
+        rows = conn.execute("SELECT uid, ts, who, note FROM obzvon_done").fetchall()
+    return {r[0]: {"когда": r[1], "кто": r[2], "заметка": r[3]} for r in rows}
+
+
+def otmetit(uid: int, done: bool = True, who: str = "", note: str = "") -> dict:
+    """Поставить или снять отметку «обзвонили».
+
+    19.09 Борис: «сделай, чтобы Аня могла галочками ставить что уже сделано».
+    Автоматика убирает строку только после состоявшегося разговора, а живая
+    работа бывает шире: дозвонились на второй номер, семья ответила в чате,
+    человек просил не звонить. Отметка закрывает строку сразу и навсегда,
+    снять её можно тем же запросом с done=false.
+    """
+    from .autopilot import _now
+    with db.get_conn() as conn:
+        _done_init(conn)
+        if done:
+            conn.execute(
+                "INSERT OR REPLACE INTO obzvon_done (uid, ts, who, note) VALUES (?,?,?,?)",
+                (int(uid), _now().isoformat(timespec="minutes"), who[:20], note[:200]))
+        else:
+            conn.execute("DELETE FROM obzvon_done WHERE uid=?", (int(uid),))
+    return {"ok": True, "uid": int(uid), "done": bool(done)}
+
+
 def spisok() -> dict:
     today = date.today()
     with db.get_conn() as conn:
@@ -210,6 +244,8 @@ def spisok() -> dict:
     deti: list[dict] = []
     aktivnye: list[dict] = []
     sdelano: list[dict] = []
+    otm: list[dict] = []
+    otmecheno = otmetki()
     vchera_s = (date.today() - timedelta(days=1)).isoformat()
     vchera: list[dict] = []
     for uid, h in hodil.items():
@@ -269,6 +305,11 @@ def spisok() -> dict:
             elif otvechali[p] == vchera_s:
                 vchera.append({**rec, "итог": "написали нам сами"})
             continue
+        if uid in otmecheno:
+            itogo["отмечено_руками"] = itogo.get("отмечено_руками", 0) + 1
+            otm.append({**rec, "итог": "отмечено вручную",
+                        "отметка": otmecheno[uid]})
+            continue
         rec["набирали"] = zvonili.get(p, "")
         rec["рассылка"] = pisali.get(p, "")
         rec["говорили_раньше"] = ranshe.get(p, "")
@@ -311,6 +352,7 @@ def spisok() -> dict:
         "обновлено": datetime.now().strftime("%H:%M"),
         "сделано_сегодня": sdelano,
         "сделано_вчера": vchera,
+        "отмечено": sorted(otm, key=lambda r: r["отметка"]["когда"], reverse=True),
         "пробовали_сегодня": sum(1 for r in deti if r["пробовали_сегодня"]),
         "окно": {"год_с": GOD_S, "год_по": GOD_PO,
                  "лето_с": LETO_S, "лето_по": LETO_PO,
