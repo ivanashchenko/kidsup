@@ -3260,7 +3260,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-19.06"
+APP_VERSION = "2026-09-19.08"
 
 
 @app.get("/api/net")
@@ -7138,6 +7138,18 @@ def api_crm_find_phone(user_id: int = 0, name: str = ""):
                                 out.append({"где": gde, "телефон": r[0], "когда": r[1]})
                     except Exception:
                         pass
+        if user_id:
+            # счета, платежи и абонементы хранят сырой ответ МойКласса —
+            # в нём иногда остаётся телефон плательщика
+            import re as _re
+            for tbl in ("invoices", "payments", "user_subscriptions", "joins"):
+                try:
+                    for (raw,) in conn.execute(
+                            f"SELECT raw FROM {tbl} WHERE user_id=?", (user_id,)).fetchall():
+                        for m in set(_re.findall(r"7\d{10}", str(raw or ""))):
+                            out.append({"где": f"сырые данные: {tbl}", "телефон": m, "когда": ""})
+                except Exception:
+                    pass
     # один и тот же номер из разных мест — это подтверждение, а не дубль
     svod = {}
     for r in out:
