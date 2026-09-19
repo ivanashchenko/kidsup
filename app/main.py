@@ -3260,7 +3260,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-19.01"
+APP_VERSION = "2026-09-19.06"
 
 
 @app.get("/api/net")
@@ -7032,6 +7032,119 @@ def api_crm_email_fix(payload: dict = Body(default={})):
     finally:
         mk.close()
     return {"ok": True, "dry_run": False, "перенесено": len(out), "строки": out, "ошибки": errs}
+
+
+@app.get("/api/crm/poisk", dependencies=AUTH)
+def api_crm_poisk(q: str = "", limit: int = 20):
+    """Поиск карточек по куску имени ребёнка или родителя (только чтение).
+
+    Нужен, когда телефон в карточке потерян и остаётся искать семью по
+    фамилии, по имени родителя или по второму ребёнку на том же номере.
+    """
+    import json as _json
+    qq = (q or "").strip()
+    if len(qq) < 3:
+        raise HTTPException(400, "нужно хотя бы три буквы")
+    # SQLite LOWER() не знает кириллицы, поэтому регистр приводим сами:
+    # ищем и как есть, и с заглавной, и строчными
+    varianty = {qq, qq.lower(), qq.capitalize(), qq.upper()}
+    out = []
+    with db.get_conn() as conn:
+        rows = []
+        for v in varianty:
+            rows += conn.execute(
+                "SELECT id, name, phone, email, client_state_id, raw FROM users "
+                "WHERE COALESCE(name,'') LIKE ? LIMIT ?",
+                (f"%{v}%", max(1, min(100, limit)))).fetchall()
+        seen = set()
+        for r in rows:
+            if r["id"] in seen:
+                continue
+            seen.add(r["id"])
+            out.append({"uid": r["id"], "имя": r["name"], "телефон": r["phone"],
+                        "почта": r["email"], "статус": r["client_state_id"],
+                        "родитель": ""})
+        # по родителю ищем в сыром виде: атрибут «Родитель» хранится в JSON
+        if len(out) < limit:
+            rows2 = []
+            for v in varianty:
+                rows2 += conn.execute(
+                    "SELECT id, name, phone, email, client_state_id, raw FROM users "
+                    "WHERE COALESCE(raw,'') LIKE ? LIMIT ?",
+                    (f"%{v}%", max(1, min(100, limit)))).fetchall()
+            for r in rows2:
+                if any(x["uid"] == r["id"] for x in out):
+                    continue
+                par = ""
+                try:
+                    for a_ in (_json.loads(r["raw"] or "{}").get("attributes") or []):
+                        if a_.get("attributeAlias", "").startswith("parent"):
+                            par = str(a_.get("value") or "")
+                except ValueError:
+                    pass
+                out.append({"uid": r["id"], "имя": r["name"], "телефон": r["phone"],
+                            "почта": r["email"], "статус": r["client_state_id"],
+                            "родитель": par})
+    return {"q": q, "найдено": len(out), "карточки": out}
+
+
+@app.get("/api/crm/find-phone", dependencies=AUTH)
+def api_crm_find_phone(user_id: int = 0, name: str = ""):
+    """Найти телефон ребёнка по следам, когда в карточке он затёрт.
+
+    19.09: в карточке Очирова Давида телефон оказался заменён на заглушку
+    79999999999, и дозвониться стало нельзя. Номер почти всегда остаётся
+    ещё где-то: в журнале отправок (там хранится uid), в очереди рассылок
+    (там хранится имя ребёнка), в списке спрошенных почт, в делах дня.
+    Здесь мы собираем все следы и показываем, что нашлось.
+    """
+    out = []
+    with db.get_conn() as conn:
+        if user_id:
+            try:
+                for r in conn.execute(
+                        "SELECT DISTINCT phone, MAX(ts) FROM wazzup_sent WHERE uid=? "
+                        "GROUP BY phone ORDER BY 2 DESC", (str(user_id),)).fetchall():
+                    out.append({"где": "журнал отправок", "телефон": r[0], "когда": r[1]})
+            except Exception:
+                pass
+        if name:
+            like = f"%{name.strip()}%"
+            for sql, gde in (
+                    ("SELECT DISTINCT phone, MAX(created) FROM broadcast_queue "
+                     "WHERE child LIKE ? GROUP BY phone ORDER BY 2 DESC", "очередь рассылок"),
+                    ("SELECT DISTINCT phone, MAX(asked_at) FROM lk_email_asked "
+                     "WHERE children LIKE ? GROUP BY phone ORDER BY 2 DESC", "спрошенные почты"),
+                    ("SELECT DISTINCT phone, MAX(ts) FROM plan_inbox "
+                     "WHERE text LIKE ? AND phone != '' GROUP BY phone ORDER BY 2 DESC", "дела дня")):
+                try:
+                    for r in conn.execute(sql, (like,)).fetchall():
+                        if r[0]:
+                            out.append({"где": gde, "телефон": r[0], "когда": r[1]})
+                except Exception:
+                    pass
+        if name:
+            # имя ребёнка часто стоит прямо в тексте нашего сообщения
+            # («Место Давида в группе закреплено»), а телефон — рядом в строке
+            for v in {name.strip(), name.strip().lower(), name.strip().capitalize()}:
+                for tbl, gde in (("wazzup_outbox", "наши сообщения"),
+                                 ("wazzup_inbox", "сообщения семьи")):
+                    try:
+                        for r in conn.execute(
+                                f"SELECT phone, MAX(ts) FROM {tbl} WHERE text LIKE ? "
+                                f"GROUP BY phone ORDER BY 2 DESC LIMIT 10",
+                                (f"%{v}%",)).fetchall():
+                            if r[0]:
+                                out.append({"где": gde, "телефон": r[0], "когда": r[1]})
+                    except Exception:
+                        pass
+    # один и тот же номер из разных мест — это подтверждение, а не дубль
+    svod = {}
+    for r in out:
+        svod.setdefault(r["телефон"], []).append(r["где"])
+    return {"user_id": user_id, "имя": name, "следы": out,
+            "номера": [{"телефон": k, "источников": len(v), "где": sorted(set(v))}
+                       for k, v in sorted(svod.items(), key=lambda kv: -len(kv[1]))]}
 
 
 @app.get("/api/crm/raw-user", dependencies=OWNER_AUTH)

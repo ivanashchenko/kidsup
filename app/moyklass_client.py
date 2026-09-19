@@ -121,6 +121,19 @@ class MoyklassClient:
         они точечные и безопасные.
         """
         cur = self.get(f"/v1/company/users/{user_id}")
+        # 19.09.2026: в карточке Очирова Давида телефон оказался заглушкой
+        # 79999999999, и семье стало некуда звонить. Реальный номер — самое
+        # ценное, что есть в карточке: подменять его цифровым мусором нельзя
+        # ни при каких обстоятельствах.
+        def _zaglushka(p: str) -> bool:
+            d = "".join(ch for ch in str(p or "") if ch.isdigit())[-10:]
+            return len(d) == 10 and (len(set(d)) <= 1 or d in
+                                     ("9999999999", "0000000000", "1234567890"))
+        new_phone = fields.get("phone")
+        if new_phone is not None and _zaglushka(new_phone) and not _zaglushka(cur.get("phone")):
+            raise ValueError(
+                f"отказ: телефон карточки {user_id} подменяли бы заглушкой "
+                f"{new_phone} вместо живого номера")
         body = {"name": cur.get("name"), "phone": cur.get("phone")}
         if cur.get("email"):
             body["email"] = cur["email"]
