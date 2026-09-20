@@ -2598,6 +2598,29 @@ def _converted_since(phone: str, since: str) -> str:
         return "был на занятии" if row else ""
 
 
+def _popytki(starts: list[int], gap: int = 120) -> tuple[int, int]:
+    """Сколько РАЗ человек звонил и сколько всего секунд ждал ответа.
+
+    20.09.2026. Гунт Лео «звонил 61 раз за 20 минут» — на деле он позвонил
+    дважды и по одиннадцать и четыре минуты слушал гудки: схема Манго гоняет
+    один вызов по добавочным 10 и 12 и пишет строку на каждый набор, раз в
+    15 секунд. Счёт по строкам (и по минутам тоже) превращает терпеливого
+    человека в сумасшедшего с автодозвоном, а дежурная не понимает, что
+    случилось на самом деле. Поэтому цепочка строк с промежутком меньше
+    gap — это одна попытка, а её длительность — время ожидания.
+    """
+    if not starts:
+        return 0, 0
+    s = sorted(starts)
+    runs = [[s[0], s[0]]]
+    for t in s[1:]:
+        if t - runs[-1][1] <= gap:
+            runs[-1][1] = t
+        else:
+            runs.append([t, t])
+    return len(runs), sum(b - a for a, b in runs)
+
+
 def incoming_missed() -> None:
     """Клиент звонил НАМ и не дозвонился — дело дежурной, без автосообщений.
 
@@ -2624,26 +2647,25 @@ def incoming_missed() -> None:
         num = "".join(ch for ch in (r.get("from_num") or "") if ch.isdigit())
         if len(num) < 10:
             continue
-        d = by.setdefault(num, {"tries": set(), "talked": False, "last": 0})
+        d = by.setdefault(num, {"starts": [], "talked": False, "last": 0})
         if r.get("answer") and (r["finish"] - r["answer"]) >= mango.TALK_MIN:
             d["talked"] = True
         else:
-            # один вызов раскладывается в строку на каждый добавочный схемы,
-            # поэтому попытки считаем по минутам, а не по строкам
-            d["tries"].add(int(r.get("start") or 0) // 60)
+            d["starts"].append(int(r.get("start") or 0))
             d["last"] = max(d["last"], int(r.get("start") or 0))
     today = _today().isoformat()
     duty = _duty_name()
     for num, d in by.items():
-        tries = len(d["tries"])
+        tries, waited = _popytki(d["starts"])
         if d["talked"] or tries < MIN_TRIES:
             continue
         if not _mark("incoming_missed", f"{today}:{num}"):
             continue
         name = _name_by_phone(num)
         who = f"{name} (+{num})" if name else f"Неизвестный номер +{num}"
-        hard = tries >= 5
-        text = (f"{'!! ' if hard else ''}{who} — звонил нам {tries} раз подряд и "
+        hard = tries >= 5 or waited >= 300
+        wait_s = f", в сумме ждал ответа {waited // 60} мин" if waited >= 60 else ""
+        text = (f"{'!! ' if hard else ''}{who} — звонил нам {tries} раз{wait_s} и "
                 f"НИ РАЗУ не дозвонился. Перезвонить первым делом и извиниться. "
                 f"Если карточки нет — завести (имя и фамилия ребёнка).")
         with db.get_conn() as conn:
