@@ -2644,7 +2644,14 @@ def incoming_missed() -> None:
     for r in rows:
         if r.get("from_ext"):                     # исходящий — не наш случай
             continue
-        num = "".join(ch for ch in (r.get("from_num") or "") if ch.isdigit())
+        raw_num = str(r.get("from_num") or "")
+        # 19.09 дежурной поставили дело «неизвестный +3400138165 звонил нам
+        # шесть раз» — такого номера не существует: это цифры из внутреннего
+        # SIP-адреса нашей же АТС (sip:user1@vpbx400138165.mangosip.ru).
+        # Админ тратит время на звонок в никуда, а доверие к списку падает.
+        if "sip:" in raw_num or "@" in raw_num:
+            continue
+        num = "".join(ch for ch in raw_num if ch.isdigit())
         if len(num) < 10:
             continue
         d = by.setdefault(num, {"starts": [], "talked": False, "last": 0})
