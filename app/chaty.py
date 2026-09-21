@@ -243,14 +243,14 @@ def dobavit(chat: str, child: str, tries: int = 3) -> dict:
         # обновляется после закрытия окна, и 21.09 это выглядело как провал
         # там, где ребёнок уже был добавлен.
         press = [s.get("result") for s in steps if isinstance(s, dict) and "js" in s]
-        # Клик по строке в окне выбора сразу кладёт ребёнка в список участников,
-        # и окно закрывается само — кнопки «Добавить» в этот момент уже нет, и
-        # это нормально. Решает последнее «Сохранить» и то, что имя видно в
-        # списке участников.
-        saved = bool(press) and str(press[-1]) == "ок"
-        seen = any(child.split()[0] in str(x) for x in press)
-        if not bad and saved and seen:
-            return {"ok": True, "чат": chat, "ребёнок": child}
+        # Успех — когда ни один шаг не упал. Читать состав чата в том же заходе
+        # нельзя: панель «Информация о группе» обновляется только после закрытия
+        # окна, и 22.09 ночью это дало ложное «не вышло: 10» на десяти детях,
+        # которые на самом деле в чатах уже сидели. Правду показывает общий
+        # снимок в конце sinhron().
+        if not bad:
+            return {"ok": True, "чат": chat, "ребёнок": child,
+                    "после": str(press[-1])[:200] if press else ""}
         last = (f"{bad[0].get('css') or bad[0].get('click') or '?'}: {bad[0].get('error')}"
                 if bad else "строка не появилась в участниках")[:200]
         log.warning("chaty.dobavit %s → %s: попытка %d, %s", child, chat, n + 1, last)
