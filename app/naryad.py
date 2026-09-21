@@ -168,9 +168,40 @@ def sobrat(day: str = "") -> list[dict]:
         log.warning("наряд: ждущие ответа не собрались: %s", e)
 
     items.sort(key=lambda i: PRIORITY.get(i["kind"], 9))
-    calls = [i for i in items if i["kind"] != "хвост"][:LIMIT_CALLS + LIMIT_TAILS]
-    tails = [i for i in items if i["kind"] == "хвост"][:LIMIT_TAILS]
+    # Лимит — на ДЕНЬ, а не на прогон. 21.09 наряд шёл раз в час и каждый раз
+    # брал по двенадцать: к обеду у Ани набралось 33 открытых пункта при семи
+    # задачах смены — столько за смену не делается, и список перестаёт быть
+    # планом. Считаем, сколько наряд уже положил сегодня, и добираем до лимита.
+    postavleno = _postavleno(day)
+    calls = [i for i in items if i["kind"] != "хвост"][:max(0, LIMIT_CALLS - postavleno)]
+    tails = [i for i in items if i["kind"] == "хвост"][
+        :max(0, LIMIT_TAILS - max(0, postavleno - LIMIT_CALLS))]
     return calls + tails
+
+
+def _postavleno(day: str) -> int:
+    """Сколько пунктов наряд уже положил за этот день (включая закрытые)."""
+    try:
+        with db.get_conn() as conn:
+            return conn.execute(
+                "SELECT COUNT(*) FROM plan_inbox WHERE day=? AND source='наряд'",
+                (day,)).fetchone()[0]
+    except Exception:
+        return 0
+
+
+def _peregruz(day: str, who: str) -> bool:
+    """У человека и так больше двадцати пяти незакрытых пунктов — не доливаем.
+    Лучше пусть строка подождёт до завтра, чем утонет в списке сегодня."""
+    try:
+        with db.get_conn() as conn:
+            n = conn.execute("SELECT COUNT(*) FROM plan_inbox WHERE day=? AND who=? AND done=0",
+                             (day, who)).fetchone()[0]
+        from . import pult
+        n += sum(1 for x in pult.tasks(day).get(who, []) if not x["done"])
+        return n >= 25
+    except Exception:
+        return False
 
 
 def raspredelit(day: str = "", dry: bool = False) -> dict:
@@ -179,9 +210,14 @@ def raspredelit(day: str = "", dry: bool = False) -> dict:
     day = day or pult.today()
     items = sobrat(day)
     on = _duty(day)
+    free = [w for w in on if dry or not _peregruz(day, w)]
     out: dict[str, list[str]] = {w: [] for w in on}
+    if not free:
+        log.info("наряд %s: у всех дежурных больше 25 открытых пунктов — не доливаем", day)
+        return {"день": day, "дежурные": on, "ничьих": len(items),
+                "поставлено": {w: 0 for w in on}, "перегруз": True, "пункты": out}
     for n, it in enumerate(items):
-        who = on[n % len(on)]
+        who = free[n % len(free)]
         if dry:
             out[who].append(it["text"])
             continue

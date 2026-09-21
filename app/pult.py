@@ -190,6 +190,15 @@ def kpi(day: str) -> dict:
             "firsts": firsts, "visits": visits, "y_kids": y_kids, "y_visits": y_visits, "inbox": ib[0], "inbox_done": ib[1], "tasks": tk[0], "tasks_done": tk[1]}
 
 
+def _sklon(n: int, one: str, few: str, many: str) -> str:
+    """«1 пункт», «2 пункта», «32 пункта», «5 пунктов» — админ читает это
+    каждый день, и «32 пунктов» бьёт по глазам."""
+    t = n % 100
+    if 11 <= t <= 14:
+        return f"{n} {many}"
+    return f"{n} {one}" if n % 10 == 1 else (f"{n} {few}" if 2 <= n % 10 <= 4 else f"{n} {many}")
+
+
 def _first_time(t: str) -> str:
     """«12:00, 12:30» → «12:00»; «15:00–17:00» → «15:00»; «весь день» → ""."""
     import re as _re
@@ -444,7 +453,7 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     moved_html = "".join(h for d_, o_, h in lis if not d_ and not o_)
     body = "".join(open_html[:LIMIT])
     if len(open_html) > LIMIT:
-        body += (f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>ещё {len(open_html) - LIMIT} на день — после этих пяти</summary>"
+        body += (f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>ещё {len(open_html) - LIMIT} на день — после этих семи</summary>"
                  f"<ol style='list-style:none;padding:0;margin:0'>{''.join(open_html[LIMIT:])}</ol></details>")
     if moved_html:
         body += f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#a35f00;font-size:13px'>перенесено на завтра</summary><ol style='list-style:none;padding:0;margin:0'>{moved_html}</ol></details>"
@@ -455,12 +464,11 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     open_n = sum(1 for i in items if not i["done"])
     late = sum(1 for i in items if not i["done"] and i["kind"] == "task"
                and _first_time(i["t"]) and cur_ft and _first_time(i["t"]) < cur_ft)
-    late_html = (f" · <span style='color:#a35f00;font-weight:700'>{late} задач(и) без галочки, время прошло</span>") if late else ""
+    late_html = (f" · <span style='color:#a35f00;font-weight:700'>{_sklon(late, 'задача', 'задачи', 'задач')} без галочки, время прошло</span>") if late else ""
     return (f"<div class='wcard' style='border-top-color:{c}'><div class='nm'>{html.escape(who)}{nb} "
             f"<span style='font-size:12px;color:#6c6a86;font-weight:600'>{done_n}/{len(items)}</span></div>"
             f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · "
-            f"<span style='font-size:12.5px;color:#312783;font-weight:700'>{open_n} пунктов на день, "
-            f"из них {tasks_n} задач смены</span>{late_html}</div>"
+            f"<span style='font-size:12.5px;color:#312783;font-weight:700'>{_sklon(open_n, 'пункт', 'пункта', 'пунктов')} на день, из них {_sklon(tasks_n, 'задача', 'задачи', 'задач')} смены</span>{late_html}</div>"
             f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol></div>")
 
 
@@ -567,7 +575,7 @@ def page(day: str = "", who: str = "") -> str:
         (f"{k['pays']}", f"оплат сегодня · {k['pays_sum']:,} ₽".replace(",", " ")),
         (f"{k['joins_new']}", "новых записей в группы сегодня"),
         (f"{k['firsts']}", f"первых занятий сегодня из {k['kids']} детей в {k['lessons']} занятиях"),
-        (f"{k['inbox_done']}/{k['inbox']}", "обещаний клиентам закрыто / всего"),
+        (f"{k['inbox_done']}/{k['inbox']}", "пунктов у людей закрыто: обещания клиентам, заявки без ответа, возврат"),
         (f"{k['tasks_done']}/{k['tasks']}", "задач смены сделано"),
     ]
     # явку отмечает Лиза вечером по спискам педагогов: вчера должно быть закрыто к утру,
@@ -608,11 +616,6 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 <div class='links card'><b>Рабочие списки</b> — открываются из задачи в колонке, отдельно заходить не нужно:
 <a href='/segodnya'>что горит сегодня</a> · <a href='/nabor'>где теряем набор</a> · <a href='/voronka'>кто без оплаты</a> · <a href='/obzvon'>вернуть ушедших</a> · <a href='/nezvonili'>кому не звонили</a> · <a href='/mesta'>свободные места</a> · <a href='/spiski'>списки занятий</a> · <a href='/karta'>карта развития</a><br>
 <b>Справочное:</b> <a href='/base/{slug}'>план и списки семей</a> · <a href='/base/gruppy_reshenia'>куда зовём, какие группы сливаем</a> · <a href='/base/skripty_v3'>скрипты</a> · <a href='/base'>вся база</a></div>
-<div class='card' style='border-left:4px solid #312783'>
-<b>Где работать.</b> Смотришь только эту страницу. Всё остальное открывается по ссылке из задачи:
-если в пункте написано «app.kidsup.ru/nabor», значит работа идёт там, а галочку ставишь здесь.
-Заходить на списки самой, «чтобы проверить, не появилось ли нового», не нужно — что нужно сделать
-сегодня, уже стоит в твоей колонке.</div>
 <h2 style='margin-top:26px'>Справочные списки — для Бориса и на потом</h2>
 <p style='margin:-4px 0 10px;color:#6c6a86;font-size:13.5px'>Админам сюда ходить не нужно: всё, что нужно сделать сегодня, уже стоит в колонке выше.</p>
 {_nikogda_ne_zvonili(day)}
