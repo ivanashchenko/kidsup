@@ -233,9 +233,17 @@ def _paid_recently(days: int = 30) -> dict[str, tuple[str, int]]:
     return out
 
 
-def _promises_html(day: str, who: str, color: str) -> str:
+def _promises_html(day: str, who: str, color: str, items: list[dict] | None = None) -> str:
     """Обещания клиентам этого человека — прямо в его колонке, под задачами.
-    08.09 Борис: «всё на одной странице», отдельной страницы под телефон не нужно."""
+    08.09 Борис: «всё на одной странице», отдельной страницы под телефон не нужно.
+
+    21.09 Борис спросил, как задачи сверху связаны с блоками ниже. Связь была
+    только в голове у того, кто ставил задачи: у Ани 6 задач и 12 обещаний,
+    и пять обещаний — про те же семьи, что уже перечислены в задаче блоком
+    («заявки без касания: Милана, Ларина…»). Админ видит это как двойную
+    работу. Теперь обещание, чей телефон встречается в тексте задачи того же
+    человека, помечается «в задаче ЧЧ:ММ» — видно, что отдельно звонить не надо.
+    """
     try:
         with db.get_conn() as conn:
             rows = conn.execute("SELECT id, ts, text, phone, source, done FROM plan_inbox WHERE day=? AND who=? ORDER BY done, id",
@@ -244,11 +252,25 @@ def _promises_html(day: str, who: str, color: str) -> str:
         rows = []
     if not rows:
         return ""
+    import re as _re
+    in_task: dict[str, str] = {}          # последние 10 цифр телефона → время задачи
+    for it in (items or []):
+        for num in _re.findall(r"\d{10,11}", it.get("text") or ""):
+            in_task.setdefault(num[-10:], _first_time(it.get("t") or "") or (it.get("t") or ""))
     paid = _paid_recently()
     lis = []
     for r in rows:
         ph = "".join(ch for ch in (r["phone"] or "") if ch.isdigit())
         tel = f" <a href='tel:+{ph}' style='color:#6c6a86;white-space:nowrap'>+{ph}</a>" if len(ph) >= 10 else ""
+        task_t = in_task.get(ph[-10:]) if len(ph) >= 10 else None
+        if not task_t:
+            for num in _re.findall(r"\d{10,11}", r["text"] or ""):
+                task_t = in_task.get(num[-10:])
+                if task_t:
+                    break
+        if task_t and not r["done"]:
+            tel += (f" <span style='display:inline-block;background:#eef1fb;color:#312783;border-radius:6px;"
+                    f"padding:1px 7px;font-size:11.5px;font-weight:700;white-space:nowrap'>в задаче {html.escape(task_t)}</span>")
         pay = paid.get(ph[-10:]) if len(ph) >= 10 else None
         if pay:
             d, summa = pay
@@ -356,7 +378,7 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     return (f"<div class='wcard' style='border-top-color:{c}'><div class='nm'>{html.escape(who)}{nb} "
             f"<span style='font-size:12px;color:#6c6a86;font-weight:600'>{done_n}/{len(items)}</span></div>"
             f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · {ib_html}{late_html}</div>"
-            f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol>{_promises_html(day, who, c) if day else ''}</div>")
+            f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol>{_promises_html(day, who, c, items) if day else ''}</div>")
 
 
 HOWTO = ("<div class='card' style='border-left:4px solid #312783;margin:10px 0;font-size:15px'>"
