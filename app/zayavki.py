@@ -218,10 +218,31 @@ def _checked_block() -> str:
                      "<ul style='list-style:none;padding:0;margin:6px 0 0'>"
                      + "".join(_li_f(f, f" <span style='color:#6c6a86;font-size:12px'>"
                                         f"{html.escape(f['why'][:90])}</span>") for f in s) + "</ul></details>")
+    # 21.09. Проверка идёт только по горячим строкам (untouched + tried), а
+    # блок возвращал ТОЛЬКО её. Заявки, где разговор был, и старые хвосты
+    # (talked + tail) не показывались вообще: Коряковская Оливия дала анкету
+    # 18.09, ждала звонка — и не значилась нигде. Показываем их тоже.
+    try:
+        raw = collect()
+        for key, title, color in (
+                ("talked", "Разговор был, решения нет — дожать и поставить статус", "#F59C00"),
+                ("tail", "Старый хвост: заявка висит, семья записана в другую группу", "#6c6a86")):
+            rows = [r for r in raw[key] if r.get("phone") not in {f["phone"] for f in fams}]
+            if not rows:
+                continue
+            p.append(f"<details style='margin-top:8px;font-size:13.5px'><summary style='cursor:pointer;"
+                     f"font-weight:700;color:{color}'>{title} — {len(rows)}</summary>"
+                     "<ul style='list-style:none;padding:0;margin:6px 0 0'>"
+                     + "".join(_li(r, f" <span style='color:#6c6a86;font-size:12px'>"
+                                     f"зв. {r['calls']}, сообщ. {r['out']}/{r['in']}</span>")
+                               for r in rows) + "</ul></details>")
+    except Exception:  # проверенный блок важнее хвостов
+        pass
     when = zayavki_audit._CACHE.get("ts")
     p.append(f"<div style='font-size:12px;color:#6c6a86;margin-top:8px'>Проверено "
              f"{when.strftime('%d.%m в %H:%M') if when else 'только что'}, "
-             f"обновляется раз в час.</div></div>")
+             f"обновляется раз в час. Строки этого блока раздаются в колонки "
+             f"дежурной сами — если строка висит, значит, её сегодня уже кто-то взял.</div></div>")
     return "".join(p)
 
 

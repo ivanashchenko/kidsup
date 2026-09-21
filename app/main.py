@@ -3305,7 +3305,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-21.06"
+APP_VERSION = "2026-09-21.09"
 
 
 @app.get("/api/net")
@@ -5707,6 +5707,20 @@ def api_calls_recording(id: str):
     if r.status_code != 200 or len(r.content) < 1000:
         raise HTTPException(404, f"запись недоступна ({r.status_code}, {len(r.content)} байт)")
     return Response(content=r.content, media_type="audio/mpeg")
+
+
+@app.get("/api/naryad", dependencies=AUTH)
+def api_naryad(day: str = "", dry: int = 1):
+    """Что из живых списков сегодня ничьё (dry=1) и раздача по дежурным (dry=0).
+
+    21.09: блоки пульта показывали работу, но никому её не назначали.
+    Теперь наряд идёт сам раз в час; здесь — посмотреть и запустить руками."""
+    from . import naryad
+    try:
+        return naryad.raspredelit(day=day, dry=bool(int(dry)))
+    except Exception as e:  # noqa: BLE001
+        import traceback
+        return {"ok": False, "error": str(e)[:300], "trace": traceback.format_exc()[-1200:]}
 
 
 @app.get("/api/zayavki/audit", dependencies=AUTH)

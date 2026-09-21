@@ -1015,13 +1015,67 @@ OWNER_ONLY = re.compile(
     r"сайт|домен|тариф", re.I)
 
 
+def _manager_short(manager_id: int) -> str:
+    """Короткое имя сотрудника по его id в МойКлассе: Аня, Лена, Ира."""
+    from .pult import SHORT
+    for a in _admins():
+        if a.get("managerId") == manager_id:
+            nm = a.get("name") or ""
+            return SHORT.get(nm, nm.split()[0] if nm else "")
+    return ""
+
+
+def inbox_add(text: str, phone: str = "", who: str = "", source: str = "автоматика") -> bool:
+    """Пункт в инбокс пульта — единственный список дел, кроме колонок.
+
+    21.09.2026. Борис: «сколько ещё косяков?» — вот главный. С 03.09 задачи в
+    МойКлассе выключены (crm_tasks_off=1), а четырнадцать мест автоматики
+    по-прежнему звали _task(): клиент ждёт ответа, не пришёл на пробное,
+    звонил и не дозвонился, счёт не выставлен. Все эти сигналы молча уходили
+    в лог и не попадали ни к кому. Теперь они идут сюда — в пульт.
+    Один и тот же текст за день не повторяем.
+    """
+    day = _today().isoformat()
+    who = who or _duty_name()
+    text = (text or "").strip()[:400]
+    if not text:
+        return False
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS plan_inbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT, who TEXT,
+            text TEXT, phone TEXT, source TEXT, done INTEGER DEFAULT 0)""")
+        dup = conn.execute("SELECT 1 FROM plan_inbox WHERE day=? AND text=?",
+                           (day, text)).fetchone()
+        if dup:
+            return False
+        conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) "
+                     "VALUES (?,?,?,?,?,?)",
+                     (day, _now().isoformat(timespec="minutes"), who, text,
+                      "".join(c for c in str(phone or "") if c.isdigit())[-11:], source))
+    return True
+
+
 def _task(mk: MoyklassClient, manager_id: int, user_id: int | None,
           body: str, day: date | None = None) -> None:
     # 03.09 владелец удалил все 807 открытых задач: работа идёт по страницам
     # плана дня. Настройка crm_tasks_off=1 останавливает автосоздание задач,
     # оставляя комментарии в карточках; по умолчанию поведение прежнее.
     if db.get_setting("crm_tasks_off", "0") == "1":
-        log.info("задача не создана (crm_tasks_off): %s", (body or "")[:60])
+        phone = ""
+        if user_id:
+            try:
+                with db.get_conn() as conn:
+                    row = conn.execute("SELECT phone FROM users WHERE id=?",
+                                       (int(user_id),)).fetchone()
+                phone = (row[0] if row else "") or ""
+            except Exception:
+                phone = ""
+        if not phone:
+            m = re.search(r"\b[78]?9\d{9}\b", body or "")
+            phone = m.group(0) if m else ""
+        who = "" if manager_id == OWNER_ID else _manager_short(manager_id)
+        inbox_add(body, phone, who, "автоматика")
+        log.info("задача → инбокс пульта (crm_tasks_off): %s", (body or "")[:60])
         return
     if manager_id == OWNER_ID and not OWNER_ONLY.search(body or ""):
         alt = (_admins_today() or _admins())
@@ -4100,6 +4154,14 @@ def _loop() -> None:
                     # клиент, до которого не перезвонили, остывает быстро
                     if 9 <= now.hour <= 20 and _mark("slot_q15_missed_in", _q15):
                         missed_inbound(mk)
+                    # наряд: строки живых списков, которые сегодня ничьи,
+                    # кладём дежурной в инбокс. Раз в час, рабочее окно.
+                    if 9 <= now.hour <= 19 and _mark("slot_hourly_naryad", _hour):
+                        try:
+                            from . import naryad
+                            naryad.raspredelit()
+                        except Exception:
+                            log.exception("наряд упал — продолжаем")
                 finally:
                     mk.close()
                 if now.minute % 20 < 3 and 9 <= now.hour < 20:
