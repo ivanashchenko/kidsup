@@ -333,3 +333,39 @@ def raskhozhdenie() -> dict:
                 svod[st] = svod.get(st, 0) + 1
         out.sort(key=lambda r: (r["группа"], r["ребёнок"]))
     return {"всего": len(out), "по_статусам": svod, "строки": out}
+
+
+def sostav(marker: str = "АЯ") -> dict:
+    """Поимённый состав групп предмета: кто ходит и кто записан на пробное.
+
+    21.09 владелец спросил, все ли дети с английского зашли в МойЧат, чтобы
+    педагоги могли с ними переписываться. Ответ требует не счётчиков, а
+    списка карточек: по каждому ребёнку дальше смотрим в МойКлассе, включён
+    ли личный кабинет и заходили ли в него.
+    """
+    with db.get_conn() as conn:
+        cls = conn.execute(
+            "SELECT id, name FROM classes WHERE name LIKE ? "
+            "AND (status IS NULL OR status = 'opened') ORDER BY name",
+            (f"2627_{marker}%",)).fetchall()
+        out, deti = [], {}
+        for c in cls:
+            if "Заявк" in (c["name"] or ""):
+                continue
+            rows = conn.execute(
+                "SELECT j.user_id, j.status_id, u.name, u.phone, u.email "
+                "FROM joins j LEFT JOIN users u ON u.id = j.user_id "
+                "WHERE j.class_id=? AND j.status_id IN (?,?,?,?)",
+                (c["id"], ST_UCHITSYA, *ST_ZAPISAN, ST_BYL)).fetchall()
+            gruppa = []
+            for r in rows:
+                kto = {"uid": r["user_id"], "имя": r["name"] or "", "телефон": r["phone"] or "",
+                       "почта": r["email"] or "",
+                       "статус": {ST_UCHITSYA: "ходит", ST_BYL: "был на пробном"}.get(
+                           r["status_id"], "записан на пробное")}
+                gruppa.append(kto)
+                deti.setdefault(r["user_id"], kto)
+            if gruppa:
+                out.append({"группа": c["name"], "id": c["id"], "детей": len(gruppa), "дети": gruppa})
+    return {"предмет": marker, "групп": len(out), "детей_всего": len(deti),
+            "группы": out, "дети": list(deti.values())}

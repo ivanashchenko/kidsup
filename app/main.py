@@ -3260,7 +3260,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-21.01"
+APP_VERSION = "2026-09-21.02"
 
 
 @app.get("/api/net")
@@ -7778,6 +7778,13 @@ def api_nabor_analiz():
     """Где рвётся набор: воронка по предметам и тёплые списки (см. app/nabor.py)."""
     from . import nabor
     return nabor.analiz()
+
+
+@app.get("/api/mesta/sostav", dependencies=AUTH)
+def api_mesta_sostav(predmet: str = "АЯ"):
+    """Поимённый состав групп предмета: кто ходит, кто записан на пробное."""
+    from . import mesta
+    return mesta.sostav(predmet)
 
 
 @app.get("/api/mesta/tablica", dependencies=AUTH)
