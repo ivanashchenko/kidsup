@@ -3260,7 +3260,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-21.02"
+APP_VERSION = "2026-09-21.03"
 
 
 @app.get("/api/net")
@@ -7778,6 +7778,16 @@ def api_nabor_analiz():
     """Где рвётся набор: воронка по предметам и тёплые списки (см. app/nabor.py)."""
     from . import nabor
     return nabor.analiz()
+
+
+@app.post("/api/rassylka/tochechnaya", dependencies=AUTH)
+def api_rassylka_tochechnaya(payload: dict = Body(...)):
+    """Точечная рассылка утверждённым текстом: {"items":[{"phone","text","sms"}],
+    "kind":"ay_chat", "dry_run":true, "sms":false}. См. app/aychat.py."""
+    from . import aychat
+    return aychat.send(payload.get("items") or [], str(payload.get("kind") or "razovoe"),
+                       bool(payload.get("dry_run", True)), bool(payload.get("sms")),
+                       int(payload.get("limit") or 30))
 
 
 @app.get("/api/mesta/sostav", dependencies=AUTH)
