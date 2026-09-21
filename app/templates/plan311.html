@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}План 311 — KidsUP{% endblock %}
+{% block content %}
+<style>
+.p3{max-width:1180px;margin:0 auto;padding:0 8px 48px;--ind:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613;--ink:#1f2140;--mute:#6b6f85;--line:#e6e8f2;--bg:#f6f7fb}
+.p3 h1{font-size:30px;color:var(--ind);margin:18px 0 4px;letter-spacing:-.01em}
+.p3 .lead{color:var(--mute);margin:0 0 22px;font-size:15px}
+.p3 h2{font-size:20px;color:var(--ind);margin:36px 0 12px;padding-top:14px;border-top:2px solid var(--line)}
+.p3 h2 small{font-weight:400;color:var(--mute);font-size:14px;margin-left:8px}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.kpi .c{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.kpi .n{font-size:34px;font-weight:700;color:var(--ind);line-height:1;font-variant-numeric:tabular-nums}
+.kpi .n.warn{color:var(--amber)}.kpi .n.bad{color:var(--red)}.kpi .n.ok{color:var(--green)}
+.kpi .l{color:var(--mute);font-size:13px;margin-top:6px;line-height:1.35}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.card h3{margin:0 0 8px;font-size:15px;color:var(--ind)}
+.card ul{margin:0;padding-left:18px}.card li{margin:5px 0;line-height:1.45}
+.src{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.src .c{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;border-top:4px solid var(--blue)}
+.src .c .g{font-size:26px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums}
+.src .c .t{font-size:14px;line-height:1.4;color:var(--ink)}
+.dec{counter-reset:d}
+.dec .d{display:grid;grid-template-columns:44px 1fr;gap:0 14px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:10px 0}
+.dec .d .num{width:34px;height:34px;border-radius:50%;background:var(--ind);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:16px}
+.dec .d.hot .num{background:var(--red)}.dec .d.warm .num{background:var(--amber)}
+.dec .d .h{font-weight:600;font-size:15px;line-height:1.4;color:var(--ink)}
+.dec .d .w{color:var(--mute);font-size:13.5px;margin-top:6px;line-height:1.45}
+.dec .d .meta{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
+.tag{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12.5px;background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.tag.srok{background:#fff4e0;border-color:#ffd9a0;color:#8a5a00}.tag.eff{background:#eef8df;border-color:#cbe6a3;color:#3f6d00}
+.who{display:inline-block;min-width:44px;text-align:center;border-radius:6px;padding:2px 8px;font-size:12.5px;font-weight:600;color:#fff;background:var(--blue)}
+.who.Лена{background:#7DB928}.who.Аня{background:#1DA7E0}.who.Лиза{background:#9b59b6}.who.Борис{background:#312783}
+.tasks .t{display:grid;grid-template-columns:30px 62px 1fr;gap:10px;align-items:start;padding:10px 12px;border-bottom:1px solid var(--line);background:#fff}
+.tasks .t:first-child{border-radius:14px 14px 0 0}.tasks .t:last-child{border-radius:0 0 14px 14px;border-bottom:0}
+.tasks{border:1px solid var(--line);border-radius:14px}
+.tasks .n{color:var(--mute);font-variant-numeric:tabular-nums;font-weight:600}
+.tasks .b{line-height:1.45}.tasks .m{color:var(--mute);font-size:12.5px;margin-top:4px}
+.days{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.day{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.day .dh{background:var(--ind);color:#fff;padding:10px 14px;font-weight:600;display:flex;justify-content:space-between}
+.day .dh span{opacity:.75;font-weight:400}
+.day .p{padding:10px 14px;border-top:1px solid var(--line)}
+.day .p .ph{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.day .p .row{display:grid;grid-template-columns:48px 1fr;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:13.5px;line-height:1.4}
+.day .p .row:first-of-type{border-top:0}
+.day .p .row .tm{color:var(--mute);font-variant-numeric:tabular-nums;font-weight:600}
+.risk li{margin:6px 0;line-height:1.45}
+.prog{background:linear-gradient(135deg,#312783,#1DA7E0);color:#fff;border-radius:16px;padding:18px 20px;line-height:1.5}
+.prog b{color:#fff}
+.foot{color:var(--mute);font-size:12.5px;margin-top:26px}
+details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-top:6px}
+@media(max-width:640px){.p3 h1{font-size:24px}.tasks .t{grid-template-columns:24px 52px 1fr}.day .p .row{grid-template-columns:44px 1fr}}
+</style>
+
+<div class="p3">
+<h1>Как донабрать группы до 311</h1>
+<p class="lead">Анализ на {{ d.дата }} · 6 направлений, каждое перепроверено отдельным агентом, затем синтез и критика · данные — снимок CRM, журнала звонков и переписок</p>
+
+<div class="kpi">
+  <div class="c"><div class="n">{{ k.paid }}</div><div class="l">оплаченных детей сезона — уникальных, впервые оплативших с 31.08 (официальный счётчик)</div></div>
+  <div class="c"><div class="n bad">{{ k.gap }}</div><div class="l">не хватает до 311 — это {{ k.per_day }} новых оплат в день на 9 дней</div></div>
+  <div class="c"><div class="n warn">{{ k.pace }}</div><div class="l">фактический темп новых оплат в день за последние две недели</div></div>
+  <div class="c"><div class="n">{{ k.trials }}</div><div class="l">детей записаны на пробное с датой до 29.09 — главный ресурс, уже в здании</div></div>
+  <div class="c"><div class="n warn">{{ k.show }}%</div><div class="l">доходимость на пробное за сентябрь; из пришедших покупают {{ k.buy }}%</div></div>
+  <div class="c"><div class="n ok">{{ k.forecast }}</div><div class="l">реалистично к 30.09 при хорошей работе; 311 — к {{ k.date311 }}</div></div>
+</div>
+
+<h2>Где мы и почему группы не полные</h2>
+<div class="card"><ul>{% for s in kartina %}<li>{{ s }}</li>{% endfor %}</ul></div>
+
+<h2>Откуда взять новых детей за 9 дней <small>без двойного счёта — списки пересекаются</small></h2>
+<div class="src">
+{% for s in istochniki %}
+  <div class="c"><div class="g">{{ s.g }}</div><div class="t">{{ s.t }}</div></div>
+{% endfor %}
+</div>
+<details class="more"><summary>Деньги, которые не двигают счётчик, но нужны</summary><div class="card" style="margin-top:8px"><ul>{% for s in dengi %}<li>{{ s }}</li>{% endfor %}</ul></div></details>
+
+<h2>Решения владельца <small>в порядке срочности</small></h2>
+<div class="dec">
+{% for p in d.plan_borisu %}
+  <div class="d {{ 'hot' if loop.index <= 2 else ('warm' if loop.index <= 5 else '') }}">
+    <div class="num">{{ p.n }}</div>
+    <div>
+      <div class="h">{{ p.chto }}</div>
+      <div class="w">{{ p.pochemu }}</div>
+      <div class="meta"><span class="tag srok">⏱ {{ p.srok }}</span><span class="tag eff">▲ {{ p.effekt }}</span></div>
+    </div>
+  </div>
+{% endfor %}
+</div>
+
+<h2>Задачи админам <small>по важности</small></h2>
+<div class="tasks">
+{% for p in d.plan_adminam %}
+  <div class="t"><div class="n">{{ p.n }}</div><div><span class="who {{ p.komu.split(' ')[0].split('/')[0] }}">{{ p.komu }}</span></div>
+    <div><div class="b">{{ p.chto }}</div><div class="m">⏱ {{ p.srok }} · ▲ {{ p.effekt }}</div></div></div>
+{% endfor %}
+</div>
+
+<h2>Пульт на три дня <small>то же, что стоит на app.kidsup.ru/pult</small></h2>
+<div class="days">
+{% for day in pult_days %}
+  <div class="day">
+    <div class="dh">{{ day.title }} <span>{{ day.n }} задач</span></div>
+    {% for who, rows in day.by_who %}
+    <div class="p">
+      <div class="ph"><span class="who {{ who }}">{{ who }}</span><span class="muted small">{{ rows|length }}</span></div>
+      {% for r in rows %}<div class="row"><div class="tm">{{ r.t }}</div><div>{{ r.text }}</div></div>{% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+{% endfor %}
+</div>
+
+<h2>Что берёт на себя автоматика</h2>
+<div class="card"><ul>{% for a in d.avtomatika_klodu %}<li>{{ a }}</li>{% endfor %}</ul></div>
+
+<h2>Что сорвёт план</h2>
+<div class="card risk"><ul>{% for r in d.riski %}<li>{{ r }}</li>{% endfor %}</ul></div>
+
+<h2>Прогноз</h2>
+<div class="prog">{{ d.prognoz }}</div>
+
+<p class="foot">Источник: docs/rabota/plan/311_{{ d.дата }}.json · Цены по действующему прайсу (8 занятий ПШ/АЯ/шахматы 8 400 ₽, «Музыка и речь» 8 600, «Первая школа» 7 800, ИЗО 7 000). Все оценки прироста — диапазоны; конверсии взяты из фактической воронки сентября.</p>
+</div>
+{% endblock %}

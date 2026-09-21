@@ -3069,6 +3069,51 @@ def api_istochniki_spravochnik():
     return istochniki.obnovit_spravochnik()
 
 
+@app.get("/plan311", response_class=HTMLResponse, dependencies=AUTH)
+def plan311_page(request: Request, day: str = "2026-09-21"):
+    """Итог анализа набора до 311 (21.09): картина, откуда взять детей,
+    решения владельца, задачи админам, пульт на три дня, риски, прогноз.
+    Данные — docs/rabota/plan/311_<дата>.json, результат многоагентного разбора."""
+    import re as _re
+    from pathlib import Path as _P
+    f = _P(__file__).resolve().parent.parent / "docs" / "rabota" / "plan" / f"311_{day}.json"
+    if not f.exists():
+        raise HTTPException(404, "плана на эту дату нет")
+    d = json.loads(f.read_text(encoding="utf-8"))
+    d["дата"] = day
+    # картина — по предложениям
+    kartina = [x.strip() for x in _re.split(r"(?<=[.!?])\s+(?=[А-ЯA-Z0-9«])", d["kartina"]) if x.strip()]
+    # математика: «(1) …; (2) …» → карточки; хвост про деньги — отдельно
+    parts = _re.split(r"\s\((\d)\)\s", d["matematika"])
+    istochniki, dengi = [], []
+    for i in range(1, len(parts) - 1, 2):
+        txt = parts[i + 1].strip().rstrip(";.")
+        tail = ""
+        if "Итого" in txt:
+            txt, tail = txt.split("Итого", 1)
+            tail = "Итого" + tail
+        m = _re.search(r"→\s*\+?([\d–\-]+)", txt)
+        istochniki.append({"g": ("+" + m.group(1)) if m else "—", "t": txt.strip().rstrip(";.")})
+        if tail:
+            dengi += [x.strip() for x in _re.split(r"(?<=[.;])\s+(?=[А-ЯA-Z0-9])", tail) if x.strip()]
+    if not dengi:
+        dengi = [x.strip() for x in _re.split(r"(?<=[.;])\s+", parts[-1]) if "Деньги" in x or "₽" in x]
+    k = {"paid": 205, "gap": 106, "per_day": "11,8", "pace": "5–6", "trials": 50,
+         "show": 66, "buy": 83, "forecast": "225–243", "date311": "12–20 октября"}
+    names = {"2026-09-21": "Понедельник 21.09", "2026-09-22": "Вторник 22.09", "2026-09-23": "Среда 23.09"}
+    pult_days = []
+    for dd in sorted({r["day"] for r in d["pult"]}):
+        rows = [r for r in d["pult"] if r["day"] == dd]
+        by = []
+        for who in ("Аня", "Лена", "Лиза", "Борис"):
+            rs = sorted([r for r in rows if r["who"] == who], key=lambda r: r["t"])
+            if rs:
+                by.append((who, rs))
+        pult_days.append({"title": names.get(dd, dd), "n": len(rows), "by_who": by})
+    return render(request, "plan311.html", active="plan311", d=d, k=k, kartina=kartina,
+                  istochniki=istochniki, dengi=dengi, pult_days=pult_days)
+
+
 @app.get("/obzvon", response_class=HTMLResponse, dependencies=AUTH)
 def obzvon_page(request: Request):
     """Кто ходил в прошлом сезоне и летом, ушёл, и кому мы не звонили."""
@@ -3260,7 +3305,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-21.04"
+APP_VERSION = "2026-09-21.05"
 
 
 @app.get("/api/net")
