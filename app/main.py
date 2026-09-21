@@ -3128,9 +3128,9 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
         # отдельный блок под колонками, и без него счёт работы не сходится.
         try:
             with db.get_conn() as _c:
-                inb = dict(_c.execute(
-                    "SELECT who, COUNT(*) FROM plan_inbox WHERE day=? AND done=0 GROUP BY who",
-                    (dd,)).fetchall())
+                inb = {w: (n, d) for w, n, d in _c.execute(
+                    "SELECT who, COUNT(*), SUM(CASE WHEN done THEN 1 ELSE 0 END) "
+                    "FROM plan_inbox WHERE day=? GROUP BY who", (dd,)).fetchall()}
         except Exception:
             inb = {}
         rows, by = [], []
@@ -3142,12 +3142,13 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
                              for r in d["pult"] if r["day"] == dd and r["who"] == who),
                             key=lambda r: r["t"])
             if rs:
-                by.append((who, rs, inb.get(who, 0)))
-                rows += rs
+                n_in, d_in = inb.get(who, (0, 0))
+                by.append((who, rs, n_in))
+                rows += rs + [{"done": 1}] * int(d_in or 0) + [{"done": 0}] * (n_in - int(d_in or 0))
         dt = datetime.fromisoformat(dd)
         pult_days.append({"title": f"{WD[dt.weekday()]} {dt.day:02d}.{dt.month:02d}",
                           "n": len(rows), "by_who": by,
-                          "inbox": sum(inb.values()),
+                          "inbox": sum(n for n, _ in inb.values()),
                           "done": sum(1 for r in rows if r.get("done"))})
     return render(request, "plan311.html", active="plan311", d=d, k=k, kartina=kartina,
                   istochniki=istochniki, dengi=dengi, pult_days=pult_days)
@@ -3353,7 +3354,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-21.22"
+APP_VERSION = "2026-09-21.24"
 
 
 @app.get("/api/net")
