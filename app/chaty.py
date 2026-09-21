@@ -185,6 +185,131 @@ def _parse_members(text: str) -> list[str]:
     return out
 
 
+def dobavit(chat: str, child: str, tries: int = 3) -> dict:
+    """Добавить ребёнка в чат его группы. Через браузер — API чаты не знает.
+
+    21.09.2026, Борис: «Нужно всех кто добавляется в ТвойКласс и ученик АЯ —
+    сразу добавлять в соответствующий чат МойЧат!!»
+
+    Путь по экрану: чат группы → «i» → «Управление группой» → «Добавить
+    участников» → вкладка «Ученики» → поиск по фамилии → строка ребёнка →
+    «Добавить» → «Сохранить». МойКласс добавит только того, у кого активирован
+    доступ в личный кабинет, — об этом он честно пишет внизу окна; для
+    остальных возвращаем «нет кабинета», и это работа для дежурной, а не
+    ошибка. Список учеников в окне подгружается с задержкой, поэтому клик по
+    строке делаем с повтором: без паузы после поиска он не попадает.
+    """
+    from . import mkweb
+    last = ""
+    for n in range(max(1, tries)):
+        pause = 4500 + n * 2500
+        r = mkweb.open_page(
+            "https://app.moyklass.com/moyChat", frame="moychat", wait_ms=8000, max_text=400,
+            actions=[{"click": chat}, {"wait": 2500},
+                     {"css": "button[class*=infoBtn]", "click": True}, {"wait": 2000},
+                     {"css": "button[class*=manageButton]", "click": True}, {"wait": 2000},
+                     {"css": "button[class*=addButton]", "click": True}, {"wait": 3000},
+                     {"click": "Ученики"}, {"wait": 2500},
+                     {"css": "input[placeholder*='Поиск по имени']", "nth": 1,
+                      "type": child, "after": pause},
+                     # Выбор ребёнка — клик именно по текстовому узлу строки:
+                     # по контейнеру строки «Выбрано» остаётся нулём, галочка
+                     # вешается на сам текст. Проверено 21.09 обоими способами.
+                     {"click": child, "exact": False, "force": True, "after": 2500},
+                     # :text-is — точное совпадение: обычный клик по слову
+                     # «Добавить» цепляет и кнопку «Добавить участников»,
+                     # и Playwright ждёт, пока разрешится неоднозначность.
+                     # Кнопки диалога («Добавить », «Сохранить») локаторами не
+                     # берутся: текст с висячим пробелом, класс общий с другими
+                     # кнопками, а force-клик упирается в перерисовку. Жмём их
+                     # прямо из страницы — это то же самое нажатие, только без
+                     # ожидания «стабильности» элемента.
+                     {"js": "(function(){var b=Array.from(document.querySelectorAll('button'))"
+                            ".filter(x=>(x.innerText||'').trim().indexOf('Добавить')===0"
+                            " && (x.innerText||'').indexOf('участник')<0);"
+                            "if(!b.length)return 'нет кнопки Добавить';"
+                            "b[b.length-1].click();return 'ок'})()", "after": 3000},
+                     {"js": "(function(){var b=Array.from(document.querySelectorAll('button'))"
+                            ".filter(x=>(x.innerText||'').trim().indexOf('Сохранить')===0);"
+                            "if(!b.length)return 'нет кнопки Сохранить';"
+                            "b[b.length-1].click();return 'ок'})()", "after": 5000},
+                     {"js": "(function(){var t=document.body.innerText;"
+                            "var i=t.lastIndexOf('Участники');return t.slice(i,i+400)})()",
+                      "after": 500}])
+        steps = r.get("actions") or []
+        bad = [s for s in steps if s.get("ok") is False]
+        # Успех — когда обе кнопки диалога действительно нажались. Состав
+        # чата в тот же заход читать бесполезно: панель «Информация о группе»
+        # обновляется после закрытия окна, и 21.09 это выглядело как провал
+        # там, где ребёнок уже был добавлен.
+        press = [s.get("result") for s in steps if isinstance(s, dict) and "js" in s]
+        # Клик по строке в окне выбора сразу кладёт ребёнка в список участников,
+        # и окно закрывается само — кнопки «Добавить» в этот момент уже нет, и
+        # это нормально. Решает последнее «Сохранить» и то, что имя видно в
+        # списке участников.
+        saved = bool(press) and str(press[-1]) == "ок"
+        seen = any(child.split()[0] in str(x) for x in press)
+        if not bad and saved and seen:
+            return {"ok": True, "чат": chat, "ребёнок": child}
+        last = (f"{bad[0].get('css') or bad[0].get('click') or '?'}: {bad[0].get('error')}"
+                if bad else "строка не появилась в участниках")[:200]
+        log.warning("chaty.dobavit %s → %s: попытка %d, %s", child, chat, n + 1, last)
+    return {"ok": False, "чат": chat, "ребёнок": child, "почему": last,
+            "нажатия": press if "press" in dir() else [],
+            "шаги": [{k: (str(v)[:60] if k == "result" else v) for k, v in s_.items()
+                      if k in ("css", "click", "ok", "error", "result")}
+                     for s_ in (steps or [])]}
+
+
+def sinhron(dry: bool = True, limit: int = 8) -> dict:
+    """Свести состав групп английского с составом чатов и добить разницу.
+
+    Кого добавляем: ребёнок учится в группе АЯ (статус записи «Учится») и
+    его нет в снимке чата. У кого нет доступа в кабинет — добавить нельзя,
+    таких собираем отдельным списком: им нужно приглашение, а не кнопка.
+    """
+    snap = _snapshot_data().get("chats") or {}
+    todo, done, fail = [], [], []
+    for g in groups():
+        inside = snap.get(g["chat"], [])
+        for k in g["kids"]:
+            if not _is_in(k["name"], inside):
+                todo.append({"чат": g["chat"], "ребёнок": k["name"],
+                             "телефон": k["phone"], "почта": k["почта"]})
+    todo.sort(key=lambda x: (not x["почта"], x["ребёнок"]))   # с почтой — первые
+    if dry:
+        return {"dry_run": True, "снимок": _snapshot_data().get("taken", ""),
+                "нет_в_чатах": len(todo), "список": todo[:40]}
+    for it in todo[:limit]:
+        r = dobavit(it["чат"], it["ребёнок"])
+        (done if r.get("ok") else fail).append({**it, **{k: v for k, v in r.items() if k == "почему"}})
+    if done:
+        snapshot([g for g in {d["чат"] for d in done}])       # освежаем снимок по тронутым чатам
+    return {"dry_run": False, "добавлено": len(done), "не_вышло": len(fail),
+            "добавлены": done, "не_вышло_список": fail, "осталось": max(0, len(todo) - limit)}
+
+
+def sinhron_start(limit: int = 12) -> dict:
+    """Синхронизация в фоне: каждый ребёнок — это заход в браузер на минуту,
+    по HTTP такое ждать нельзя. Итог кладём в настройку chaty_sinhron."""
+    def _run():
+        try:
+            res = sinhron(dry=False, limit=limit)
+        except Exception as e:  # noqa: BLE001
+            res = {"ok": False, "error": str(e)[:200]}
+        res["когда"] = datetime.now().isoformat(timespec="minutes")
+        db.set_setting("chaty_sinhron", json.dumps(res, ensure_ascii=False)[:4000])
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "running": True, "limit": limit}
+
+
+def sinhron_status() -> dict:
+    try:
+        return json.loads(db.get_setting("chaty_sinhron", "") or "{}")
+    except ValueError:
+        return {}
+
+
 def plan() -> dict:
     """Кому и что отправим. Ничего не отправляет и не пишет в очередь."""
     ln = links()

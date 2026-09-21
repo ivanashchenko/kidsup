@@ -3223,6 +3223,36 @@ def api_chaty_lk():
     return chaty.lk_readiness()
 
 
+@app.post("/api/chaty/dobavit", dependencies=AUTH)
+def api_chaty_dobavit(payload: dict = Body(...)):
+    """Добавить ребёнка в чат его группы: {"chat": "АЯ пн-ср 16:00", "child": "Лебедева Арина"}."""
+    from . import chaty
+    chat, child = str(payload.get("chat") or "").strip(), str(payload.get("child") or "").strip()
+    if not chat or not child:
+        raise HTTPException(400, "нужны chat и child")
+    return chaty.dobavit(chat, child)
+
+
+@app.post("/api/chaty/sinhron", dependencies=AUTH)
+def api_chaty_sinhron(payload: dict = Body(default={})):
+    """Свести группы английского с чатами: dry=1 — показать разницу, dry=0 — добить."""
+    from . import chaty
+    return chaty.sinhron(dry=bool(int(payload.get("dry", 1))), limit=int(payload.get("limit", 8)))
+
+
+@app.post("/api/chaty/sinhron/start", dependencies=AUTH)
+def api_chaty_sinhron_start(payload: dict = Body(default={})):
+    """Синхронизация чатов в фоне; итог — GET /api/chaty/sinhron/status."""
+    from . import chaty
+    return chaty.sinhron_start(limit=int(payload.get("limit", 12)))
+
+
+@app.get("/api/chaty/sinhron/status", dependencies=AUTH)
+def api_chaty_sinhron_status():
+    from . import chaty
+    return chaty.sinhron_status()
+
+
 @app.get("/api/chaty/snapshot", dependencies=AUTH)
 def api_chaty_snapshot():
     """Кто уже состоит в чатах групп — по последнему снимку."""
@@ -3375,7 +3405,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-21.27"
+APP_VERSION = "2026-09-21.39"
 
 
 @app.get("/api/net")

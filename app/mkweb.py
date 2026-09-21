@@ -280,9 +280,28 @@ def open_page(url: str, wait_ms: int = 4000, max_text: int = 6000, click: str = 
                 elif st.get("press") and st.get("css"):
                     tgt.locator(st["css"]).first.press(st["press"])
                 elif st.get("css"):
-                    tgt.locator(st["css"]).nth(int(st.get("nth", 0))).click(timeout=15000)
+                    # has_text — клик по строке списка, у которой нет своего
+                    # текста: в «Моём Чате» ученик нарисован как блок «аватар +
+                    # имя», и get_by_text по имени мажет мимо. 21.09: три
+                    # попытки подряд падали на Timeout именно из-за этого.
+                    loc = (tgt.locator(st["css"], has_text=st["has_text"]) if st.get("has_text")
+                           else tgt.locator(st["css"]))
+                    loc = loc.nth(int(st.get("nth", 0)))
+                    # force — когда элемент виден, но Playwright не считает его
+                    # «кликабельным»: строки списка в «Моём Чате» перерисовываются
+                    # на каждый ввод, и проверка стабильности не завершается никогда.
+                    if st.get("force"):
+                        try:
+                            loc.scroll_into_view_if_needed(timeout=5000)
+                        except Exception:  # noqa: BLE001
+                            pass
+                        loc.click(timeout=15000, force=True)
+                    else:
+                        loc.click(timeout=15000)
                 elif st.get("click"):
-                    tgt.get_by_text(str(st["click"]), exact=bool(st.get("exact", True))).nth(int(st.get("nth", 0))).click(timeout=15000)
+                    loc = tgt.get_by_text(str(st["click"]),
+                                          exact=bool(st.get("exact", True))).nth(int(st.get("nth", 0)))
+                    loc.click(timeout=15000, force=bool(st.get("force")))
                 tgt.wait_for_timeout(int(st.get("after", 1500)))
                 done.append({**st, "ok": True})
             except Exception as e:  # noqa: BLE001
