@@ -99,15 +99,15 @@ details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-to
 {% endfor %}
 </div>
 
-<h2>Пульт на три дня <small>то же, что стоит на app.kidsup.ru/pult</small></h2>
+<h2>Пульт на три дня <small>читается прямо из <a href="/pult">app.kidsup.ru/pult</a> — одна и та же база, галочки те же</small></h2>
 <div class="days">
 {% for day in pult_days %}
   <div class="day">
-    <div class="dh">{{ day.title }} <span>{{ day.n }} задач</span></div>
-    {% for who, rows in day.by_who %}
+    <div class="dh">{{ day.title }} <span>{{ day.done }} из {{ day.n }} сделано{% if day.inbox %} · {{ day.inbox }} в инбоксе{% endif %}</span></div>
+    {% for who, rows, nin in day.by_who %}
     <div class="p">
-      <div class="ph"><span class="who {{ who }}">{{ who }}</span><span class="muted small">{{ rows|length }}</span></div>
-      {% for r in rows %}<div class="row"><div class="tm">{{ r.t }}</div><div>{{ r.text }}</div></div>{% endfor %}
+      <div class="ph"><span class="who {{ who }}">{{ who }}</span><span class="muted small">{{ rows|length }} задач{% if nin %} + {{ nin }} обещаний и наряда{% endif %}</span></div>
+      {% for r in rows %}<div class="row"><div class="tm">{{ r.t }}</div><div{% if r.done %} style="color:#6b6f85;text-decoration:line-through"{% endif %}>{{ r.text }}</div></div>{% endfor %}
     </div>
     {% endfor %}
   </div>

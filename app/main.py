@@ -3100,16 +3100,55 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
         dengi = [x.strip() for x in _re.split(r"(?<=[.;])\s+", parts[-1]) if "Деньги" in x or "₽" in x]
     k = {"paid": 205, "gap": 106, "per_day": "11,8", "pace": "5–6", "trials": 50,
          "show": 66, "buy": 83, "forecast": "225–243", "date311": "12–20 октября"}
-    names = {"2026-09-21": "Понедельник 21.09", "2026-09-22": "Вторник 22.09", "2026-09-23": "Среда 23.09"}
+    # Счётчик оплаченных и ресурс пробных берём живыми: 21.09 Борис спросил,
+    # согласованы ли /pult и эта страница. Статичный снимок расходится с
+    # пультом в тот же день, а две разные цифры на двух страницах — хуже,
+    # чем одна неточная.
+    try:
+        v = api_mesta_voronka()
+        k["paid"] = v.get("оплачено_в_группах_сезона", k["paid"])
+        k["gap"] = max(0, 311 - k["paid"])
+        k["trials"] = v.get("ждём_на_пробное", k["trials"])
+        left = max(1, (date(2026, 9, 30) - date.today()).days)
+        k["per_day"] = str(round(k["gap"] / left, 1)).replace(".", ",")
+    except Exception:
+        pass
+    WD = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
     pult_days = []
+    from . import pult as _pult
     for dd in sorted({r["day"] for r in d["pult"]}):
-        rows = [r for r in d["pult"] if r["day"] == dd]
-        by = []
+        # Задачи — живые из пульта, а не из снимка анализа: пульт меняется в
+        # течение дня (наряд, отмены, новые заявки), и страница обязана это
+        # показывать, иначе админ видит одно, а владелец — другое.
+        try:
+            live = _pult.tasks(dd)
+        except Exception:
+            live = {}
+        # Инбокс того же дня: обещания клиентам и наряд. На пульте это
+        # отдельный блок под колонками, и без него счёт работы не сходится.
+        try:
+            with db.get_conn() as _c:
+                inb = dict(_c.execute(
+                    "SELECT who, COUNT(*) FROM plan_inbox WHERE day=? AND done=0 GROUP BY who",
+                    (dd,)).fetchall())
+        except Exception:
+            inb = {}
+        rows, by = [], []
         for who in ("Аня", "Лена", "Лиза", "Борис"):
-            rs = sorted([r for r in rows if r["who"] == who], key=lambda r: r["t"])
+            rs = [{"t": x["t"], "text": x["text"], "done": x["done"]}
+                  for x in sorted(live.get(who, []), key=lambda x: x["t"])]
+            if not rs:                       # день ещё не собран — показываем план
+                rs = sorted(({"t": r["t"], "text": r["text"], "done": 0}
+                             for r in d["pult"] if r["day"] == dd and r["who"] == who),
+                            key=lambda r: r["t"])
             if rs:
-                by.append((who, rs))
-        pult_days.append({"title": names.get(dd, dd), "n": len(rows), "by_who": by})
+                by.append((who, rs, inb.get(who, 0)))
+                rows += rs
+        dt = datetime.fromisoformat(dd)
+        pult_days.append({"title": f"{WD[dt.weekday()]} {dt.day:02d}.{dt.month:02d}",
+                          "n": len(rows), "by_who": by,
+                          "inbox": sum(inb.values()),
+                          "done": sum(1 for r in rows if r.get("done"))})
     return render(request, "plan311.html", active="plan311", d=d, k=k, kartina=kartina,
                   istochniki=istochniki, dengi=dengi, pult_days=pult_days)
 
@@ -3305,7 +3344,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-21.09"
+APP_VERSION = "2026-09-21.11"
 
 
 @app.get("/api/net")
