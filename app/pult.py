@@ -427,6 +427,27 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
         else:
             done_js = (f"fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
                        f"body:JSON.stringify({{id:{it['id']},done:this.checked}})}}).then(()=>location.reload())")
+            if not it["done"] and day:
+                # Перенести можно было только задачу смены. Пункт инбокса
+                # оставалось либо закрыть галочкой (соврав), либо тащить до
+                # ночи: 21.09 так набралось 33 открытых за день.
+                from datetime import date as _dt, timedelta as _td
+                nxt = (_dt.fromisoformat(day) + _td(days=1)).isoformat()
+                # Кому: если завтра человек не в смене, дело уходит завтрашней
+                # дежурной — иначе оно ляжет в колонку того, кто не работает.
+                shifts = set(SHORT.values())
+                to_who = who
+                if who in shifts:
+                    tom = [d for d in duty(nxt) if d in shifts]
+                    if tom and who not in tom:
+                        to_who = tom[0]
+                body = (f"{{ids:[{it['id']}],to_day:'{nxt}'"
+                        + (f",to_who:'{to_who}'" if to_who != who else "") + "}")
+                ctrl = (f" <a href='#' style='font-size:12px;color:#a35f00;white-space:nowrap' "
+                        f"title='Пункт уйдёт в завтрашнюю колонку дежурной' onclick=\""
+                        f"fetch('/api/plan/inbox/move',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
+                        f"body:JSON.stringify({body})}}).then(()=>location.reload());"
+                        f"return false\">перенести на завтра ↩</a>")
             text_html = html.escape(it["text"])
             ph = it.get("phone") or ""
             if len(ph) >= 10:
