@@ -182,14 +182,23 @@ class MoyklassClient:
         # 03.09 владелец: задач в МойКлассе быть не должно — единственный список
         # дел — страница плана дня. Ловим ВСЕ пути создания задач (autopilot,
         # ankety, callmark, imena, nadezhda, sverka, разовые скрипты) в одной точке.
-        if path.rstrip("/") == "/v1/company/tasks":
+        # 21.09 владелец увидел в To-do листе МойКласса задачи с моими пометками
+        # («закрыто автоматикой: дубль») и спросил, зачем я их веду, если список
+        # дел — пульт. Создавать я их перестал ещё 03.09, но десяток модулей
+        # (taskclean, taskenrich, taskfinish, callqueue, lizaplan, hintrefresh,
+        # sla, nabormail) продолжал ПРАВИТЬ чужие задачи: двигал даты, менял
+        # категории, дописывал пометки — и тем поддерживал второй список дел
+        # рядом с пультом. Теперь при crm_tasks_off любая правка задачи тоже
+        # блокируется; разрешено только закрытие, чтобы остатки можно было
+        # погасить.
+        if path.rstrip("/").startswith("/v1/company/tasks"):
             try:
                 from . import db as _db
-                if _db.get_setting("crm_tasks_off", "0") == "1":
+                if _db.get_setting("crm_tasks_off", "0") == "1" and not (body or {}).get("isComplete"):
                     import logging
                     logging.getLogger(__name__).info(
-                        "задача в CRM не создана (crm_tasks_off): %s",
-                        str((body or {}).get("body") or "")[:80])
+                        "задача в CRM не тронута (crm_tasks_off): %s %s",
+                        path, str((body or {}).get("body") or "")[:60])
                     return {"id": None, "skipped": "crm_tasks_off"}
             except Exception:
                 pass
