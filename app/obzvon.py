@@ -99,25 +99,146 @@ def otmetki() -> dict[int, dict]:
     return {r[0]: {"когда": r[1], "кто": r[2], "заметка": r[3]} for r in rows}
 
 
+MIN_TALK = 30          # секунд: короче — это не разговор, а «алло, не могу»
+
+
+def _osnovanie(conn, uid: int, days: int = 2) -> dict:
+    """Чем подтверждается, что с семьёй сегодня действительно говорили.
+
+    Смотрим журнал Манго и входящие сообщения за последние двое суток по
+    ВСЕМ телефонам этой семьи (у карточек бывает второй номер родителя).
+    """
+    since = (date.today() - timedelta(days=days)).isoformat()
+    phones = set()
+    try:
+        for r in conn.execute("SELECT phone FROM users WHERE id=?", (int(uid),)):
+            p = _p10(r[0] if not isinstance(r, dict) else r["phone"])
+            if p:
+                phones.add(p)
+    except Exception:
+        pass
+    if not phones:
+        return {"есть": False, "почему": "в карточке нет телефона"}
+    q = ",".join("?" * len(phones))
+    try:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(mango_calls)")}
+        has_secs = "secs" in cols
+        sql = (f"SELECT ts, state{', secs' if has_secs else ''} FROM mango_calls "
+               f"WHERE ts >= ? AND substr(replace(replace(replace(phone,'+',''),'-',''),' ',''),-10) IN ({q})")
+        for row in conn.execute(sql, (since, *phones)):
+            state = str(row[1] or "")
+            if state != "talked":
+                continue
+            secs = int(row[2] or 0) if has_secs and len(row) > 2 else 0
+            # Секунды пишутся с 21.09; у старых строк их нет, и там признак
+            # talked (порог Манго — 20 с) остаётся единственным, что есть.
+            if secs and secs < MIN_TALK:
+                continue
+            return {"есть": True, "чем": f"разговор {str(row[0])[11:16]}"
+                                         + (f", {secs} с" if secs else "")}
+    except Exception:
+        pass
+    try:
+        for row in conn.execute(
+                f"SELECT ts FROM wazzup_inbox WHERE ts >= ? AND substr(phone,-10) IN ({q})",
+                (since, *phones)):
+            return {"есть": True, "чем": f"клиент написал нам {str(row[0])[5:16]}"}
+    except Exception:
+        pass
+    return {"есть": False, "почему": f"в журнале нет разговора от {MIN_TALK} секунд и входящих сообщений"}
+
+
 def otmetit(uid: int, done: bool = True, who: str = "", note: str = "") -> dict:
     """Поставить или снять отметку «обзвонили».
 
     19.09 Борис: «сделай, чтобы Аня могла галочками ставить что уже сделано».
-    Автоматика убирает строку только после состоявшегося разговора, а живая
-    работа бывает шире: дозвонились на второй номер, семья ответила в чате,
-    человек просил не звонить. Отметка закрывает строку сразу и навсегда,
-    снять её можно тем же запросом с done=false.
+
+    21.09.2026, решение владельца. 19.09 список закрыли 88 галочками при нуле
+    исходящих звонков, 20.09 — ещё 28. Так из списка пропали Кузнецов Никита,
+    ответивший на рассылку «Да», и Ковалева Аида со ста занятиями у нас: их
+    «обзвонили», не позвонив. Галочка, которая не стоит за работой, хуже
+    отсутствия галочки — она скрывает деньги.
+
+    Теперь отметка принимается, только если она чем-то подтверждена:
+      • разговор от 30 секунд по журналу Манго за последние двое суток
+        (любой из телефонов семьи, в любую сторону), или
+      • входящее сообщение от клиента за тот же срок, или
+      • заметка от админа своими словами (от 12 символов) — что именно
+        произошло: «мама написала в чате, что переехали», «ошиблись номером».
+    Заметка видна в отчёте дня, и по ней всегда можно проверить.
     """
     from .autopilot import _now
     with db.get_conn() as conn:
         _done_init(conn)
         if done:
+            osn = _osnovanie(conn, int(uid))
+            note = (note or "").strip()
+            if not osn["есть"] and len(note) < 12:
+                return {"ok": False, "uid": int(uid),
+                        "нужно": "разговор или заметка",
+                        "почему": osn["почему"],
+                        "подсказка": "Позвони и поговори — строка закроется сама. "
+                                     "Если закрываешь без звонка (семья написала в чате, "
+                                     "переехали, ошиблись номером) — напиши это словами в заметке."}
             conn.execute(
                 "INSERT OR REPLACE INTO obzvon_done (uid, ts, who, note) VALUES (?,?,?,?)",
-                (int(uid), _now().isoformat(timespec="minutes"), who[:20], note[:200]))
-        else:
-            conn.execute("DELETE FROM obzvon_done WHERE uid=?", (int(uid),))
-    return {"ok": True, "uid": int(uid), "done": bool(done)}
+                (int(uid), _now().isoformat(timespec="minutes"), who[:20],
+                 (note or osn.get("чем", ""))[:200]))
+            return {"ok": True, "uid": int(uid), "done": True,
+                    "основание": osn.get("чем") or f"заметка: {note[:60]}"}
+        conn.execute("DELETE FROM obzvon_done WHERE uid=?", (int(uid),))
+    return {"ok": True, "uid": int(uid), "done": False}
+
+
+def audit(vernut: bool = False, days: int = 7) -> dict:
+    """Проверить уже стоящие галочки тем же правилом и вернуть пустые.
+
+    21.09, решение владельца. 19.09 список закрыли 88 галочками при нуле
+    исходящих звонков, 20.09 — ещё 28. Новое правило действует с сегодня, но
+    семьи, потерянные вчера, от этого не возвращаются: их надо вернуть руками.
+    Здесь каждая отметка проверяется по журналу и переписке; те, за которыми
+    ничего нет и нет заметки, снимаются — строка возвращается в список.
+    """
+    since = (date.today() - timedelta(days=days)).isoformat()
+    out = {"проверено": 0, "с разговором": [], "по заметке": [], "пустые": []}
+    with db.get_conn() as conn:
+        _done_init(conn)
+        rows = conn.execute("SELECT uid, ts, who, note FROM obzvon_done WHERE ts >= ?",
+                            (since,)).fetchall()
+        names = {}
+        for r in rows:
+            try:
+                n = conn.execute("SELECT name FROM users WHERE id=?", (int(r["uid"]),)).fetchone()
+                names[r["uid"]] = (n[0] if n else "") or str(r["uid"])
+            except Exception:
+                names[r["uid"]] = str(r["uid"])
+        for r in rows:
+            out["проверено"] += 1
+            # Основание ищем на дату отметки, а не на сегодня: разговор был
+            # тогда, и через неделю его «за двое суток» уже не видно.
+            osn = _osnovanie(conn, int(r["uid"]), days=_dney_nazad(r["ts"]) + 2)
+            item = {"uid": r["uid"], "имя": names.get(r["uid"], ""),
+                    "когда": (r["ts"] or "")[:16], "кто": r["who"],
+                    "заметка": (r["note"] or "")[:80]}
+            if osn["есть"]:
+                item["чем"] = osn["чем"]
+                out["с разговором"].append(item)
+            elif len((r["note"] or "").strip()) >= 12:
+                out["по заметке"].append(item)
+            else:
+                out["пустые"].append(item)
+        if vernut and out["пустые"]:
+            ids = [int(x["uid"]) for x in out["пустые"]]
+            conn.execute("DELETE FROM obzvon_done WHERE uid IN (%s)" % ",".join("?" * len(ids)), ids)
+            out["вернули"] = len(ids)
+    return out
+
+
+def _dney_nazad(ts: str) -> int:
+    try:
+        return max(0, (date.today() - date.fromisoformat(str(ts)[:10])).days)
+    except Exception:
+        return 7
 
 
 def spisok() -> dict:

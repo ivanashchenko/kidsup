@@ -3156,8 +3156,9 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
 @app.get("/obzvon", response_class=HTMLResponse, dependencies=AUTH)
 def obzvon_page(request: Request):
     """Кто ходил в прошлом сезоне и летом, ушёл, и кому мы не звонили."""
-    from . import obzvon
-    return render(request, "obzvon.html", active="obzvon", d=obzvon.spisok())
+    from . import obzvon, pult
+    duty = ([w for w in pult.duty(pult.today()) if w in set(pult.SHORT.values())] or ["Лена"])[0]
+    return render(request, "obzvon.html", active="obzvon", d=obzvon.spisok(), duty=duty)
 
 
 @app.post("/api/obzvon/done", dependencies=AUTH)
@@ -3169,6 +3170,14 @@ def api_obzvon_done(payload: dict = Body(...)):
         raise HTTPException(400, "нужен uid")
     return obzvon.otmetit(uid, bool(payload.get("done", True)),
                           str(payload.get("who") or ""), str(payload.get("note") or ""))
+
+
+@app.get("/api/obzvon/audit", dependencies=AUTH)
+def api_obzvon_audit(vernut: int = 0, days: int = 7):
+    """Проверить стоящие галочки по журналу звонков и переписке.
+    vernut=1 — снять те, за которыми нет ни разговора, ни заметки."""
+    from . import obzvon
+    return obzvon.audit(vernut=bool(int(vernut)), days=days)
 
 
 @app.get("/api/obzvon", dependencies=AUTH)
@@ -3344,7 +3353,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-21.18"
+APP_VERSION = "2026-09-21.21"
 
 
 @app.get("/api/net")

@@ -169,14 +169,30 @@ function vernut(box, uid){
   </tbody>
 </table></div>
 <script>
-function gotovo(box, uid){
+var DUTY = {{ duty|default('Лена')|tojson }};
+// 21.09, решение владельца: галочка принимается только за состоявшимся
+// разговором (30 секунд по журналу Манго) или за заметкой своими словами.
+// Сервер проверяет сам; здесь — понятный диалог вместо молчаливого отказа.
+function gotovo(box, uid, note){
   var tr = box.closest('tr');
   tr.style.transition = 'opacity .25s';
   tr.style.opacity = box.checked ? '.25' : '1';
   fetch('/api/obzvon/done', {method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({uid: uid, done: box.checked, who: 'Аня'})})
+        body: JSON.stringify({uid: uid, done: box.checked, who: DUTY, note: note || ''})})
    .then(function(r){ return r.json(); })
-   .then(function(){ if (box.checked) { setTimeout(function(){ tr.remove(); schet(); }, 250); } })
+   .then(function(res){
+      if (!box.checked) { return; }
+      if (res && res.ok === false) {
+        var t = prompt('Разговора в журнале нет (' + (res.почему || '') +
+          ').\n\nЕсли всё-таки закрываешь строку — напиши одной фразой, что произошло:\n' +
+          'например «мама написала в чате, что переехали» или «ошиблись номером».\n' +
+          'Просто закрыть без звонка нельзя — так мы теряем семьи, которые платили.', '');
+        if (t && t.trim().length >= 12) { gotovo(box, uid, t.trim()); return; }
+        box.checked = false; tr.style.opacity = '1';
+        return;
+      }
+      setTimeout(function(){ tr.remove(); schet(); }, 250);
+   })
    .catch(function(){ box.checked = !box.checked; tr.style.opacity = '1';
                       alert('Не сохранилось, попробуйте ещё раз'); });
 }

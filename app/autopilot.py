@@ -4035,6 +4035,10 @@ def store_calls(rows: list[dict]) -> int:
     от TALK_MIN секунд, short — сняли и сбросили, missed — не ответили."""
     added = 0
     with db.get_conn() as conn:
+        try:
+            conn.execute("ALTER TABLE mango_calls ADD COLUMN secs INTEGER DEFAULT 0")
+        except Exception:
+            pass                      # колонка уже есть
         for r in rows:
             start = r.get("start")
             if not start:
@@ -4049,10 +4053,14 @@ def store_calls(rows: list[dict]) -> int:
             fin = int(r.get("finish") or 0)
             state = ("talked" if ans and fin - ans >= mango.TALK_MIN
                      else "short" if ans else "missed")
+            # 21.09, решение владельца: галочку в обзвоне принимаем только за
+            # разговором от 30 секунд. Проверить это было нечем — в журнале
+            # лежал лишь признак talked (порог Манго — 20 с). Пишем секунды.
+            secs = max(0, fin - ans) if ans and fin else 0
             cur = conn.execute(
-                "INSERT OR IGNORE INTO mango_calls (ts, phone, direction, state, rec_id) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (ts, phone, "out" if ext else "in", state, str(r.get("rec") or "")))
+                "INSERT OR IGNORE INTO mango_calls (ts, phone, direction, state, rec_id, secs) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (ts, phone, "out" if ext else "in", state, str(r.get("rec") or ""), secs))
             added += cur.rowcount
     return added
 
