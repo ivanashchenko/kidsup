@@ -485,11 +485,11 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     open_n = sum(1 for i in items if not i["done"])
     late = sum(1 for i in items if not i["done"] and i["kind"] == "task"
                and _first_time(i["t"]) and cur_ft and _first_time(i["t"]) < cur_ft)
-    late_html = (f" · <span style='color:#a35f00;font-weight:700'>{_sklon(late, 'задача', 'задачи', 'задач')} без галочки, время прошло</span>") if late else ""
+    late_html = (f" · <span style='color:#a35f00;font-weight:700'>{_sklon(late, 'дело', 'дела', 'дел')} без галочки, время прошло</span>") if late else ""
     return (f"<div class='wcard' style='border-top-color:{c}'><div class='nm'>{html.escape(who)}{nb} "
             f"<span style='font-size:12px;color:#6c6a86;font-weight:600'>{done_n}/{len(items)}</span></div>"
             f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · "
-            f"<span style='font-size:12.5px;color:#312783;font-weight:700'>{_sklon(open_n, 'пункт', 'пункта', 'пунктов')} на день, из них {_sklon(tasks_n, 'задача', 'задачи', 'задач')} смены</span>{late_html}</div>"
+            f"<span style='font-size:12.5px;color:#312783;font-weight:700'>{_sklon(open_n, 'дело', 'дела', 'дел')} на сегодня</span>{late_html}</div>"
             f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol></div>")
 
 
@@ -596,8 +596,8 @@ def page(day: str = "", who: str = "") -> str:
         (f"{k['pays']}", f"оплат сегодня · {k['pays_sum']:,} ₽".replace(",", " ")),
         (f"{k['joins_new']}", "новых записей в группы сегодня"),
         (f"{k['firsts']}", f"первых занятий сегодня из {k['kids']} детей в {k['lessons']} занятиях"),
-        (f"{k['inbox_done']}/{k['inbox']}", "пунктов у людей закрыто: обещания клиентам, заявки без ответа, возврат"),
-        (f"{k['tasks_done']}/{k['tasks']}", "задач смены сделано"),
+        (f"{k['inbox_done'] + k['tasks_done']}/{k['inbox'] + k['tasks']}",
+         "дел за день закрыто: план смены, обещания клиентам, заявки без ответа, возврат"),
     ]
     # явку отмечает Лиза вечером по спискам педагогов: вчера должно быть закрыто к утру,
     # сегодня — к 21:00. Красное — только если вчерашний день не закрыт.
