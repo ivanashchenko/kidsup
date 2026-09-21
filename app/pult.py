@@ -296,23 +296,68 @@ def _promises_html(day: str, who: str, color: str, items: list[dict] | None = No
             f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol></div>")
 
 
+def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
+    """Одна лента на человека: задачи смены и обещания клиентам вперемешку,
+    по времени.
+
+    21.09.2026. Борис, глядя на колонку: «Я не понимаю вообще как админам
+    пользоваться пультом!!?? Когда им идти в "обещания" и "заявки где
+    недоделали"??!!» — и он прав. В колонке было два списка с разными
+    правилами (задачи сверху, обещания под ними), блок заявок — третий, и
+    порядок действий держался только на объяснении сверху страницы.
+
+    Теперь список один и правило одно: иди сверху вниз. Задача смены и
+    обещание клиенту различаются меткой, а не местом на странице.
+    """
+    out: list[dict] = []
+    for it in items:
+        out.append({"kind": "task", "id": it["id"], "t": it["t"], "text": it["text"],
+                    "done": it["done"], "note": it.get("note"), "tag": "", "phone": ""})
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute(
+                "SELECT id, ts, text, phone, source, done FROM plan_inbox "
+                "WHERE day=? AND who=? ORDER BY id", (day, who)).fetchall()
+    except Exception:
+        rows = []
+    for r in rows:
+        src = (r["source"] or "")
+        t = _first_time(src) or _first_time((r["ts"] or "")[11:16]) or ""
+        out.append({"kind": "inbox", "id": r["id"], "t": t, "text": r["text"] or "",
+                    "done": 1 if r["done"] else 0, "note": None,
+                    "tag": "наряд" if src.startswith("наряд") else "обещание",
+                    "phone": "".join(c for c in (r["phone"] or "") if c.isdigit())})
+    out.sort(key=lambda x: (x["t"] or "99:99"))
+    return out
+
+
 def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str = "") -> str:
     """Метка СЕЙЧАС идёт за часами: текущий — несделанный пункт с самым поздним временем,
     которое уже наступило (мы внутри его окна). Несделанные пункты с более ранним временем —
     «время прошло»: делаются сразу после текущего. Пункты без времени («весь день»,
     «после каждого занятия») — фоновые, без метки. Будущие — приглушены."""
     c = COLOR.get(who, "#6c6a86")
+    tasks_n = len(items)
+    items = _lenta(day, who, items) if day else [
+        {**i, "kind": "task", "tag": "", "phone": ""} for i in items]
     done_n = sum(1 for i in items if i["done"] == 1)
     open_items = [i for i in items if not i["done"]]
-    cur_id = None
+    cur_key = None
+    # СЕЙЧАС идёт по задачам смены: у них время плановое. У обещаний время —
+    # это момент, когда обещание появилось, и метка «время прошло» на нём
+    # означала бы просрочку там, где её нет.
+    if [i for i in open_items if i["kind"] == "task"]:
+        open_items = [i for i in open_items if i["kind"] == "task"]
     if open_items:
         timed = [(i, _first_time(i["t"])) for i in open_items if _first_time(i["t"])]
         started = [(i, ft) for i, ft in timed if not now_hm or ft <= now_hm]
         if started:
-            cur_id = max(started, key=lambda x: x[1])[0]["id"]
+            cur = max(started, key=lambda x: x[1])[0]
         else:
-            cur_id = open_items[0]["id"]
-    cur_ft = next((_first_time(i["t"]) for i in items if i["id"] == cur_id), "")
+            cur = open_items[0]
+        cur_key = (cur["kind"], cur["id"])
+    cur_ft = next((_first_time(i["t"]) for i in items if (i["kind"], i["id"]) == cur_key), "")
+    paid = _paid_recently() if day else {}
     lis = []
     for it in items:
         st, badge, extra = "", "", ""
@@ -335,28 +380,65 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             st = "background:#fff2f2;border-left:4px solid #E30613;border-radius:8px;padding:6px 8px;margin-left:-8px"
             badge = ("<span style='display:inline-block;font-size:11px;font-weight:800;color:#fff;background:#E30613;"
                      "border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>БЕЗ ЭТОГО ВСТАНЕТ</span>")
-        elif it["id"] == cur_id:
+        elif (it["kind"], it["id"]) == cur_key:
             st = f"background:#f1effb;border-left:4px solid {c};border-radius:8px;padding:6px 8px;margin-left:-8px"
             badge = f"<span style='display:inline-block;font-size:11px;font-weight:800;color:#fff;background:{c};border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>СЕЙЧАС</span>"
+        elif it["kind"] == "inbox" and ft:
+            wait = ""
+            if now_hm and ft < now_hm:
+                mins = (int(now_hm[:2]) * 60 + int(now_hm[3:])) - (int(ft[:2]) * 60 + int(ft[3:]))
+                if mins >= 120:
+                    wait = f", ждёт {mins // 60} ч"
+            col = ("#a35f00", "#fff1d6") if wait else ("#0c6a94", "#e6f4fb")
+            badge = (f"<span style='display:inline-block;font-size:11px;font-weight:700;color:{col[0]};"
+                     f"background:{col[1]};border-radius:6px;padding:1px 7px;margin-right:6px;"
+                     f"vertical-align:middle'>с {ft}{wait}</span>")
         elif ft and cur_ft and ft < cur_ft:
             badge = "<span style='display:inline-block;font-size:11px;font-weight:700;color:#a35f00;background:#fff1d6;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>время прошло — сразу после СЕЙЧАС</span>"
         elif not ft:
             badge = "<span style='display:inline-block;font-size:11px;font-weight:700;color:#0c6a94;background:#e6f4fb;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>фон</span>"
         else:
             st = "opacity:.7"
-        ctrl = ""
-        if not it["done"]:
-            ctrl = (f" <a href='#' style='font-size:12px;color:#a35f00;white-space:nowrap' title='Пункт уйдёт в завтрашнюю колонку — твою, если ты завтра в смене, иначе к дежурной' onclick=\""
-                    f"fetch('/api/pult/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{it['id']},state:2,note:'перенос'}})}}).then(()=>location.reload());return false\">перенести на завтра ↩</a>")
+        # Метка вида: задача смены, обещание клиенту или наряд — чтобы в одной
+        # ленте было видно, откуда пункт, но порядок оставался один.
+        if it.get("tag") == "обещание":
+            badge += ("<span style='display:inline-block;font-size:11px;font-weight:700;color:#8a1a00;background:#ffe7df;"
+                      "border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>обещали клиенту</span>")
+        elif it.get("tag") == "наряд":
+            badge += ("<span style='display:inline-block;font-size:11px;font-weight:700;color:#0c6a94;background:#e6f4fb;"
+                      "border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>заявка без ответа</span>")
+        ctrl, tel = "", ""
+        if it["kind"] == "task":
+            if not it["done"]:
+                ctrl = (f" <a href='#' style='font-size:12px;color:#a35f00;white-space:nowrap' title='Пункт уйдёт в завтрашнюю колонку — твою, если ты завтра в смене, иначе к дежурной' onclick=\""
+                        f"fetch('/api/pult/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{it['id']},state:2,note:'перенос'}})}}).then(()=>location.reload());return false\">перенести на завтра ↩</a>")
+            done_js = (f"fetch('/api/pult/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
+                       f"body:JSON.stringify({{id:{it['id']},state:this.checked?1:0}})}}).then(()=>location.reload())")
+            text_html = it["text"]
+        else:
+            done_js = (f"fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
+                       f"body:JSON.stringify({{id:{it['id']},done:this.checked}})}}).then(()=>location.reload())")
+            text_html = html.escape(it["text"])
+            ph = it.get("phone") or ""
+            if len(ph) >= 10:
+                tel = f" <a href='tel:+{ph}' style='color:#6c6a86;white-space:nowrap'>+{ph}</a>"
+                pay = paid.get(ph[-10:])
+                if pay:
+                    d_, summa = pay
+                    tel += (f" <span style='display:inline-block;background:#eaf5db;color:#3f6f0f;border-radius:6px;"
+                            f"padding:1px 7px;font-size:11.5px;font-weight:700;white-space:nowrap'>"
+                            f"оплата {d_[8:10]}.{d_[5:7]} · {summa:,} ₽</span>".replace(",", " "))
         lis.append((it["done"] == 1, it["done"] == 0,
             f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
             f"<input type='checkbox' {'checked' if it['done'] == 1 else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
-            f"onchange=\"fetch('/api/pult/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-            f"body:JSON.stringify({{id:{it['id']},state:this.checked?1:0}})}}).then(()=>location.reload())\">"
-            f"<span>{badge}" + (f"<b>{html.escape(it['t'])}</b> — " if it["t"] else "") + f"{it['text']}{extra}{ctrl}</span></label></li>"))
-    # 08.09: по 10–12 пунктов в колонке не читаются. Показываем 5 первых несделанных,
-    # остальные несделанные и все сделанные — свёрнуто.
-    LIMIT = 5
+            f"onchange=\"{done_js}\">"
+            f"<span>{badge}"
+            + (f"<b>{html.escape(it['t'])}</b> — " if it["t"] and it["kind"] == "task" else "")
+            + f"{text_html}{tel}{extra}{ctrl}</span></label></li>"))
+    # 08.09: по 10–12 пунктов в колонке не читаются. Показываем ближайшие,
+    # остальные несделанные и все сделанные — свёрнуто. 21.09: лента стала
+    # общей (задачи + обещания), поэтому показываем семь, а не пять.
+    LIMIT = 7
     done_html = "".join(h for d_, o_, h in lis if d_)
     open_html = [h for d_, o_, h in lis if o_]
     moved_html = "".join(h for d_, o_, h in lis if not d_ and not o_)
@@ -370,29 +452,79 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
         body += f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#4e8a12;font-size:13px'>сделано {done_n} ✓</summary><ol style='list-style:none;padding:0;margin:0'>{done_html}</ol></details>"
     body = body or "<li style='color:#6c6a86'>задач пока нет — Клод положит к началу смены</li>"
     nb = "" if onduty else " <span style='font-size:11px;color:#6c6a86;font-weight:500'>не в смене</span>"
-    ib = _inbox_open(day, who) if day else 0
-    ib_html = (f"<span style='font-size:12.5px;color:#E30613;font-weight:700'>обещаний клиентам: {ib} — ниже в колонке ↓</span>"
-               if ib else "<span style='font-size:12.5px;color:#7DB928;font-weight:700'>обещаний клиентам нет</span>")
-    late = sum(1 for i in items if not i["done"] and _first_time(i["t"]) and cur_ft and _first_time(i["t"]) < cur_ft)
-    late_html = f" · <span style='color:#a35f00;font-weight:700'>{late} пункт(а) без галочки, время прошло</span>" if late else ""
+    open_n = sum(1 for i in items if not i["done"])
+    late = sum(1 for i in items if not i["done"] and i["kind"] == "task"
+               and _first_time(i["t"]) and cur_ft and _first_time(i["t"]) < cur_ft)
+    late_html = (f" · <span style='color:#a35f00;font-weight:700'>{late} задач(и) без галочки, время прошло</span>") if late else ""
     return (f"<div class='wcard' style='border-top-color:{c}'><div class='nm'>{html.escape(who)}{nb} "
             f"<span style='font-size:12px;color:#6c6a86;font-weight:600'>{done_n}/{len(items)}</span></div>"
-            f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · {ib_html}{late_html}</div>"
-            f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol>{_promises_html(day, who, c, items) if day else ''}</div>")
+            f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · "
+            f"<span style='font-size:12.5px;color:#312783;font-weight:700'>{open_n} пунктов на день, "
+            f"из них {tasks_n} задач смены</span>{late_html}</div>"
+            f"<ol class='small' style='list-style:none;padding:0;margin:0'>{body}</ol></div>")
 
 
 HOWTO = ("<div class='card' style='border-left:4px solid #312783;margin:10px 0;font-size:15px'>"
-         "<b>Как пользоваться — три шага.</b> "
-         "<b>1.</b> Сначала — красное <span style='background:#E30613;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:800'>БЕЗ ЭТОГО ВСТАНЕТ</span>: без него работа встаёт или будут проблемы. Дальше — пункт с меткой <span style='background:#312783;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:800'>СЕЙЧАС</span>, она идёт за часами. В колонке видны пять ближайших, остальное свёрнуто ниже. "
-         "<b>2.</b> Сделала — галочка сразу, не вечером. Не успеваешь — «перенести на завтра ↩», пункт сам появится в завтрашней колонке: в твоей, если ты завтра в смене, иначе у дежурной, с пометкой, от кого. "
-         "<b>3.</b> Ниже задач в твоей колонке — <b>«Обещания клиентам»</b>: семьи, которым мы что-то обещали в звонке или переписке. Закрываются сверху вниз раз в час, галочка сразу после действия. "
-         "<details style='margin-top:6px;font-size:13.5px'><summary style='cursor:pointer;color:#6c6a86'>подробнее: время прошло, фон, явка</summary>"
+         "<b>Работай только в своей колонке, сверху вниз.</b> В ней уже всё: задачи смены, "
+         "обещания клиентам и заявки без ответа — одним списком по времени. Выбирать, "
+         "куда пойти дальше, не нужно: следующий пункт — тот, что ниже. "
+         "<b>Сделала — галочка сразу</b>, не вечером. Не успеваешь — «перенести на завтра ↩». "
+         "Списки ниже (заявки, места) — справочные, туда ходить не надо: всё, что оттуда "
+         "нужно сегодня, уже стоит у тебя в колонке. "
+         "<details style='margin-top:6px;font-size:13.5px'><summary style='cursor:pointer;color:#6c6a86'>что значат метки и откуда берутся пункты</summary>"
          "<ul style='margin:6px 0 0;padding-left:20px'>"
-         "<li><b>«время прошло»</b> — пункт со временем, который не сделан и не отмечен. Делается сразу после СЕЙЧАС, не пропускается; если уже бессмыслен — «перенести на завтра».</li>"
-         "<li><b>«фон»</b> — пункты без времени: карта развития после каждого занятия, ответ в чате за 30 минут. Делаются между строками весь день.</li>"
-         "<li><b>Явка</b> — отмечает Лиза вечером по спискам педагогов (все занятия дня, флажок «пробное» у первых). Плитка сверху показывает вчера и сегодня; красная — вчерашний день не закрыт. Дежурная отмечает только первые занятия сразу после них — от этого зависит карта развития и оплата на выходе.</li>"
-         "<li><b>Итог дня</b> складывается сам из галочек и переносов: отдельный отчёт писать не нужно.</li>"
+         "<li><span style='background:#E30613;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:800'>БЕЗ ЭТОГО ВСТАНЕТ</span> — делается первым, до всего остального.</li>"
+         "<li><span style='background:#312783;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:800'>СЕЙЧАС</span> — пункт текущего часа, метка идёт за часами сама.</li>"
+         "<li><span style='background:#fff1d6;color:#a35f00;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:700'>время прошло</span> — не сделан и не отмечен: делается сразу после СЕЙЧАС. Уже не нужен — «перенести на завтра».</li>"
+         "<li><span style='background:#ffe7df;color:#8a1a00;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:700'>обещали клиенту</span> — мы что-то пообещали семье в звонке или переписке. Срок — тот, что назвали клиенту.</li>"
+         "<li><span style='background:#e6f4fb;color:#0c6a94;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:700'>заявка без ответа</span> — семья оставила заявку или написала, и ей ещё никто не ответил. Кладётся в колонку само, раз в час.</li>"
+         "<li><span style='background:#e6f4fb;color:#0c6a94;border-radius:6px;padding:1px 7px;font-size:12px;font-weight:700'>фон</span> — без времени: карта развития после занятия, ответ в чате за 30 минут. Между делом весь день.</li>"
+         "<li><b>Явка</b> — Лиза вечером по спискам педагогов. Дежурная отмечает только первые занятия сразу после них: от этого зависят карта развития и оплата на выходе.</li>"
+         "<li><b>Итог дня</b> складывается сам из галочек: отдельный отчёт писать не нужно.</li>"
          "</ul></details></div>")
+
+
+def _nikogda_ne_zvonili(day: str) -> str:
+    """Ответ на вопрос «а где список тех, кому ещё ни разу не позвонили?».
+
+    21.09.2026, Борис. Таких списков у нас три, и они про разных людей:
+    свежие заявки этого сезона, семьи прошлого года и те, кто ходил и ушёл.
+    Показываем их одной карточкой с числами — чтобы не искать по меню.
+    """
+    n_new = n_old = n_left = None
+    try:
+        from . import zayavki as _z
+        d = _z.collect()
+        n_new = len(d["untouched"])
+    except Exception:
+        pass
+    try:
+        from . import nezvonili as _nz
+        n_old = _nz.spisok(_nz.OKNO_S, _nz.OKNO_PO).get("семей_без_звонка")
+    except Exception:
+        pass
+    try:
+        from . import obzvon as _ob
+        o = _ob.spisok()
+        n_left = o.get("никогда_не_набирали")
+    except Exception:
+        pass
+    def _row(n, title, link, note):
+        num = f"<b style='font-size:22px;color:#312783'>{n}</b>" if n is not None else "<b>—</b>"
+        return (f"<li style='margin:7px 0'>{num} <a href='{link}' style='font-weight:700'>{title}</a>"
+                f"<div style='font-size:12.5px;color:#6c6a86'>{note}</div></li>")
+    return ("<div class='card' style='border-left:4px solid #1DA7E0'>"
+            "<b style='font-size:17px'>Кому мы ещё ни разу не звонили</b>"
+            "<div style='font-size:12.5px;color:#6c6a86;margin:2px 0 6px'>Три разных списка про разных людей. "
+            "Самое горячее из них кладётся в колонки само, раз в час; остальное берут, когда закрыта колонка.</div>"
+            "<ul style='list-style:none;padding:0;margin:0'>"
+            + _row(n_new, "Заявки сезона без единого касания", "/pult#zayavki",
+                   "ни звонка, ни сообщения, ни комментария — блок «Заявки, где мы не доделали» ниже на этой странице")
+            + _row(n_old, "Семьи прошлого учебного года", "/nezvonili",
+                   "оставляли заявку год назад, и мы им так и не позвонили ни разу")
+            + _row(n_left, "Ходили и ушли — обзвон возврата", "/obzvon",
+                   "прошлый сезон и лето; по 10 живых звонков в день, галочка только после разговора")
+            + "</ul></div>")
 
 
 def page(day: str = "", who: str = "") -> str:
@@ -472,6 +604,9 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 если в пункте написано «app.kidsup.ru/nabor», значит работа идёт там, а галочку ставишь здесь.
 Заходить на списки самой, «чтобы проверить, не появилось ли нового», не нужно — что нужно сделать
 сегодня, уже стоит в твоей колонке.</div>
+<h2 style='margin-top:26px'>Справочные списки — для Бориса и на потом</h2>
+<p style='margin:-4px 0 10px;color:#6c6a86;font-size:13.5px'>Админам сюда ходить не нужно: всё, что нужно сделать сегодня, уже стоит в колонке выше.</p>
+{_nikogda_ne_zvonili(day)}
 <div id='inbox'></div>{_inbox_block(day)}
 {zayavki.block()}
 {mesta.block()}
