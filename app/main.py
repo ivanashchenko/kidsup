@@ -2454,12 +2454,33 @@ def api_pult_tasks_set(payload: dict = Body(...)):
 
 @app.post("/api/pult/done", dependencies=AUTH)
 def api_pult_done(payload: dict = Body(...)):
+    """Галочка на деле смены. Если дело про один конкретный телефон, галочка
+    должна за чем-то стоять: разговор от 30 секунд, отправленное сообщение
+    или заметка своими словами. То же правило, что владелец принял 21.09 для
+    обзвона, — теперь на всём пульте."""
     from . import pult
     if "state" in payload:
         state = int(payload.get("state") or 0)
     else:
         state = 1 if payload.get("done", True) else 0
-    return {"ok": pult.mark(int(payload.get("id") or 0), state, str(payload.get("note") or ""))}
+    note = str(payload.get("note") or "").strip()
+    tid = int(payload.get("id") or 0)
+    if state == 1 and len(note) < 12:
+        with db.get_conn() as conn:
+            row = conn.execute("SELECT text FROM pult_tasks WHERE id=?", (tid,)).fetchone()
+        phones = set(re.findall(r"\b[78]?9\d{9}\b", (row["text"] if row else "") or ""))
+        if len(phones) == 1:
+            osn = pult._govorili(phones.pop())
+            if not osn["есть"]:
+                return {"ok": False, "нужно": "разговор или заметка", "почему": osn["почему"]}
+    return {"ok": pult.mark(tid, state, note)}
+
+
+@app.post("/api/pult/nedozvon", dependencies=AUTH)
+def api_pult_nedozvon(payload: dict = Body(...)):
+    """Исход «набрала — не дозвонилась»: {"kind": "task|inbox", "id": 123}."""
+    from . import pult
+    return pult.nedozvon(str(payload.get("kind") or "inbox"), int(payload.get("id") or 0))
 
 
 @app.get("/karta", response_class=HTMLResponse, dependencies=AUTH)
@@ -3354,7 +3375,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-21.24"
+APP_VERSION = "2026-09-21.27"
 
 
 @app.get("/api/net")
@@ -5491,6 +5512,28 @@ def api_plan_inbox_add(payload: dict = Body(...)):
     return {"ok": True}
 
 
+@app.post("/api/plan/inbox/edit", dependencies=AUTH)
+def api_plan_inbox_edit(payload: dict = Body(...)):
+    """Поправить дело: {"id": 1, "text": "...", "tries": 0}. Нужно, когда
+    формулировка устарела или счётчик попыток сбился (например, после проверки)."""
+    iid = int(payload.get("id") or 0)
+    sets, args = [], []
+    if payload.get("text"):
+        sets.append("text=?"); args.append(str(payload["text"])[:400])
+    if "tries" in payload:
+        sets.append("tries=?"); args.append(int(payload.get("tries") or 0))
+    if not sets:
+        raise HTTPException(400, "нужен text и/или tries")
+    with db.get_conn() as conn:
+        _inbox_init(conn)
+        try:
+            conn.execute("ALTER TABLE plan_inbox ADD COLUMN tries INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        conn.execute("UPDATE plan_inbox SET " + ", ".join(sets) + " WHERE id=?", args + [iid])
+    return {"ok": True, "id": iid}
+
+
 @app.post("/api/plan/inbox/move", dependencies=AUTH)
 def api_plan_inbox_move(payload: dict = Body(...)):
     """Передать незакрытые дела другому админу и/или на другой день.
@@ -5656,10 +5699,29 @@ def api_plan_inbox_list(day: str = ""):
 
 @app.post("/api/plan/inbox/done", dependencies=AUTH)
 def api_plan_inbox_done(payload: dict = Body(...)):
+    """Галочка на деле, прилетевшем за день. Правило то же, что у задач смены:
+    если дело про один телефон — нужен разговор, сообщение или заметка."""
+    from . import pult
+    done = bool(payload.get("done", True))
+    iid = int(payload.get("id") or 0)
+    note = str(payload.get("note") or "").strip()
     with db.get_conn() as conn:
         _inbox_init(conn)
-        conn.execute("UPDATE plan_inbox SET done=? WHERE id=?",
-                     (1 if payload.get("done", True) else 0, int(payload.get("id") or 0)))
+        if done and len(note) < 12:
+            row = conn.execute("SELECT text, phone FROM plan_inbox WHERE id=?", (iid,)).fetchone()
+            phone = (row["phone"] if row else "") or ""
+            if not phone and row:
+                found = set(re.findall(r"\b[78]?9\d{9}\b", row["text"] or ""))
+                phone = found.pop() if len(found) == 1 else ""
+            if phone:
+                osn = pult._govorili(phone)
+                if not osn["есть"]:
+                    return {"ok": False, "нужно": "разговор или заметка", "почему": osn["почему"]}
+        if note:
+            conn.execute("UPDATE plan_inbox SET done=?, text=text||' — '||? WHERE id=?",
+                         (1 if done else 0, note[:200], iid))
+        else:
+            conn.execute("UPDATE plan_inbox SET done=? WHERE id=?", (1 if done else 0, iid))
     return {"ok": True}
 
 

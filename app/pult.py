@@ -139,6 +139,78 @@ def mark(task_id: int, state: int, note: str = "") -> bool:
         return cur.rowcount > 0
 
 
+def nedozvon(kind: str, item_id: int) -> dict:
+    """Исход «набрала — не дозвонилась». Дело остаётся, попытка считается.
+
+    21.09.2026. До сегодня у дела был один исход — галочка. Админ звонит,
+    никто не берёт, и дальше два пути: соврать галочкой или оставить строку
+    висеть без следа. Так 19.09 список обзвона закрыли 88 галочками при нуле
+    звонков. Теперь вторая кнопка: попытка записывается, дело остаётся и
+    уходит чуть ниже, на третьей попытке подсказываем перейти в мессенджер.
+    """
+    kind = "task" if str(kind) == "task" else "inbox"
+    with db.get_conn() as conn:
+        _init(conn)
+        _inbox_tries(conn)
+        if kind == "task":
+            row = conn.execute("SELECT note FROM pult_tasks WHERE id=?", (int(item_id),)).fetchone()
+            if not row:
+                return {"ok": False}
+            n = (row["note"] or "").count("не дозвонилась") + 1
+            conn.execute("UPDATE pult_tasks SET note=? WHERE id=?",
+                         (f"{(row['note'] or '').strip()} не дозвонилась".strip()[:200], int(item_id)))
+        else:
+            row = conn.execute("SELECT COALESCE(tries,0) FROM plan_inbox WHERE id=?",
+                               (int(item_id),)).fetchone()
+            if not row:
+                return {"ok": False}
+            n = int(row[0]) + 1
+            conn.execute("UPDATE plan_inbox SET tries=? WHERE id=?", (n, int(item_id)))
+    sovet = ("Третья попытка — дальше телефоном не возьмёшь: напиши в мессенджер "
+             "и поставь статус «2. Нет ответа»." if n >= 3 else
+             "Попытка записана. Дело осталось в колонке — набери ещё раз через час.")
+    return {"ok": True, "попыток": n, "совет": sovet}
+
+
+def _govorili(phone: str, hours: int = 4) -> dict:
+    """Был ли за последние часы разговор от 30 секунд по этому номеру.
+
+    То же правило, что владелец принял для обзвона, только теперь на всём
+    пульте: галочка на деле с одним телефоном должна за чем-то стоять.
+    """
+    from datetime import timedelta
+    from . import autopilot
+    p = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
+    if len(p) < 10:
+        return {"есть": True, "чем": ""}          # дело без телефона не проверяем
+    since = (autopilot._now() - timedelta(hours=hours)).isoformat(timespec="seconds")
+    with db.get_conn() as conn:
+        try:
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(mango_calls)")}
+            sel = "ts, state" + (", secs" if "secs" in cols else "")
+            for row in conn.execute(
+                    f"SELECT {sel} FROM mango_calls WHERE ts >= ? AND substr(phone,-10)=?",
+                    (since, p)):
+                if str(row[1] or "") != "talked":
+                    continue
+                secs = int(row[2] or 0) if "secs" in cols and len(row) > 2 else 0
+                if secs and secs < 30:
+                    continue
+                return {"есть": True, "чем": f"разговор {str(row[0])[11:16]}"
+                                             + (f", {secs} с" if secs else "")}
+        except Exception:
+            return {"есть": True, "чем": ""}      # журнала нет — не мешаем работать
+        try:
+            for row in conn.execute(
+                    "SELECT ts FROM wazzup_outbox WHERE ts >= ? AND substr(phone,-10)=?",
+                    (since, p)):
+                return {"есть": True, "чем": f"написали в {str(row[0])[11:16]}"}
+        except Exception:
+            pass
+    return {"есть": False, "почему": "за последние 4 часа нет ни разговора от 30 секунд, "
+                                     "ни отправленного сообщения по этому номеру"}
+
+
 def kpi(day: str) -> dict:
     with db.get_conn() as conn:
         pays = conn.execute("SELECT COUNT(*), COALESCE(SUM(summa),0) FROM payments WHERE date=? AND summa>0", (day,)).fetchone()
@@ -188,6 +260,11 @@ def kpi(day: str) -> dict:
             if conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE name='pult_tasks'").fetchone()[0] else (0, 0)
     return {"pays": pays[0], "pays_sum": int(pays[1]), "joins_new": joins_new, "lessons": len(lids), "kids": kids,
             "firsts": firsts, "visits": visits, "y_kids": y_kids, "y_visits": y_visits, "inbox": ib[0], "inbox_done": ib[1], "tasks": tk[0], "tasks_done": tk[1]}
+
+
+def _re_phone(text: str | None) -> bool:
+    import re as _re
+    return bool(_re.search(r"\b[78]?9\d{9}\b", text or ""))
 
 
 def _sklon(n: int, one: str, few: str, many: str) -> str:
@@ -321,12 +398,14 @@ def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
     out: list[dict] = []
     for it in items:
         out.append({"kind": "task", "id": it["id"], "t": it["t"], "text": it["text"],
-                    "done": it["done"], "note": it.get("note"), "tag": "", "phone": ""})
+                    "done": it["done"], "note": it.get("note"), "tag": "", "phone": "",
+                    "tries": 0})
     try:
         with db.get_conn() as conn:
+            _inbox_tries(conn)
             rows = conn.execute(
-                "SELECT id, ts, text, phone, source, done FROM plan_inbox "
-                "WHERE day=? AND who=? ORDER BY id", (day, who)).fetchall()
+                "SELECT id, ts, text, phone, source, done, COALESCE(tries,0) AS tries "
+                "FROM plan_inbox WHERE day=? AND who=? ORDER BY id", (day, who)).fetchall()
     except Exception:
         rows = []
     for r in rows:
@@ -334,10 +413,53 @@ def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
         t = _first_time(src) or _first_time((r["ts"] or "")[11:16]) or ""
         out.append({"kind": "inbox", "id": r["id"], "t": t, "text": r["text"] or "",
                     "done": 1 if r["done"] else 0, "note": None,
-                    "tag": "наряд" if src.startswith("наряд") else "обещание",
-                    "phone": "".join(c for c in (r["phone"] or "") if c.isdigit())})
-    out.sort(key=lambda x: (x["t"] or "99:99"))
+                    "tag": "наряд" if src.startswith("наряд")
+                           else "возврат" if src.startswith("возврат") else "обещание",
+                    "phone": "".join(c for c in (r["phone"] or "") if c.isdigit()),
+                    "tries": int(r["tries"] or 0)})
+    for x in out:
+        x["ves"] = _ves(x)
+    out.sort(key=lambda x: (x["ves"], x["t"] or "99:99"))
     return out
+
+
+# Порядок дел — по цене ошибки, а не по времени появления.
+#
+# 21.09.2026, Борис: «Точно ли она самая лучшая?» Нет: хвост заявки
+# сорокадневной давности стоял между «подтвердить пробное на 18:00» и
+# «клиент ждёт ответа три часа» только потому, что попал в колонку в 14:04.
+# Сегодня центр теряет деньги в этом порядке — так и сортируем.
+VES = (
+    (0, r"!!|СРОЧНО|ЖДЁТ ОТВЕТА|ждёт ответа|не может дозвониться|не дозвонился|"
+        r"жалоб|готов(ы)? оплат|вернуть деньги"),
+    (1, r"подтвердить пробн|пробное сегодня|первое занятие|выход с|окно \d|"
+        r"оплат|счёт|счета|ссылк[ау] на оплату|абонемент законч"),
+    (2, r"перезвонить|обещали перезвонить|не дозвонились|набрать|дожим|"
+        r"были, не купили|не пришёл на пробное|заявк"),
+    (3, r"вернуть:|возврат|бывш"),
+    (4, r"статус|закрыть запись|хвост|в crm|карточк|почт|чат групп"),
+)
+
+
+def _ves(it: dict) -> int:
+    """Чем меньше число, тем раньше дело в колонке."""
+    import re as _re
+    txt = (it.get("text") or "")
+    if it.get("tag") == "возврат":
+        return 3
+    for ves, pat in VES:
+        if _re.search(pat, txt, _re.I):
+            return ves
+    return 2 if it.get("phone") else 4
+
+
+def _inbox_tries(conn) -> None:
+    """Колонка попыток дозвона у дел инбокса — появилась 21.09 вместе с
+    исходом «не дозвонилась»."""
+    try:
+        conn.execute("ALTER TABLE plan_inbox ADD COLUMN tries INTEGER DEFAULT 0")
+    except Exception:
+        pass
 
 
 def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str = "") -> str:
@@ -416,17 +538,23 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
         elif it.get("tag") == "наряд":
             badge += ("<span style='display:inline-block;font-size:11px;font-weight:700;color:#0c6a94;background:#e6f4fb;"
                       "border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>заявка без ответа</span>")
+        elif it.get("tag") == "возврат":
+            badge += ("<span style='display:inline-block;font-size:11px;font-weight:700;color:#3f6f0f;background:#eaf5db;"
+                      "border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>вернуть ушедшего</span>")
+        if it.get("tries"):
+            n = int(it["tries"])
+            badge += (f"<span style='display:inline-block;font-size:11px;font-weight:700;color:#8a5a00;background:#fff1d6;"
+                      f"border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>"
+                      f"не дозвонилась {n}&nbsp;раз{'а' if 2 <= n <= 4 else ''}</span>")
         ctrl, tel = "", ""
         if it["kind"] == "task":
             if not it["done"]:
                 ctrl = (f" <a href='#' style='font-size:12px;color:#a35f00;white-space:nowrap' title='Пункт уйдёт в завтрашнюю колонку — твою, если ты завтра в смене, иначе к дежурной' onclick=\""
                         f"fetch('/api/pult/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{it['id']},state:2,note:'перенос'}})}}).then(()=>location.reload());return false\">перенести на завтра ↩</a>")
-            done_js = (f"fetch('/api/pult/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-                       f"body:JSON.stringify({{id:{it['id']},state:this.checked?1:0}})}}).then(()=>location.reload())")
+            done_js = f"pultDone(this,'task',{it['id']})"
             text_html = it["text"]
         else:
-            done_js = (f"fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-                       f"body:JSON.stringify({{id:{it['id']},done:this.checked}})}}).then(()=>location.reload())")
+            done_js = f"pultDone(this,'inbox',{it['id']})"
             if not it["done"] and day:
                 # Перенести можно было только задачу смены. Пункт инбокса
                 # оставалось либо закрыть галочкой (соврав), либо тащить до
@@ -458,6 +586,12 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
                     tel += (f" <span style='display:inline-block;background:#eaf5db;color:#3f6f0f;border-radius:6px;"
                             f"padding:1px 7px;font-size:11.5px;font-weight:700;white-space:nowrap'>"
                             f"оплата {d_[8:10]}.{d_[5:7]} · {summa:,} ₽</span>".replace(",", " "))
+        import re as _re2
+        nums = set(_re2.findall(r"\b[78]?9\d{9}\b", (it.get("text") or "") + " " + (it.get("phone") or "")))
+        if not it["done"] and len(nums) == 1:
+            ctrl = (f" <a href='#' style='font-size:12px;color:#8a5a00;white-space:nowrap' "
+                    f"title='Набрала, никто не взял — дело останется, попытка запишется' onclick=\""
+                    f"pultMiss('{it['kind']}',{it['id']});return false\">не дозвонилась ☎</a>") + ctrl
         lis.append((it["done"] == 1, it["done"] == 0,
             f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
             f"<input type='checkbox' {'checked' if it['done'] == 1 else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
@@ -472,10 +606,45 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     done_html = "".join(h for d_, o_, h in lis if d_)
     open_html = [h for d_, o_, h in lis if o_]
     moved_html = "".join(h for d_, o_, h in lis if not d_ and not o_)
+    # Черта смены. 21.09 у Ани к обеду висело 33 дела на четыре часа работы —
+    # это не план, а гора. Считаем по-честному: звонок с записью в CRM — шесть
+    # минут, дело без телефона — три. Всё, что за чертой, до конца смены не
+    # делается, и врать об этом не надо: пусть человек видит границу и решает,
+    # что перенести, а не тонет.
+    uspeem = None
+    if day == today() and now_hm and onduty:
+        # На дела уходит не всё время смены: входящие звонки, встреча детей,
+        # родители на ресепшене съедают около сорока процентов часа. 21.09 без
+        # этой поправки выходило, что 33 дела «успеваются», — а по факту за
+        # день закрывалось втрое меньше.
+        left = int(max(0, (20 * 60) - (int(now_hm[:2]) * 60 + int(now_hm[3:]))) * 0.6)
+        cena = [6 if i.get("phone") or _re_phone(i.get("text")) else 3
+                for i in items if not i["done"]]
+        s_, uspeem = 0, 0
+        for c_ in cena:
+            if s_ + c_ > left:
+                break
+            s_ += c_
+            uspeem += 1
     body = "".join(open_html[:LIMIT])
     if len(open_html) > LIMIT:
-        body += (f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>ещё {len(open_html) - LIMIT} на день — после этих семи</summary>"
-                 f"<ol style='list-style:none;padding:0;margin:0'>{''.join(open_html[LIMIT:])}</ol></details>")
+        hvost = open_html[LIMIT:]
+        if uspeem is not None and LIMIT <= uspeem < len(open_html):
+            n_do = uspeem - LIMIT
+            body += (f"<details open style='margin:6px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>"
+                     f"ещё {n_do} успеваешь до конца смены — по шесть минут на звонок</summary>"
+                     f"<ol style='list-style:none;padding:0;margin:0'>{''.join(hvost[:n_do])}</ol></details>")
+            hvost = hvost[n_do:]
+            if hvost:
+                body += (f"<div style='margin:10px 0 4px;border-top:2px dashed #E30613;padding-top:6px;"
+                         f"font-size:12.5px;color:#E30613;font-weight:700'>Ниже черты: {len(hvost)} — "
+                         f"до 20:00 при обычной скорости не успеть</div>"
+                         f"<details style='margin:2px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>"
+                         f"показать и решить, что перенести</summary>"
+                         f"<ol style='list-style:none;padding:0;margin:0'>{''.join(hvost)}</ol></details>")
+        else:
+            body += (f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>ещё {len(hvost)} на день — после этих семи</summary>"
+                     f"<ol style='list-style:none;padding:0;margin:0'>{''.join(hvost)}</ol></details>")
     if moved_html:
         body += f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#a35f00;font-size:13px'>перенесено на завтра</summary><ol style='list-style:none;padding:0;margin:0'>{moved_html}</ol></details>"
     if done_html:
@@ -643,7 +812,34 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 <div id='inbox'></div>{_inbox_block(day)}
 {zayavki.block()}
 {mesta.block()}
-<p style='color:#6c6a86;font-size:12px'>Пульт собран сервером {now_msk.strftime('%H:%M')} МСК · версия {ver}</p><script>(function(){{var off={int(now_msk.utcoffset().total_seconds())}*1000;function t(){{var d=new Date(Date.now()+off);document.getElementById('clock').textContent=('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)}};t();setInterval(t,15000)}})();</script>
+<p style='color:#6c6a86;font-size:12px'>Пульт собран сервером {now_msk.strftime('%H:%M')} МСК · версия {ver}</p><script>
+// 21.09. У дела два исхода, а не один. Галочка — «сделала», и если дело про
+// один телефон, сервер проверяет, стоит ли за ней разговор от 30 секунд или
+// отправленное сообщение; нет — спрашиваем словами, что произошло. Вторая
+// кнопка — «не дозвонилась»: попытка записывается, дело остаётся.
+function pultDone(box, kind, id, note){{
+  var url = kind === 'task' ? '/api/pult/done' : '/api/plan/inbox/done';
+  var body = kind === 'task' ? {{id:id, state: box.checked ? 1 : 0, note: note || ''}}
+                             : {{id:id, done: box.checked, note: note || ''}};
+  fetch(url, {{method:'POST', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify(body)}})
+   .then(function(r){{ return r.json(); }})
+   .then(function(res){{
+     if (res && res.ok === false) {{
+       var t = prompt('По этому номеру за последние 4 часа нет ни разговора от 30 секунд, ни отправленного сообщения.\n\nЕсли дело всё-таки сделано — напиши одной фразой, как:\nнапример «говорила с личного», «ответила в WhatsApp», «мама сама пришла».\nЕсли не дозвонилась — нажми «не дозвонилась ☎», строка останется.', '');
+       if (t && t.trim().length >= 12) {{ pultDone(box, kind, id, t.trim()); return; }}
+       box.checked = false; return;
+     }}
+     location.reload();
+   }})
+   .catch(function(){{ box.checked = !box.checked; alert('Не сохранилось, попробуйте ещё раз'); }});
+}}
+function pultMiss(kind, id){{
+  fetch('/api/pult/nedozvon', {{method:'POST', headers:{{'Content-Type':'application/json'}},
+        body: JSON.stringify({{kind:kind, id:id}})}})
+   .then(function(r){{ return r.json(); }})
+   .then(function(res){{ if (res && res.совет) {{ alert(res.совет); }} location.reload(); }});
+}}
+</script><script>(function(){{var off={int(now_msk.utcoffset().total_seconds())}*1000;function t(){{var d=new Date(Date.now()+off);document.getElementById('clock').textContent=('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)}};t();setInterval(t,15000)}})();</script>
 </div></body></html>"""
 
 
