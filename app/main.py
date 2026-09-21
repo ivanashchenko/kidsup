@@ -3260,7 +3260,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-21.03"
+APP_VERSION = "2026-09-21.04"
 
 
 @app.get("/api/net")
@@ -7788,6 +7788,32 @@ def api_rassylka_tochechnaya(payload: dict = Body(...)):
     return aychat.send(payload.get("items") or [], str(payload.get("kind") or "razovoe"),
                        bool(payload.get("dry_run", True)), bool(payload.get("sms")),
                        int(payload.get("limit") or 30))
+
+
+@app.get("/api/mango/diag", dependencies=AUTH)
+def api_mango_diag(minutes: int = 120):
+    """Почему молчит журнал звонков: баланс АТС и сырые ответы stats/request →
+    stats/result. 21.09 выгрузка не приходила 13 часов подряд, вебхуков за
+    утро — ноль; за сутки до этого по той же причине (нет денег) лёг хостинг."""
+    import time as _time
+    from . import mango as _mango
+    out = {"баланс": _mango.balance()}
+    now = int(_time.time())
+    try:
+        req = _mango._call("stats/request", {
+            "date_from": now - int(minutes) * 60, "date_to": now,
+            "fields": "records,start,finish,answer,from_extension,from_number,"
+                      "to_extension,to_number,disconnect_reason"})
+        out["request"] = {"http": req.status_code, "text": req.text[:300]}
+        key = (req.json() or {}).get("key") if req.status_code == 200 else None
+        if key:
+            _time.sleep(6)
+            res = _mango._call("stats/result", {"key": key})
+            out["result"] = {"http": res.status_code, "bytes": len(res.text or ""),
+                             "text": (res.text or "")[:300]}
+    except Exception as e:  # noqa: BLE001
+        out["ошибка"] = str(e)[:300]
+    return out
 
 
 @app.get("/api/mesta/sostav", dependencies=AUTH)
