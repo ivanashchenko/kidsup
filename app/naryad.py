@@ -98,6 +98,28 @@ def _zhdet(minut) -> str:
     return "почти сутки" if d < 1 else ("больше суток" if d == 1 else f"{d} дня и дольше")
 
 
+# Имя, годное для разговора. В карточках встречается служебный мусор
+# («Звонок от…», сам номер вместо имени) — админ читает такую строку и не
+# понимает, к кому обращаться (22.09.2026, аудит).
+MUSOR_IMYA = re.compile(r"^\s*(звонок|заявка|лид|заказ|клиент|тест)\b|^\+?\d[\d\s\-()]*$", re.I)
+# Служебные группы CRM — это не то, чего хочет семья, а наш внутренний буфер.
+SLUZHEBNOE = re.compile(r"буфер|лист ожидан|без группы|нераспредел|архив|общая|прочее", re.I)
+
+
+def _imya(nm, phone: str = "") -> str:
+    n = str(nm or "").strip()
+    if not n or MUSOR_IMYA.match(n):
+        return "имя не заполнено — спросить в разговоре"
+    return n[:40]
+
+
+def _hochet(want: str) -> str:
+    """Чего хочет семья — без служебных групп и без пустого «, ,»."""
+    chasti = [c.strip() for c in str(want or "").split("+") if c.strip()]
+    chasti = [c for c in chasti if not SLUZHEBNOE.search(c)]
+    return " + ".join(chasti)[:60]
+
+
 def _p10(x) -> str:
     d = "".join(c for c in str(x or "") if c.isdigit())
     return d[-10:] if len(d) >= 10 else ""
@@ -151,17 +173,21 @@ def sobrat(day: str = "") -> list[dict]:
         days = f.get("days")
         if f["kind"] == "не доделали":
             _add("звонок", f["phone"], nm,
-                 f"Заявка без единого касания: {nm} {f['phone']}, {want}, {days} дн. "
+                 f"Заявка без единого касания: {_imya(nm)}"
+                 + (f", {_hochet(want)}" if _hochet(want) else "")
+                 + f", {days} дн. "
                  f"Позвонить первым делом. Не дозвонилась — статус «2. Нет ответа», "
                  f"сообщение в мессенджер и СМС.")
         elif f["kind"] in ("писали", "звонили"):
             _add("звонок", f["phone"], nm,
-                 f"Заявка, где не доделали: {nm} {f['phone']}, {want}, {days} дн — "
+                 f"Заявка, где не доделали: {_imya(nm)}"
+                 + (f", {_hochet(want)}" if _hochet(want) else "")
+                 + f", {days} дн — "
                  f"{f.get('why', '')[:60]}. Набрать голосом; не дозвонилась — статус "
                  f"«2. Нет ответа» и сообщение.")
         elif f["kind"] in ("говорили", "работает", "не клиент"):
             _add("статус", f["phone"], nm,
-                 f"Заявка висит «новой», хотя итог известен: {nm} {f['phone']}, {days} дн — "
+                 f"Заявка висит «новой», хотя итог известен: {_imya(nm)}, {days} дн — "
                  f"{f.get('why', '')[:60]}. Поставить статус записи в CRM (звонить не нужно).")
 
     # 2. Сырые списки — то, что проверка ещё не разобрала.
@@ -172,16 +198,18 @@ def sobrat(day: str = "") -> list[dict]:
         raw = {"untouched": [], "tried": [], "talked": [], "tail": []}
     for r in raw["untouched"] + raw["tried"]:
         _add("звонок", r["phone"], r["name"],
-             f"Заявка сезона без результата: {r['name']} {r['phone']}, "
-             f"{(r['comment'] or r['class'])[:50]}, {r['days']} дн. Позвонить.")
+             f"Заявка сезона без результата: {_imya(r['name'])}"
+             + (f", {_hochet(r['comment'] or r['class'])}" if _hochet(r['comment'] or r['class']) else "")
+             + f", {r['days']} дн. Позвонить.")
     for r in raw["talked"]:
         _add("звонок", r["phone"], r["name"],
-             f"С семьёй говорили, решения нет: {r['name']} {r['phone']}, "
-             f"{(r['comment'] or r['class'])[:50]}, {r['days']} дн. Дожать до записи "
+             f"С семьёй говорили, решения нет: {_imya(r['name'])}"
+             + (f", {_hochet(r['comment'] or r['class'])}" if _hochet(r['comment'] or r['class']) else "")
+             + f", {r['days']} дн. Дожать до записи "
              f"или отказа и поставить статус.")
     for r in raw["tail"]:
         _add("хвост", r["phone"], r["name"],
-             f"Хвост: заявка {r['name']} {r['phone']} висит {r['days']} дн, "
+             f"Хвост: заявка {_imya(r['name'])} висит {r['days']} дн, "
              f"семья записана в другую группу. Закрыть запись в CRM.")
 
     # 3. Записались на пробное и не пришли — самые тёплые из холодных.
@@ -189,7 +217,7 @@ def sobrat(day: str = "") -> list[dict]:
         from .main import api_mesta_voronka          # считается там же, где страница
         for r in (api_mesta_voronka().get("списки") or {}).get("не пришёл на пробное", []):
             _add("звонок", r.get("phone"), r.get("name"),
-                 f"Не пришёл на пробное: {r.get('name')} {r.get('phone')}, "
+                 f"Не пришёл на пробное: {_imya(r.get('name'))}, "
                  f"{(r.get('group') or '')[:45]}. Позвонить и перезаписать на ближайшее.")
     except Exception as e:  # noqa: BLE001
         log.warning("наряд: воронка не собралась: %s", e)
@@ -218,7 +246,7 @@ def sobrat(day: str = "") -> list[dict]:
                 continue
             nm = r.get("name") or r.get("phone")
             _add("ответ", r["phone"], nm,
-                 f"Клиент ждёт ответа {_zhdet(r.get('wait_min'))}: {nm} — "
+                 f"Клиент ждёт ответа {_zhdet(r.get('wait_min'))}: {_imya(nm)} — "
                  f"«{t[:90]}». Ответить в мессенджере и поставить следующий шаг.")
     except Exception as e:  # noqa: BLE001
         log.warning("наряд: ждущие ответа не собрались: %s", e)

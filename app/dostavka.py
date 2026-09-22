@@ -167,9 +167,13 @@ def sms_text(kind: str, note: str = "") -> str:
 def chase(dry: bool = True, limit: int = 25) -> dict:
     """Догнать СМС то, что не дошло. Возвращает, что сделано."""
     from . import mango
-    hour = _now().hour
-    if not (SMS_FROM <= hour < SMS_TO):
-        return {"пропуск": f"сейчас {hour}:00, вне окна 9-20"}
+    _n = _now()
+    hour = _n.hour
+    # То же правило выходных, что и в wazzup.guard: в субботу и воскресенье
+    # первое сообщение не раньше 10:00 (22.09.2026, аудит).
+    s_from = 10 if _n.weekday() >= 5 else SMS_FROM
+    if not (s_from <= hour < SMS_TO):
+        return {"пропуск": f"сейчас {hour}:00, вне окна {s_from}-{SMS_TO}"}
     if db.get_setting("sms_on", "0") != "1":
         return {"пропуск": "СМС выключены настройкой sms_on"}
     # Страховка от мёртвого вебхука: статусы доставки пишет только вебхук

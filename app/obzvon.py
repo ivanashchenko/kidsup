@@ -207,14 +207,40 @@ def otmetit(uid: int, done: bool = True, who: str = "", note: str = "") -> dict:
                         "подсказка": "Позвони и поговори — строка закроется сама. "
                                      "Если закрываешь без звонка (семья написала в чате, "
                                      "переехали, ошиблись номером) — напиши это словами в заметке."}
-            conn.execute(
-                "INSERT OR REPLACE INTO obzvon_done (uid, ts, who, note) VALUES (?,?,?,?)",
-                (int(uid), _now().isoformat(timespec="minutes"), who[:20],
-                 (note or osn.get("чем", ""))[:200]))
+            # 22.09.2026, аудит. Отметка писалась по карточке ребёнка, а
+            # строка списка строится по СЕМЬЕ: после галочки та же семья
+            # возвращалась в «Кому звонить» под именем второго ребёнка, и
+            # админ звонила во второй раз. Отмечаем всех детей на номере.
+            rodnya = _rodnya(conn, int(uid))
+            ts = _now().isoformat(timespec="minutes")
+            osnov = (note or osn.get("чем", ""))[:200]
+            for u in rodnya:
+                conn.execute(
+                    "INSERT OR REPLACE INTO obzvon_done (uid, ts, who, note) VALUES (?,?,?,?)",
+                    (u, ts, who[:20], osnov))
             return {"ok": True, "uid": int(uid), "done": True,
+                    "семья": sorted(rodnya),
                     "основание": osn.get("чем") or f"заметка: {note[:60]}"}
-        conn.execute("DELETE FROM obzvon_done WHERE uid=?", (int(uid),))
+        for u in _rodnya(conn, int(uid)):
+            conn.execute("DELETE FROM obzvon_done WHERE uid=?", (u,))
     return {"ok": True, "uid": int(uid), "done": False}
+
+
+def _rodnya(conn, uid: int) -> set[int]:
+    """Все карточки на том же телефоне — это одна семья и один звонок."""
+    svoi = {int(uid)}
+    try:
+        row = conn.execute("SELECT phone FROM users WHERE id=?", (int(uid),)).fetchone()
+        p = _p10(row[0] if row else "")
+        if not p:
+            return svoi
+        for r in conn.execute(
+                "SELECT id FROM users WHERE substr(replace(replace(replace("
+                "COALESCE(phone,''),'+',''),'-',''),' ',''),-10)=?", (p,)):
+            svoi.add(int(r[0]))
+    except Exception:
+        pass
+    return svoi
 
 
 def audit(vernut: bool = False, days: int = 7) -> dict:
@@ -303,14 +329,25 @@ def spisok() -> dict:
                     if not p:
                         continue
                     day = str(ts)[:10]
-                    govoril = str(state or "") == "talked"
+                    st_ = str(state or "")
+                    govoril = st_ == "talked"
                     ish = str(direction).startswith(("out", "исх"))
                     if day == today_s:
-                        segodnya.setdefault(p, []).append({
-                            "время": str(ts)[11:16],
-                            "что": ("поговорили" if govoril
-                                    else "набирали — не взяли" if ish
-                                    else "звонили нам — не сняли")})
+                        # 22.09.2026, аудит: сброшенный звонок (сняли и сразу
+                        # положили, state='short') показывался админу как
+                        # «набирали — не взяли». Это разные вещи: трубку сняли,
+                        # говорить отказались — перезванивать через час
+                        # бессмысленно, а по «не взяли» как раз надо.
+                        if govoril:
+                            chto = "поговорили"
+                        elif st_ == "short":
+                            chto = "сняли и сбросили" if ish else "звонили нам, разговор сорвался"
+                        elif ish:
+                            chto = "набирали — не взяли"
+                        else:
+                            chto = "звонили нам — не сняли"
+                        segodnya.setdefault(p, []).append(
+                            {"время": str(ts)[11:16], "что": chto})
                     if day < NABOR_S:
                         # разговор до набора — не контакт по этому поводу,
                         # но админу полезно знать, что человек уже общался

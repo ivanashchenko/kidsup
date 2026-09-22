@@ -22,9 +22,12 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 from datetime import datetime
 
 from . import db
+
+log = logging.getLogger("kidsup.pult")
 
 SHORT = {"Анна Инкина": "Аня", "Елена Кузнецова": "Лена", "Ирина Головина": "Ира"}
 COLOR = {"Лена": "#7DB928", "Аня": "#F59C00", "Ира": "#E30613", "Лиза": "#1DA7E0", "Борис": "#312783"}
@@ -91,14 +94,27 @@ def set_tasks(day: str, who: str, items: list[dict], replace: bool = True) -> in
         else:
             base = conn.execute("SELECT COALESCE(MAX(ord),0) FROM pult_tasks WHERE day=? AND who=?",
                                 (day, who)).fetchone()[0]
-        n = 0
+        n, chuzhie = 0, []
         for i, it in enumerate(items, 1):
             text = str(it.get("text") or "").strip()
             if not text:
                 continue
+            # 22.09.2026, аудит. Решение владельца от 20.09: у Лизы только
+            # закрытие занятий (явка, «проведено») и долги. Помешать поставить
+            # ей что-то ещё было нечему — и на 22.09 у неё в колонке лежали
+            # две чужие задачи. Такие не записываем и называем вслух, чтобы
+            # тот, кто их ставил, переадресовал.
+            if who == "Лиза":
+                from .pult_proverka import LIZA_MOZHNO
+                if not LIZA_MOZHNO.search(text):
+                    chuzhie.append(text[:70])
+                    continue
             conn.execute("INSERT INTO pult_tasks (day, who, t, text, done, ord, ts) VALUES (?,?,?,?,?,?,?)",
                          (day, who, str(it.get("t") or ""), text, 1 if text in done_texts else 0, base + i, now))
             n += 1
+        if chuzhie:
+            log.warning("set_tasks: Лизе не поставлено %d задач вне её роли "
+                        "(с 20.09 у неё только явка и долги): %s", len(chuzhie), chuzhie)
         return n
 
 
@@ -120,8 +136,15 @@ def mark(task_id: int, state: int, note: str = "") -> bool:
     with db.get_conn() as conn:
         _init(conn)
         row = conn.execute("SELECT day, who, t, text FROM pult_tasks WHERE id=?", (int(task_id),)).fetchone()
-        cur = conn.execute("UPDATE pult_tasks SET done=?, note=? WHERE id=?",
-                           (int(state), (note or "")[:200], int(task_id)))
+        # 22.09.2026, аудит: заметка перетиралась пустой при каждом нажатии
+        # галочки, и счётчик попыток дозвона («не дозвонилась ☎») обнулялся.
+        # Пустую заметку не пишем — состояние и комментарий живут отдельно.
+        if (note or "").strip():
+            cur = conn.execute("UPDATE pult_tasks SET done=?, note=? WHERE id=?",
+                               (int(state), (note or "")[:200], int(task_id)))
+        else:
+            cur = conn.execute("UPDATE pult_tasks SET done=? WHERE id=?",
+                               (int(state), int(task_id)))
         if int(state) == 2 and row:
             nxt = (date.fromisoformat(row["day"]) + timedelta(days=1)).isoformat()
             who, frm = row["who"], ""
@@ -395,7 +418,7 @@ def _promises_html(day: str, who: str, color: str, items: list[dict] | None = No
         short = txt if len(txt) <= 150 else f"{txt[:150]}<details style='display:inline'><summary style='display:inline;cursor:pointer;color:#6c6a86'> …</summary> {txt[150:]}</details>"
         lis.append(f"<li style='margin:6px 0;{'opacity:.45;text-decoration:line-through' if r['done'] else ''}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
                    f"<input type='checkbox' {'checked' if r['done'] else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
-                   f"onchange=\"fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{r['id']},done:this.checked}})}}).then(()=>location.reload())\">"
+                   f"onchange=\"inboxDone(this,{r['id']})\">"
                    f"<span><span style='color:#6c6a86;font-size:11.5px'>{html.escape((r['source'] or '')[:22])}</span> {short}{tel}</span></label></li>")
     open_n = sum(1 for r in rows if not r["done"])
     open_li = [h for r, h in zip(rows, lis) if not r["done"]]
@@ -425,9 +448,12 @@ def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
     """
     out: list[dict] = []
     for it in items:
+        # Попытки дозвона у задачи смены жили только в заметке, а в ленту
+        # приходил жёсткий ноль — кнопка «не дозвонилась ☎» нажималась, но
+        # на странице ничего не менялось (22.09, аудит).
         out.append({"kind": "task", "id": it["id"], "t": it["t"], "text": it["text"],
                     "done": it["done"], "note": it.get("note"), "tag": "", "phone": "",
-                    "tries": 0})
+                    "tries": (it.get("note") or "").lower().count("не дозвонил")})
     try:
         with db.get_conn() as conn:
             _inbox_tries(conn)
@@ -827,6 +853,23 @@ def _nikogda_ne_zvonili(day: str) -> str:
             + "</ul></div>")
 
 
+def _safe(fn, *a, imya: str = "", **kw) -> str:
+    """Блок страницы, который не роняет страницу.
+
+    22.09.2026, аудит: справочные блоки пульта звались без защиты, и падение
+    одного из них — воронки, заявок, мест — уносило весь пульт вместе с
+    колонками админов. Соседние блоки так уже умеют; теперь умеют все.
+    """
+    try:
+        return fn(*a, **kw) or ""
+    except Exception:
+        log.exception("блок пульта «%s» упал — страницу показываем без него",
+                      imya or getattr(fn, "__name__", "?"))
+        return (f"<div class='card' style='border-left:4px solid #E30613'>"
+                f"<b>Блок «{html.escape(imya or '?')}» не собрался.</b> "
+                f"Остальной пульт работает. Клод увидит это в логе и починит.</div>")
+
+
 def page(day: str = "", who: str = "") -> str:
     from . import zayavki, mesta
     from .main import _inbox_block
@@ -915,10 +958,10 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 <b>Справочное:</b> <a href='/base/{slug}'>план и списки семей</a> · <a href='/base/gruppy_reshenia'>куда зовём, какие группы сливаем</a> · <a href='/base/skripty_v3'>скрипты</a> · <a href='/base'>вся база</a></div>
 <h2 style='margin-top:26px'>Справочные списки — для Бориса и на потом</h2>
 <p style='margin:-4px 0 10px;color:#6c6a86;font-size:13.5px'>Админам сюда ходить не нужно: всё, что нужно сделать сегодня, уже стоит в колонке выше.</p>
-{_nikogda_ne_zvonili(day)}
-<div id='inbox'></div>{_inbox_block(day)}
-{zayavki.block()}
-{mesta.block()}
+{_safe(_nikogda_ne_zvonili, day, imya='кому не звонили')}
+<div id='inbox'></div>{_safe(_inbox_block, day, imya='обещания за день')}
+{_safe(zayavki.block, imya='заявки сезона')}
+{_safe(mesta.block, imya='свободные места')}
 <p style='color:#6c6a86;font-size:12px'>Пульт собран сервером {now_msk.strftime('%H:%M')} МСК · версия {ver}</p><script>
 // 21.09. У дела два исхода, а не один. Галочка — «сделала», и если дело про
 // один телефон, сервер проверяет, стоит ли за ней разговор от 30 секунд или
@@ -971,7 +1014,7 @@ def promises_page(day: str, who: str) -> str:
         body = f"<b>{head}</b>" + (f"<details style='display:inline'><summary style='display:inline;cursor:pointer;color:#6c6a86'> …</summary><span> {tail}</span></details>" if tail else "")
         lis.append(f"<li style='margin:10px 0;padding:10px 12px;background:#fff;border:1px solid #e4e2f0;border-radius:12px;{'opacity:.45;text-decoration:line-through' if r['done'] else ''}'>"
                    f"<label style='display:flex;gap:10px;align-items:flex-start'><input type='checkbox' {'checked' if r['done'] else ''} style='width:22px;height:22px;flex:none;margin-top:2px' "
-                   f"onchange=\"fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{r['id']},done:this.checked}})}}).then(()=>location.reload())\">"
+                   f"onchange=\"inboxDone(this,{r['id']})\">"
                    f"<span><span style='color:#6c6a86;font-size:12px'>{html.escape((r['source'] or '')[:24])} · {html.escape((r['ts'] or '')[11:16])}</span><br>{body}{links}</span></label></li>")
     open_n = sum(1 for r in rows if not r["done"])
     status = (f"Не закрыто: <b style='color:#E30613'>{open_n}</b>. Сверху вниз, галочка сразу после действия." if open_n
@@ -983,4 +1026,11 @@ def promises_page(day: str, who: str) -> str:
 h1{{font-size:20px;margin:0 0 4px;color:{c}}}p{{margin:0 0 10px;color:#6c6a86;font-size:14px}}ul{{list-style:none;padding:0;margin:0}}a{{text-decoration:none}}</style></head><body><div class='wrap'>
 <h1>{html.escape(who)}: обещания клиентам · {day[8:]}.{day[5:7]}</h1>
 <p>{status} · <a href='/pult?who={html.escape(who)}' style='color:{c}'>моя колонка на пульте</a></p>
-<ul>{body_ul}</ul></div></body></html>"""
+<ul>{body_ul}</ul></div>
+<script>function inboxDone(b,i){{
+  fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+        body:JSON.stringify({{id:i,done:b.checked}})}})
+   .then(function(r){{if(!r.ok)throw 0;return r.json()}})
+   .then(function(x){{if(x&&x.ok===false){{b.checked=!b.checked;alert('Не сохранилось');return}}location.reload()}})
+   .catch(function(){{b.checked=!b.checked;alert('Не сохранилось — проверьте связь и нажмите ещё раз')}});
+}}</script></body></html>"""

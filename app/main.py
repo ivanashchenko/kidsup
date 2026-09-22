@@ -2439,6 +2439,22 @@ def api_pult_tasks(day: str = ""):
     return {"day": d, "duty": pult.duty(d), "tasks": pult.tasks(d), "kpi": pult.kpi(d)}
 
 
+@app.get("/api/hvost", dependencies=AUTH)
+def api_hvost(dry: int = 1, days: int = 7):
+    """Разбор незакрытых дел прошлых дней: что протухло, что живое.
+    dry=1 — только показать. Разбирать — POST /api/hvost/razobrat."""
+    from . import hvost
+    return hvost.razobrat(dry=bool(int(dry)), den_starosti=int(days))
+
+
+@app.post("/api/hvost/razobrat", dependencies=OWNER_AUTH)
+def api_hvost_razobrat(payload: dict = Body(default={})):
+    """Сделать разбор: протухшее закрыть с пометкой, живое перенести на
+    сегодня. Только владелец — это массовая правка списка дел."""
+    from . import hvost
+    return hvost.razobrat(dry=False, den_starosti=int(payload.get("days") or 7))
+
+
 @app.get("/api/pult/proverka", dependencies=AUTH)
 def api_pult_proverka(day: str = ""):
     """Самопроверка пульта: дубли на одну семью, пустышки, строки не тому
@@ -3165,13 +3181,20 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
         # отдельный блок под колонками, и без него счёт работы не сходится.
         try:
             with db.get_conn() as _c:
+                # 22.09.2026, аудит: здесь done считался как truthy, а
+                # done=2 означает «перенесено на завтра» — перенос попадал
+                # в «сделано». И колонок было жёстко четыре: работа Иры на
+                # этой странице не появлялась никогда.
                 inb = {w: (n, d) for w, n, d in _c.execute(
-                    "SELECT who, COUNT(*), SUM(CASE WHEN done THEN 1 ELSE 0 END) "
+                    "SELECT who, COUNT(*), SUM(CASE WHEN done=1 THEN 1 ELSE 0 END) "
                     "FROM plan_inbox WHERE day=? GROUP BY who", (dd,)).fetchall()}
         except Exception:
             inb = {}
         rows, by = [], []
-        for who in ("Аня", "Лена", "Лиза", "Борис"):
+        kolonki = list(_pult.duty(dd)) + [w for w in ("Лиза", "Борис")
+                                          if w not in _pult.duty(dd)]
+        kolonki += [w for w in (set(live) | set(inb)) if w not in kolonki]
+        for who in kolonki:
             rs = [{"t": x["t"], "text": x["text"], "done": x["done"]}
                   for x in sorted(live.get(who, []), key=lambda x: x["t"])]
             if not rs:                       # день ещё не собран — показываем план
@@ -3186,7 +3209,7 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
         pult_days.append({"title": f"{WD[dt.weekday()]} {dt.day:02d}.{dt.month:02d}",
                           "n": len(rows), "by_who": by,
                           "inbox": sum(n for n, _ in inb.values()),
-                          "done": sum(1 for r in rows if r.get("done"))})
+                          "done": sum(1 for r in rows if r.get("done") == 1)})
     return render(request, "plan311.html", active="plan311", d=d, k=k, kartina=kartina,
                   istochniki=istochniki, dengi=dengi, pult_days=pult_days)
 
@@ -3421,7 +3444,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-22.13"
+APP_VERSION = "2026-09-22.18"
 
 
 @app.get("/api/net")
@@ -5781,6 +5804,9 @@ def api_plan_inbox_done(payload: dict = Body(...)):
     return {"ok": True}
 
 
+INBOX_DONE_JS = "<script>function inboxDone(b,i){fetch('/api/plan/inbox/done',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:i,done:b.checked})}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(x){if(x&&x.ok===false){b.checked=!b.checked;alert('Не сохранилось');return}location.reload()}).catch(function(){b.checked=!b.checked;alert('Не сохранилось — проверьте связь и нажмите ещё раз')})}</script>"
+
+
 def _pult_tel(phone) -> str:
     """Номер для ссылки tel: — всегда с кодом страны (см. pult._tel)."""
     from .pult import _tel
@@ -5799,7 +5825,7 @@ def _inbox_block(day: str) -> str:
         c = col.get(r["who"], "#6c6a86")
         items.append(
             f"<li data-id='{r['id']}' style='margin:6px 0;{'opacity:.45;text-decoration:line-through' if r['done'] else ''}'>"
-            f"<input type='checkbox' {'checked' if r['done'] else ''} onchange=\"fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{id:{r['id']},done:this.checked}})}}).then(()=>location.reload())\"> "
+            f"<input type='checkbox' {'checked' if r['done'] else ''} onchange=\"inboxDone(this,{r['id']})\"> "
             f"<span style='display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:800;color:#fff;background:{c}'>{html.escape(r['who'])}</span> "
             f"<span style='color:#6c6a86;font-size:12px'>{html.escape(r['ts'][11:16])}</span> "
             + (lambda tx: (f"{html.escape(tx[:140])}<details style='display:inline'><summary style='display:inline;cursor:pointer;color:#6c6a86'> …</summary> {html.escape(tx[140:])}</details>" if len(tx) > 160 else html.escape(tx)))(r['text'] or "")
@@ -5811,9 +5837,14 @@ def _inbox_block(day: str) -> str:
         if not r["done"]:
             by_who[r["who"]] = by_who.get(r["who"], 0) + 1
     heads = " · ".join(f"<span style='color:{col.get(w, '#6c6a86')};font-weight:700'>{html.escape(w)} {n}</span>" for w, n in sorted(by_who.items(), key=lambda x: -x[1]))
-    return (f"<div class='card' style='border-left:4px solid #312783;margin:14px 0'>"
+    # 22.09.2026, аудит: галочка здесь стояла на голом fetch без разбора
+    # ответа — при обрыве связи она оставалась нажатой, хотя на сервере
+    # ничего не закрылось. Это ровно то, на что жаловались админы:
+    # «нажала, а задача не уходит». Теперь отказ виден сразу.
+    return (INBOX_DONE_JS
+            + f"<div class='card' style='border-left:4px solid #312783;margin:14px 0'>"
             f"<b style='display:block;font-size:17px;margin-bottom:2px'>Обещания клиентам за день ({len(rows)}, не закрыто {sum(by_who.values())})</b>"
-            f"<div style='font-size:13px;color:#6c6a86;margin-bottom:8px'>Общий список для Бориса; у каждого те же пункты стоят в своей колонке выше. Не закрыто: {heads or '—'}</div>"
+            f"<div style='font-size:13px;color:#6c6a86;margin-bottom:8px'>Общий список для Бориса. Не закрыто: {heads or '—'}</div>"
             f"<ul style='list-style:none;padding:0;margin:0;font-size:14px'>{body}</ul></div>")
 
 

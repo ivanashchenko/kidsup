@@ -277,11 +277,18 @@ def block() -> str:
                 f"<td class='num' style='white-space:nowrap'>{r['live']} / {r['cap']}</td>"
                 f"<td class='num' style='white-space:nowrap;color:{'#4e8a12' if r['paid'] else '#6c6a86'}'>{r['paid']}</td>"
                 f"<td style='font-size:13px'>{st}</td></tr>")
-    free_total = sum(r["free"] for r in rs if not r["merge"])
+    # 22.09.2026, аудит: здесь считалось без сливаемых групп, а в шапке /mesta —
+    # со всеми, и две страницы под одной подписью «в 49 группах» показывали 110
+    # и 119. Считаем всё, а разницу называем словами — это разные вопросы:
+    # «сколько мест в центре» и «куда сегодня можно записать».
+    free_total = sum(r["free"] for r in rs)
+    free_open = sum(r["free"] for r in rs if not r["merge"])
+    free_hint = (f" · из них {free_total - free_open} в группах, куда сейчас не записываем"
+                 if free_total != free_open else "")
     live_total = sum(r["live"] for r in rs)
     paid_total = sum(r["paid"] for r in rs)
     return (f"<details class='card' style='border-left:4px solid #7DB928;margin:14px 0'>"
-            f"<summary style='cursor:pointer;font-size:17px;font-weight:800'>Места сейчас: свободно {free_total} в {len(rs)} группах · живых записей {live_total} · оплатили {paid_total}</summary>"
+            f"<summary style='cursor:pointer;font-size:17px;font-weight:800'>Места сейчас: свободно {free_total} в {len(rs)} группах{free_hint} · живых записей {live_total} · оплатили {paid_total}</summary>"
             f"<div style='font-size:12.5px;color:#6c6a86;margin:4px 0 8px'>Считается по записям CRM при каждом открытии (синхронизация раз в 5 минут). "
             f"Красным — группы, куда записываем первыми; «не записывать» — сливаются 14–18.09, вместо них соседняя группа. Мини-сад и нулевой класс — норма 10 (больше — открываем ещё группу).</div>"
             f"<div class='scroll'><table><tr><th>Группа</th><th class='num'>живых / норма</th><th class='num'>оплатили</th><th>места</th></tr>"

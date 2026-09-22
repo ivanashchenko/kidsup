@@ -246,8 +246,14 @@ def guard(phone: str, text: str, kind: str = "",
         for marker, dead in EXPIRED:
             if marker.lower() in low and today >= dead:
                 return f"приглашение просрочено с {dead}: «{marker}»"
-    if not (HOUR_FROM <= now.hour < HOUR_TO):
-        return f"сейчас {now.hour}:00 — вне окна {HOUR_FROM}-{HOUR_TO}"
+    # По выходным семьи спят дольше, и владелец велел писать с 10:00. Правило
+    # жило только в autopilot._wa, а через guard идут send(), send_via() и
+    # send_smart() — то есть рассылка набора и автоответы уходили в субботу
+    # в 9:00 мимо правила (22.09.2026, аудит).
+    s_hour = 10 if now.weekday() >= 5 else HOUR_FROM
+    if not (s_hour <= now.hour < HOUR_TO):
+        return (f"сейчас {now.hour}:00 — вне окна {s_hour}-{HOUR_TO}"
+                + (" (выходной: пишем с 10:00)" if now.weekday() >= 5 else ""))
     import hashlib
     dig = hashlib.sha1(text.strip().lower().encode()).hexdigest()[:16]
     day = now.date().isoformat()

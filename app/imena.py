@@ -180,14 +180,25 @@ def watch(mk, days: int = 1) -> int:
             f"Имя — только имя и фамилия ребёнка. Канал общения виден в Wazzup, "
             f"возраст — в дате рождения, скидка и «не звонить» — теги.")
     # Решение владельца 03.09: задач в МойКлассе не создаём — пункт в инбокс плана дня.
+    #
+    # 22.09.2026, аудит. Здесь было два дефекта сразу. Первый: пункт писался
+    # в таблицу мимо inbox_add, то есть без всякой дедупликации, и каждый
+    # вечер ложилась слово в слово та же строка — к 22.09 их накопилось
+    # девятнадцать. Второй: адресатом жёстко стояла Лиза, а с 20.09 у неё
+    # только закрытие занятий и долги; чистка карточек — не её работа.
+    # Теперь: пока прошлый такой пункт не закрыт, новый не кладём.
     try:
         from . import db as _db
-        from datetime import datetime as _dt
+        from .autopilot import inbox_add as _inbox_add
         with _db.get_conn() as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS plan_inbox (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT,
                             who TEXT, text TEXT, phone TEXT, source TEXT, done INTEGER DEFAULT 0)""")
-            conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) VALUES (?,?,?,?,?,?)",
-                         (date.today().isoformat(), _dt.now().isoformat(timespec="minutes"), "Лиза", body[:400], "", "сторож имён"))
+            visit = conn.execute(
+                "SELECT 1 FROM plan_inbox WHERE source='сторож имён' AND done=0").fetchone()
+        if visit:
+            log.info("сторож имён: прошлый пункт ещё не закрыт — новый не кладём")
+        else:
+            _inbox_add(body, "", "Борис", "сторож имён")
     except Exception as e:
         log.warning("сторож имён: инбокс недоступен: %s", str(e)[:80])
     log.info("сторож имён: %d новых засорённых", len(fresh))
