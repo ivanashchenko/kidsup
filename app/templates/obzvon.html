@@ -203,6 +203,30 @@ function schet(){
 }
 </script>
 
+{% if d.сказали_нет %}
+<h2 style="margin-top:1.6rem">Сказали «нет» — {{ d.сказали_нет|length }}</h2>
+<p class="muted">Эти семьи ходили у нас, но уже отказались или ушли в архив набора: в CRM у них
+стоит «Отказ» или «Архив». В работу смены они не идут — звать «вернуться» того, кто месяц назад
+сказал нет, значит ходить по кругу. Блок нужен, чтобы было видно, что их не потеряли:
+{{ d.сказали_нет|selectattr('платил')|list|length }} из них когда-то платили, и к ним стоит
+вернуться отдельной кампанией — с поводом, а не с обзвоном.</p>
+<div class="scroll"><table>
+  <tr><th>Ребёнок</th><th>Ходил на</th><th class="num">занятий</th><th>Ушёл</th><th>Платил</th><th>Статус</th><th>Телефон</th><th>CRM</th></tr>
+  {% for r in d.сказали_нет %}
+  <tr style="opacity:.75">
+    <td><b>{{ r.имя }}</b></td>
+    <td class="sm">{{ r.предметы|join(', ') or '—' }}</td>
+    <td class="num">{{ r.занятий }}</td>
+    <td class="sm">{{ r.последнее[8:] }}.{{ r.последнее[5:7] }}.{{ r.последнее[2:4] }}</td>
+    <td class="sm">{% if r.платил %}<b style="color:#4e8a12">да</b>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="sm">{{ r.статус_текст or '—' }}</td>
+    <td class="sm"><a href="tel:+{{ r.телефон }}">+{{ r.телефон }}</a></td>
+    <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">→</a></td>
+  </tr>
+  {% endfor %}
+</table></div>
+{% endif %}
+
 {% if d.по_предметам %}
 <h2 style="margin-top:1.6rem">На что ходили</h2>
 <p class="muted">Полезно перед звонком: если ребёнок ходил на английский, его зовут обратно
