@@ -3405,7 +3405,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-22.02"
+APP_VERSION = "2026-09-22.05"
 
 
 @app.get("/api/net")
@@ -7442,6 +7442,46 @@ def api_crm_phones(kind: str = "clients", fmt: str = "txt"):
     return PlainTextResponse("\n".join(out) + "\n",
                              headers={"Content-Disposition":
                                       f'attachment; filename="phones_{kind}.txt"'})
+
+
+@app.post("/api/crm/class-rename", dependencies=OWNER_AUTH)
+def api_crm_class_rename(payload: dict = Body(...)):
+    """Переименовать учебную группу: {"class_id": 727741, "name": "...", "dry": 1}.
+
+    Имя группы — не просто подпись: из него сайт берёт возраст и уровень
+    (_enrollment_groups → /api/public/schedule), поэтому правка названия в CRM
+    меняет и витрину. Работаем как с карточкой клиента: GET → merge → POST,
+    чтобы не затереть остальные поля. Новые группы здесь не создаются.
+    """
+    from .moyklass_client import MoyklassClient
+    cid = int(payload.get("class_id") or 0)
+    name = str(payload.get("name") or "").strip()
+    if not cid or not name:
+        raise HTTPException(400, "нужны class_id и name")
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        cur = mk.get(f"/v1/company/classes/{cid}")
+        was = cur.get("name")
+        if int(payload.get("dry", 1)):
+            return {"dry_run": True, "class_id": cid, "было": was, "станет": name}
+        # Полное тело класса МойКласс на обновление не принимает (400):
+        # часть полей readOnly. Шлём узкий набор — имя и то, без чего API
+        # не примет запрос. Состав набора задаётся в keep, чтобы при новой
+        # ошибке не гадать вслепую.
+        keep = payload.get("keep") or ["courseId", "filialId", "maxStudents", "status"]
+        body = {"name": name}
+        for k in keep:
+            if k in cur:
+                body[k] = cur[k]
+        try:
+            mk.post(f"/v1/company/classes/{cid}", body)
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "class_id": cid, "было": was,
+                    "error": str(e)[:400], "поля": sorted(body)[:25]}
+        after = mk.get(f"/v1/company/classes/{cid}").get("name")
+        return {"ok": after == name, "class_id": cid, "было": was, "стало": after}
+    finally:
+        mk.close()
 
 
 @app.get("/api/crm/classes", dependencies=AUTH)
