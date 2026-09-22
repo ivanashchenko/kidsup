@@ -522,9 +522,38 @@ FEATURES = [("starters", "Starters · 1-й год"), ("movers", "Movers · 2-й 
 _AGE_RE = re.compile(r"(\d{1,2}(?:[.,]\d)?)\s*[-–]\s*(\d{1,2}(?:[.,]\d)?)")
 
 
+# Класс школы в названии группы: «3-6 класс», «2 класс».
+# 22.09.2026, Ира: «мы не можем поставить группу 9–13 лет, это большой разрыв.
+# То, что девятилетки хорошо легли к девочкам 11–13, — чистая случайность:
+# уровень у них одинаковый, но фактически это разные классы. Нужно уточнять
+# класс, а не возраст». Она права: у школьника группу определяет класс и
+# уровень, а не год рождения. Родитель, читающий «9–13 лет», видит разрыв в
+# четыре года и не записывается — или записывается, и ребёнок попадает не
+# к своим. Поэтому у старших групп в названии стоит класс, а возраст для
+# внутренних фильтров считается от него (1 класс ≈ 7 лет).
+_KLASS_RE = re.compile(r"(\d{1,2})\s*[-–—]\s*(\d{1,2})\s*класс|(\d{1,2})\s*класс", re.I)
+KLASS_V_VOZRAST = 6          # 1 класс ≈ 7 лет, 2 класс ≈ 8 лет и так далее
+
+
+def _group_klass(name: str) -> tuple[int | None, int | None]:
+    """Классы из названия группы: «3-6 класс» → (3, 6); «2 класс» → (2, 2)."""
+    m = _KLASS_RE.search(name or "")
+    if not m:
+        return None, None
+    if m.group(3):
+        k = int(m.group(3))
+        return (k, k) if 1 <= k <= 11 else (None, None)
+    lo, hi = int(m.group(1)), int(m.group(2))
+    return (lo, hi) if 1 <= lo <= hi <= 11 else (None, None)
+
+
 def _group_ages(name: str) -> tuple[float | None, float | None]:
     """Возраст из названия: «5-6 лет», «1,3 - 1,8», «4-7» → (мин, макс).
-    Номера групп и время вырезаем, чтобы не принять их за возраст."""
+    Номера групп и время вырезаем, чтобы не принять их за возраст.
+    Если группа описана классом, возраст считаем от него."""
+    k_lo, k_hi = _group_klass(name)
+    if k_lo:
+        return float(k_lo + KLASS_V_VOZRAST), float(k_hi + KLASS_V_VOZRAST)
     clean = re.sub(r"Группа\s*\d+", " ", name or "", flags=re.I)
     clean = _TIME_RE.sub(" ", clean).replace("_", " ")
     m = _AGE_RE.search(clean)
@@ -591,6 +620,7 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         enrolled = r["enrolled"] or 0
         fill = 0 if buffer else (min(100, round(enrolled * 100 / cap)) if cap else 0)
         age_lo, age_hi = _group_ages(name)
+        k_lo, k_hi = _group_klass(name)
         groups.append({
             "id": r["id"],
             "name": name,
@@ -601,7 +631,10 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
             "time": " · ".join(times[:2]) or "—",
             "slot": _time_slot(times), "features": _group_features(name),
             "age_lo": age_lo, "age_hi": age_hi,
-            "age": (f"{age_lo:g}–{age_hi:g} лет" if age_lo else "—"),
+            "klass": (f"{k_lo}–{k_hi} класс" if k_lo and k_hi and k_lo != k_hi
+                      else (f"{k_lo} класс" if k_lo else None)),
+            "age": ((f"{k_lo}–{k_hi} класс" if k_lo != k_hi else f"{k_lo} класс") if k_lo
+                    else (f"{age_lo:g}–{age_hi:g} лет" if age_lo else "—")),
             "enrolled": enrolled, "capacity": cap,
             "free": max(0, cap - enrolled), "fresh": r["fresh"] or 0, "fill_pct": fill,
             "color": "#E5232A" if fill >= 100 else "#F5A81C" if fill >= 75 else "#5FB53B",
@@ -3460,7 +3493,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-22.22"
+APP_VERSION = "2026-09-22.24"
 
 
 @app.get("/api/net")
