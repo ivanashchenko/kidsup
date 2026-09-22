@@ -252,11 +252,19 @@ def kpi(day: str) -> dict:
                         visits += 1
                 except ValueError:
                     pass
+        # 22.09.2026, аудит. Считали SUM(done), а done=2 означает «перенесено
+        # на завтра»: каждое нажатие «перенести» добавляло к итогу дня ДВА
+        # закрытых дела. Цифра «сделано за день» завышалась ровно на число
+        # переносов — то есть тем сильнее, чем хуже шёл день.
         try:
-            ib = conn.execute("SELECT COUNT(*), COALESCE(SUM(done),0) FROM plan_inbox WHERE day=?", (day,)).fetchone()
+            ib = conn.execute(
+                "SELECT COUNT(*), COALESCE(SUM(CASE WHEN done=1 THEN 1 ELSE 0 END),0) "
+                "FROM plan_inbox WHERE day=?", (day,)).fetchone()
         except Exception:
             ib = (0, 0)
-        tk = conn.execute("SELECT COUNT(*), COALESCE(SUM(done),0) FROM pult_tasks WHERE day=?", (day,)).fetchone() \
+        tk = conn.execute(
+            "SELECT COUNT(*), COALESCE(SUM(CASE WHEN done=1 THEN 1 ELSE 0 END),0) "
+            "FROM pult_tasks WHERE day=?", (day,)).fetchone() \
             if conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE name='pult_tasks'").fetchone()[0] else (0, 0)
     return {"pays": pays[0], "pays_sum": int(pays[1]), "joins_new": joins_new, "lessons": len(lids), "kids": kids,
             "firsts": firsts, "visits": visits, "y_kids": y_kids, "y_visits": y_visits, "inbox": ib[0], "inbox_done": ib[1], "tasks": tk[0], "tasks_done": tk[1]}
@@ -265,6 +273,25 @@ def kpi(day: str) -> dict:
 def _re_phone(text: str | None) -> bool:
     import re as _re
     return bool(_re.search(r"\b[78]?9\d{9}\b", text or ""))
+
+
+def _tel(phone: str | None) -> str:
+    """Номер для ссылки tel:/wa.me — всегда с кодом страны, иначе пусто.
+
+    22.09.2026, аудит пульта. Наряд хранил десять цифр, а ссылка собиралась
+    как tel:+{номер}: телефон дежурной набирал +90 (Турция) вместо +7 903…,
+    +81 (Япония) вместо 8 123…, +49 (Германия) вместо 8 495…. На живой
+    странице таких ссылок было тридцать шесть. Лучше не показать кнопку,
+    чем отправить админа в международный вызов.
+    """
+    d = "".join(c for c in str(phone or "") if c.isdigit())
+    if len(d) == 10 and d[0] == "9":
+        return "7" + d
+    if len(d) == 11 and d[0] in "78":
+        return "7" + d[1:]
+    if len(d) == 10:                       # городской: 495…, 812…
+        return "7" + d
+    return ""
 
 
 def _sklon(n: int, one: str, few: str, many: str) -> str:
@@ -347,7 +374,8 @@ def _promises_html(day: str, who: str, color: str, items: list[dict] | None = No
     lis = []
     for r in rows:
         ph = "".join(ch for ch in (r["phone"] or "") if ch.isdigit())
-        tel = f" <a href='tel:+{ph}' style='color:#6c6a86;white-space:nowrap'>+{ph}</a>" if len(ph) >= 10 else ""
+        _t = _tel(ph)
+        tel = f" <a href='tel:+{_t}' style='color:#6c6a86;white-space:nowrap'>+{_t}</a>" if _t else ""
         task_t = in_task.get(ph[-10:]) if len(ph) >= 10 else None
         if not task_t:
             for num in _re.findall(r"\d{10,11}", r["text"] or ""):
@@ -403,16 +431,30 @@ def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
     try:
         with db.get_conn() as conn:
             _inbox_tries(conn)
+            # 22.09.2026, аудит пульта. Незакрытый пункт в полночь просто
+            # исчезал: колонка строилась запросом WHERE day=сегодня, и всё,
+            # что не успели вчера, переставало показываться кому бы то ни
+            # было. Так накопилось 261 дело за 14–21.09 — с обещаниями
+            # семьям «перезвоним сегодня». Берём и хвост прошлых дней,
+            # помечая, с какого числа он висит: дата обещания важнее, чем
+            # аккуратный список.
             rows = conn.execute(
-                "SELECT id, ts, text, phone, source, done, COALESCE(tries,0) AS tries "
-                "FROM plan_inbox WHERE day=? AND who=? ORDER BY id", (day, who)).fetchall()
+                "SELECT id, ts, day, text, phone, source, done, COALESCE(tries,0) AS tries "
+                "FROM plan_inbox WHERE who=? AND (day=? OR (day<? AND done=0)) "
+                "ORDER BY day, id", (who, day, day)).fetchall()
     except Exception:
         rows = []
     for r in rows:
         src = (r["source"] or "")
         t = _first_time(src) or _first_time((r["ts"] or "")[11:16]) or ""
-        out.append({"kind": "inbox", "id": r["id"], "t": t, "text": r["text"] or "",
+        staryj = (r["day"] or day) < day
+        tekst = r["text"] or ""
+        if staryj:
+            d = (r["day"] or "")[8:10] + "." + (r["day"] or "")[5:7]
+            tekst = f"⏳ с {d}: {tekst}"
+        out.append({"kind": "inbox", "id": r["id"], "t": t, "text": tekst,
                     "done": 1 if r["done"] else 0, "note": None,
+                    "day": r["day"] or day, "staryj": staryj,
                     "tag": "наряд" if src.startswith("наряд")
                            else "возврат" if src.startswith("возврат") else "обещание",
                     "phone": "".join(c for c in (r["phone"] or "") if c.isdigit()),
@@ -461,7 +503,17 @@ def _ves(it: dict) -> int:
     for ves, pat in VES:
         if _re.search(pat, txt, _re.I):
             return ves
-    return 2 if it.get("phone") else 4
+    # 22.09.2026, аудит. Задача смены, не попавшая ни в один шаблон, всегда
+    # получала 4 — хуже любого пункта с телефоном. Не потому, что она менее
+    # важная, а потому, что _lenta принудительно ставит задачам пустой
+    # phone, а телефон семьи у них лежит внутри текста. Так «Подтвердить
+    # звонком ВСЕ вечерние пробные сегодня» (семь семей) уехало под черту
+    # «до 20:00 не успеть» и в свёрнутый блок, а над ним стоял хвост заявки
+    # сорокадневной давности. Смотрим и текст — как это уже делает расчёт
+    # самой черты.
+    if it.get("kind") == "task":
+        return 2
+    return 2 if (it.get("phone") or _re_phone(txt)) else 4
 
 
 def _inbox_tries(conn) -> None:
@@ -590,7 +642,9 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             text_html = html.escape(it["text"])
             ph = it.get("phone") or ""
             if len(ph) >= 10:
-                tel = f" <a href='tel:+{ph}' style='color:#6c6a86;white-space:nowrap'>+{ph}</a>"
+                _t = _tel(ph)
+                tel = (f" <a href='tel:+{_t}' style='color:#6c6a86;white-space:nowrap'>+{_t}</a>"
+                       if _t else "")
                 pay = paid.get(ph[-10:])
                 if pay:
                     d_, summa = pay
@@ -603,7 +657,7 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             ctrl = (f" <a href='#' style='font-size:12px;color:#8a5a00;white-space:nowrap' "
                     f"title='Набрала, никто не взял — дело останется, попытка запишется' onclick=\""
                     f"pultMiss('{it['kind']}',{it['id']});return false\">не дозвонилась ☎</a>") + ctrl
-        lis.append((it["done"] == 1, it["done"] == 0,
+        lis.append((it["done"] == 1, it["done"] == 0, bool(it.get("staryj")),
             f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
             f"<input type='checkbox' {'checked' if it['done'] == 1 else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
             f"onchange=\"{done_js}\">"
@@ -614,9 +668,14 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     # остальные несделанные и все сделанные — свёрнуто. 21.09: лента стала
     # общей (задачи + обещания), поэтому показываем семь, а не пять.
     LIMIT = 7
-    done_html = "".join(h for d_, o_, h in lis if d_)
-    open_html = [h for d_, o_, h in lis if o_]
-    moved_html = "".join(h for d_, o_, h in lis if not d_ and not o_)
+    done_html = "".join(h for d_, o_, st_, h in lis if d_)
+    # 22.09.2026. Незакрытые дела прошлых дней раньше просто исчезали в
+    # полночь — так пропало 261 обещание семьям. Теперь они видны, но не в
+    # сегодняшней ленте: 261 строка в колонку — это уже не план, а свалка.
+    # Отдельным блоком внизу, со счётчиком и самой старой датой.
+    open_html = [h for d_, o_, st_, h in lis if o_ and not st_]
+    staryj_html = [h for d_, o_, st_, h in lis if o_ and st_]
+    moved_html = "".join(h for d_, o_, st_, h in lis if not d_ and not o_)
     # Черта смены. 21.09 у Ани к обеду висело 33 дела на четыре часа работы —
     # это не план, а гора. Считаем по-честному: звонок с записью в CRM — шесть
     # минут, дело без телефона — три. Всё, что за чертой, до конца смены не
@@ -629,14 +688,24 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
         # этой поправки выходило, что 33 дела «успеваются», — а по факту за
         # день закрывалось втрое меньше.
         left = int(max(0, (20 * 60) - (int(now_hm[:2]) * 60 + int(now_hm[3:]))) * 0.6)
+        otkrytye = [i for i in items if not i["done"] and not i.get("staryj")]
         cena = [6 if i.get("phone") or _re_phone(i.get("text")) else 3
-                for i in items if not i["done"]]
+                for i in otkrytye]
         s_, uspeem = 0, 0
         for c_ in cena:
             if s_ + c_ > left:
                 break
             s_ += c_
             uspeem += 1
+        # Задача смены под чертой не прячется никогда. 22.09.2026, аудит:
+        # «Подтвердить звонком ВСЕ вечерние пробные сегодня» и «Встретить
+        # пробные 16:00–17:00» лежали в свёрнутом блоке под надписью «до
+        # 20:00 не успеть» — страница сама разрешила их не делать, а это
+        # каркас дня, на котором стоят семь семей. Черта режет добавочные
+        # пункты, а не расписание смены.
+        posledn = max((n for n, i in enumerate(otkrytye, 1)
+                       if i.get("kind") == "task"), default=0)
+        uspeem = max(uspeem, posledn)
     body = "".join(open_html[:LIMIT])
     if len(open_html) > LIMIT:
         hvost = open_html[LIMIT:]
@@ -656,16 +725,29 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
         else:
             body += (f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>ещё {len(hvost)} на день — после этих семи</summary>"
                      f"<ol style='list-style:none;padding:0;margin:0'>{''.join(hvost)}</ol></details>")
+    if staryj_html:
+        body += (f"<div style='margin:12px 0 4px;border-top:2px solid #F59C00;padding-top:6px;"
+                 f"font-size:12.5px;color:#a35f00;font-weight:700'>"
+                 f"Не закрыто с прошлых дней: {len(staryj_html)}</div>"
+                 f"<details style='margin:2px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>"
+                 f"показать — это обещания семьям, которые мы не выполнили</summary>"
+                 f"<ol style='list-style:none;padding:0;margin:0'>{''.join(staryj_html)}</ol></details>")
     if moved_html:
         body += f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#a35f00;font-size:13px'>перенесено на завтра</summary><ol style='list-style:none;padding:0;margin:0'>{moved_html}</ol></details>"
     if done_html:
         body += f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#4e8a12;font-size:13px'>сделано {done_n} ✓</summary><ol style='list-style:none;padding:0;margin:0'>{done_html}</ol></details>"
     body = body or "<li style='color:#6c6a86'>задач пока нет — Клод положит к началу смены</li>"
     nb = "" if onduty else " <span style='font-size:11px;color:#6c6a86;font-weight:500'>не в смене</span>"
-    open_n = sum(1 for i in items if not i["done"])
+    # «Дел на сегодня» — именно на сегодня: хвост прошлых дней считаем
+    # отдельно, иначе цифра в шапке колонки пугает и перестаёт быть планом.
+    open_n = sum(1 for i in items if not i["done"] and not i.get("staryj"))
+    staryh = sum(1 for i in items if not i["done"] and i.get("staryj"))
     late = sum(1 for i in items if not i["done"] and i["kind"] == "task"
                and _first_time(i["t"]) and cur_ft and _first_time(i["t"]) < cur_ft)
     late_html = (f" · <span style='color:#a35f00;font-weight:700'>{_sklon(late, 'дело', 'дела', 'дел')} без галочки, время прошло</span>") if late else ""
+    if staryh:
+        late_html += (f" · <span style='color:#a35f00;font-weight:700'>"
+                      f"+{staryh} с прошлых дней</span>")
     return (f"<div class='wcard' style='border-top-color:{c}'><div class='nm'>{html.escape(who)}{nb} "
             f"<span style='font-size:12px;color:#6c6a86;font-weight:600'>{done_n}/{len(items)}</span></div>"
             f"<div class='rl'>{html.escape(ROLE.get(who, ''))} · "
@@ -755,7 +837,21 @@ def page(day: str = "", who: str = "") -> str:
     d = datetime.fromisoformat(day)
     wd = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"][d.weekday()]
     order = on + [w for w in ("Лиза", "Борис") if w not in on]
-    extra = [w for w in tk if w not in order]           # задачи есть, а в смене нет — показываем свёрнуто внизу
+    # 22.09.2026, аудит. Колонка рисовалась только тем, у кого есть ЗАДАЧИ
+    # смены. Ира не в смене и задач нет — колонки нет, и пункты инбокса,
+    # адресованные лично ей, не видел никто, включая её саму (так пролежал
+    # пункт 544 про Дарсалию: спросили робототехнику, а на первое занятие
+    # не позвали). Считаем и по адресатам инбокса.
+    komu = set(tk)
+    try:
+        with db.get_conn() as conn:
+            _init(conn)
+            komu |= {r[0] for r in conn.execute(
+                "SELECT DISTINCT who FROM plan_inbox WHERE done=0 AND day<=? "
+                "AND COALESCE(who,'') != ''", (day,)).fetchall()}
+    except Exception:
+        pass
+    extra = [w for w in sorted(komu) if w not in order]  # не в смене — показываем свёрнуто внизу
     if who:
         order = [w for w in order + extra if w == who] or [who]
         extra = []
@@ -864,8 +960,10 @@ def promises_page(day: str, who: str) -> str:
         ph = "".join(ch for ch in (r["phone"] or "") if ch.isdigit())
         links = ""
         if len(ph) >= 10:
-            links = (f" <a href='tel:+{ph}' style='color:{c};font-weight:700;white-space:nowrap'>📞 +{ph}</a>"
-                     f" <a href='https://wa.me/{ph}' style='color:#25D366;font-weight:700'>WA</a>")
+            _t = _tel(ph)
+            links = ((f" <a href='tel:+{_t}' style='color:{c};font-weight:700;white-space:nowrap'>📞 +{_t}</a>"
+                      f" <a href='https://wa.me/{_t}' style='color:#25D366;font-weight:700'>WA</a>")
+                     if _t else "")
         txt = html.escape(r["text"] or "")
         head, sep, tail = txt.partition(" — ")
         if not sep or len(head) > 120:

@@ -3135,7 +3135,18 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
         k["paid"] = v.get("оплачено_в_группах_сезона", k["paid"])
         k["gap"] = max(0, 311 - k["paid"])
         k["trials"] = v.get("ждём_на_пробное", k["trials"])
+        # 22.09.2026, аудит. Подпись гласила «записаны на пробное с датой до
+        # 29.09», а в числе сидели дети с пробным на 01.10, 04.10 и даже
+        # 07.11 — владелец планировал донабор из ресурса, которого до конца
+        # сентября не будет. Считаем отдельно тех, кто успевает до срока.
+        srok = date(2026, 9, 30).isoformat()
+        uspeut = [r for r in (v.get("списки") or {}).get("ждём", [])
+                  if ((r.get("пробное") or {}).get("дата") or "") < srok]
+        if uspeut:
+            k["trials_do_sroka"] = len(uspeut)
+            k["trials_pozzhe"] = max(0, k["trials"] - len(uspeut))
         left = max(1, (date(2026, 9, 30) - date.today()).days)
+        k["days_left"] = left
         k["per_day"] = str(round(k["gap"] / left, 1)).replace(".", ",")
     except Exception:
         pass
@@ -3410,7 +3421,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-22.09"
+APP_VERSION = "2026-09-22.13"
 
 
 @app.get("/api/net")
@@ -5523,6 +5534,12 @@ def _days_param(days: str) -> list[str] | None:
     return out or None
 
 
+# Кому вообще можно адресовать пункт. Колонки на пульте только эти; пункт с
+# любым другим именем не показывается никому, а раньше по умолчанию
+# подставлялась «Аня» независимо от того, кто дежурит (22.09.2026, аудит).
+KOLONKI_PULTA = {"Аня", "Лена", "Ира", "Лиза", "Борис"}
+
+
 def _inbox_init(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS plan_inbox (
         id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT, who TEXT,
@@ -5537,14 +5554,28 @@ def api_plan_inbox_add(payload: dict = Body(...)):
     страница плана дня. Разборы звонков и переписок кладут сюда всё, что
     требует действия; суть разговора остаётся в комментарии карточки."""
     from . import autopilot
+    from .pult import _tel
     now = autopilot._now()
+    # 22.09.2026, аудит пульта: текст резался молча на 400 символах, и
+    # двадцать четыре из пятидесяти открытых пунктов обрывались на полуслове
+    # («…снять запись, чтобы вре»). Режем по границе предложения и ставим
+    # многоточие, чтобы обрыв было видно. Адресата проверяем: пункт с
+    # неизвестным именем не показывается ни в одной колонке.
+    who = str(payload.get("who") or "").strip()[:20]
+    if who and who not in KOLONKI_PULTA:
+        raise HTTPException(400, f"колонки «{who}» на пульте нет: {', '.join(sorted(KOLONKI_PULTA))}")
+    if not who:
+        who = autopilot._duty_name()
+    tekst = autopilot.obrezat(str(payload.get("text") or ""), 400)
+    if not tekst:
+        raise HTTPException(400, "пустой текст пункта")
     with db.get_conn() as conn:
         _inbox_init(conn)
         conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) VALUES (?,?,?,?,?,?)",
                      (str(payload.get("day") or now.date().isoformat()), now.isoformat(timespec="minutes"),
-                      str(payload.get("who") or "Аня")[:20], str(payload.get("text") or "")[:400],
-                      str(payload.get("phone") or "")[:20], str(payload.get("source") or "")[:40]))
-    return {"ok": True}
+                      who, tekst,
+                      _tel(payload.get("phone")), str(payload.get("source") or "")[:40]))
+    return {"ok": True, "who": who}
 
 
 @app.post("/api/plan/inbox/edit", dependencies=AUTH)
@@ -5750,6 +5781,12 @@ def api_plan_inbox_done(payload: dict = Body(...)):
     return {"ok": True}
 
 
+def _pult_tel(phone) -> str:
+    """Номер для ссылки tel: — всегда с кодом страны (см. pult._tel)."""
+    from .pult import _tel
+    return _tel(phone)
+
+
 def _inbox_block(day: str) -> str:
     """HTML-блок «Появилось за день» для страниц плана. Галочка — fetch на /done."""
     with db.get_conn() as conn:
@@ -5766,7 +5803,8 @@ def _inbox_block(day: str) -> str:
             f"<span style='display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:800;color:#fff;background:{c}'>{html.escape(r['who'])}</span> "
             f"<span style='color:#6c6a86;font-size:12px'>{html.escape(r['ts'][11:16])}</span> "
             + (lambda tx: (f"{html.escape(tx[:140])}<details style='display:inline'><summary style='display:inline;cursor:pointer;color:#6c6a86'> …</summary> {html.escape(tx[140:])}</details>" if len(tx) > 160 else html.escape(tx)))(r['text'] or "")
-            + (f" <a href='tel:+{html.escape(r['phone'])}' style='white-space:nowrap;color:#6c6a86'>+{html.escape(r['phone'])}</a>" if r['phone'] else "") + "</li>")
+            + (lambda t: (f" <a href='tel:+{t}' style='white-space:nowrap;color:#6c6a86'>+{t}</a>" if t else ""))(
+                html.escape(_pult_tel(r['phone']))) + "</li>")
     body = "".join(items) or "<li style='color:#6c6a86'>пока пусто — сюда падает всё, что мы пообещали клиентам в звонках и переписке за день</li>"
     by_who = {}
     for r in rows:

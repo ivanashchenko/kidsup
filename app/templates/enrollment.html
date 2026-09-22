@@ -154,7 +154,7 @@
         </details>
         {% endif %}
         <button type="button" class="copy" style="margin-left:6px"
-                data-text="Записываю [ребёнка] в группу «{{ g.course }}», {{ g.day }} в {{ g.time }}{% if g.age != '—' %}, возраст {{ g.age }}{% endif %}. Адрес: б-р Маршала Рокоссовского, 6 к1В (напротив ТЦ «Янтарь»). Абонемент 8 занятий — {{ g.price_new or '—' }} ₽ с 01.09. Первое занятие пробное и бесплатное — приходите, посмотрите педагога 💛">текст клиенту</button>
+                data-text="Записываю [ребёнка] в группу «{{ g.course }}», {{ g.day }} в {{ g.time }}{% if g.age != '—' %}, возраст {{ g.age }}{% endif %}. Адрес: б-р Маршала Рокоссовского, 6 к1В (напротив ТЦ «Янтарь»). Абонемент 8 занятий — {{ g.price_new or '—' }} ₽ с 01.09. Первое занятие условно-бесплатное: не понравится — платить не нужно, понравится — оно входит в этот абонемент. Приходите, посмотрите педагога 💛">текст клиенту</button>
       </td>
     </tr>
     {% endfor %}
@@ -239,7 +239,7 @@ function recalc() {
   document.getElementById('detail').textContent = disc ? ('(без скидки ' + sum.toLocaleString('ru-RU') + ' ₽, скидка ' + disc + '%)') : '';
   document.getElementById('calccopy').dataset.text =
     'Расчёт на месяц: ' + names.join(' + ') + (disc ? (', со скидкой ' + disc + '%') : '') +
-    ' — ' + total.toLocaleString('ru-RU') + ' ₽. Первое занятие по каждому направлению — бесплатное пробное.';
+    ' — ' + total.toLocaleString('ru-RU') + ' ₽. Первое занятие по каждому направлению — условно-бесплатное: не понравится — платить не нужно, понравится — войдёт в первый абонемент.';
 }
 document.addEventListener('change', function (e) {
   if (e.target.matches('.calcitem, #mnog, #psh')) recalc();

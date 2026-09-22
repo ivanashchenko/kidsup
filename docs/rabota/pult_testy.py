@@ -134,8 +134,50 @@ def test_ves():
     proverka("хвост в CRM — последним", ves("Закрыть запись в CRM, поставить статус"), 4)
 
 
+# ── 5. Правки аудита 22.09.2026 ───────────────────────────────────────────
+def test_audit():
+    print("Находки аудита 22.09 (телефоны, обрезка, отказы, адресаты)")
+    from app.pult import _tel
+    from app.autopilot import obrezat, _OTKAZ_SLOVA, _manager_short, MANAGER_NAMES
+    from app import naryad
+
+    # Кнопка «позвонить» набирала Турцию, Японию и Германию
+    proverka("мобильный из десяти цифр", _tel("9032952727"), "79032952727")
+    proverka("городской Петербурга", _tel("8123315033"), "78123315033")
+    proverka("восьмёрка спереди", _tel("89161879763"), "79161879763")
+    proverka("мусор — ссылки нет", _tel("123"), "")
+    proverka("пусто — ссылки нет", _tel(""), "")
+
+    # Текст обрывался на полуслове, и последнее указание не читалось
+    dlinno = ("Нафиков Назар придёт к логопеду СЕГОДНЯ в 19:20 вместо четверга. "
+              "Если не придут, снять запись, чтобы время не простаивало.")
+    proverka("короткий не трогаем", obrezat("Позвонить маме", 400), "Позвонить маме")
+    proverka("длинный обрывается видимо", obrezat(dlinno, 80).endswith("…"), True)
+    proverka("обрыв по границе предложения",
+             obrezat(dlinno, 80), "Нафиков Назар придёт к логопеду СЕГОДНЯ в 19:20 вместо четверга…")
+
+    # Статус «Отказ» по одной догадке модели ставить нельзя
+    proverka("«Спасибо большое!» — не отказ", bool(_OTKAZ_SLOVA.search("Спасибо большое! ❤️")), False)
+    proverka("«не будем ходить» — отказ", bool(_OTKAZ_SLOVA.search("Мы не будем ходить")), True)
+    proverka("«уже неактуально» — отказ наряда",
+             bool(naryad.OTKAZ_RE.search("Добрый день, уже неактуально")), True)
+    proverka("«хотим записаться» — не отказ",
+             bool(naryad.OTKAZ_RE.search("Здравствуйте, хотим записаться")), False)
+
+    # Пункты Лизе и Борису уезжали дежурной
+    proverka("Лиза находится по справочнику", _manager_short(154181), "Лиза")
+    proverka("Борис находится по справочнику", _manager_short(84116), "Борис")
+    proverka("неизвестный id — пусто", _manager_short(999999), "")
+
+    # «2645 мин» админ в уме не переводит
+    proverka("минуты до полутора часов", naryad._zhdet(45), "45 мин")
+    proverka("часы", naryad._zhdet(1032), "17 ч")
+    proverka("больше суток", naryad._zhdet(2645), "больше суток")
+
+
+
 def main():
-    for t in (test_dedup, test_polite, test_proverka_pulta, test_ves):
+    for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_audit):
         t()
         print()
     if oshibok:

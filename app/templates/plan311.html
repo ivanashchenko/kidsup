@@ -59,9 +59,9 @@ details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-to
 
 <div class="kpi">
   <div class="c"><div class="n">{{ k.paid }}</div><div class="l">оплаченных детей сезона — уникальных, впервые оплативших с 31.08 (официальный счётчик)</div></div>
-  <div class="c"><div class="n bad">{{ k.gap }}</div><div class="l">не хватает до 311 — это {{ k.per_day }} новых оплат в день на 9 дней</div></div>
+  <div class="c"><div class="n bad">{{ k.gap }}</div><div class="l">не хватает до 311 — это {{ k.per_day }} новых оплат в день на {{ k.days_left or 9 }} дн. до 30.09</div></div>
   <div class="c"><div class="n warn">{{ k.pace }}</div><div class="l">фактический темп новых оплат в день за последние две недели</div></div>
-  <div class="c"><div class="n">{{ k.trials }}</div><div class="l">детей записаны на пробное с датой до 29.09 — главный ресурс, уже в здании</div></div>
+  <div class="c"><div class="n">{{ k.trials_do_sroka or k.trials }}</div><div class="l">детей записаны на пробное и успевают до 30.09 — главный ресурс{% if k.trials_pozzhe %}; ещё {{ k.trials_pozzhe }} записаны на октябрь и позже, в сентябрьский счёт не идут{% endif %}</div></div>
   <div class="c"><div class="n warn">{{ k.show }}%</div><div class="l">доходимость на пробное за сентябрь; из пришедших покупают {{ k.buy }}%</div></div>
   <div class="c"><div class="n ok">{{ k.forecast }}</div><div class="l">реалистично к 30.09 при хорошей работе; 311 — к {{ k.date311 }}</div></div>
 </div>
@@ -69,7 +69,7 @@ details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-to
 <h2>Где мы и почему группы не полные</h2>
 <div class="card"><ul>{% for s in kartina %}<li>{{ s }}</li>{% endfor %}</ul></div>
 
-<h2>Откуда взять новых детей за 9 дней <small>без двойного счёта — списки пересекаются</small></h2>
+<h2>Откуда взять новых детей за {{ k.days_left or 9 }} дн. <small>без двойного счёта — списки пересекаются</small></h2>
 <div class="src">
 {% for s in istochniki %}
   <div class="c"><div class="g">{{ s.g }}</div><div class="t">{{ s.t }}</div></div>

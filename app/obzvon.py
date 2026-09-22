@@ -112,13 +112,27 @@ def otmetki() -> dict[int, dict]:
 MIN_TALK = 30          # секунд: короче — это не разговор, а «алло, не могу»
 
 
-def _osnovanie(conn, uid: int, days: int = 2) -> dict:
+def _osnovanie(conn, uid: int, days: int = 2, do: str = "") -> dict:
     """Чем подтверждается, что с семьёй сегодня действительно говорили.
 
     Смотрим журнал Манго и входящие сообщения за последние двое суток по
     ВСЕМ телефонам этой семьи (у карточек бывает второй номер родителя).
+
+    22.09.2026, аудит. У окна не было ВЕРХНЕЙ границы: проверка стоящей
+    галочки брала всё «от today−N до сейчас». Админ отмечала семью 19.09
+    без разговора, 21.09 родитель сам перезванивал по другому поводу — и
+    проверка засчитывала этот звонок как основание для позавчерашней
+    галочки. Параметр `do` закрывает окно сверху моментом отметки.
     """
     since = (date.today() - timedelta(days=days)).isoformat()
+    # немного воздуха вперёд: админ ставит галочку через минуту-другую
+    # после разговора, а бывает и наоборот — сперва отметила, потом набрала
+    verh = (do or "")[:19]
+    if verh:
+        try:
+            verh = (datetime.fromisoformat(verh) + timedelta(hours=2)).isoformat(timespec="seconds")
+        except ValueError:
+            verh = ""
     phones = set()
     try:
         for r in conn.execute("SELECT phone FROM users WHERE id=?", (int(uid),)):
@@ -134,8 +148,10 @@ def _osnovanie(conn, uid: int, days: int = 2) -> dict:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(mango_calls)")}
         has_secs = "secs" in cols
         sql = (f"SELECT ts, state{', secs' if has_secs else ''} FROM mango_calls "
-               f"WHERE ts >= ? AND substr(replace(replace(replace(phone,'+',''),'-',''),' ',''),-10) IN ({q})")
-        for row in conn.execute(sql, (since, *phones)):
+               f"WHERE ts >= ? {'AND ts <= ?' if verh else ''} "
+               f"AND substr(replace(replace(replace(phone,'+',''),'-',''),' ',''),-10) IN ({q}) "
+               f"ORDER BY ts")
+        for row in conn.execute(sql, (since, *((verh,) if verh else ()), *phones)):
             state = str(row[1] or "")
             if state != "talked":
                 continue
@@ -144,14 +160,15 @@ def _osnovanie(conn, uid: int, days: int = 2) -> dict:
             # talked (порог Манго — 20 с) остаётся единственным, что есть.
             if secs and secs < MIN_TALK:
                 continue
-            return {"есть": True, "чем": f"разговор {str(row[0])[11:16]}"
+            return {"есть": True, "чем": f"разговор {str(row[0])[:16].replace('T', ' ')}"
                                          + (f", {secs} с" if secs else "")}
     except Exception:
         pass
     try:
         for row in conn.execute(
-                f"SELECT ts FROM wazzup_inbox WHERE ts >= ? AND substr(phone,-10) IN ({q})",
-                (since, *phones)):
+                f"SELECT ts FROM wazzup_inbox WHERE ts >= ? {'AND ts <= ?' if verh else ''} "
+                f"AND substr(phone,-10) IN ({q}) ORDER BY ts",
+                (since, *((verh,) if verh else ()), *phones)):
             return {"есть": True, "чем": f"клиент написал нам {str(row[0])[5:16]}"}
     except Exception:
         pass
@@ -226,7 +243,8 @@ def audit(vernut: bool = False, days: int = 7) -> dict:
             out["проверено"] += 1
             # Основание ищем на дату отметки, а не на сегодня: разговор был
             # тогда, и через неделю его «за двое суток» уже не видно.
-            osn = _osnovanie(conn, int(r["uid"]), days=_dney_nazad(r["ts"]) + 2)
+            osn = _osnovanie(conn, int(r["uid"]), days=_dney_nazad(r["ts"]) + 2,
+                             do=r["ts"])
             item = {"uid": r["uid"], "имя": names.get(r["uid"], ""),
                     "когда": (r["ts"] or "")[:16], "кто": r["who"],
                     "заметка": (r["note"] or "")[:80]}
