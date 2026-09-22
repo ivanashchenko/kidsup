@@ -1048,6 +1048,22 @@ def inbox_add(text: str, phone: str = "", who: str = "", source: str = "авто
                            (day, text)).fetchone()
         if dup:
             return False
+        # 22.09. Лена: «Афанасьева, Панишева — уже созвонилась, комментарий
+        # написала, задача не уходит». Половина таких пунктов — не задержка
+        # пульта, а ВТОРОЙ пункт про ту же фразу клиента: наряд кладёт
+        # «Клиент ждёт ответа N мин», через час автоматика кладёт «Клиент
+        # писал, ответа нет». Тексты разные, сигнал один; админ закрывает
+        # первый, второй остаётся висеть и выглядит бессмысленным.
+        # Автоматика больше не кладёт второй ОТКРЫТЫЙ пункт на тот же номер
+        # за день. Горящее (🔥) проходит всегда — его терять нельзя.
+        p10 = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
+        if source == "автоматика" and len(p10) == 10 and "🔥" not in text:
+            занят = conn.execute(
+                "SELECT 1 FROM plan_inbox WHERE day=? AND done=0 "
+                "AND length(phone)>=10 AND substr(phone,-10)=?",
+                (day, p10)).fetchone()
+            if занят:
+                return False
         conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) "
                      "VALUES (?,?,?,?,?,?)",
                      (day, _now().isoformat(timespec="minutes"), who, text,
