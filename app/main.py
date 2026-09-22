@@ -2439,6 +2439,15 @@ def api_pult_tasks(day: str = ""):
     return {"day": d, "duty": pult.duty(d), "tasks": pult.tasks(d), "kpi": pult.kpi(d)}
 
 
+@app.get("/api/pult/proverka", dependencies=AUTH)
+def api_pult_proverka(day: str = ""):
+    """Самопроверка пульта: дубли на одну семью, пустышки, строки не тому
+    человеку, обрывки текста, перегруз. 22.09: обещать «без косяков» словами
+    бесполезно — пусть смотрит проверка, и каждый час."""
+    from . import pult_proverka
+    return pult_proverka.proverit(day)
+
+
 @app.post("/api/pult/tasks", dependencies=AUTH)
 def api_pult_tasks_set(payload: dict = Body(...)):
     """{"day": "2026-09-06", "who": "Аня", "items": [{"t": "11:00", "text": "…"}], "replace": true}.

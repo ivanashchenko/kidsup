@@ -4213,6 +4213,20 @@ def _loop() -> None:
                             naryad.raspredelit()
                         except Exception:
                             log.exception("наряд упал — продолжаем")
+                        # 22.09. Сразу после раздачи смотрим на получившийся
+                        # список глазами проверки: дубли на одну семью,
+                        # пустышки, строки не тому человеку. Находки — в лог,
+                        # чинятся в тот же день, а не через неделю по жалобе.
+                        try:
+                            from . import pult_proverka
+                            itog = pult_proverka.proverit()
+                            if not itog.get("ok"):
+                                log.warning("ПУЛЬТ: %s", pult_proverka.kratko())
+                                for b in itog.get("беды", [])[:12]:
+                                    log.warning("  %s: %s — %s (%s)",
+                                                b["род"], b["что"], b["где"], b["почему"])
+                        except Exception:
+                            log.exception("самопроверка пульта упала — продолжаем")
                 finally:
                     mk.close()
                 if now.minute % 20 < 3 and 9 <= now.hour < 20:

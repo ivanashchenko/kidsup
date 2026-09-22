@@ -62,7 +62,11 @@ def _polite(text: str) -> bool:
     parts = [p.strip(" .,!·\n") for p in re.split(r"[.!\n·]+", clean)]
     parts = [p for p in parts if p]
     if not parts:
-        return False
+        # Букв не осталось вообще — значит сообщение было из одних смайликов
+        # («👍», «🌺❤️»). Комментарий над POLITE_RE это и обещал, а код
+        # возвращал False, и «👍» шёл дежурной пунктом. Поймано проверкой
+        # правил 22.09.2026.
+        return bool((text or "").strip())
     return all(POLITE_RE.match(p) for p in parts)
 
 # Что срочнее: ждущий ответа человек важнее старого хвоста в CRM.
