@@ -250,6 +250,7 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
     <p>Занятие идёт целиком на английском, без перевода на русский, с первой минуты. До 8 детей
     в группе — каждый говорит вслух не меньше 12 раз за занятие. Кембриджская лестница:
     Starters → Movers → Flyers.</p>
+    <p class="hero-fakty" style="margin:10px 0 0;font-size:17px;line-height:1.5"><b>8 400 ₽</b> в месяц — 8 занятий, два раза в неделю. Группы с 16:00 до 19:00, понедельник-среда и вторник-четверг. <a href="#groups" style="color:inherit">Посмотреть свободные места →</a></p>
     <form class="mini-lead hero-mini" data-mini="1" action="https://app.kidsup.ru/api/public/lead" method="post">
       <b>Первое занятие — условно-бесплатное. Оставьте номер — подберём группу за один звонок.</b>
       <input id="hero-phone" name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
@@ -281,6 +282,60 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
     <div><b>3–12</b><span>лет — своя дорожка для каждого возраста</span></div>
   </div>
 </div>
+
+<!-- 22.09.2026: расписание и цены подняты к началу. С рекламы /english давал
+     74-77% отказов против 41% у главной: человек искал «английский для детей»,
+     попадал на лонгрид про методику, а цены и свободные места лежали
+     двенадцатым разделом из четырнадцати. -->
+<section id="groups">
+  <div class="wrap">
+    <h2>Группы и свободные места</h2>
+    <p class="lead">Живые данные из нашей системы записи, обновляются каждые несколько минут.
+    В группу до 8 детей — поэтому места заканчиваются быстро.</p>
+    <div class="scroll"><table id="tbl">
+      <thead><tr><th>Возраст</th><th>Уровень</th><th>Дни</th><th>Время</th><th>Места</th></tr></thead>
+      <tbody><tr><td colspan="5" style="color:var(--muted)">Загружаем расписание…</td></tr></tbody>
+    </table></div>
+    <p class="alt" style="text-align:left">Не нашли удобное время — напишите нам, мы ведём лист ожидания
+    и открываем новые группы по спросу.</p>
+  </div>
+</section>
+
+<section style="background:var(--soft);border-block:1px solid var(--line)">
+  <div class="wrap">
+    <h2>Сколько стоит</h2>
+    <div class="price">
+      <div class="box hi">
+        <div class="num">8 400 ₽</div>
+        <small>8 занятий в месяц, 2 раза в неделю</small>
+        <ul>
+          <li>Занятие 50 минут, до 8 детей</li>
+          <li>Домашний аудиоплейлист — без доплаты</li>
+          <li>Видео с занятий и карточка речи</li>
+        </ul>
+      </div>
+      <div class="box">
+        <div class="num">5 000 ₽</div>
+        <small>4 занятия в месяц, 1 раз в неделю</small>
+        <ul>
+          <li>Для тех, кто пробует или совмещает</li>
+          <li>К экзамену за год такой темп не выводит — говорим честно</li>
+        </ul>
+      </div>
+      <div class="box">
+        <div class="num">Первое занятие</div>
+        <small>условно-бесплатное</small>
+        <ul>
+          <li>Не понравилось — платить не нужно</li>
+          <li>Понравилось — занятие входит в первый абонемент</li>
+          <li>В день первого занятия на первый абонемент — скидка 15%</li>
+          <li>−10% на второй предмет, второго ребёнка и многодетным семьям;
+              скидки не суммируются, действует наибольшая</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
 
 <section id="vozrast">
   <div class="wrap">
@@ -548,55 +603,7 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
   </div>
 </section>
 
-<section id="groups">
-  <div class="wrap">
-    <h2>Группы и свободные места</h2>
-    <p class="lead">Живые данные из нашей системы записи, обновляются каждые несколько минут.
-    В группу до 8 детей — поэтому места заканчиваются быстро.</p>
-    <div class="scroll"><table id="tbl">
-      <thead><tr><th>Возраст</th><th>Уровень</th><th>Дни</th><th>Время</th><th>Места</th></tr></thead>
-      <tbody><tr><td colspan="5" style="color:var(--muted)">Загружаем расписание…</td></tr></tbody>
-    </table></div>
-    <p class="alt" style="text-align:left">Не нашли удобное время — напишите нам, мы ведём лист ожидания
-    и открываем новые группы по спросу.</p>
-  </div>
-</section>
 
-<section style="background:var(--soft);border-block:1px solid var(--line)">
-  <div class="wrap">
-    <h2>Сколько стоит</h2>
-    <div class="price">
-      <div class="box hi">
-        <div class="num">8 400 ₽</div>
-        <small>8 занятий в месяц, 2 раза в неделю</small>
-        <ul>
-          <li>Занятие 50 минут, до 8 детей</li>
-          <li>Домашний аудиоплейлист — без доплаты</li>
-          <li>Видео с занятий и карточка речи</li>
-        </ul>
-      </div>
-      <div class="box">
-        <div class="num">5 000 ₽</div>
-        <small>4 занятия в месяц, 1 раз в неделю</small>
-        <ul>
-          <li>Для тех, кто пробует или совмещает</li>
-          <li>К экзамену за год такой темп не выводит — говорим честно</li>
-        </ul>
-      </div>
-      <div class="box">
-        <div class="num">Первое занятие</div>
-        <small>условно-бесплатное</small>
-        <ul>
-          <li>Не понравилось — платить не нужно</li>
-          <li>Понравилось — занятие входит в первый абонемент</li>
-          <li>В день первого занятия на первый абонемент — скидка 15%</li>
-          <li>−10% на второй предмет, второго ребёнка и многодетным семьям;
-              скидки не суммируются, действует наибольшая</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- otzyvy:start -->
 <section id="otzyvy">
