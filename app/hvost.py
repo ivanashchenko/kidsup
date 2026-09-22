@@ -206,3 +206,181 @@ def razobrat(dry: bool = True, den_starosti: int = 7, perenesti: bool = False) -
     itog["итого закрыть"] = len(itog["закрыть"])
     itog["итого перенести"] = len(itog["перенести"])
     return itog
+
+
+# Пункты, которые владелец велел закрыть насовсем: подбор персонала мы не
+# ведём (решение Бориса 22.09.2026 — «соискатели, нам не нужны»).
+NE_NUZHNO = re.compile(r"соискател|резюме|ваканси|hh\.ru|на работу устро|"
+                       r"ищет работу|трудоустрой", re.I)
+
+
+def _semya(conn) -> dict[str, set[int]]:
+    """Телефон → все карточки на нём. Обещание даётся семье, а работа может
+    быть записана в карточку другого ребёнка того же родителя."""
+    out: dict[str, set[int]] = {}
+    try:
+        for uid, ph in conn.execute("SELECT id, phone FROM users").fetchall():
+            p = _p10(ph)
+            if p:
+                out.setdefault(p, set()).add(int(uid))
+    except Exception:
+        pass
+    return out
+
+
+def _posle(conn, sql: str, args=()) -> dict:
+    """uid → максимальная дата события. Молча переживает отсутствие таблицы."""
+    out: dict[int, str] = {}
+    try:
+        for uid, ts in conn.execute(sql, args).fetchall():
+            if uid is None:
+                continue
+            t = str(ts or "")
+            if t > out.get(int(uid), ""):
+                out[int(uid)] = t
+    except Exception:
+        pass
+    return out
+
+
+def proverit(zakryt: bool = False, dry: bool = True) -> dict:
+    """Пройти по каждому живому пункту хвоста и проверить доказательствами,
+    сделан он или нет.
+
+    22.09.2026, Борис: «можешь перепроверить по каждой задаче, что это реально
+    ещё не сделано??» — могу, но только по следам, которые остаются в системе.
+    Их четыре, и они разной силы:
+      • оплата семьи после даты пункта — повод точно отработан;
+      • ребёнок был на занятии после даты — семья дошла;
+      • разговор от 30 секунд по журналу Манго — с семьёй говорили;
+      • комментарий в карточке после даты — админ карточку открывал и писал.
+    Слабее: наше исходящее сообщение или входящее от клиента — контакт был,
+    но обещание могло остаться невыполненным. Такие в «сделано» не идут:
+    их показываем отдельно, решает человек.
+    """
+    from . import pult
+    segodnya = pult.today()
+    itog = {"день": segodnya, "проверено": 0,
+            "сделано": [], "касались": [], "не трогали": [], "не нужно": [],
+            "по доказательствам": {}, "сделано_записано": bool(zakryt and not dry)}
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                "SELECT id, day, who, text, phone, source FROM plan_inbox "
+                "WHERE done=0 AND day<? ORDER BY day, id", (segodnya,)).fetchall()
+        except Exception as e:  # noqa: BLE001
+            return {**itog, "ошибка": str(e)[:120]}
+        if not rows:
+            return itog
+        s_daty = min(r["day"] for r in rows)
+        semya = _semya(conn)
+        oplaty = _posle(conn, "SELECT user_id, MAX(date) FROM payments "
+                              "WHERE date >= ? GROUP BY user_id", (s_daty,))
+        vizity = _posle(conn, "SELECT r.user_id, MAX(l.date) FROM lesson_records r "
+                              "JOIN lessons l ON l.id = r.lesson_id "
+                              "WHERE r.visit = 1 AND l.date >= ? GROUP BY r.user_id", (s_daty,))
+        # Комментарий в карточке — доказательство только когда его написал
+        # ЖИВОЙ администратор. 22.09.2026: первая версия проверки засчитала
+        # 143 пункта «сделано» по комментариям, а туда пишет и автопилот
+        # («🎯 ПОДСКАЗКА ДЛЯ ЗВОНКА» в каждого нового лида), и мой же разбор
+        # звонков — от того же аккаунта, что админы. Правило «кто человек,
+        # а кто робот» уже выверено в воронке, берём его оттуда.
+        from .voronka import MANAGERS as _MGR, _robot as _robot_text
+        kommenty: dict[int, str] = {}
+        robotskie = 0
+        try:
+            for uid, ts, mid, txt in conn.execute(
+                    "SELECT user_id, ts, manager_id, text FROM crm_comments "
+                    "WHERE ts >= ?", (s_daty,)).fetchall():
+                if mid not in _MGR or _robot_text(txt):
+                    robotskie += 1
+                    continue
+                if str(ts or "") > kommenty.get(int(uid), ""):
+                    kommenty[int(uid)] = str(ts)
+        except Exception:
+            pass
+        itog["комментариев_автоматики_не_в_счёт"] = robotskie
+        # телефонные следы — по номеру, не по карточке
+        razgovory: dict[str, str] = {}
+        try:
+            cols = {c[1] for c in conn.execute("PRAGMA table_info(mango_calls)")}
+            secs = "AND COALESCE(secs,999) >= 30" if "secs" in cols else ""
+            for ph, ts in conn.execute(
+                    f"SELECT phone, MAX(ts) FROM mango_calls WHERE state='talked' "
+                    f"AND ts >= ? {secs} GROUP BY phone", (s_daty,)).fetchall():
+                p = _p10(ph)
+                if p and str(ts or "") > razgovory.get(p, ""):
+                    razgovory[p] = str(ts)
+        except Exception:
+            pass
+        pisali: dict[str, str] = {}
+        for tbl in ("wazzup_outbox", "wazzup_inbox"):
+            try:
+                for ph, ts in conn.execute(
+                        f"SELECT phone, MAX(ts) FROM {tbl} WHERE ts >= ? GROUP BY phone",
+                        (s_daty,)).fetchall():
+                    p = _p10(ph)
+                    if p and str(ts or "") > pisali.get(p, ""):
+                        pisali[p] = str(ts)
+            except Exception:
+                pass
+
+        zakryvat: list[tuple[int, str]] = []
+        for r in rows:
+            itog["проверено"] += 1
+            den = r["day"]
+            p = _p10(r["phone"])
+            uids = semya.get(p, set()) if p else set()
+            karta = {"id": r["id"], "день": den, "кто": r["who"],
+                     "текст": (r["text"] or "")[:100]}
+
+            if NE_NUZHNO.search(r["text"] or ""):
+                karta["почему"] = "подбор персонала мы не ведём (решение владельца 22.09)"
+                itog["не нужно"].append(karta)
+                zakryvat.append((r["id"], karta["почему"]))
+                continue
+
+            dokazatelstva = []
+            if any(oplaty.get(u, "") > den for u in uids):
+                dokazatelstva.append("семья оплатила после этой даты")
+            if any(vizity.get(u, "") > den for u in uids):
+                dokazatelstva.append("ребёнок был на занятии после этой даты")
+            if p and razgovory.get(p, "") > den:
+                dokazatelstva.append(f"разговор от 30 с — {razgovory[p][:10]}")
+            if any(kommenty.get(u, "") > den for u in uids):
+                dokazatelstva.append("администратор писал в карточку после этой даты")
+
+            # Пункты владельца по следам в карточках клиентов не закрываем:
+            # у него организационное («групп робототехники в CRM нет»,
+            # «партнёрское предложение»), и запись админа в чужой карточке
+            # про это ничего не говорит. Показываем как подсказку — решает он.
+            if dokazatelstva and r["who"] == "Борис":
+                karta["след"] = "по семье работа была: " + "; ".join(dokazatelstva) + \
+                                " — но это твой пункт, закрывать тебе"
+                itog["касались"].append(karta)
+                continue
+            if dokazatelstva:
+                karta["доказательства"] = dokazatelstva
+                itog["сделано"].append(karta)
+                for d_ in dokazatelstva:
+                    k = d_.split(" —")[0]
+                    itog["по доказательствам"][k] = itog["по доказательствам"].get(k, 0) + 1
+                zakryvat.append((r["id"], "проверено по следам: " + "; ".join(dokazatelstva)))
+            elif p and pisali.get(p, "") > den:
+                karta["след"] = f"переписка была {pisali[p][:10]}, но обещание могло остаться"
+                itog["касались"].append(karta)
+            elif not p:
+                karta["след"] = "телефона в пункте нет — проверить нечем, смотрит человек"
+                itog["не трогали"].append(karta)
+            else:
+                karta["след"] = "ни звонка, ни сообщения, ни комментария — не сделано"
+                itog["не трогали"].append(karta)
+
+        if zakryt and not dry:
+            for iid, pochemu in zakryvat:
+                conn.execute("UPDATE plan_inbox SET done=1, text = text || ? WHERE id=?",
+                             (f" — закрыто {segodnya}: {pochemu}", iid))
+            log.warning("перепроверка хвоста: закрыто %d пунктов", len(zakryvat))
+    for k in ("сделано", "касались", "не трогали", "не нужно"):
+        itog[f"итого {k}"] = len(itog[k])
+    return itog

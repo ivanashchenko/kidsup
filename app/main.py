@@ -2447,6 +2447,22 @@ def api_hvost(dry: int = 1, days: int = 7):
     return hvost.razobrat(dry=bool(int(dry)), den_starosti=int(days))
 
 
+@app.get("/api/hvost/proverka", dependencies=AUTH)
+def api_hvost_proverka():
+    """Перепроверить каждый живой пункт хвоста по следам: оплата, визит на
+    занятие, разговор от 30 с, комментарий в карточке. Только чтение."""
+    from . import hvost
+    return hvost.proverit(zakryt=False, dry=True)
+
+
+@app.post("/api/hvost/proverka", dependencies=OWNER_AUTH)
+def api_hvost_proverka_zakryt(payload: dict = Body(default={})):
+    """Закрыть те пункты хвоста, по которым нашлось доказательство работы,
+    и те, что владелец велел не вести. Только владелец."""
+    from . import hvost
+    return hvost.proverit(zakryt=True, dry=False)
+
+
 @app.post("/api/hvost/razobrat", dependencies=OWNER_AUTH)
 def api_hvost_razobrat(payload: dict = Body(default={})):
     """Сделать разбор: протухшее закрыть с пометкой, живое перенести на
@@ -3444,7 +3460,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-22.18"
+APP_VERSION = "2026-09-22.21"
 
 
 @app.get("/api/net")
