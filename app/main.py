@@ -2513,6 +2513,35 @@ def api_pult_proverka(day: str = ""):
     return pult_proverka.proverit(day)
 
 
+@app.get("/api/pult/svidetelstva", dependencies=AUTH)
+def api_pult_svidetelstva(day: str = "", offset: int = 0, limit: int = 25):
+    """Следы по каждому делу пульта: комментарии, звонки, сообщения, оплаты,
+    визиты и записи по всем телефонам из дела. Только чтение — чтобы
+    проверять «сделано или нет» по фактам, а не по тексту пункта."""
+    from . import svidetelstva
+    return svidetelstva.vygruzka(day, max(0, offset), max(1, min(limit, 60)))
+
+
+@app.post("/api/pult/task-edit", dependencies=AUTH)
+def api_pult_task_edit(payload: dict = Body(...)):
+    """Поправить одну задачу смены: {"id": 1, "text": "...", "t": "11:00"}.
+    Нужно, когда задача собрана по вчерашним данным и формулировка устарела:
+    пересобирать всю колонку ради одной строки — терять галочки и заметки."""
+    from . import pult
+    tid = int(payload.get("id") or 0)
+    sets, args = [], []
+    if str(payload.get("text") or "").strip():
+        sets.append("text=?"); args.append(str(payload["text"]).strip()[:600])
+    if "t" in payload:
+        sets.append("t=?"); args.append(str(payload.get("t") or "")[:5])
+    if not sets:
+        raise HTTPException(400, "нужен text и/или t")
+    with db.get_conn() as conn:
+        pult._init(conn)
+        cur = conn.execute("UPDATE pult_tasks SET " + ", ".join(sets) + " WHERE id=?", args + [tid])
+    return {"ok": cur.rowcount > 0, "id": tid}
+
+
 @app.post("/api/pult/tasks", dependencies=AUTH)
 def api_pult_tasks_set(payload: dict = Body(...)):
     """{"day": "2026-09-06", "who": "Аня", "items": [{"t": "11:00", "text": "…"}], "replace": true}.
@@ -3493,7 +3522,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-22.28"
+APP_VERSION = "2026-09-23.01"
 
 
 @app.get("/api/net")
