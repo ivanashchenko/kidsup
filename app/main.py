@@ -3493,7 +3493,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-22.25"
+APP_VERSION = "2026-09-22.27"
 
 
 @app.get("/api/net")
@@ -6222,6 +6222,81 @@ def api_crm_dossier(q: list[str] = Query(default=[]), days_back: int = 7, days_a
         except Exception:
             pass
     return {"window": [since, until], "groups": out}
+
+
+@app.get("/api/kruzhki/sostav", dependencies=AUTH)
+def api_kruzhki_sostav(q: list[str] = Query(default=["ШАХ", "Робототехника"])):
+    """Кто ходит в партнёрские кружки и сколько раз в неделю — для расчёта
+    экономики групп. Только чтение.
+
+    22.09.2026, Борис: посчитать шахматы и робототехнику по тарифам
+    педагогов-партнёров и решить, какие группы объединять. Для этого по
+    каждому ребёнку нужно: какой абонемент (4 занятия = раз в неделю,
+    8 = два раза), оплачен ли и на какие дни — дни админы пишут в
+    комментарии абонемента.
+    """
+    import json as _json
+    live = (2, 58132, 83760, 58131, 50509)
+    out = []
+    with db.get_conn() as conn:
+        for sub in q:
+            for c in conn.execute("SELECT id, name FROM classes WHERE name LIKE ? "
+                                  "AND name LIKE '2627%' AND COALESCE(status,'')!='archive'",
+                                  (f"%{sub}%",)):
+                deti = []
+                for j in conn.execute(
+                        "SELECT user_id, status_id FROM joins WHERE class_id=? AND status_id IN (%s)"
+                        % ",".join("?" * len(live)), (c["id"], *live)):
+                    u = conn.execute("SELECT name FROM users WHERE id=?", (j["user_id"],)).fetchone()
+                    abon = []
+                    for s_ in conn.execute("SELECT raw FROM user_subscriptions WHERE user_id=?",
+                                           (j["user_id"],)):
+                        try:
+                            r = _json.loads(s_["raw"] or "{}")
+                        except ValueError:
+                            continue
+                        cids = set(r.get("classIds") or [])
+                        if r.get("mainClassId"):
+                            cids.add(r["mainClassId"])
+                        if c["id"] not in cids:
+                            continue
+                        if (r.get("sellDate") or "") < "2026-06-01":
+                            continue
+                        abon.append({"продан": (r.get("sellDate") or "")[:10],
+                                     "занятий": r.get("visitCount") or r.get("itemCount"),
+                                     "цена": r.get("price"), "оплачено": r.get("payed"),
+                                     "с": (r.get("beginDate") or "")[:10],
+                                     "по": (r.get("endDate") or "")[:10],
+                                     "статус": r.get("statusId"),
+                                     "комментарий": (r.get("comment") or "")[:160],
+                                     "название": (r.get("name") or "")[:80]})
+                    # Фактические посещения с 01.09 — по ним видно, в какой
+                    # день ребёнок реально ходит, даже если в абонементе дни
+                    # не написаны.
+                    DN = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+                    byl = []
+                    try:
+                        for (dt,) in conn.execute(
+                                "SELECT l.date FROM lesson_records r JOIN lessons l ON l.id = r.lesson_id "
+                                "WHERE l.class_id=? AND r.user_id=? AND r.visit=1 AND l.date>='2026-09-01' "
+                                "ORDER BY l.date", (c["id"], j["user_id"])):
+                            byl.append(f"{DN[date.fromisoformat(str(dt)[:10]).weekday()]} {str(dt)[8:10]}.{str(dt)[5:7]}")
+                    except Exception:
+                        pass
+                    deti.append({"uid": j["user_id"], "имя": (u["name"] if u else ""),
+                                 "запись": j["status_id"], "абонементы": abon, "был": byl})
+                # Сколько занятий группы реально прошло с 01.09 и в какие дни
+                proshlo = []
+                try:
+                    for (dt,) in conn.execute(
+                            "SELECT date FROM lessons WHERE class_id=? AND date>='2026-09-01' "
+                            "AND date<=? ORDER BY date", (c["id"], date.today().isoformat())):
+                        proshlo.append(str(dt)[:10])
+                except Exception:
+                    pass
+                out.append({"id": c["id"], "группа": c["name"], "дети": deti,
+                            "занятий_прошло": proshlo})
+    return {"группы": out}
 
 
 @app.get("/api/mkweb/status", dependencies=OWNER_AUTH)
