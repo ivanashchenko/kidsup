@@ -2465,14 +2465,10 @@ def api_pult_done(payload: dict = Body(...)):
         state = 1 if payload.get("done", True) else 0
     note = str(payload.get("note") or "").strip()
     tid = int(payload.get("id") or 0)
-    if state == 1 and len(note) < 12:
-        with db.get_conn() as conn:
-            row = conn.execute("SELECT text FROM pult_tasks WHERE id=?", (tid,)).fetchone()
-        phones = set(re.findall(r"\b[78]?9\d{9}\b", (row["text"] if row else "") or ""))
-        if len(phones) == 1:
-            osn = pult._govorili(phones.pop())
-            if not osn["есть"]:
-                return {"ok": False, "нужно": "разговор или заметка", "почему": osn["почему"]}
+    # 22.09. Проверку «галочка только за разговором» я распространил со списка
+    # возврата на весь пульт по своей инициативе — и она стала мешать: дело,
+    # сделанное вчера или закрытое звонком не с нашего номера, отказывалось
+    # закрываться. Решение владельца касалось обзвона бывших, там она и живёт.
     return {"ok": pult.mark(tid, state, note)}
 
 
@@ -3405,7 +3401,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-22.05"
+APP_VERSION = "2026-09-22.06"
 
 
 @app.get("/api/net")
@@ -5737,16 +5733,6 @@ def api_plan_inbox_done(payload: dict = Body(...)):
     note = str(payload.get("note") or "").strip()
     with db.get_conn() as conn:
         _inbox_init(conn)
-        if done and len(note) < 12:
-            row = conn.execute("SELECT text, phone FROM plan_inbox WHERE id=?", (iid,)).fetchone()
-            phone = (row["phone"] if row else "") or ""
-            if not phone and row:
-                found = set(re.findall(r"\b[78]?9\d{9}\b", row["text"] or ""))
-                phone = found.pop() if len(found) == 1 else ""
-            if phone:
-                osn = pult._govorili(phone)
-                if not osn["есть"]:
-                    return {"ok": False, "нужно": "разговор или заметка", "почему": osn["почему"]}
         if note:
             conn.execute("UPDATE plan_inbox SET done=?, text=text||' — '||? WHERE id=?",
                          (1 if done else 0, note[:200], iid))

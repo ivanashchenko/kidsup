@@ -824,11 +824,7 @@ function pultDone(box, kind, id, note){{
   fetch(url, {{method:'POST', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify(body)}})
    .then(function(r){{ return r.json(); }})
    .then(function(res){{
-     if (res && res.ok === false) {{
-       var t = prompt('По этому номеру за последние 4 часа нет ни разговора от 30 секунд, ни отправленного сообщения.\n\nЕсли дело всё-таки сделано — напиши одной фразой, как:\nнапример «говорила с личного», «ответила в WhatsApp», «мама сама пришла».\nЕсли не дозвонилась — нажми «не дозвонилась ☎», строка останется.', '');
-       if (t && t.trim().length >= 12) {{ pultDone(box, kind, id, t.trim()); return; }}
-       box.checked = false; return;
-     }}
+     if (res && res.ok === false) {{ box.checked = false; alert('Не сохранилось: ' + (res.почему || '')); return; }}
      location.reload();
    }})
    .catch(function(){{ box.checked = !box.checked; alert('Не сохранилось, попробуйте ещё раз'); }});

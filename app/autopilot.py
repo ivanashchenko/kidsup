@@ -1358,6 +1358,18 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
                 "WHERE ts >= ? AND chat_type != 'manual' GROUP BY phone", (cutoff,)).fetchall()
             outbox = dict(conn.execute(
                 "SELECT phone, MAX(ts) FROM wazzup_outbox GROUP BY phone").fetchall())
+            # 22.09. Лена: «созвонилась, комментарий написала — задача не уходит».
+            # Так и было: ответом считалось только сообщение в мессенджере, а
+            # админ отвечает звонком. Пункт закрывали, автоматика через час
+            # ставила его заново — и так по кругу. Разговор от 30 секунд по
+            # этому номеру — такой же ответ клиенту, как и сообщение.
+            try:
+                talked = dict(conn.execute(
+                    "SELECT substr(phone,-10), MAX(ts) FROM mango_calls "
+                    "WHERE state='talked' AND ts >= ? GROUP BY substr(phone,-10)",
+                    (cutoff,)).fetchall())
+            except Exception:
+                talked = {}
         except Exception:
             return  # таблиц ещё нет — вебхук не приносил сообщений
         after_broadcast = {p: _got_broadcast(conn, p) for p, *_ in inbox}
@@ -1373,7 +1385,9 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
         if ts_in > (now - timedelta(minutes=UNANSWERED_MIN)).isoformat(timespec="seconds"):
             continue                      # ещё есть время ответить по-человечески
         if outbox.get(phone, "") > ts_in:
-            continue                      # уже ответили
+            continue                      # уже ответили сообщением
+        if talked.get(phone[-10:], "") > ts_in:
+            continue                      # уже поговорили голосом — это тоже ответ
         if not _mark("inbox_task", f"{_today().isoformat()}:{phone[-10:]}"):
             continue                      # задача по этому номеру сегодня уже есть
         uid, name = None, ""
