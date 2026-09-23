@@ -50,32 +50,96 @@
 .prog b{color:#fff}
 .foot{color:var(--mute);font-size:12.5px;margin-top:26px}
 details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-top:6px}
+.src2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.src2 .c{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;border-top:4px solid var(--blue)}
+.src2 .c:nth-child(-n+3){border-top-color:var(--green)}
+.src2 .top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.src2 .nm{font-weight:700;color:var(--ind);font-size:15px;line-height:1.3}
+.src2 .g{font-size:24px;font-weight:700;color:var(--green);white-space:nowrap;font-variant-numeric:tabular-nums}
+.src2 .g small{font-size:12px;color:var(--mute);font-weight:400;display:block;text-align:right}
+.src2 .pul{color:var(--mute);font-size:13px;margin:4px 0 8px}
+.src2 .kak{font-size:14px;line-height:1.45}
+.src2 .kto{margin-top:8px;font-size:12.5px;color:var(--mute)}
+.grp{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}
+.grp .c{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.grp .hd{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.grp .nm{font-weight:600;font-size:14px;line-height:1.35;color:var(--ink)}
+.grp .st{font-size:12px;border-radius:999px;padding:2px 9px;white-space:nowrap;border:1px solid var(--line)}
+.grp .st.pp{background:#eef8df;border-color:#cbe6a3;color:#3f6d00}.grp .st.em{background:#e8f6fd;border-color:#b6e1f5;color:#0b5f86}
+.grp .st.sl{background:#fff4e0;border-color:#ffd9a0;color:#8a5a00}.grp .st.pe{background:#fde8ea;border-color:#f6b8be;color:#9b0610}
+.grp .num{color:var(--mute);font-size:12.5px;margin:4px 0 6px;font-variant-numeric:tabular-nums}
+.grp .dl{font-size:13.5px;line-height:1.45}
+.grp ul{margin:6px 0 0;padding-left:16px;font-size:13px}.grp li{margin:3px 0}
+.days2 .r{display:grid;grid-template-columns:120px 70px 1fr;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);background:#fff;align-items:start}
+.days2{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.days2 .r:last-child{border-bottom:0}.days2 .dn{font-weight:600;color:var(--ind)}.days2 .cl{font-weight:700;color:var(--green);font-variant-numeric:tabular-nums}
+@media(max-width:640px){.days2 .r{grid-template-columns:1fr}}
 @media(max-width:640px){.p3 h1{font-size:24px}.tasks .t{grid-template-columns:24px 52px 1fr}.day .p .row{grid-template-columns:44px 1fr}}
 </style>
 
 <div class="p3">
 <h1>Как донабрать группы до 311</h1>
-<p class="lead">Анализ на {{ d.дата }} · 6 направлений, каждое перепроверено отдельным агентом, затем синтез и критика · данные — снимок CRM, журнала звонков и переписок</p>
+<p class="lead">Разбор на {{ d.дата }} · 6 направлений (группы, математика, свои базы, реклама, воронка, район), затем сводка и две независимые проверки — цифр и правил · оплаченные и пробные на карточках сверху считаются живыми</p>
 
 <div class="kpi">
   <div class="c"><div class="n">{{ k.paid }}</div><div class="l">оплаченных детей сезона — уникальных, впервые оплативших с 31.08 (официальный счётчик)</div></div>
   <div class="c"><div class="n bad">{{ k.gap }}</div><div class="l">не хватает до 311 — это {{ k.per_day }} новых оплат в день на {{ k.days_left or 9 }} дн. до 30.09</div></div>
   <div class="c"><div class="n warn">{{ k.pace }}</div><div class="l">фактический темп новых оплат в день за последние две недели</div></div>
   <div class="c"><div class="n">{{ k.trials_do_sroka or k.trials }}</div><div class="l">детей записаны на пробное и успевают до 30.09 — главный ресурс{% if k.trials_pozzhe %}; ещё {{ k.trials_pozzhe }} записаны на октябрь и позже, в сентябрьский счёт не идут{% endif %}</div></div>
-  <div class="c"><div class="n warn">{{ k.show }}%</div><div class="l">доходимость на пробное за сентябрь; из пришедших покупают {{ k.buy }}%</div></div>
-  <div class="c"><div class="n ok">{{ k.forecast }}</div><div class="l">реалистично к 30.09 при хорошей работе; 311 — к {{ k.date311 }}</div></div>
+  {% if k.show %}<div class="c"><div class="n warn">{{ k.show }}%</div><div class="l">доходимость на пробное за сентябрь; из пришедших покупают {{ k.buy }}%</div></div>{% endif %}
+  {% if k.nuzhno %}<div class="c"><div class="n warn">{{ k.nuzhno }}</div><div class="l">новых оплат в день нужно, чтобы выйти на 311 к {{ k.date311 }}</div></div>{% endif %}
+  <div class="c"><div class="n ok">{{ k.forecast }}</div><div class="l">реалистичный рубеж к 30.09; 311 — {{ k.date311 }}</div></div>
 </div>
 
 <h2>Где мы и почему группы не полные</h2>
 <div class="card"><ul>{% for s in kartina %}<li>{{ s }}</li>{% endfor %}</ul></div>
 
-<h2>Откуда взять новых детей за {{ k.days_left or 9 }} дн. <small>без двойного счёта — списки пересекаются</small></h2>
+<h2>Откуда взять новых детей <small>отсортировано по оплатам за 7 дней · без двойного счёта — списки пересекаются</small></h2>
+{% if istochniki_new %}
+<div class="src2">
+{% for s in istochniki_new %}
+  <div class="c">
+    <div class="top"><div class="nm">{{ s.nazvanie }}</div><div class="g">+{{ s.oplat_7 }}<small>за 7 дн. · за 3 нед. +{{ s.oplat_21 }}</small></div></div>
+    <div class="pul">Пул: {{ s.pul }}</div>
+    <div class="kak">{{ s.kak }}</div>
+    <div class="kto">Кто: {{ s.kto }}</div>
+    <details class="more"><summary>Почему такие цифры</summary><div class="kak" style="margin-top:6px;color:var(--mute)">{{ s.pochemu }}</div></details>
+  </div>
+{% endfor %}
+</div>
+{% else %}
 <div class="src">
 {% for s in istochniki %}
   <div class="c"><div class="g">{{ s.g }}</div><div class="t">{{ s.t }}</div></div>
 {% endfor %}
 </div>
-<details class="more"><summary>Деньги, которые не двигают счётчик, но нужны</summary><div class="card" style="margin-top:8px"><ul>{% for s in dengi %}<li>{{ s }}</li>{% endfor %}</ul></div></details>
+{% endif %}
+{% if dengi %}<details class="more"><summary>Деньги, которые не двигают счётчик, но нужны</summary><div class="card" style="margin-top:8px"><ul>{% for s in dengi %}<li>{{ s }}</li>{% endfor %}</ul></div></details>{% endif %}
+
+{% if gruppy %}
+<h2>Группы: чем заполнить <small>{{ gruppy|length }} групп, где есть что делать · свободно {{ svobodno }} мест · сначала почти полные — их добить быстрее всего</small></h2>
+<div class="grp">
+{% for g in gruppy %}
+  {% set cls = {'почти полная':'pp','есть места':'em','слабая':'sl','переполнена':'pe','полная':'pp'}.get(g.sostoyanie,'em') %}
+  <div class="c">
+    <div class="hd"><div class="nm">{{ g.gruppa }}</div><span class="st {{ cls }}">{{ g.sostoyanie }}</span></div>
+    <div class="num">{{ g.predmet }} · мест {{ g.mest }} · оплачено {{ g.oplacheno }} · свободно {{ g.svobodno }}</div>
+    <div class="dl">{{ g.chto_delat }}</div>
+    {% if g.kandidaty %}<ul>{% for c in g.kandidaty %}<li><b>{{ c.imya }}</b> {% if c.telefon %}<a href="tel:+{{ c.telefon|replace('+','') }}">{{ c.telefon }}</a>{% endif %} — {{ c.pochemu }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if d.novye_gruppy %}
+<h2>Новые группы из листов ожидания <small>открываем при 4 предоплатах</small></h2>
+<div class="card"><ul>{% for n in d.novye_gruppy %}<li><b>{{ n.gruppa }}</b> — {{ n.interes }}. <span class="muted">Условие: {{ n.uslovie }} · кто: {{ n.kto }}</span></li>{% endfor %}</ul></div>
+{% endif %}
+
+{% if d.po_dnyam %}
+<h2>По дням</h2>
+<div class="days2">{% for r in d.po_dnyam %}<div class="r"><div class="dn">{{ r.den }}</div><div class="cl">{{ r.cel }}</div><div>{{ r.glavnoe }}</div></div>{% endfor %}</div>
+{% endif %}
 
 <h2>Решения владельца <small>в порядке срочности</small></h2>
 <div class="dec">
@@ -99,7 +163,7 @@ details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-to
 {% endfor %}
 </div>
 
-<h2>Пульт на три дня <small>то же, что видят админы на <a href="/pult">app.kidsup.ru/pult</a>: та же база, те же галочки. Сверху — дела из плана смены, ниже счётчик того, что прилетело за день</small></h2>
+<h2>Пульт на три дня <small>живой: то же, что видят админы на <a href="/pult">app.kidsup.ru/pult</a>: та же база, те же галочки. Сверху — дела из плана смены, ниже счётчик того, что прилетело за день</small></h2>
 <div class="days">
 {% for day in pult_days %}
   <div class="day">

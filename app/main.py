@@ -3226,21 +3226,32 @@ def api_istochniki_spravochnik():
 
 
 @app.get("/plan311", response_class=HTMLResponse, dependencies=AUTH)
-def plan311_page(request: Request, day: str = "2026-09-21"):
-    """Итог анализа набора до 311 (21.09): картина, откуда взять детей,
-    решения владельца, задачи админам, пульт на три дня, риски, прогноз.
-    Данные — docs/rabota/plan/311_<дата>.json, результат многоагентного разбора."""
+def plan311_page(request: Request, day: str = ""):
+    """Итог анализа набора до 311: картина, откуда взять детей, какие группы
+    чем заполнять, решения владельца, задачи админам, пульт, риски, прогноз.
+    Данные — docs/rabota/plan/311_<дата>.json, результат многоагентного разбора.
+
+    23.09.2026: страница была прибита к разбору 21.09 (day по умолчанию), и
+    новый разбор не появился бы, пока кто-то не поправит ссылку. Без даты
+    открываем самый свежий файл."""
     import re as _re
     from pathlib import Path as _P
-    f = _P(__file__).resolve().parent.parent / "docs" / "rabota" / "plan" / f"311_{day}.json"
+    papka = _P(__file__).resolve().parent.parent / "docs" / "rabota" / "plan"
+    if not day:
+        vse = sorted(papka.glob("311_*.json"))
+        if not vse:
+            raise HTTPException(404, "плана нет")
+        day = vse[-1].stem[4:]
+    f = papka / f"311_{day}.json"
     if not f.exists():
         raise HTTPException(404, "плана на эту дату нет")
     d = json.loads(f.read_text(encoding="utf-8"))
     d["дата"] = day
     # картина — по предложениям
     kartina = [x.strip() for x in _re.split(r"(?<=[.!?])\s+(?=[А-ЯA-Z0-9«])", d["kartina"]) if x.strip()]
-    # математика: «(1) …; (2) …» → карточки; хвост про деньги — отдельно
-    parts = _re.split(r"\s\((\d)\)\s", d["matematika"])
+    # математика: «(1) …; (2) …» → карточки; хвост про деньги — отдельно.
+    # С 23.09 источники приходят списком (istochniki) — тогда разбор текста не нужен.
+    parts = _re.split(r"\s\((\d)\)\s", d.get("matematika") or "")
     istochniki, dengi = [], []
     for i in range(1, len(parts) - 1, 2):
         txt = parts[i + 1].strip().rstrip(";.")
@@ -3256,6 +3267,13 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
         dengi = [x.strip() for x in _re.split(r"(?<=[.;])\s+", parts[-1]) if "Деньги" in x or "₽" in x]
     k = {"paid": 205, "gap": 106, "per_day": "11,8", "pace": "5–6", "trials": 50,
          "show": 66, "buy": 83, "forecast": "225–243", "date311": "12–20 октября"}
+    if isinstance(d.get("istochniki"), list):          # разбор с 23.09
+        istochniki_new = d["istochniki"]
+        k.update(pace=d.get("temp") or k["pace"], forecast=d.get("rubezh_30") or k["forecast"],
+                 date311=d.get("data_311") or k["date311"], show=None, buy=None,
+                 nuzhno=d.get("nuzhno_v_den") or "")
+    else:
+        istochniki_new = []
     # Счётчик оплаченных и ресурс пробных берём живыми: 21.09 Борис спросил,
     # согласованы ли /pult и эта страница. Статичный снимок расходится с
     # пультом в тот же день, а две разные цифры на двух страницах — хуже,
@@ -3283,7 +3301,13 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
     WD = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
     pult_days = []
     from . import pult as _pult
-    for dd in sorted({r["day"] for r in d["pult"]}):
+    # пульт на три дня: по разбору 21.09 — его дни; в новых разборах пульта
+    # в файле нет, показываем живой пульт сегодня, завтра и послезавтра.
+    dni = sorted({r["day"] for r in d.get("pult") or []})
+    if not dni:
+        _t0 = date.fromisoformat(_pult.today())
+        dni = [(_t0 + timedelta(days=i)).isoformat() for i in range(3)]
+    for dd in dni:
         # Задачи — живые из пульта, а не из снимка анализа: пульт меняется в
         # течение дня (наряд, отмены, новые заявки), и страница обязана это
         # показывать, иначе админ видит одно, а владелец — другое.
@@ -3313,7 +3337,7 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
                   for x in sorted(live.get(who, []), key=lambda x: x["t"])]
             if not rs:                       # день ещё не собран — показываем план
                 rs = sorted(({"t": r["t"], "text": r["text"], "done": 0}
-                             for r in d["pult"] if r["day"] == dd and r["who"] == who),
+                             for r in d.get("pult") or [] if r["day"] == dd and r["who"] == who),
                             key=lambda r: r["t"])
             if rs:
                 n_in, d_in = inb.get(who, (0, 0))
@@ -3324,8 +3348,13 @@ def plan311_page(request: Request, day: str = "2026-09-21"):
                           "n": len(rows), "by_who": by,
                           "inbox": sum(n for n, _ in inb.values()),
                           "done": sum(1 for r in rows if r.get("done") == 1)})
+    gruppy = d.get("gruppy") or []
+    PORYADOK = {"почти полная": 0, "есть места": 1, "слабая": 2, "переполнена": 3, "полная": 4}
+    gruppy = sorted(gruppy, key=lambda g: (PORYADOK.get(g.get("sostoyanie"), 9), -(g.get("svobodno") or 0)))
     return render(request, "plan311.html", active="plan311", d=d, k=k, kartina=kartina,
-                  istochniki=istochniki, dengi=dengi, pult_days=pult_days)
+                  istochniki=istochniki, dengi=dengi, pult_days=pult_days,
+                  istochniki_new=istochniki_new, gruppy=gruppy,
+                  svobodno=sum(int(g.get("svobodno") or 0) for g in gruppy))
 
 
 @app.get("/obzvon", response_class=HTMLResponse, dependencies=AUTH)
