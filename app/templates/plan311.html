@@ -84,13 +84,16 @@ details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-to
 <div class="kpi">
   <div class="c"><div class="n">{{ k.paid }}</div><div class="l">оплаченных детей сезона — уникальных, впервые оплативших с 31.08 (официальный счётчик)</div></div>
   <div class="c"><div class="n bad">{{ k.gap }}</div><div class="l">не хватает до 311 — это {{ k.per_day }} новых оплат в день на {{ k.days_left or 9 }} дн. до 30.09</div></div>
-  <div class="c"><div class="n warn">{{ k.pace }}</div><div class="l">фактический темп новых оплат в день за последние две недели</div></div>
+  <div class="c"><div class="n warn">{{ k.pace }}</div><div class="l">новых оплат в день за последние 4 дня (за 14 дней — 4,3; темп падает)</div></div>
   <div class="c"><div class="n">{{ k.trials_do_sroka or k.trials }}</div><div class="l">детей записаны на пробное и успевают до 30.09 — главный ресурс{% if k.trials_pozzhe %}; ещё {{ k.trials_pozzhe }} записаны на октябрь и позже, в сентябрьский счёт не идут{% endif %}</div></div>
   {% if k.show %}<div class="c"><div class="n warn">{{ k.show }}%</div><div class="l">доходимость на пробное за сентябрь; из пришедших покупают {{ k.buy }}%</div></div>{% endif %}
-  {% if k.nuzhno %}<div class="c"><div class="n warn">{{ k.nuzhno }}</div><div class="l">новых оплат в день нужно, чтобы выйти на 311 к {{ k.date311 }}</div></div>{% endif %}
+  {% if k.nuzhno %}<div class="c"><div class="n warn">{{ k.nuzhno }}</div><div class="l">новых оплат в день нужно, чтобы выйти на 311 к 31.10; к 30.09 нужно было бы {{ k.per_day }} — это невозможно</div></div>{% endif %}
   <div class="c"><div class="n ok">{{ k.forecast }}</div><div class="l">реалистичный рубеж к 30.09; 311 — {{ k.date311 }}</div></div>
 </div>
 
+{% if d.matematika_tekst %}
+<details class="more"><summary>Как посчитаны темп, рубеж и срок</summary><div class="card" style="margin-top:8px"><ul>{% for h, x in d.matematika_tekst %}<li><b>{{ h }}.</b> {{ x }}</li>{% endfor %}</ul></div></details>
+{% endif %}
 <h2>Где мы и почему группы не полные</h2>
 <div class="card"><ul>{% for s in kartina %}<li>{{ s }}</li>{% endfor %}</ul></div>
 
