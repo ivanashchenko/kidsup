@@ -197,9 +197,25 @@ def test_data_gruppy():
              ap._next_lesson(Mk(), 7, days=99999), "5 января в 10:00")
 
 
+
+# ── 7. Повторное «позвонить» не ложится поверх открытого хвоста ──────────
+# 23.09 в 08:01 утренний добор положил Ане «Недозвон, попытка №1: Комлев»
+# и «…Княжев», хотя у обоих с прошлых дней открыты «недозвон, повтор №2»
+# и «ВЕРНУТЬ». Проверка дублей смотрела только сегодняшний день.
+def test_povtor():
+    print("Повторные звонки сверяются с хвостом")
+    from app.autopilot import POVTOR_RE
+    for t, zhdali in (("Недозвон, попытка №1: Комлев Ярослав +79251766455", True),
+                      ("ВЕРНУТЬ: Княжев Богдан 79263891584", True),
+                      ("Не пришёл на пробное: Даша", True),
+                      ("Клиент писал, ответа нет (18:34, +79151316404)", False),
+                      ("🔥 НОВАЯ ЗАЯВКА — позвонить в течение 5 минут!", False)):
+        proverka(t[:40], bool(POVTOR_RE.match(t)), zhdali)
+
+
 def main():
     for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_audit,
-              test_data_gruppy):
+              test_data_gruppy, test_povtor):
         t()
         print()
     if oshibok:

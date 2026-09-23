@@ -33,6 +33,33 @@ JUNK_RE = re.compile(r"дубл|7777777777|тест|собеседован", re.
 CAMP_RE = re.compile(r"лагер|летн|_лк\b|клуб", re.I)
 
 
+def provereno() -> dict:
+    """Заявки, по которым проверка установила, что работы нет: {phone10:
+    {"why": "...", "do": "YYYY-MM-DD"}}.
+
+    23.09.2026. Борис спросил, проверена ли на пульте каждая задача. Блок
+    заявок проверен не был: в нём стояли «наш педагог», фотостудия, личный
+    номер педагога, «дубль», семьи со статусом «отказ» и объяснением в
+    карточке — всё это с пометкой «поставить статус» или «набрать ещё раз».
+    Такие строки после проверки уходят из блока и из наряда, но не молча:
+    внизу блока видно, сколько скрыто и почему. Новая заявка с того же номера
+    (созданная позже даты проверки) снова появится.
+    """
+    try:
+        d = json.loads(db.get_setting("zayavki_provereno") or "{}")
+        return d if isinstance(d, dict) else {}
+    except ValueError:
+        return {}
+
+
+def skryto(phone, created: str = "") -> str:
+    """Причина, если строка проверена и работы по ней нет; иначе пусто."""
+    p = provereno().get(str(phone or "")[-10:])
+    if not p:
+        return ""
+    return p.get("why") or "проверено" if (created or "")[:10] <= p.get("do", "") else ""
+
+
 _CALLS: dict = {"ts": None, "idx": {}}
 
 
@@ -129,6 +156,9 @@ def collect() -> dict:
                                            (p10, since)).fetchone()[0]
                     n_talk = conn.execute("SELECT COUNT(*) FROM mango_calls WHERE substr(phone,-10)=? "
                                           "AND ts>=? AND state='connected'", (p10, since)).fetchone()[0]
+            if skryto(p10, since):
+                out["skryto"] = out.get("skryto", 0) + 1
+                continue
             row = {"join": j["id"], "uid": u["id"], "name": u["name"] or "", "phone": p10,
                    "class": re.sub(r"^2627_", "", cname), "comment": comment,
                    "created": since[:10], "calls": n_calls, "out": n_out, "in": n_in,
@@ -177,7 +207,7 @@ def _checked_block() -> str:
     d = zayavki_audit.cached()
     if not d:
         return ""
-    fams = d["семьи"]
+    fams = [f for f in d["семьи"] if not skryto(f.get("phone"), f.get("created", ""))]
 
     def _sec(kind: str) -> list[dict]:
         return [f for f in fams if f["kind"] == kind]
@@ -238,6 +268,13 @@ def _checked_block() -> str:
                                for r in rows) + "</ul></details>")
     except Exception:  # проверенный блок важнее хвостов
         pass
+    skr = [(ph, v) for ph, v in provereno().items()]
+    if skr:
+        p.append(f"<details style='margin-top:8px;font-size:12.5px;color:#6c6a86'><summary "
+                 f"style='cursor:pointer'>Проверено, работы нет — {len(skr)} (скрыты из блока и наряда)"
+                 f"</summary><ul style='margin:6px 0 0;padding-left:18px'>"
+                 + "".join(f"<li>{html.escape(ph)} — {html.escape(str(v.get('why', ''))[:110])}</li>"
+                           for ph, v in skr) + "</ul></details>")
     when = zayavki_audit._CACHE.get("ts")
     p.append(f"<div style='font-size:12px;color:#6c6a86;margin-top:8px'>Проверено "
              f"{when.strftime('%d.%m в %H:%M') if when else 'только что'}, "

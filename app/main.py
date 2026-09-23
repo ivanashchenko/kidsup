@@ -2522,6 +2522,42 @@ def api_pult_svidetelstva(day: str = "", offset: int = 0, limit: int = 25):
     return svidetelstva.vygruzka(day, max(0, offset), max(1, min(limit, 60)))
 
 
+@app.get("/api/pult/sledy", dependencies=AUTH)
+def api_pult_sledy(phone: str, days: int = 30):
+    """Те же следы, что в /api/pult/svidetelstva, но по любому номеру —
+    для строк, которые не лежат в пунктах (например, блок заявок)."""
+    from . import svidetelstva
+    from datetime import date as _d, timedelta as _td
+    p10 = svidetelstva._p10(phone)
+    if not p10:
+        raise HTTPException(400, "нужен телефон из 10+ цифр")
+    since = (_d.today() - _td(days=max(1, min(days, 120)))).isoformat()
+    with db.get_conn() as conn:
+        return svidetelstva._sledy(conn, p10, since, _d.today().isoformat())
+
+
+@app.post("/api/zayavki/provereno", dependencies=AUTH)
+def api_zayavki_provereno(payload: dict = Body(...)):
+    """Отметить заявку проверенной — работы по ней нет: {"phone": "79…",
+    "why": "…"}; {"phone": …, "remove": true} — вернуть в блок. Строка
+    уходит из блока заявок и из наряда, а внизу блока остаётся причина."""
+    from . import zayavki
+    import json as _json
+    p10 = "".join(c for c in str(payload.get("phone") or "") if c.isdigit())[-10:]
+    if len(p10) != 10:
+        raise HTTPException(400, "нужен телефон")
+    d = zayavki.provereno()
+    if payload.get("remove"):
+        d.pop(p10, None)
+    else:
+        why = str(payload.get("why") or "").strip()[:200]
+        if len(why) < 8:
+            raise HTTPException(400, "нужна причина своими словами")
+        d[p10] = {"why": why, "do": str(payload.get("do") or date.today().isoformat())[:10]}
+    db.set_setting("zayavki_provereno", _json.dumps(d, ensure_ascii=False))
+    return {"ok": True, "vsego": len(d)}
+
+
 @app.post("/api/pult/task-edit", dependencies=AUTH)
 def api_pult_task_edit(payload: dict = Body(...)):
     """Поправить одну задачу смены: {"id": 1, "text": "...", "t": "11:00"}.
@@ -3522,7 +3558,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-23.02"
+APP_VERSION = "2026-09-23.03"
 
 
 @app.get("/api/net")

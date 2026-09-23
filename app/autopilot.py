@@ -1165,6 +1165,11 @@ def obrezat(text: str, predel: int) -> str:
     return kusok[:granica].rstrip(" ,;:—-") + "…"
 
 
+# Пункты вида «позвонить ещё раз»: второй такой на семью, у которой уже
+# открыт звонок с прошлых дней, — дубль (см. inbox_add).
+POVTOR_RE = re.compile(r"(Недозвон|ВЕРНУТЬ|Не пришёл на пробное|Заявка|С семьёй говорили|Хвост:)")
+
+
 def inbox_add(text: str, phone: str = "", who: str = "", source: str = "автоматика") -> bool:
     """Пункт в инбокс пульта — единственный список дел, кроме колонок.
 
@@ -1216,6 +1221,16 @@ def inbox_add(text: str, phone: str = "", who: str = "", source: str = "авто
                 "SELECT 1 FROM plan_inbox WHERE day=? AND done=0 "
                 "AND length(phone)>=10 AND substr(phone,-10)=?",
                 (day, p10)).fetchone()
+            # 23.09.2026. Проверка смотрела только сегодняшний день, а у
+            # семей с прошлых дней висят открытые «ВЕРНУТЬ…» и «недозвон,
+            # повтор №2». Утренний добор в 08:01 положил Ане второй пункт
+            # «позвонить» Комлеву и Княжеву поверх уже открытых. Повторные
+            # «позвонить ещё раз» сверяем со всем незакрытым хвостом.
+            if not занят and POVTOR_RE.match(text):
+                занят = conn.execute(
+                    "SELECT 1 FROM plan_inbox WHERE day<=? AND done=0 AND "
+                    "((length(phone)>=10 AND substr(phone,-10)=?) OR text LIKE ?)",
+                    (day, p10, f"%{p10}%")).fetchone()
             if занят:
                 return False
         # Номер храним с кодом страны. 22.09.2026, аудит: наряд клал десять

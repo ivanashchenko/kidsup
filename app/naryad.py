@@ -130,9 +130,22 @@ def _busy(day: str) -> set[str]:
     from . import pult
     out: set[str] = set()
     blob = json.dumps(pult.tasks(day), ensure_ascii=False)
+    # 23.09.2026. Смотрели только сегодняшний день. А незакрытый хвост
+    # прошлых дней тоже стоит на пульте, и наряд клал второй пункт на ту же
+    # семью. И наоборот: дело, закрытое вчера после разговора или проверки
+    # («отказ», «уже оплатили»), назавтра возвращалось из живого списка.
+    # Поэтому заняты: всё открытое до сегодня включительно и всё, что
+    # закрыли за последние два дня.
+    from datetime import date as _d, timedelta as _td
+    try:
+        dva = (_d.fromisoformat(day) - _td(days=2)).isoformat()
+    except ValueError:
+        dva = day
     with db.get_conn() as conn:
         try:
-            rows = conn.execute("SELECT text, phone FROM plan_inbox WHERE day=?", (day,)).fetchall()
+            rows = conn.execute("SELECT text, phone FROM plan_inbox WHERE day=? "
+                                "OR (done=0 AND day<?) OR (day>=? AND day<?)",
+                                (day, day, dva, day)).fetchall()
         except Exception:
             rows = []
     blob += " ".join(f"{t or ''} {p or ''}" for t, p in rows)
@@ -168,6 +181,8 @@ def sobrat(day: str = "") -> list[dict]:
     # 1. Проверенные заявки: по каждой уже известно, чего не хватает.
     checked = zayavki_audit.cached(max_age_min=180) or {}
     for f in checked.get("семьи", []):
+        if zayavki.skryto(f.get("phone"), f.get("created", "")):
+            continue                 # проверено: работы по заявке нет
         want = " + ".join(dict.fromkeys(x for x in f.get("хочет") or [] if x))[:60]
         nm = f.get("name") or f.get("phone")
         days = f.get("days")
