@@ -162,7 +162,7 @@ details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-to
 <div class="tasks">
 {% for p in d.plan_adminam %}
   <div class="t"><div class="n">{{ p.n }}</div><div><span class="who {{ p.komu.split(' ')[0].split('/')[0] }}">{{ p.komu }}</span></div>
-    <div><div class="b">{{ p.chto }}</div><div class="m">⏱ {{ p.srok }} · ▲ {{ p.effekt }}</div></div></div>
+    <div><div class="b">{{ p.chto }}</div><div class="m">⏱ {{ p.srok }} · ▲ {{ p.effekt }}{% if p.na_pulte %} · <b style="color:#3f6d00">на пульте: {{ p.na_pulte }}</b>{% endif %}</div></div></div>
 {% endfor %}
 </div>
 
