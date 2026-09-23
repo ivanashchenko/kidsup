@@ -175,9 +175,31 @@ def test_audit():
     proverka("больше суток", naryad._zhdet(2645), "больше суток")
 
 
+# ── 6. Дата первого занятия — только из той группы, куда записали ─────────
+# 10.09 Новикову Льву пришло «Робототехника 11 сентября в 10:00» — это был
+# его нулевой класс. 23.09: откат «нет записей в группе → берём любую» убран.
+def test_data_gruppy():
+    print("Дата первого занятия в подтверждении записи")
+    from app import autopilot as ap
+
+    class Mk:
+        def get(self, path, params=None):
+            return {"lessonRecords": [
+                {"lesson": {"classId": 1, "date": "2099-01-05", "beginTime": "10:00"}},
+                {"lesson": {"classId": 2, "date": "2099-01-09", "beginTime": "17:00"}},
+            ]}
+    proverka("своя группа", ap._next_lesson(Mk(), 7, days=99999, class_id=2), "9 января в 17:00")
+    proverka("несколько групп — ближайшая из них",
+             ap._next_lesson(Mk(), 7, days=99999, class_id=[2, 1]), "5 января в 10:00")
+    proverka("в группе записей нет — даты нет, чужую не берём",
+             ap._next_lesson(Mk(), 7, days=99999, class_id=3), "")
+    proverka("группа не известна — ближайшая любая",
+             ap._next_lesson(Mk(), 7, days=99999), "5 января в 10:00")
+
 
 def main():
-    for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_audit):
+    for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_audit,
+              test_data_gruppy):
         t()
         print()
     if oshibok:

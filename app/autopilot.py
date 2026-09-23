@@ -1758,7 +1758,8 @@ def trial_reminder_2h(mk: MoyklassClient) -> None:
         log.info("напоминание за 2 часа: %s на %s", phone[-4:], begin)
 
 
-def _next_lesson(mk: MoyklassClient, uid: int, days: int = 21, class_id: int | None = None) -> str:
+def _next_lesson(mk: MoyklassClient, uid: int, days: int = 21,
+                 class_id: int | list | None = None) -> str:
     """Ближайшее БУДУЩЕЕ занятие, на которое записан именно этот ребёнок:
     «7 сентября в 18:00». Пусто — записи на конкретное занятие нет.
 
@@ -1779,8 +1780,15 @@ def _next_lesson(mk: MoyklassClient, uid: int, days: int = 21, class_id: int | N
     # 05.09 Русанову ушло «МА · вс. Первое занятие — 11 сентября в 19:00»: группа
     # из одной записи, дата из другой (шахматы). Когда известна группа — дата
     # берётся только из занятий этой группы.
+    #
+    # 23.09.2026. Здесь стоял откат «… or rows»: если в новой группе записей
+    # ещё нет, дата бралась из любой другой — и 10.09 Новикову Льву ушло
+    # «Робототехника 11 сентября в 10:00», а это был его нулевой класс.
+    # Нет записи в этой группе — даты нет, подтверждение скажет «уточнит
+    # администратор». class_id может быть списком: у семьи несколько записей.
     if class_id:
-        rows = [r for r in rows if (r.get("lesson") or {}).get("classId") == class_id] or rows
+        want = set(class_id) if isinstance(class_id, (list, tuple, set)) else {class_id}
+        rows = [r for r in rows if (r.get("lesson") or {}).get("classId") in want]
     dates = sorted(((r.get("lesson") or {}).get("date"), ((r.get("lesson") or {}).get("beginTime") or "")[:5])
                    for r in rows if (r.get("lesson") or {}).get("date"))
     dates = [(d, t) for d, t in dates if d > today or (d == today and t > now_hm)]
@@ -2476,8 +2484,11 @@ def confirm_joins(mk: MoyklassClient) -> None:
         for fuid in fam["uids"]:
             mine += past.get(fuid, [])
         cont = all(_continuing(mine, cls, cid) for cid in fam["cids"])
-        # дата — по записям КАЖДОГО ребёнка семьи на занятия, не по группе
-        firsts = [f for f in (_next_lesson(mk, fuid) for fuid in fam["uids"]) if f]
+        # дата — по записям КАЖДОГО ребёнка семьи на занятия, не по группе.
+        # 23.09: и только на занятия ТЕХ групп, в которые его сейчас записали —
+        # без этого называлась ближайшая дата любой его группы.
+        firsts = [f for f in (_next_lesson(mk, fuid, class_id=fresh_ids.get(fuid) or None)
+                              for fuid in fam["uids"]) if f]
         if len(set(firsts)) == 1:
             when_start = f"Первое занятие — {firsts[0]}."
         elif firsts:
