@@ -1207,6 +1207,26 @@ def inbox_add(text: str, phone: str = "", who: str = "", source: str = "авто
                                "AND COALESCE(phone,'')=''", (day, text)).fetchone()
         if dup:
             return False
+        # 23.09.2026. Мама Стефании в 08:27 и 08:29 отправила с сайта две
+        # формы (актёрское мастерство и бальные танцы) — у Ани стало два 🔥
+        # пункта на один звонок, а следом пришёл третий, без имени и номера,
+        # от проверки «свежий лид». Вторая заявка той же семьи за день
+        # дописывается в первый пункт, отдельной строки не будет.
+        if "НОВАЯ ЗАЯВКА" in text:
+            m = re.search(r"(?<!\d)(?:\+?7|8)?(9\d{9})(?!\d)", text)
+            pz = m.group(1) if m else p10
+            if len(pz) == 10:
+                old = conn.execute(
+                    "SELECT id, text FROM plan_inbox WHERE day=? AND done=0 "
+                    "AND text LIKE '%НОВАЯ ЗАЯВКА%' AND (text LIKE ? OR "
+                    "(length(phone)>=10 AND substr(phone,-10)=?)) ORDER BY id LIMIT 1",
+                    (day, f"%{pz}%", pz)).fetchone()
+                if old:
+                    chto = text.split("минут!", 1)[-1].split(", тел.")[0].strip(" .")
+                    if chto and chto not in (old[1] or "") and "Свежий лид" not in chto:
+                        conn.execute("UPDATE plan_inbox SET text=? WHERE id=?",
+                                     (obrezat(f"{old[1]} + ещё заявка: {chto}", 400), old[0]))
+                    return False
         # 22.09. Лена: «Афанасьева, Панишева — уже созвонилась, комментарий
         # написала, задача не уходит». Половина таких пунктов — не задержка
         # пульта, а ВТОРОЙ пункт про ту же фразу клиента: наряд кладёт
@@ -1455,9 +1475,23 @@ def speed_to_lead(mk: MoyklassClient) -> None:
                                          f"{j['userId']}:{today}"):
             _mark("lead_task", str(j["id"]))
             continue
+        # 23.09.2026. Пункт приходил без имени и номера: телефон брался из
+        # локальной базы, а карточка туда ещё не доехала (синк раз в 5 минут).
+        # Такой пункт бесполезен, а для заявки с сайта ещё и дублирует уже
+        # поставленный подробный пункт. Имя и номер берём из самой CRM.
+        _imya_l, _tel_l = "", ""
+        if j.get("userId"):
+            try:
+                _u = mk.get(f"/v1/company/users/{j['userId']}") or {}
+                _imya_l = (_u.get("name") or "").strip()[:40]
+                _tel_l = "".join(c for c in str(_u.get("phone") or "") if c.isdigit())[-10:]
+            except Exception:
+                pass
         _task(mk, duty["managerId"], j.get("userId"),
               "🔥 НОВАЯ ЗАЯВКА — позвонить в течение 5 минут! "
-              "Свежий лид конвертируется в разы лучше.")
+              + (f"{_imya_l}" if _imya_l else "имя не указано")
+              + (f", тел. +7{_tel_l}" if len(_tel_l) == 10 else "")
+              + ". Свежий лид конвертируется в разы лучше.")
         if j.get("userId") and _mark("lead_hint", str(j["userId"])):
             try:
                 _hint_for_lead(mk, j["userId"], j)

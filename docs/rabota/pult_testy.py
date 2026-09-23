@@ -213,9 +213,41 @@ def test_povtor():
         proverka(t[:40], bool(POVTOR_RE.match(t)), zhdali)
 
 
+
+# ── 8. Две заявки с сайта от одной семьи — один пункт ────────────────────
+# 23.09: мама Стефании за две минуты отправила две формы — у Ани два 🔥
+# пункта и третий, пустой, от «свежего лида». Проверяем на временной базе.
+def test_zayavki_odin_punkt():
+    print("Повторная заявка с сайта дописывается в первый пункт")
+    from app import config, autopilot as ap
+    staryj = config.DB_PATH
+    config.DB_PATH = os.path.join(tempfile.mkdtemp(), "t.db")
+    try:
+        ap._duty_name = lambda: "Аня"
+        a = ap.inbox_add("🤖 Клод: 🔥 НОВАЯ ЗАЯВКА с сайта — позвонить в течение 5 минут! "
+                         "Стефания, 3, 🎭 Актёрское мастерство (лист ожидания), тел. +79153520003", "", "Аня")
+        b = ap.inbox_add("🤖 Клод: 🔥 НОВАЯ ЗАЯВКА с сайта — позвонить в течение 5 минут! "
+                         "Стефания, 3, 💃 Спортивно-бальные танцы (лист ожидания), тел. +79153520003", "", "Аня")
+        c = ap.inbox_add("🔥 НОВАЯ ЗАЯВКА — позвонить в течение 5 минут! Стефания, тел. +79153520003. "
+                         "Свежий лид конвертируется в разы лучше.", "", "Аня")
+        d = ap.inbox_add("🤖 Клод: 🔥 НОВАЯ ЗАЯВКА с сайта — позвонить в течение 5 минут! "
+                         "Мирон, 3,7, акробатика, тел. +79815062239", "", "Аня")
+        conn = sqlite3.connect(config.DB_PATH)
+        rows = conn.execute("SELECT text FROM plan_inbox ORDER BY id").fetchall()
+        proverka("первая заявка — пункт", a, True)
+        proverka("вторая той же семьи — без нового пункта", b, False)
+        proverka("«свежий лид» по ней же — без нового пункта", c, False)
+        proverka("другая семья — свой пункт", d, True)
+        proverka("всего пунктов", len(rows), 2)
+        proverka("второе направление дописано", "бальные танцы" in rows[0][0], True)
+    finally:
+        config.DB_PATH = staryj
+
+
 def main():
     for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_audit,
-              test_data_gruppy, test_povtor):
+              test_data_gruppy, test_povtor,
+              test_zayavki_odin_punkt):
         t()
         print()
     if oshibok:
