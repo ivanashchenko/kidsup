@@ -72,14 +72,22 @@ PRO = ("Гр4)", "Гр5)", "Гр8)")
 MALYSHI = ("Гр2)",)
 
 
+# Английский в мини-саду и нулевом классе ведёт Маша, пн и ср (методичка,
+# раздел 7): группы центра те же, отдельных групп английского в CRM нет.
+SAD = {"Мини-сад": "Мини-сад · английский пн, ср 12:00",
+       "Нулевой класс": "Нулевой класс · английский пн, ср 13:00"}
+
+
 def _pedagog(cls: str) -> str:
+    if cls.startswith("Мини-сад") or cls.startswith("Нулевой класс"):
+        return "Маша"
     return "Маша" if "пн-ср" in cls else ("Илья" if "вт-чт" in cls else "")
 
 
 def _dorozhka(cls: str) -> str:
     if any(x in cls for x in PRO):
         return "pro"
-    if any(x in cls for x in MALYSHI):
+    if any(x in cls for x in MALYSHI) or cls.startswith("Мини-сад"):
         return "malyshi"
     return "base"
 
@@ -125,12 +133,16 @@ def _deti(conn) -> list[dict]:
         "SELECT j.user_id, j.status_id, c.name AS cls, u.name AS kid, u.phone "
         "FROM joins j JOIN classes c ON c.id = j.class_id "
         "LEFT JOIN users u ON u.id = j.user_id "
-        f"WHERE j.status_id IN ({q}) AND c.name LIKE '2627_АЯ%' "
+        f"WHERE j.status_id IN ({q}) AND (c.name LIKE '2627_АЯ%' "
+        "OR c.name LIKE '2627_Мини-сад%' OR c.name LIKE '2627_Нулевой класс%') "
         "AND c.name NOT LIKE '%аявк%' "
         "AND (c.status IS NULL OR c.status = 'opened')", tuple(LIVE)).fetchall()
     out = {}
     for r in rows:
         cls = (r["cls"] or "").replace("2627_АЯ_", "").replace("2627_", "")
+        for k, v in SAD.items():
+            if cls.startswith(k):
+                cls = v
         key = (r["user_id"], cls)
         out[key] = {
             "user_id": r["user_id"], "имя": r["kid"] or str(r["user_id"]),

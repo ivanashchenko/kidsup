@@ -34,12 +34,12 @@ table.kt td,table.kt th{font-size:13px;padding:.25rem .35rem}
   <button data-g="" class="on">Все</button>
   <button data-p="Маша">Маша</button><button data-p="Илья">Илья</button>
   <button data-x="novideo">Без видео 31+ день</button><button data-x="noreport">Без отчёта</button>
-  {% for g in k.группы %}<button data-g="{{ g.группа }}">{{ g.группа.split('_')[0] }} {{ g.группа.split('_')[1] }} · {{ g.детей }}</button>{% endfor %}
+  {% for g in k.группы %}<button data-g="{{ g.группа }}">{% if '_' in g.группа %}{{ g.группа.split('_')[0] }} {{ g.группа.split('_')[1] }}{% else %}{{ g.группа.split(' · ')[0] }}{% endif %} · {{ g.детей }}</button>{% endfor %}
 </div>
 
 {% set ns = namespace(g='') %}
 {% for d in k.дети %}
-{% if d.группа != ns.g %}{% set ns.g = d.группа %}<div class="gh" data-grp="{{ d.группа }}" data-ped="{{ d.педагог }}">{{ d.педагог }} · {{ d.группа }}{% if d.дорожка == 'pro' %} · <span class="small">пункты для продвинутых</span>{% endif %}</div>{% endif %}
+{% if d.группа != ns.g %}{% set ns.g = d.группа %}<div class="gh" data-grp="{{ d.группа }}" data-ped="{{ d.педагог }}">{{ d.педагог }} · {{ d.группа }}{% if d.дорожка == 'pro' %} · <span class="small">пункты для продвинутых</span>{% endif %}{% if ' · ' in d.группа %} · <span class="small">в карточке все дети группы — кто не ходит в пн и ср, пропустите</span>{% endif %}</div>{% endif %}
 <details class="kid" data-grp="{{ d.группа }}" data-ped="{{ d.педагог }}"
          data-novideo="{{ 1 if d.видео_просрочено else 0 }}" data-noreport="{{ 0 if d.отчёт_сейчас else 1 }}">
   <summary>
