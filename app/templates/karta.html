@@ -11,6 +11,8 @@
 .kid .body{padding:0 .8rem .8rem}
 .pill{font-size:12px;border-radius:10px;padding:.1rem .5rem;background:#eef0f7;color:#312783;white-space:nowrap}
 .pill.red{background:#fde8ea;color:#b1000f}.pill.ok{background:#e9f5dc;color:#3d6b0d}.pill.warn{background:#fff3dc;color:#8a5a00}
+.vchip{display:inline-flex;align-items:center;gap:.25rem;margin:.1rem}
+.vdel{border:0;background:transparent;color:#b1000f;cursor:pointer;font-size:13px;padding:0 .15rem}
 .gh{margin:18px 0 4px;font-size:15px;color:#312783}
 .rep textarea{width:100%;min-height:2.4em;font:inherit;font-size:14px;margin:.15rem 0}
 .row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.5rem 0}
@@ -44,7 +46,7 @@ table.kt td,table.kt th{font-size:13px;padding:.25rem .35rem}
          data-novideo="{{ 1 if d.видео_просрочено else 0 }}" data-noreport="{{ 0 if d.отчёт_сейчас else 1 }}">
   <summary>
     <b>{{ d.имя }}</b>
-    {% if d.статус %}<span class="pill warn">{{ d.статус }}</span>{% endif %}
+    <span class="pill {{ 'ok' if d.статус == 'учится' else 'warn' }}">{{ d.статус }}</span>
     {% if d.последнее_видео %}<span class="pill {{ 'red' if d.видео_просрочено else 'ok' }}">видео {{ d.последнее_видео[8:10] }}.{{ d.последнее_видео[5:7] }}</span>{% else %}<span class="pill red">видео не снимали</span>{% endif %}
     <span class="pill {{ 'ok' if d.отчёт_сейчас else '' }}">отчёт {{ k.текущая_точка_имя|lower }}: {{ 'отправлен' if d.отчёт_сейчас else 'нет' }}</span>
     <span class="small">точек: {{ d.заполнено }}/{{ k.точки|length }}</span>
@@ -54,7 +56,7 @@ table.kt td,table.kt th{font-size:13px;padding:.25rem .35rem}
       <b>Видео</b> <span class="small">раз в месяц, 30–60 с, ребёнок говорит сам</span>
       <input type="date" class="vd" data-uid="{{ d.user_id }}" value="{{ k.сегодня }}">
       <button class="vadd" data-uid="{{ d.user_id }}">Видео снято</button>
-      <span class="small">{% for v in d.видео %}{{ v[8:10] }}.{{ v[5:7] }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+      <span class="vlist" data-uid="{{ d.user_id }}">{% for v in d.видео %}<span class="pill ok vchip" data-date="{{ v }}">{{ v[8:10] }}.{{ v[5:7] }} <button class="vdel" title="Убрать — отмечено по ошибке">✕</button></span>{% endfor %}</span>
     </div>
     <div class="scroll">
     <table class="kt">
@@ -114,9 +116,31 @@ document.querySelectorAll('select.m').forEach(e => e.addEventListener('change', 
   post('/api/english/karta', {user_id: +e.dataset.uid, tochka: e.dataset.tochka, marks: marks(e.dataset.uid, e.dataset.tochka)})));
 document.querySelectorAll('input.n').forEach(e => e.addEventListener('change', () =>
   post('/api/english/karta/note', {user_id: +e.dataset.uid, note: e.value})));
-document.querySelectorAll('button.vadd').forEach(b => b.addEventListener('click', async () => {
-  const d = document.querySelector(`input.vd[data-uid="${b.dataset.uid}"]`).value;
-  if (await post('/api/english/karta/video', {user_id: +b.dataset.uid, date: d})) b.textContent = 'Отмечено ✓';
+function vchip(uid, d) {
+  const s = document.createElement('span');
+  s.className = 'pill ok vchip'; s.dataset.date = d;
+  s.innerHTML = d.slice(8, 10) + '.' + d.slice(5, 7) + ' <button class="vdel" title="Убрать — отмечено по ошибке">✕</button>';
+  bindDel(s.querySelector('.vdel'), uid);
+  return s;
+}
+function bindDel(btn, uid) {
+  btn.addEventListener('click', async ev => {
+    ev.preventDefault();
+    const chip = btn.closest('.vchip');
+    if (!confirm('Убрать видео от ' + chip.dataset.date.split('-').reverse().join('.') + '?')) return;
+    if (await post('/api/english/karta/video', {user_id: +uid, date: chip.dataset.date, remove: true})) {
+      chip.remove(); out.textContent = 'Видео убрано — обновите страницу, чтобы пересчитать счётчики';
+    }
+  });
+}
+document.querySelectorAll('.vlist').forEach(l => l.querySelectorAll('.vdel').forEach(b => bindDel(b, l.dataset.uid)));
+document.querySelectorAll('button.vadd').forEach(b => b.addEventListener('click', async ev => {
+  ev.preventDefault();
+  const uid = b.dataset.uid, d = document.querySelector(`input.vd[data-uid="${uid}"]`).value;
+  if (!d) { out.textContent = 'Выберите дату видео'; return; }
+  const list = document.querySelector(`.vlist[data-uid="${uid}"]`);
+  if (list.querySelector(`[data-date="${d}"]`)) { out.textContent = 'Видео за эту дату уже отмечено'; return; }
+  if (await post('/api/english/karta/video', {user_id: +uid, date: d})) list.appendChild(vchip(uid, d));
 }));
 document.querySelectorAll('.rep').forEach(box => {
   const uid = +box.dataset.uid, tochka = box.dataset.tochka;

@@ -64,7 +64,7 @@ DOROZHKI = {"base": PUNKTY, "malyshi": PUNKTY[:5], "pro": PUNKTY_PRO}
 OTVETY = ("да", "почти", "пока нет")
 
 # Кто сидит в группе — те же статусы записи, что на странице мест
-LIVE = {2: "", 58132: "записан на пробное", 83760: "подтвердил пробное",
+LIVE = {2: "учится", 58132: "записан на пробное", 83760: "подтвердил пробное",
         58131: "был на пробном — не оформлен"}
 
 # Продвинутые группы и малыши — по методичке (раздел 7, таблица групп)
@@ -200,7 +200,7 @@ def rows() -> dict:
             "группы": [{"педагог": p, "группа": g,
                         "детей": sum(1 for d in deti if d["группа"] == g)} for p, g in gruppy],
             "всего": len(deti),
-            "не_оформлены": sum(1 for d in deti if d["статус"]),
+            "не_оформлены": sum(1 for d in deti if d["статус"] != "учится"),
             "без_видео": sum(1 for d in deti if not d["последнее_видео"]),
             "видео_в_месяце": sum(1 for d in deti if d["видео_в_месяце"]),
             "отчёт_сейчас": sum(1 for d in deti if d["отчёт_сейчас"])}
@@ -251,6 +251,9 @@ def save_video(user_id: int, day: str, remove: bool = False, author: str = "") -
         _ensure(conn)
         if remove:
             conn.execute("DELETE FROM speech_videos WHERE user_id=? AND date=?", (int(user_id), day))
+            # старая отметка видео внутри точки замера — тоже снимаем
+            conn.execute("UPDATE speech_cards SET video_date='' WHERE user_id=? AND video_date=?",
+                         (int(user_id), day))
         else:
             conn.execute("INSERT OR IGNORE INTO speech_videos (user_id, date, ts, author) "
                          "VALUES (?,?,?,?)", (int(user_id), day, date.today().isoformat(), author[:40]))
