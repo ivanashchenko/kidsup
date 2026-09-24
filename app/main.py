@@ -2570,12 +2570,39 @@ def api_pult_task_edit(payload: dict = Body(...)):
         sets.append("text=?"); args.append(str(payload["text"]).strip()[:600])
     if "t" in payload:
         sets.append("t=?"); args.append(str(payload.get("t") or "")[:5])
+    # 24.09: перестановка по графику смен — задача уходит к тому, кто в смене.
+    if str(payload.get("who") or "").strip():
+        sets.append("who=?"); args.append(str(payload["who"]).strip()[:20])
+    if str(payload.get("day") or "").strip():
+        sets.append("day=?"); args.append(str(payload["day"]).strip()[:10])
+    if "prio" in payload:
+        sets.append("prio=?"); args.append(None if payload["prio"] is None else int(payload["prio"]))
     if not sets:
-        raise HTTPException(400, "нужен text и/или t")
+        raise HTTPException(400, "нужен text, t, who, day или prio")
     with db.get_conn() as conn:
         pult._init(conn)
         cur = conn.execute("UPDATE pult_tasks SET " + ", ".join(sets) + " WHERE id=?", args + [tid])
     return {"ok": cur.rowcount > 0, "id": tid}
+
+
+@app.post("/api/pult/prio", dependencies=AUTH)
+def api_pult_prio(payload: dict = Body(...)):
+    """Порядок дел в колонке вручную: {"items": [{"kind": "inbox|task",
+    "id": 1, "prio": 205}]}. prio = уровень·100 + место: 0 горит сегодня,
+    1 деньги, 2 заполнить группы, 3 вторые дети и возврат, 4 CRM.
+    null — вернуть порядок по шаблонам."""
+    from . import pult
+    n = 0
+    with db.get_conn() as conn:
+        pult._init(conn)
+        pult._inbox_tries(conn)
+        for it in payload.get("items") or []:
+            tab = "pult_tasks" if it.get("kind") == "task" else "plan_inbox"
+            pr = it.get("prio")
+            cur = conn.execute(f"UPDATE {tab} SET prio=? WHERE id=?",
+                               (None if pr is None else int(pr), int(it.get("id") or 0)))
+            n += cur.rowcount
+    return {"ok": True, "n": n}
 
 
 @app.post("/api/pult/tasks", dependencies=AUTH)
@@ -3587,7 +3614,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-23.06"
+APP_VERSION = "2026-09-24.03"
 
 
 @app.get("/api/net")
@@ -5754,8 +5781,13 @@ def api_plan_inbox_edit(payload: dict = Body(...)):
         sets.append("text=?"); args.append(str(payload["text"])[:400])
     if "tries" in payload:
         sets.append("tries=?"); args.append(int(payload.get("tries") or 0))
+    # 24.09: у пунктов про чат Wazzup в поле телефона лежал id чата — пульт
+    # рисовал по нему кнопку звонка «не туда». "phone": "" очищает поле.
+    if "phone" in payload:
+        from .pult import _tel
+        sets.append("phone=?"); args.append(_tel(payload.get("phone")) if payload.get("phone") else "")
     if not sets:
-        raise HTTPException(400, "нужен text и/или tries")
+        raise HTTPException(400, "нужен text, tries или phone")
     with db.get_conn() as conn:
         _inbox_init(conn)
         try:

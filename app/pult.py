@@ -31,8 +31,8 @@ log = logging.getLogger("kidsup.pult")
 
 SHORT = {"Анна Инкина": "Аня", "Елена Кузнецова": "Лена", "Ирина Головина": "Ира"}
 COLOR = {"Лена": "#7DB928", "Аня": "#F59C00", "Ира": "#E30613", "Лиза": "#1DA7E0", "Борис": "#312783"}
-ROLE = {"Аня": "телефон, деньги, пробные", "Ира": "дверь, явка, база, CRM", "Лена": "дожим, оплаты, разговор на выходе",
-        "Лиза": "переписка", "Борис": "решения"}
+ROLE = {"Аня": "телефон, деньги, пробные", "Ира": "телефон, переписка, дверь", "Лена": "дожим, оплаты, разговор на выходе",
+        "Лиза": "только явка и долги", "Борис": "решения"}
 MON = {1: "yan", 2: "fev", 3: "mar", 4: "apr", 5: "may", 6: "iyn", 7: "iyl", 8: "avg", 9: "sen", 10: "okt", 11: "noy", 12: "dek"}
 LIVE_JOIN = (2, 58132, 83760, 58131)
 # «перенос со вчера от Лена» читается как машинный текст — держим родительный падеж
@@ -43,10 +43,11 @@ def _init(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS pult_tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, who TEXT, t TEXT, text TEXT,
         done INTEGER DEFAULT 0, ord INTEGER DEFAULT 0, ts TEXT)""")
-    try:
-        conn.execute("ALTER TABLE pult_tasks ADD COLUMN note TEXT")
-    except Exception:
-        pass
+    for col in ("note TEXT", "prio INTEGER"):
+        try:
+            conn.execute("ALTER TABLE pult_tasks ADD COLUMN " + col)
+        except Exception:
+            pass
 
 
 def today() -> str:
@@ -71,7 +72,7 @@ def duty(day: str) -> list[str]:
 def tasks(day: str) -> dict[str, list[dict]]:
     with db.get_conn() as conn:
         _init(conn)
-        rows = conn.execute("SELECT id, who, t, text, done, note FROM pult_tasks WHERE day=? ORDER BY who, ord, id",
+        rows = conn.execute("SELECT id, who, t, text, done, note, prio FROM pult_tasks WHERE day=? ORDER BY who, ord, id",
                             (day,)).fetchall()
     out: dict[str, list[dict]] = {}
     for r in rows:
@@ -453,7 +454,8 @@ def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
         # на странице ничего не менялось (22.09, аудит).
         out.append({"kind": "task", "id": it["id"], "t": it["t"], "text": it["text"],
                     "done": it["done"], "note": it.get("note"), "tag": "", "phone": "",
-                    "tries": (it.get("note") or "").lower().count("не дозвонил")})
+                    "tries": (it.get("note") or "").lower().count("не дозвонил"),
+                    "prio": it.get("prio")})
     try:
         with db.get_conn() as conn:
             _inbox_tries(conn)
@@ -465,7 +467,7 @@ def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
             # помечая, с какого числа он висит: дата обещания важнее, чем
             # аккуратный список.
             rows = conn.execute(
-                "SELECT id, ts, day, text, phone, source, done, COALESCE(tries,0) AS tries "
+                "SELECT id, ts, day, text, phone, source, done, COALESCE(tries,0) AS tries, prio "
                 "FROM plan_inbox WHERE who=? AND (day=? OR (day<? AND done=0)) "
                 "ORDER BY day, id", (who, day, day)).fetchall()
     except Exception:
@@ -484,10 +486,16 @@ def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
                     "tag": "наряд" if src.startswith("наряд")
                            else "возврат" if src.startswith("возврат") else "обещание",
                     "phone": "".join(c for c in (r["phone"] or "") if c.isdigit()),
-                    "tries": int(r["tries"] or 0)})
+                    "tries": int(r["tries"] or 0), "prio": r["prio"]})
     for x in out:
         x["ves"] = _ves(x)
-    out.sort(key=lambda x: (x["ves"], x["t"] or "99:99"))
+    # 24.09.2026, Борис: «упорядочи по срочности и важности для набора полных
+    # групп». Шаблоны VES угадывают важность по словам — и «ВЕРНУТЬ» стоит
+    # выше «записать до занятия», если во втором есть слово «карточка». Когда
+    # порядок разобран вручную, у дела есть prio = уровень·100 + место внутри
+    # уровня; новые дела без prio встают в середину своего уровня.
+    out.sort(key=lambda x: (x["ves"], x["prio"] % 100 if x.get("prio") is not None else 50,
+                            x["t"] or "99:99"))
     return out
 
 
@@ -520,10 +528,17 @@ VES = (
 )
 
 
+UROVNI = {0: "Горит: сегодня и до занятия", 1: "Деньги: оплаты и продажа",
+          2: "Заполнить группы: тёплые и неявки", 3: "Вторые дети, листы, вернуть бывших",
+          4: "CRM — в свободное окно"}
+
+
 def _ves(it: dict) -> int:
     """Чем меньше число, тем раньше дело в колонке."""
     import re as _re
     txt = (it.get("text") or "")
+    if it.get("prio") is not None:
+        return max(0, min(4, int(it["prio"]) // 100))
     if it.get("tag") == "возврат":
         return 3
     for ves, pat in VES:
@@ -545,10 +560,11 @@ def _ves(it: dict) -> int:
 def _inbox_tries(conn) -> None:
     """Колонка попыток дозвона у дел инбокса — появилась 21.09 вместе с
     исходом «не дозвонилась»."""
-    try:
-        conn.execute("ALTER TABLE plan_inbox ADD COLUMN tries INTEGER DEFAULT 0")
-    except Exception:
-        pass
+    for col in ("tries INTEGER DEFAULT 0", "prio INTEGER"):
+        try:
+            conn.execute("ALTER TABLE plan_inbox ADD COLUMN " + col)
+        except Exception:
+            pass
 
 
 def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str = "") -> str:
@@ -579,8 +595,17 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     cur_ft = next((_first_time(i["t"]) for i in items if (i["kind"], i["id"]) == cur_key), "")
     paid = _paid_recently() if day else {}
     lis = []
+    # Заголовки уровней — только когда порядок в колонке разобран вручную
+    # (есть prio): тогда уровень значит «почему это выше», а не догадку по словам.
+    razobrano = any(i.get("prio") is not None for i in items)
+    prev_ves = None
     for it in items:
         st, badge, extra = "", "", ""
+        head = ""
+        if razobrano and not it["done"] and not it.get("staryj") and it.get("ves") != prev_ves:
+            prev_ves = it.get("ves")
+            head = (f"<li style='margin:12px 0 2px;font-size:11.5px;font-weight:800;letter-spacing:.04em;"
+                    f"text-transform:uppercase;color:#6c6a86'>{UROVNI.get(prev_ves, '')}</li>")
         ft = _first_time(it["t"])
         # 10.09, просьба Иры: «пишите красным жизненно важное, без чего работа
         # встанет, а не СРОЧНО перенёс ли пробник свой день». Пункт, начатый
@@ -684,7 +709,7 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
                     f"title='Набрала, никто не взял — дело останется, попытка запишется' onclick=\""
                     f"pultMiss('{it['kind']}',{it['id']});return false\">не дозвонилась ☎</a>") + ctrl
         lis.append((it["done"] == 1, it["done"] == 0, bool(it.get("staryj")),
-            f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
+            head + f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
             f"<input type='checkbox' {'checked' if it['done'] == 1 else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
             f"onchange=\"{done_js}\">"
             f"<span>{badge}"
