@@ -1,83 +1,148 @@
 {% extends "base.html" %}
 {% block title %}Карточка речи — KidsUP{% endblock %}
 {% block content %}
+<style>
+.kf{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0}
+.kf button{border:1px solid #cfd3e6;background:#fff;border-radius:16px;padding:.3rem .75rem;font-size:13.5px;cursor:pointer}
+.kf button.on{background:#312783;color:#fff;border-color:#312783}
+.kid{border:1px solid #e3e5ef;border-radius:10px;margin:8px 0;background:#fff}
+.kid>summary{list-style:none;cursor:pointer;padding:.6rem .8rem;display:flex;flex-wrap:wrap;gap:.35rem .8rem;align-items:baseline}
+.kid>summary::-webkit-details-marker{display:none}
+.kid .body{padding:0 .8rem .8rem}
+.pill{font-size:12px;border-radius:10px;padding:.1rem .5rem;background:#eef0f7;color:#312783;white-space:nowrap}
+.pill.red{background:#fde8ea;color:#b1000f}.pill.ok{background:#e9f5dc;color:#3d6b0d}.pill.warn{background:#fff3dc;color:#8a5a00}
+.gh{margin:18px 0 4px;font-size:15px;color:#312783}
+.rep textarea{width:100%;min-height:2.4em;font:inherit;font-size:14px;margin:.15rem 0}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.5rem 0}
+.small{font-size:12.5px;color:#666}
+table.kt td,table.kt th{font-size:13px;padding:.25rem .35rem}
+</style>
+
 <h1>Карточка речи: английский</h1>
-<p class="muted">Форма к разделу 10 методички. Шесть пунктов на ребёнка, каждый — «да / почти / пока нет».
-Формулировки поведенческие: не «знает лексику», а то, что видно глазом. Заполняется внутри обычного
-занятия, ребёнок не должен понимать, что его проверяют.</p>
-<p class="muted"><b>Два «пока нет» подряд на двух точках</b> — сигнал посмотреть посещаемость и домашнее
-аудио, и только потом обсуждать перевод в другую группу.</p>
+<p class="muted">Раздел 10 методички (<a href="/english/metodika#zamer">app.kidsup.ru/english/metodika</a>).
+Пункты поведенческие — то, что видно глазом, «да / почти / пока нет». Заполняется внутри обычного
+занятия. <b>Два «пока нет» подряд на двух точках</b> — сначала смотрим посещаемость и домашнее аудио.</p>
 
 <div class="cards">
-  <div class="card"><div class="card-value">{{ k.всего }}</div><div class="card-label">детей в группах английского</div></div>
-  <div class="card"><div class="card-value">{{ k.без_видео }}</div><div class="card-label">без единого видео</div></div>
+  <div class="card"><div class="card-value">{{ k.всего }}</div><div class="card-label">детей в группах (все, кто ходит)</div></div>
+  <div class="card"><div class="card-value">{{ k.видео_в_месяце }} / {{ k.всего }}</div><div class="card-label">видео в этом месяце (норма — каждому)</div></div>
+  <div class="card"><div class="card-value">{{ k.отчёт_сейчас }} / {{ k.всего }}</div><div class="card-label">отчётов родителям: {{ k.текущая_точка_имя|lower }}</div></div>
+  <div class="card"><div class="card-value">{{ k.не_оформлены }}</div><div class="card-label">ходят, но не «учится» в CRM</div></div>
 </div>
 
-{% for d in k.дети %}
-<div class="card" style="margin:14px 0">
-  <div style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:baseline;justify-content:space-between">
-    <div><b style="font-size:17px">{{ d.имя }}</b>
-      <span class="muted" style="margin-left:.5rem">{{ d.группа }}</span></div>
-    <div class="muted" style="font-size:13px">
-      заполнено точек: {{ d.заполнено }} из {{ k.точки|length }} ·
-      видео: {% if d.последнее_видео %}{{ d.последнее_видео }}{% else %}<b style="color:#E30613">не снимали</b>{% endif %}
-    </div>
-  </div>
-  <div class="scroll" style="margin-top:.6rem">
-  <table>
-    <tr><th>Пункт</th>{% for key, when, what in k.точки %}<th>{{ when }}</th>{% endfor %}</tr>
-    {% for pk, ptext in k.пункты %}
-    <tr><td style="font-size:13.5px">{{ ptext }}</td>
-      {% for key, when, what in k.точки %}
-      <td>
-        <select data-uid="{{ d.user_id }}" data-tochka="{{ key }}" data-punkt="{{ pk }}" class="m">
-          <option value=""{% if not d.точки[key].get('marks',{}).get(pk) %} selected{% endif %}>—</option>
-          {% for o in k.ответы %}
-          <option value="{{ o }}"{% if d.точки[key].get('marks',{}).get(pk) == o %} selected{% endif %}>{{ o }}</option>
-          {% endfor %}
-        </select>
-      </td>
-      {% endfor %}
-    </tr>
-    {% endfor %}
-    <tr><td><b>Видео снято</b></td>
-      {% for key, when, what in k.точки %}
-      <td><input type="date" class="v" data-uid="{{ d.user_id }}" data-tochka="{{ key }}"
-                 value="{{ d.точки[key].get('video_date','') }}"></td>
-      {% endfor %}
-    </tr>
-  </table>
-  </div>
-  <div style="margin-top:.5rem">
-    <input class="n" data-uid="{{ d.user_id }}" style="width:100%" placeholder="Заметка педагога: что мешает, что получилось"
-           value="{{ d.точки['t1'].get('note','') }}">
-  </div>
+<div class="kf" id="flt">
+  <button data-g="" class="on">Все</button>
+  <button data-p="Маша">Маша</button><button data-p="Илья">Илья</button>
+  <button data-x="novideo">Без видео 31+ день</button><button data-x="noreport">Без отчёта</button>
+  {% for g in k.группы %}<button data-g="{{ g.группа }}">{{ g.группа.split('_')[0] }} {{ g.группа.split('_')[1] }} · {{ g.детей }}</button>{% endfor %}
 </div>
+
+{% set ns = namespace(g='') %}
+{% for d in k.дети %}
+{% if d.группа != ns.g %}{% set ns.g = d.группа %}<div class="gh" data-grp="{{ d.группа }}" data-ped="{{ d.педагог }}">{{ d.педагог }} · {{ d.группа }}{% if d.дорожка == 'pro' %} · <span class="small">пункты для продвинутых</span>{% endif %}</div>{% endif %}
+<details class="kid" data-grp="{{ d.группа }}" data-ped="{{ d.педагог }}"
+         data-novideo="{{ 1 if d.видео_просрочено else 0 }}" data-noreport="{{ 0 if d.отчёт_сейчас else 1 }}">
+  <summary>
+    <b>{{ d.имя }}</b>
+    {% if d.статус %}<span class="pill warn">{{ d.статус }}</span>{% endif %}
+    {% if d.последнее_видео %}<span class="pill {{ 'red' if d.видео_просрочено else 'ok' }}">видео {{ d.последнее_видео[8:10] }}.{{ d.последнее_видео[5:7] }}</span>{% else %}<span class="pill red">видео не снимали</span>{% endif %}
+    <span class="pill {{ 'ok' if d.отчёт_сейчас else '' }}">отчёт {{ k.текущая_точка_имя|lower }}: {{ 'отправлен' if d.отчёт_сейчас else 'нет' }}</span>
+    <span class="small">точек: {{ d.заполнено }}/{{ k.точки|length }}</span>
+  </summary>
+  <div class="body">
+    <div class="row">
+      <b>Видео</b> <span class="small">раз в месяц, 30–60 с, ребёнок говорит сам</span>
+      <input type="date" class="vd" data-uid="{{ d.user_id }}" value="{{ k.сегодня }}">
+      <button class="vadd" data-uid="{{ d.user_id }}">Видео снято</button>
+      <span class="small">{% for v in d.видео %}{{ v[8:10] }}.{{ v[5:7] }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+    </div>
+    <div class="scroll">
+    <table class="kt">
+      <tr><th>Пункт</th>{% for key, when, what in k.точки %}<th{% if key == k.текущая_точка %} style="background:#eef0f7"{% endif %}>{{ when }}</th>{% endfor %}</tr>
+      {% for pk, ptext in d.пункты %}
+      <tr><td>{{ ptext }}</td>
+        {% for key, when, what in k.точки %}
+        <td><select data-uid="{{ d.user_id }}" data-tochka="{{ key }}" data-punkt="{{ pk }}" class="m">
+            <option value="">—</option>
+            {% for o in k.ответы %}<option value="{{ o }}"{% if d.точки[key].get('marks',{}).get(pk) == o %} selected{% endif %}>{{ o }}</option>{% endfor %}
+        </select></td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </table>
+    </div>
+
+    {% set r = d.точки[k.текущая_точка].get('report', {}) %}
+    <div class="rep" data-uid="{{ d.user_id }}" data-tochka="{{ k.текущая_точка }}" data-name="{{ d.имя.split(' ')[-1] if d.имя.split(' ')|length > 1 else d.имя }}">
+      <div class="row"><b>Отчёт родителю · {{ k.текущая_точка_имя|lower }}</b>
+        <span class="small">три строки, конкретно, без «молодец»</span></div>
+      <textarea class="ru" placeholder="Что уже умеет: «понимает все команды занятия без перевода, отвечает о себе целой фразой, рассказывает 4 стиха»">{{ r.get('umeet','') }}</textarea>
+      <textarea class="rr" placeholder="Над чем работаем сейчас — одна вещь: «учимся просить: Can I have…?»">{{ r.get('rabotaem','') }}</textarea>
+      <textarea class="rd" placeholder="Что сделать дома — одно действие: «плейлист группы по 15 минут в машине»">{{ r.get('doma','') }}</textarea>
+      <div class="row">
+        <button class="rcopy">Скопировать текст для родителя</button>
+        <label class="small">отправлен <input type="date" class="rdate" value="{{ d.точки[k.текущая_точка].get('report_date','') }}"></label>
+      </div>
+      {% for key, when, what in k.точки %}{% if key != k.текущая_точка and d.точки[key].get('report_date') %}
+      <div class="small">{{ when }}, отправлен {{ d.точки[key].report_date }}: {{ d.точки[key].report.get('umeet','') }} · {{ d.точки[key].report.get('rabotaem','') }} · {{ d.точки[key].report.get('doma','') }}</div>
+      {% endif %}{% endfor %}
+    </div>
+
+    <input class="n" data-uid="{{ d.user_id }}" style="width:100%;margin-top:.4rem" placeholder="Заметка педагога: что мешает, что получилось" value="{{ d.заметка }}">
+  </div>
+</details>
 {% endfor %}
 
 <p id="out" class="muted" style="position:sticky;bottom:0;background:#fff;padding:.5rem 0"></p>
 <script>
 const out = document.getElementById('out');
-function collect(uid, tochka) {
-  const marks = {};
-  document.querySelectorAll(`select.m[data-uid="${uid}"][data-tochka="${tochka}"]`).forEach(s => {
-    if (s.value) marks[s.dataset.punkt] = s.value;
-  });
-  const v = document.querySelector(`input.v[data-uid="${uid}"][data-tochka="${tochka}"]`);
-  const n = document.querySelector(`input.n[data-uid="${uid}"]`);
-  return {user_id: +uid, tochka: tochka, marks: marks,
-          video_date: v ? v.value : '', note: n ? n.value : ''};
-}
-async function save(uid, tochka) {
+async function post(url, body) {
   out.textContent = 'Сохраняю…';
-  const r = await fetch('/api/english/karta', {method: 'POST',
-    headers: {'Content-Type': 'application/json'}, body: JSON.stringify(collect(uid, tochka))});
-  const j = await r.json();
-  out.textContent = j.ok ? 'Сохранено ' + new Date().toLocaleTimeString('ru-RU') : 'Не сохранилось';
+  try {
+    const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    const j = await r.json();
+    out.textContent = j.ok ? 'Сохранено ' + new Date().toLocaleTimeString('ru-RU') : 'Не сохранилось';
+    return j.ok;
+  } catch (e) { out.textContent = 'Не сохранилось — проверьте связь'; return false; }
 }
-document.querySelectorAll('select.m, input.v').forEach(e =>
-  e.addEventListener('change', () => save(e.dataset.uid, e.dataset.tochka)));
-document.querySelectorAll('input.n').forEach(e =>
-  e.addEventListener('change', () => save(e.dataset.uid, 't1')));
+function marks(uid, tochka) {
+  const m = {};
+  document.querySelectorAll(`select.m[data-uid="${uid}"][data-tochka="${tochka}"]`).forEach(s => { if (s.value) m[s.dataset.punkt] = s.value; });
+  return m;
+}
+document.querySelectorAll('select.m').forEach(e => e.addEventListener('change', () =>
+  post('/api/english/karta', {user_id: +e.dataset.uid, tochka: e.dataset.tochka, marks: marks(e.dataset.uid, e.dataset.tochka)})));
+document.querySelectorAll('input.n').forEach(e => e.addEventListener('change', () =>
+  post('/api/english/karta/note', {user_id: +e.dataset.uid, note: e.value})));
+document.querySelectorAll('button.vadd').forEach(b => b.addEventListener('click', async () => {
+  const d = document.querySelector(`input.vd[data-uid="${b.dataset.uid}"]`).value;
+  if (await post('/api/english/karta/video', {user_id: +b.dataset.uid, date: d})) b.textContent = 'Отмечено ✓';
+}));
+document.querySelectorAll('.rep').forEach(box => {
+  const uid = +box.dataset.uid, tochka = box.dataset.tochka;
+  const rep = () => ({umeet: box.querySelector('.ru').value, rabotaem: box.querySelector('.rr').value, doma: box.querySelector('.rd').value});
+  box.querySelectorAll('textarea, .rdate').forEach(e => e.addEventListener('change', () =>
+    post('/api/english/karta', {user_id: uid, tochka: tochka, report: rep(), report_date: box.querySelector('.rdate').value})));
+  box.querySelector('.rcopy').addEventListener('click', async () => {
+    const r = rep(), mon = '{{ k.текущая_точка_имя|lower }}';
+    const t = `${box.dataset.name}, ${mon}.\nЧто уже умеет: ${r.umeet}\nНад чем работаем: ${r.rabotaem}\nЧто делать дома: ${r.doma}`;
+    try { await navigator.clipboard.writeText(t); out.textContent = 'Текст скопирован — вставьте в чат родителю и отметьте дату отправки'; }
+    catch (e) { prompt('Скопируйте текст', t); }
+  });
+});
+// фильтры
+const kids = [...document.querySelectorAll('details.kid')], heads = [...document.querySelectorAll('.gh')];
+document.querySelectorAll('#flt button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#flt button').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  const g = b.dataset.g, p = b.dataset.p, x = b.dataset.x;
+  kids.forEach(k => {
+    let show = true;
+    if (g) show = k.dataset.grp === g;
+    if (p) show = k.dataset.ped === p;
+    if (x) show = k.dataset[x] === '1';
+    k.style.display = show ? '' : 'none';
+  });
+  heads.forEach(h => { h.style.display = kids.some(k => k.dataset.grp === h.dataset.grp && k.style.display !== 'none') ? '' : 'none'; });
+}));
 </script>
 {% endblock %}

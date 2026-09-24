@@ -3630,7 +3630,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-24.13"
+APP_VERSION = "2026-09-24.14"
 
 
 @app.get("/api/net")
@@ -8411,14 +8411,35 @@ def api_english_karta_save(payload: dict = Body(...)):
     """Отметки по одному ребёнку и одной точке замера."""
     from . import karta
     try:
+        # поле, которого нет в запросе, не трогаем — см. karta.save
         return karta.save(int(payload.get("user_id") or 0),
                           str(payload.get("tochka") or ""),
-                          payload.get("marks") or {},
-                          str(payload.get("video_date") or ""),
-                          str(payload.get("note") or ""),
-                          str(payload.get("author") or ""))
+                          payload.get("marks"),
+                          payload.get("video_date"),
+                          payload.get("note"),
+                          str(payload.get("author") or ""),
+                          payload.get("report"),
+                          payload.get("report_date"))
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@app.post("/api/english/karta/video", dependencies=AUTH)
+def api_english_karta_video(payload: dict = Body(...)):
+    """Видео ребёнка снято: {"user_id", "date", "remove": false}. Раз в месяц (методичка, раздел 10)."""
+    from . import karta
+    try:
+        return karta.save_video(int(payload.get("user_id") or 0), str(payload.get("date") or ""),
+                                bool(payload.get("remove")), str(payload.get("author") or ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/english/karta/note", dependencies=AUTH)
+def api_english_karta_note(payload: dict = Body(...)):
+    from . import karta
+    return karta.save_note(int(payload.get("user_id") or 0), str(payload.get("note") or ""),
+                           str(payload.get("author") or ""))
 
 
 @app.get("/nabor", response_class=HTMLResponse, dependencies=AUTH)
