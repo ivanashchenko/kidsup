@@ -1968,6 +1968,26 @@ def welcome_series(mk: MoyklassClient) -> None:
             user = mk.get(f"/v1/company/users/{uid}")
         except Exception:
             continue
+        # Серия — одна на семью, а не на каждого ребёнка. 24.09: Лубенцы
+        # (Ксения и Константин) получили две серии подряд, семья, где второй
+        # ребёнок пришёл на новый предмет, — «спасибо, что выбрали нас»
+        # после года занятий. Если на этом номере платили раньше — молчим.
+        p10 = "".join(c for c in (user.get("phone") or "") if c.isdigit())[-10:]
+        try:
+            with db.get_conn() as conn:
+                fam = conn.execute(
+                    "SELECT 1 FROM users u JOIN payments p ON p.user_id = u.id "
+                    "WHERE substr(u.phone,-10)=? AND u.id != ? AND p.summa > 0 "
+                    "AND substr(p.date,1,10) <= ? LIMIT 1",
+                    (p10, uid, pay_day)).fetchone()
+        except Exception:
+            fam = None
+        if fam or not p10:
+            for st in ("welcome1", "welcome2", "welcome3", "welcome4"):
+                _mark(st, f"{uid}:{pay_day}")
+            log.info("welcome: %s — семья уже платила по другому ребёнку, серию не начинаем",
+                     p10[-4:])
+            continue
         # 17.09: «Спасибо, что выбрали KidsUP, место закреплено» ушло семье,
         # которая за час до этого написала «мы больше не посещаем» и уже
         # стояла в «0.1 Не писать». Приход по карточке — не повод писать
@@ -1988,7 +2008,7 @@ def welcome_series(mk: MoyklassClient) -> None:
             lines.append(f"📅 Занятия: {f['schedule']}")
         if f["next"]:
             lines.append(f"📍 Ближайшее занятие: {f['next']}")
-        lines.append("Сейчас пришлю ещё пару коротких сообщений — что взять с собой "
+        lines.append("Завтра пришлю короткую памятку: что взять с собой "
                      "и куда писать по разным вопросам.")
         lines.append("Сохраните, пожалуйста, наш контакт, чтобы не терять сообщения. "
                      "Любые вопросы — прямо сюда 💛")
@@ -2013,10 +2033,12 @@ def welcome_series(mk: MoyklassClient) -> None:
         # Стадии идут строго по порядку и не больше одной за прогон: 03.09
         # девять семей получили третье сообщение раньше второго — календарь
         # сказал «прошёл день», а второе ещё не уходило.
-        if not _seen("welcome2", f"{uid}:{day}"):
-            stage = 2                       # первая же возможность после первого
-        elif not _seen("welcome3", f"{uid}:{day}") and age >= 1:
-            stage = 3
+        # 24.09: серия из четырёх сообщений стала из трёх — памятка и
+        # «куда писать» теперь одно сообщение на следующий день после первого
+        if not _seen("welcome3", f"{uid}:{day}"):
+            _mark("welcome3", f"{uid}:{day}")
+        if not _seen("welcome2", f"{uid}:{day}") and age >= 1:
+            stage = 2
         elif not _seen("welcome4", f"{uid}:{day}") and age >= 7:
             stage = 4
         else:
@@ -2044,7 +2066,9 @@ def welcome_series(mk: MoyklassClient) -> None:
                     "📚 Педагог ведёт прогресс каждого ребёнка: в течение года будут "
                     "диагностики, по их итогам вы получите обратную связь и рекомендации.\n"
                     "Приходите за 10 минут до начала — спокойно переодеться "
-                    "и познакомиться с педагогом.")
+                    "и познакомиться с педагогом.\n"
+                    "💬 Расписание, переносы, пропуски, оплата, вопросы педагогу — "
+                    "пишите сюда, в этот чат. Сайт kidsup.ru, телефон +7 (495) 120-90-24.")
         elif stage == 3:
             text = ("Ещё пара вещей, чтобы вам было легко у нас ориентироваться 🌿\n"
                     "💬 Расписание, переносы, пропуски, оплата — пишите сюда, в этот чат.\n"
@@ -2327,25 +2351,35 @@ def _missed_kind(mk: MoyklassClient, phone: str) -> tuple[str, str]:
     p10 = phone[-10:]
     if p10 in _team_phones():
         return "team", ""
+    # 24.09: смотрим ВСЕ карточки на номере, а не первую попавшуюся. Семья
+    # Русановых (Максим учится, Александр записан на пробное) получила
+    # холодное «идёт набор групп»: первой нашлась карточка Александра.
+    # «Своими» считаем и тех, с кем уже идёт разговор: думает, записан,
+    # есть запись в группе — им автодогон не нужен вовсе (жалобы админов
+    # 24.09: «после каждого нашего звонка в чате вал сообщений»).
     with db.get_conn() as conn:
-        row = conn.execute(
-            "SELECT id, name, raw FROM users WHERE substr(phone,-10)=? LIMIT 1",
-            (p10,)).fetchone()
-    if not row:
+        rows = conn.execute(
+            "SELECT id, name, raw FROM users WHERE substr(phone,-10)=?",
+            (p10,)).fetchall()
+    if not rows:
         return "cold", ""
-    child = _child_name(row["name"] or "") or ""
-    try:
-        state = json.loads(row["raw"] or "{}").get("clientStateId")
-    except ValueError:
-        state = None
-    if state == ST_CLIENT:
-        return "client", child
-    with db.get_conn() as conn:
-        learning = conn.execute(
-            "SELECT 1 FROM joins WHERE user_id=? AND status_id=2 LIMIT 1",
-            (row["id"],)).fetchone()
-    if learning or _paid_recently(row["id"], 120):
-        return "client", child
+    child = _child_name(rows[0]["name"] or "") or ""
+    for row in rows:
+        try:
+            state = json.loads(row["raw"] or "{}").get("clientStateId")
+        except ValueError:
+            state = None
+        if state in (ST_CLIENT, 125952, 125953, 146950, 345767):
+            return "client", _child_name(row["name"] or "") or child
+        with db.get_conn() as conn:
+            # заявка в буфере «Заявки» — ещё не запись: новым лидам догон нужен
+            live = conn.execute(
+                "SELECT 1 FROM joins j LEFT JOIN classes c ON c.id = j.class_id "
+                "WHERE j.user_id=? AND j.status_id IN (2, 5, 58131, 58132, 83760) "
+                "AND COALESCE(c.name, '') NOT LIKE '%аявк%' LIMIT 1",
+                (row["id"],)).fetchone()
+        if live or _paid_recently(row["id"], 120):
+            return "client", _child_name(row["name"] or "") or child
     return "cold", child
 
 
@@ -2670,7 +2704,6 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
     единого касания за трое суток. Сообщение персональное (имя ребёнка,
     предмет из его истории), не чаще раза в неделю на семью, не больше
     cap за день — это разовые письма по правилу каналов, не рассылка."""
-    week = _today().isocalendar()[1]
     users = mk.fetch_all("/v1/company/users", ["users"],
                          params={"clientStateIds": 146950}) or []
     thinkers = [u for u in users if u.get("clientStateId") == 146950]
@@ -2730,7 +2763,9 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
         phone = "".join(ch for ch in (u.get("phone") or "") if ch.isdigit())[-10:]
         if len(phone) != 10 or uid in busy_uids or phone in busy_phones:
             continue
-        if uid in touched or not _mark("reactivate", f"{uid}:w{week}"):
+        # одна реактивация на семью раз в три недели, а не на каждую карточку
+        # каждую неделю (24.09: вал сообщений семьям, которых обзваниваем)
+        if uid in touched or not _mark("reactivate", f"{phone}:p{_today().toordinal() // 21}"):
             continue
         child = _child_name(u.get("name") or "")
         subj = interest.get(uid)
@@ -3110,10 +3145,27 @@ def missed_calls(days: list[str] | None = None) -> None:
             if kind == "team":
                 log.info("missed_calls: %s — свой номер, автосообщение не шлём", phone[-4:])
                 continue
+            # 24.09, жалобы Лены и Иры: семьи, которых обзваниваем (логопед,
+            # раннее развитие, английский), после каждого недозвона получали
+            # «звонили вам по поводу набора» в WhatsApp и СМС — «похоже на
+            # спам, хочется заблокировать». Своим (учатся, записаны, думают)
+            # автодогон больше не шлём: админ, если нужно, пишет сама, по делу.
+            # Новому контакту — не чаще раза в 14 дней.
             if kind == "client":
-                text = MISSED_OUR.format(child=f" по занятиям {_genitive(child)}" if child else "")
-            else:
-                text = MISSED_COLD + _age_pitch(phone)
+                log.info("missed_calls: %s — своя семья, автодогон не шлём", phone[-4:])
+                continue
+            try:
+                with db.get_conn() as conn:
+                    recent = conn.execute(
+                        "SELECT 1 FROM wazzup_guard WHERE phone=? AND kind='missed' "
+                        "AND day >= ? LIMIT 1",
+                        (phone[-10:], (_today() - timedelta(days=14)).isoformat())).fetchone()
+            except Exception:
+                recent = None
+            if recent:
+                log.info("missed_calls: %s — догон уже был за 14 дней", phone[-4:])
+                continue
+            text = MISSED_COLD + _age_pitch(phone)
             delivered = _wa(phone, text, kind="missed")
             # Правило владельца 24.08 (вечер): если с семьёй НЕТ переписки
             # в Telegram и MAX, СМС уходит ВМЕСТЕ с WhatsApp — не как

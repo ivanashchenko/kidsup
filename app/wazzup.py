@@ -144,6 +144,13 @@ DAY_LIMIT = 2            # автосообщений одному челове�
 SERVICE_KINDS = {"confirm", "trial_reminder", "reschedule", "missed",
                  "booking", "sms", "welcome"}
 MARKETING_DAY_LIMIT = 1
+# Недельный потолок «необязательных» автосообщений семье — всё, кроме
+# подтверждения записи, напоминания о занятии и переноса. 24.09 админы:
+# семьи, которых обзваниваем, получают вал сообщений, «похоже на спам»;
+# мама Марка Костанян попросила отключить рассылку, Панишевы грозят уйти.
+# Суточный лимит этого не ловил: по два в день — это четырнадцать в неделю.
+WEEK_KINDS_FREE = {"confirm", "trial_reminder", "reschedule", "booking", "sms"}
+WEEK_LIMIT = 2
 HOUR_FROM, HOUR_TO = 9, 20
 
 # Приглашения с датой живут ровно до этой даты. Текст кампании готовится
@@ -284,6 +291,15 @@ def guard(phone: str, text: str, kind: str = "",
                              (p, day)).fetchone()[0]
             if n >= DAY_LIMIT:
                 return f"за сегодня уже {n} автосообщения — лимит {DAY_LIMIT}"
+            if kind not in WEEK_KINDS_FREE:
+                skip = FREE_KINDS | WEEK_KINDS_FREE
+                w = conn.execute(
+                    "SELECT COUNT(DISTINCT digest) FROM wazzup_guard "
+                    "WHERE phone=? AND ts>=? AND COALESCE(kind,'') NOT IN (%s)"
+                    % ",".join("?" * len(skip)), (p, week, *skip)).fetchone()[0]
+                if w >= WEEK_LIMIT:
+                    return (f"за 7 дней семье уже {w} необязательных автосообщения "
+                            f"— лимит {WEEK_LIMIT} в неделю")
             if kind not in SERVICE_KINDS:
                 m = conn.execute(
                     "SELECT COUNT(DISTINCT digest) FROM wazzup_guard "
