@@ -75,7 +75,7 @@ table.kt td,table.kt th{font-size:13px;padding:.25rem .35rem}
     </div>
 
     {% set r = d.точки[k.текущая_точка].get('report', {}) %}
-    <div class="rep" data-uid="{{ d.user_id }}" data-tochka="{{ k.текущая_точка }}" data-name="{{ d.имя.split(' ')[-1] if d.имя.split(' ')|length > 1 else d.имя }}">
+    <div class="rep" data-uid="{{ d.user_id }}" data-tochka="{{ k.текущая_точка }}" data-name="{{ d.имя_короткое }}">
       <div class="row"><b>Отчёт родителю · {{ k.текущая_точка_имя|lower }}</b>
         <span class="small">три строки, конкретно, без «молодец»</span></div>
       <textarea class="ru" placeholder="Что уже умеет: «понимает все команды занятия без перевода, отвечает о себе целой фразой, рассказывает 4 стиха»">{{ r.get('umeet','') }}</textarea>

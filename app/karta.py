@@ -30,6 +30,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 
 from . import db
@@ -192,6 +193,9 @@ def rows() -> dict:
         d["отчётов"] = sum(1 for v in d["точки"].values() if v.get("report_date"))
         d["отчёт_сейчас"] = d["точки"].get(tek, {}).get("report_date", "")
         d["пункты"] = DOROZHKI[d["дорожка"]]
+        # в CRM «Фамилия Имя (пометка)» — для обращения нужно только имя
+        slova = re.sub(r"\(.*?\)", "", d["имя"] or "").split()
+        d["имя_короткое"] = slova[1] if len(slova) >= 2 else (slova[0] if slova else "")
         d["заметка"] = notes.get(d["user_id"], "") or d["точки"]["t1"].get("note", "")
     gruppy = sorted({(d["педагог"], d["группа"]) for d in deti})
     return {"дети": deti, "точки": TOCHKI, "ответы": OTVETY, "сегодня": today.isoformat(),
