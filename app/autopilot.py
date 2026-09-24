@@ -2682,8 +2682,29 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
             ("_АЯ_|_ЛК_|нглийск", "английскому языку"),
             ("ини-сад|_НК_", "мини-саду"), ("ИЗО", "ИЗО-студии"),
             ("ШАХ", "шахматам"), ("_МА_|ентальн", "ментальной арифметике"),
-            ("Лицей|Первая школа|МсМ|Музыка", "занятиям для малышей"))
+            ("Лицей|Первая школа|МсМ|Музыка", "раннему развитию"))
     import re as _re
+    # Статус «думает» бывает устаревшим. 24.09 реактивация ушла маме Марка
+    # Костанян, который ходит в «Музыку и речь» с 09.09, — карточке просто
+    # не сменили статус, а мама попросила отключить её от рассылки. Поэтому
+    # смотрим на записи: учится или записан в настоящую группу (не в
+    # «Заявки») сам ребёнок или любой ребёнок с того же телефона — не пишем.
+    busy_uids = {j.get("userId") for j in joins
+                 if j.get("statusId") in {2, 5, 50509, 58131, 58132, 83760}
+                 and "аявк" not in cls.get(j.get("classId"), "").lower()}
+    busy_phones: set[str] = set()
+    try:
+        with db.get_conn() as conn:
+            for r in conn.execute("SELECT id, phone, raw FROM users"):
+                try:
+                    st = json.loads(r["raw"] or "{}").get("clientStateId")
+                except ValueError:
+                    st = None
+                if r["id"] in busy_uids or st in (125952, 125953, 125955):
+                    busy_phones.add("".join(c for c in (r["phone"] or "")
+                                            if c.isdigit())[-10:])
+    except Exception:
+        log.warning("reactivate: локальная база недоступна — семьи по телефону не сверяем")
     interest: dict[int, str] = {}
     for j in joins:
         nm = cls.get(j.get("classId"), "")
@@ -2706,22 +2727,24 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
         if sent >= cap:
             break
         uid = u["id"]
-        if uid in touched or not _mark("reactivate", f"{uid}:w{week}"):
-            continue
         phone = "".join(ch for ch in (u.get("phone") or "") if ch.isdigit())[-10:]
-        if len(phone) != 10:
+        if len(phone) != 10 or uid in busy_uids or phone in busy_phones:
+            continue
+        if uid in touched or not _mark("reactivate", f"{uid}:w{week}"):
             continue
         child = _child_name(u.get("name") or "")
         subj = interest.get(uid)
         about = f" по {subj}" if subj else ""
-        who = f" {child}" if child else ""
+        # имя — только в именительном падеже: «для Марк» читается как ошибка
+        who = child or "ребёнок"
         ok = _wa(phone,
                  f"Здравствуйте! Это KidsUP на бульваре Рокоссовского. "
-                 f"Вы думали про занятия{about} для{who or ' ребёнка'} — учебный "
-                 f"год идёт с 31 августа, но войти можно в любой момент. "
+                 f"Вы думали про занятия{about}. Учебный год идёт с 31 августа, "
+                 f"но {who} может присоединиться в любой момент. "
                  f"Чтобы место точно осталось за вами, можно прийти на первое "
                  f"занятие: оно условно-бесплатное, и на нём же бесплатная "
-                 f"диагностика. Написать, какие дни и время ещё свободны?")
+                 f"диагностика. Написать, какие дни и время ещё свободны?",
+                 kind="reactivate")
         if ok:
             try:
                 mk.post("/v1/company/userComments",

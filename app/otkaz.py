@@ -200,6 +200,43 @@ def note(chat: str, text: str, ts: str = "") -> bool:
     return True
 
 
+def promo_off(phone: str) -> str | None:
+    """Семья попросила не присылать рекламу — но остаётся клиентом.
+
+    24.09 мама Марка Костанян (учится в «Музыке и речи») получила
+    реактивацию «думает» и написала «отключите меня от рассылки». Стоп-лист
+    отказов тут не годится: он глушит и напоминания о занятиях, а они ей
+    нужны. Этот список режет только продающие сообщения — рассылки
+    кампаний и реактивацию. Хранится в настройке promo_off: {телефон: пометка}.
+    """
+    p = _digits(phone)[-10:]
+    if not p:
+        return None
+    try:
+        import json
+        lst = json.loads(db.get_setting("promo_off", "") or "{}")
+    except Exception:
+        return None
+    if p in lst:
+        return f"просили без рекламы: {str(lst[p])[:60]}"
+    return None
+
+
+def set_promo_off(phone: str, note: str = "", off: bool = True) -> dict:
+    import json
+    p = _digits(phone)[-10:]
+    try:
+        lst = json.loads(db.get_setting("promo_off", "") or "{}")
+    except Exception:
+        lst = {}
+    if off and p:
+        lst[p] = note or datetime.now(MSK).strftime("%d.%m")
+    else:
+        lst.pop(p, None)
+    db.set_setting("promo_off", json.dumps(lst, ensure_ascii=False))
+    return lst
+
+
 def is_refused(phone: str) -> str | None:
     """Причина, по которой этому человеку писать нельзя, либо None.
 

@@ -219,6 +219,10 @@ def guard(phone: str, text: str, kind: str = "",
             why = otkaz.is_refused(phone)
             if why:
                 return why
+            if kind.startswith("bc:") or kind in ("reactivate", "promo"):
+                why = otkaz.promo_off(phone)
+                if why:
+                    return why
         except Exception:
             pass
     now = _msk()

@@ -3630,7 +3630,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-24.09"
+APP_VERSION = "2026-09-24.10"
 
 
 @app.get("/api/net")
@@ -5052,6 +5052,17 @@ def api_broadcast_log(day: str = "", limit: int = 100):
                         # у каждого номера своё состояние и свой лимит
                         "sender": r["sender"]})
     return {"day": d, "count": len(out), "rows": out}
+
+
+@app.post("/api/promo-off", dependencies=AUTH)
+def promo_off_set(payload: dict):
+    """Семья просит без рекламы, но остаётся клиентом: {"phone", "note", "off": true}.
+    Режет только рассылки кампаний и реактивацию; напоминания о занятиях идут."""
+    from . import otkaz
+    lst = otkaz.set_promo_off(str(payload.get("phone") or ""),
+                              str(payload.get("note") or ""),
+                              bool(payload.get("off", True)))
+    return {"ok": True, "count": len(lst)}
 
 
 @app.post("/api/autopilot/reactivate-now", dependencies=AUTH)
