@@ -239,6 +239,17 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 .sb-sheet .mini-lead{border:0;box-shadow:none;margin:0;border-radius:0}
 .sb-sheet .mini-lead a{display:inline;padding:0;border:0;font:inherit;font-size:12.5px;color:var(--blue-ink,#0F6E96);text-decoration:underline}
 .sb-sheet .mini-lead .ok-msg a{font-size:inherit;color:var(--green-ink,#4E7A18)}
+/* 24.09.2026: лестница уровней и блок про маткапитал */
+.ladder{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:22px;align-items:end}
+.rung{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:16px 17px}
+.rung .lvl{font-family:Rubik,sans-serif;font-weight:900;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue-ink)}
+.rung h3{font-size:17px;font-weight:700;color:var(--indigo);margin:4px 0 6px}
+.rung p{font-size:14.5px;color:var(--muted)}
+.rung .age{display:inline-block;margin-top:8px;font-size:13px;font-weight:700;color:var(--green-ink);background:#F2F8E8;border-radius:8px;padding:2px 9px}
+@media(min-width:760px){.rung:nth-child(1){min-height:170px}.rung:nth-child(2){min-height:200px}.rung:nth-child(3){min-height:230px}.rung:nth-child(4){min-height:260px}}
+.money{margin-top:22px;background:#fff;border:2px solid var(--green);border-radius:var(--r);padding:20px 22px;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.money b.big{display:block;font-family:Rubik,sans-serif;font-size:22px;font-weight:900;color:var(--indigo);line-height:1.15;margin-bottom:4px}
+.money p{font-size:15px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -268,7 +279,7 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
       <span>💳 Абонемент 8 занятий — 8 400 ₽</span>
     </div>
     <a class="cta" href="#hero-phone">Записаться на первое занятие</a>
-    <a class="cta ghost" href="#road">Что ребёнок будет уметь по месяцам</a>
+    <a class="cta ghost" href="#lestnica">Лестница от 3 лет до Cambridge</a>
     <p class="note">Учебный год идёт с 31 августа — присоединиться можно в любой месяц,
     педагог определит уровень на первом занятии.</p>
   </div>
@@ -276,7 +287,7 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 
 <div class="facts">
   <div class="wrap grid">
-    <div><b>до 8</b><span>детей в группе — не 15 и не 20</span></div>
+    <div><b>до 8</b><span>детей в группе — педагог слышит каждого, а не «класс»</span></div>
     <div><b>100%</b><span>занятия на английском, без перевода</span></div>
     <div><b>12+</b><span>раз ребёнок говорит вслух за 50 минут</span></div>
     <div><b>3–12</b><span>лет — своя дорожка для каждого возраста</span></div>
@@ -334,6 +345,15 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
         </ul>
       </div>
     </div>
+    <div class="money" id="matkapital">
+      <div><b class="big">Можно оплатить материнским капиталом</b>
+        <p>У центра образовательная лицензия, поэтому маткапитал принимаем на английский и на все
+        остальные занятия. Порядок: вы подаёте заявление в Соцфонд, мы готовим договор; первый месяц
+        семья оплачивает сама, после перечисления из Соцфонда деньги возвращаем.</p></div>
+      <div><b class="big">Налоговый вычет 13%</b>
+        <p>Часть оплаты за английский можно вернуть налоговым вычетом на обучение ребёнка. Договор
+        и документы для налоговой подготовим — скажите администратору.</p></div>
+    </div>
   </div>
 </section>
 
@@ -365,6 +385,32 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
     <p class="lead" style="margin-top:16px">Что общее у всех трёх: занятие целиком по-английски,
     без перевода; группа до 8 детей; ребёнок говорит вслух не меньше 12 раз за 50 минут — это
     педагог считает, а не прикидывает на глаз.</p>
+  </div>
+</section>
+
+<!-- 24.09.2026: лестница уровней. Родитель трёхлетки должен видеть, куда ведёт
+     дорога, а родитель школьника — что мы доводим до экзамена Cambridge. -->
+<section id="lestnica" style="background:var(--soft);border-block:1px solid var(--line)">
+  <div class="wrap">
+    <h2>Лестница: от первых песен в 3 года до экзамена Cambridge</h2>
+    <p class="lead">Один путь, без смены школы: каждая ступень продолжает предыдущую. Куда поставить
+    ребёнка, решает не возраст в паспорте, а то, что он уже умеет, — это педагог видит на первом занятии.</p>
+    <div class="ladder">
+      <div class="rung"><div class="lvl">Ступень 1</div><h3>Слышу и пою</h3>
+        <p>Песни, стихи, движение, игры. Букв нет. Ребёнок понимает команды без перевода и говорит первые фразы.</p>
+        <span class="age">3–5 лет</span></div>
+      <div class="rung"><div class="lvl">Ступень 2</div><h3>Говорю</h3>
+        <p>Стихи и сказки наизусть, ответы целыми фразами. С января — первое чтение знакомых текстов.</p>
+        <span class="age">5–7 лет · к Starters</span></div>
+      <div class="rung"><div class="lvl">Ступень 3</div><h3>Читаю и пишу</h3>
+        <p>Школьники: звуки, чтение и письмо с первого месяца, рассказ о себе. Экзамен Pre A1 Starters.</p>
+        <span class="age">7–12 лет · Starters</span></div>
+      <div class="rung"><div class="lvl">Ступень 4</div><h3>Рассуждаю</h3>
+        <p>Описывает картинку, рассказывает историю, пишет короткие тексты, обсуждает по-английски. Movers, дальше Flyers.</p>
+        <span class="age">8–12 лет · Movers → Flyers</span></div>
+    </div>
+    <p class="lead" style="margin-top:16px">Кембриджский экзамен — по желанию семьи: подготовим и поможем
+    записаться. Внутренний экзамен в том же формате — каждую весну для всех, кто готов.</p>
   </div>
 </section>
 
@@ -446,7 +492,7 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 
 <section class="dark">
   <div class="wrap">
-    <h2>15 минут дома, которые решают почти всё</h2>
+    <h2>Английский каждый день, а не два раза в неделю</h2>
     <p class="lead">Скажем честно арифметику, которую обычно не показывают. Два занятия в неделю
     по 50 минут — это 60 часов за учебный год. Чтобы ребёнок свободно заговорил, языку нужно
     звучать заметно больше.</p>
@@ -459,6 +505,9 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
       <div class="card"><h3>Что это даёт</h3><p>Ещё около 45 часов английского за год —
         почти второй учебный год, бесплатно. Именно поэтому дети, у кого дома звучит аудио,
         обгоняют остальных к декабрю.</p></div>
+      <div class="card"><h3>Где всё лежит</h3><p>В чате группы в личном кабинете «Твой Класс»:
+        педагог выкладывает туда аудио, домашние задания, фото с занятий и объявления. Плейлист
+        обновляем раз в две недели — по мере того, как группа идёт дальше.</p></div>
     </div>
   </div>
 </section>
