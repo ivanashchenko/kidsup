@@ -2664,13 +2664,13 @@ def api_pult_nedozvon(payload: dict = Body(...)):
 @app.get("/karta", response_class=HTMLResponse, dependencies=AUTH)
 def karta_page():
     """«Карта развития» после первого занятия: три строки педагога → PNG маме в WhatsApp (06.09)."""
-    from . import karta
+    from . import karta_razvitiya as karta
     return HTMLResponse(karta.page(PRICES))
 
 
 @app.post("/api/karta/send", dependencies=AUTH)
 def api_karta_send(payload: dict = Body(...)):
-    from . import karta
+    from . import karta_razvitiya as karta
     return karta.send(payload or {})
 
 
@@ -3630,7 +3630,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-24.16"
+APP_VERSION = "2026-09-24.17"
 
 
 @app.get("/api/net")

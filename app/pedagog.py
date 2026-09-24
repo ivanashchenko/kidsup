@@ -63,7 +63,7 @@ def key_ok(k: str) -> bool:
 
 
 def page(k: str) -> str:
-    from . import karta
+    from . import karta_razvitiya as karta
     if not key_ok(k):
         return "<h2 style='font-family:sans-serif;margin:2rem'>Ссылка недействительна. Попросите новую у администратора.</h2>"
     data = karta._kids(days=2)
