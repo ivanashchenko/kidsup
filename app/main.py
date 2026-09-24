@@ -3630,7 +3630,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-24.11"
+APP_VERSION = "2026-09-24.12"
 
 
 @app.get("/api/net")
@@ -7784,7 +7784,8 @@ def api_names_status(full: int = 0):
 def api_crm_phones(kind: str = "clients", fmt: str = "txt"):
     """Телефоны клиентов для загрузки в рекламные кабинеты (только владелец).
 
-    kind=clients — те, кто хоть раз платил; kind=all — все карточки с телефоном.
+    kind=clients — те, кто хоть раз платил; kind=all — все карточки с телефоном;
+    kind=active — действующие клиенты (статус «клиент»): их исключаем из рекламы.
     fmt=txt — по номеру в строке (VK Ads, Яндекс Аудитории принимают такой файл);
     fmt=md5 — md5 от номера, если кабинет просит хэши.
     """
@@ -7806,6 +7807,8 @@ def api_crm_phones(kind: str = "clients", fmt: str = "txt"):
     for u in users:
         if kind == "clients" and u["id"] not in payers:
             continue
+        if kind == "active" and u.get("clientStateId") != 125955:
+            continue
         for p in (u.get("phone") or []) if isinstance(u.get("phone"), list) else [u.get("phone")]:
             d = "".join(ch for ch in str(p or "") if ch.isdigit())
             if len(d) == 11 and d[0] in "78":
@@ -7821,6 +7824,46 @@ def api_crm_phones(kind: str = "clients", fmt: str = "txt"):
     return PlainTextResponse("\n".join(out) + "\n",
                              headers={"Content-Disposition":
                                       f'attachment; filename="phones_{kind}.txt"'})
+
+
+@app.post("/api/ads/vk-users-list", dependencies=OWNER_AUTH)
+def api_ads_vk_users_list(payload: dict = Body(...)):
+    """Загрузить в VK Рекламу список телефонов из CRM: {"kind": "active", "name": "..."}.
+
+    24.09: в ретаргетинг «свои» попадали и те, кто уже платит, — деньги на
+    показы действующим клиентам. Список действующих загружается сюда, а
+    дальше подключается к сегменту как исключающее условие. Прокси
+    /api/ads/vk шлёт только JSON, а VK принимает список файлом.
+    """
+    import httpx
+    kind = str(payload.get("kind") or "active")
+    if kind not in ("active", "clients", "all"):
+        raise HTTPException(400, "kind: active | clients | all")
+    body = api_crm_phones(kind=kind, fmt="txt").body
+    n = body.decode().count("\n")
+    name = str(payload.get("name") or f"KidsUP_{kind}_{datetime.now():%d.%m.%y}")[:100]
+
+    def up(tok):
+        return httpx.post("https://ads.vk.com/api/v2/remarketing/users_lists.json",
+                          headers={"Authorization": f"Bearer {tok}"}, timeout=180,
+                          data={"name": name, "type": "phones"},
+                          files={"file": ("phones.txt", body, "text/plain")})
+    r = up(db.get_setting("vk_ads_token"))
+    if r.status_code == 401:
+        tr = httpx.post("https://ads.vk.com/api/v2/oauth2/token.json", timeout=60,
+                        data={"grant_type": "refresh_token",
+                              "refresh_token": db.get_setting("vk_ads_refresh_token"),
+                              "client_id": db.get_setting("vk_ads_client_id"),
+                              "client_secret": db.get_setting("vk_ads_client_secret")})
+        if tr.status_code == 200:
+            j = tr.json()
+            db.set_setting("vk_ads_token", j.get("access_token", ""))
+            db.set_setting("vk_ads_refresh_token", j.get("refresh_token", ""))
+            r = up(j.get("access_token", ""))
+    try:
+        return {"http": r.status_code, "phones": n, "body": r.json()}
+    except Exception:  # noqa: BLE001
+        return {"http": r.status_code, "phones": n, "text": r.text[:500]}
 
 
 @app.post("/api/crm/class-rename", dependencies=OWNER_AUTH)
