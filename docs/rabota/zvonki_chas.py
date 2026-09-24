@@ -78,6 +78,9 @@ def calls(minutes: int) -> list[dict]:
     return out
 
 
+FOREIGN_EXTS = {"21"}
+
+
 def done_ids() -> set:
     try:
         return set(json.loads(DONE.read_text()))
@@ -123,6 +126,15 @@ if __name__ == "__main__":
         mark = "уже" if x["rec"] in done else ("НОВ" if x["dur"] >= TALK_MIN and x["rec"] else "")
         print(f'{x["t"]} {"ИСХ" if x["dir"] == "out" else "ВХ "} {x["phone"]:12s} '
               f'{x["dur"]:4d}с reason={x["reason"]} {mark}')
+    # 24.09: доб. 21 — мобильный сотрудника Клуба Буракова (Люберцы) на общей
+    # АТС. Их клиентов в CRM KidsUP не заводим и разговоры не разбираем —
+    # так же, как app/mango.py FOREIGN_EXTS; в выгрузку через сервер они
+    # всё равно попадают, поэтому режем здесь.
+    chuzhie = [x for x in rows if str(x.get("ext") or x.get("to_ext") or "") in FOREIGN_EXTS]
+    if chuzhie:
+        mark_done([x["rec"] for x in chuzhie if x["rec"]])
+        print(f"пропущено звонков чужого центра (доб. {', '.join(sorted(FOREIGN_EXTS))}): {len(chuzhie)}")
+    rows = [x for x in rows if x not in chuzhie]
     new = [x for x in rows if x["dur"] >= TALK_MIN and x["rec"] and x["rec"] not in done]
     print(f"\nвсего строк {len(rows)}, к разбору {len(new)}")
     if new and "--list" not in sys.argv:
