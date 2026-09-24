@@ -4506,6 +4506,16 @@ def _loop() -> None:
                             chaty.sinhron_start(limit=12)
                         except Exception:
                             log.exception("синхронизация чатов не запустилась")
+                    # 24.09: утренняя актуализация пульта — вчерашние недоделанные
+                    # дела не уезжают в свёрнутый хвост к тому, кто сегодня не
+                    # работает: сделанные по следам закрываются, живые переходят
+                    # на сегодня к тем, кто в смене (hvost.utro).
+                    if 7 <= now.hour <= 9 and _mark("pult_utro", str(_today())):
+                        try:
+                            from . import hvost
+                            hvost.utro()
+                        except Exception:
+                            log.exception("утро пульта")
                     # наряд: строки живых списков, которые сегодня ничьи,
                     # кладём дежурной в инбокс. Раз в час, рабочее окно.
                     if 9 <= now.hour <= 19 and _mark("slot_hourly_naryad", _hour):

@@ -2504,6 +2504,15 @@ def api_hvost_razobrat(payload: dict = Body(default={})):
     return hvost.razobrat(dry=False, den_starosti=int(payload.get("days") or 7))
 
 
+@app.get("/api/pult/utro", dependencies=AUTH)
+def api_pult_utro(dry: int = 1):
+    """Утренняя актуализация пульта (сама идёт в 07:00–09:59 раз в день):
+    хвост со следом оплаты/визита/разговора ≥30 с — закрыть, остальное —
+    на сегодня тем, кто в смене. dry=1 — только показать."""
+    from . import hvost
+    return hvost.utro(dry=bool(int(dry)))
+
+
 @app.get("/api/pult/proverka", dependencies=AUTH)
 def api_pult_proverka(day: str = ""):
     """Самопроверка пульта: дубли на одну семью, пустышки, строки не тому
@@ -3614,7 +3623,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-24.03"
+APP_VERSION = "2026-09-24.04"
 
 
 @app.get("/api/net")

@@ -384,3 +384,92 @@ def proverit(zakryt: bool = False, dry: bool = True) -> dict:
     for k in ("сделано", "касались", "не трогали", "не нужно"):
         itog[f"итого {k}"] = len(itog[k])
     return itog
+
+
+def utro(dry: bool = False) -> dict:
+    """Утренняя актуализация пульта — раз в день, до начала смены.
+
+    24.09.2026, Борис: «Пульт регулярно обновляется??!!» Новые дела приходили
+    сами (наряд, разбор звонков, автопилот), а вчерашние недоделанные в
+    полночь уезжали в свёрнутый хвост — к тому, кто сегодня может и не
+    работать. Разбирали их только вручную.
+
+    Теперь каждое утро:
+      1. Закрываем пункт хвоста только по сильному следу после его даты:
+         оплата семьи, визит ребёнка, разговор от 30 секунд. Комментарий
+         админа не в счёт — «не берут трубку» тоже комментарий. Обязательства
+         (деньги, документы, жалобы) и дела Бориса не закрываем никогда.
+      2. Остальное живое переносим на сегодня: своему человеку, если он в
+         смене, иначе — дежурной, у которой меньше дел. Уровень важности
+         (prio) сохраняется, пометка «⏳ с ДД.ММ» — чтобы было видно возраст.
+    Задачи смены (pult_tasks) не переносим: они собраны под свой день.
+    """
+    from . import pult
+    segodnya = pult.today()
+    smena = [w for w in pult.duty(segodnya) if w in set(pult.SHORT.values())]
+    itog = {"день": segodnya, "смена": smena, "закрыто": [], "перенесено": 0,
+            "по_людям": {}, "dry": dry}
+    with db.get_conn() as conn:
+        pult._inbox_tries(conn)
+        rows = conn.execute(
+            "SELECT id, day, who, text, phone FROM plan_inbox "
+            "WHERE done=0 AND day<? ORDER BY day, id", (segodnya,)).fetchall()
+        if not rows:
+            return itog
+        s_daty = min(r["day"] for r in rows)
+        semya = _semya(conn)
+        oplaty = _posle(conn, "SELECT user_id, MAX(date) FROM payments "
+                              "WHERE date >= ? AND summa > 0 GROUP BY user_id", (s_daty,))
+        vizity = _posle(conn, "SELECT r.user_id, MAX(l.date) FROM lesson_records r "
+                              "JOIN lessons l ON l.id = r.lesson_id "
+                              "WHERE r.visit = 1 AND l.date >= ? GROUP BY r.user_id", (s_daty,))
+        razgovory: dict[str, str] = {}
+        try:
+            cols = {c[1] for c in conn.execute("PRAGMA table_info(mango_calls)")}
+            if "secs" in cols:
+                for ph, ts in conn.execute(
+                        "SELECT phone, MAX(ts) FROM mango_calls WHERE state='talked' "
+                        "AND COALESCE(secs, 0) >= 30 AND ts >= ? GROUP BY phone", (s_daty,)).fetchall():
+                    p = _p10(ph)
+                    if p and str(ts or "") > razgovory.get(p, ""):
+                        razgovory[p] = str(ts)
+        except Exception:
+            pass
+        nagruzka = {w: conn.execute(
+            "SELECT COUNT(*) FROM plan_inbox WHERE done=0 AND day=? AND who=?",
+            (segodnya, w)).fetchone()[0] for w in smena}
+        for r in rows:
+            den, kto, tekst = r["day"], r["who"], r["text"] or ""
+            p = _p10(r["phone"])
+            uids = semya.get(p, set()) if p else set()
+            sled = []
+            if kto != "Борис" and not OBYAZATELSTVO.search(tekst):
+                if any(oplaty.get(u, "") > den for u in uids):
+                    sled.append("семья оплатила после этой даты")
+                if any(vizity.get(u, "") > den for u in uids):
+                    sled.append("ребёнок был на занятии после этой даты")
+                if p and razgovory.get(p, "")[:10] > den:
+                    sled.append(f"разговор от 30 с {razgovory[p][:10]}")
+            if sled:
+                itog["закрыто"].append({"id": r["id"], "кто": kto, "почему": "; ".join(sled)})
+                if not dry:
+                    conn.execute("UPDATE plan_inbox SET done=1, text = text || ? WHERE id=?",
+                                 (f" — закрыто {segodnya} утром: {'; '.join(sled)}", r["id"]))
+                continue
+            novyj = kto
+            if kto in set(pult.SHORT.values()) and smena and kto not in smena:
+                novyj = min(smena, key=lambda w: nagruzka.get(w, 0))
+            if novyj in nagruzka:
+                nagruzka[novyj] += 1
+            metka = "" if tekst.startswith("⏳") else f"⏳ с {den[8:10]}.{den[5:7]}: "
+            if len(metka) + len(tekst) > 400:
+                metka = ""          # обрезанный на полуслове текст хуже, чем без пометки
+            itog["перенесено"] += 1
+            itog["по_людям"][novyj] = itog["по_людям"].get(novyj, 0) + 1
+            if not dry:
+                conn.execute("UPDATE plan_inbox SET day=?, who=?, text=? WHERE id=?",
+                             (segodnya, novyj, (metka + tekst)[:400], r["id"]))
+    if not dry:
+        log.warning("утро пульта: закрыто %d, перенесено %d (%s)", len(itog["закрыто"]),
+                    itog["перенесено"], itog["по_людям"])
+    return itog
