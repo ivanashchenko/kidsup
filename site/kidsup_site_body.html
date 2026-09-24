@@ -273,6 +273,8 @@ footer .legal a{color:#9BD7F5}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto}}
 body.js .reveal{opacity:0;transform:translateY(14px);transition:opacity .5s,transform .5s}
 body.js .reveal.in{opacity:1;transform:none}
+/* 24.09.2026 разбор рекламы: быстрые ссылки Директа ведут на карточки (#mental и др.) — не прятать под липкой шапкой */
+#cards .card[id]{scroll-margin-top:84px}
 </style>
 </head>
 <body>
@@ -417,7 +419,7 @@ body.js .reveal.in{opacity:1;transform:none}
       <button data-a="7">7–12 лет</button>
     </div>
     <div class="c-grid" id="cards">
-<div class="card g3">
+<div class="card g3" id="podgotovka">
   <div class="age">✏️ 4–7 лет</div><h3>Подготовка к школе</h3>
   <div class="tag">Научим читать за 3 месяца. Не по буквам — по-настоящему.</div>
   <div class="meta">🗓 2 раза в неделю по 50 мин · будни 16:00–20:00 или суббота утром · 15 групп</div>
@@ -446,7 +448,7 @@ body.js .reveal.in{opacity:1;transform:none}
 чтение словами и пересказ. И спокойное «сел и доделал».</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Подготовка к школе">Записаться</a>
 </div>
-<div class="card g3 g7">
+<div class="card g3 g7" id="english">
   <div class="age">🇬🇧 3–12 лет</div><h3>Английский язык</h3>
   <div class="tag">Через год ребёнок говорит на английском. Не «знает слова» — говорит.</div>
   <div class="meta">🗓 2 раза в неделю по 50 мин · пн-ср или вт-чт, 16:00–20:00</div>
@@ -472,7 +474,7 @@ body.js .reveal.in{opacity:1;transform:none}
 который ведёт занятие целиком на английском, — и ребёнка, который заговорит.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Английский язык">Записаться</a>
 </div>
-<div class="card g1 g3">
+<div class="card g1 g3" id="minisad">
   <div class="age">🌿 2–4 года</div><h3>Английский мини-сад</h3>
   <div class="tag">Полдня, за которые ребёнок получает больше, чем за день в обычном саду.</div>
   <div class="meta">🗓 будни 9:00–13:00 · от 2 до 5 дней в неделю · группа до 15 детей</div>
@@ -493,7 +495,7 @@ body.js .reveal.in{opacity:1;transform:none}
 детский английский — тот же центр, те же лица, никакого стресса от смены места.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Английский мини-сад">Записаться</a>
 </div>
-<div class="card g3">
+<div class="card g3" id="nulevoy">
   <div class="age">🎒 5–7 лет</div><h3>Нулевой класс</h3>
   <div class="tag">Нулевой класс: мягкая репетиция школы за год до школы.</div>
   <div class="meta">🗓 будни 10:00–14:00 · 5 или 3 дня в неделю · группа до 15 детей</div>
@@ -513,7 +515,7 @@ body.js .reveal.in{opacity:1;transform:none}
 дальше пробная неделя с зачётом стоимости при покупке месяца.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Нулевой класс">Записаться</a>
 </div>
-<div class="card g1">
+<div class="card g1" id="rannee">
   <div class="age">🧸 1,3–4 года</div><h3>Раннее развитие</h3>
   <div class="tag">От первых слов до первых «сам!» — три программы по возрасту.</div>
   <div class="meta">🗓 утро (с мамой) и день · группы 6–8 детей · 45–50 мин</div>
@@ -538,7 +540,7 @@ body.js .reveal.in{opacity:1;transform:none}
 в одном месте, с знакомыми лицами.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Раннее развитие">Записаться</a>
 </div>
-<div class="card g1 g3 g7">
+<div class="card g1 g3 g7" id="logoped">
   <div class="age">🗣️ 2–8 лет</div><h3>Логопед</h3>
   <div class="tag">Запуск речи и чистые звуки — пока это решается легко.</div>
   <div class="meta">🗓 индивидуально · Елена: пн/ср/пт вечер + вт/чт утро (50 мин) · Марина: вт/чт вечер, сб (40 мин)</div>
@@ -559,7 +561,7 @@ body.js .reveal.in{opacity:1;transform:none}
 с «р» и «ш» — диагностика у нас в том же здании, в те же дни.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Логопед">Записаться</a>
 </div>
-<div class="card g3 g7">
+<div class="card g3 g7" id="mental">
   <div class="age">🧮 4–12 лет</div><h3>Ментальная арифметика</h3>
   <div class="tag">Считает быстрее калькулятора — а на самом деле тренирует память и концентрацию.</div>
   <div class="meta">🗓 воскресенье · 12:30 (4–7 лет) и 14:00 (7–12 лет) · 90 мин</div>
@@ -579,7 +581,7 @@ body.js .reveal.in{opacity:1;transform:none}
 медленно считает» целиком.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Ментальная арифметика">Записаться</a>
 </div>
-<div class="card g7">
+<div class="card g7" id="shahmaty">
   <div class="age">♟️ 6–12 лет</div><h3>Шахматы</h3>
   <div class="tag">Логика и умение думать наперёд — через сказку для малышей и турниры для школьников.</div>
   <div class="meta">🗓 Гр1 (продолжающие): пт 18:00 + вс 11:00 · Гр2 (начинающие): пт 19:00 + вс 12:00</div>
@@ -599,7 +601,7 @@ body.js .reveal.in{opacity:1;transform:none}
 не продолжать, занятие оплачивается отдельно — 850 ₽.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Шахматы">Записаться</a>
 </div>
-<div class="card g3 g7">
+<div class="card g3 g7" id="izo">
   <div class="age">🎨 4–11 лет</div><h3>ИЗО-студия</h3>
   <div class="tag">Не «порисовать» — четыре темы, в каждой ребёнок доводит работу до результата.</div>
   <div class="meta">🗓 пн + ср, 16:00–20:00 · 4 группы по темам</div>
@@ -623,7 +625,7 @@ body.js .reveal.in{opacity:1;transform:none}
 не продолжать, занятие оплачивается отдельно — 850 ₽.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="ИЗО-студия">Записаться</a>
 </div>
-<div class="card g7">
+<div class="card g7" id="skorochtenie">
   <div class="age">📖 7–12 лет</div><h3>Скорочтение (техника чтения)</h3>
   <div class="tag">Кто быстро читает — быстро учится. Всё остальное — следствие.</div>
   <div class="meta">🗓 2 раза в неделю по 50 мин</div>
@@ -642,7 +644,7 @@ body.js .reveal.in{opacity:1;transform:none}
 то есть обе опоры школьной скорости.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Скорочтение (техника чтения)">Записаться</a>
 </div>
-<div class="card g7">
+<div class="card g7" id="kalligrafiya">
   <div class="age">✒️ 7–10 лет</div><h3>Каллиграфия + грамота</h3>
   <div class="tag">Если учитель пишет «старайся!» красной ручкой — это к нам.</div>
   <div class="meta">🗓 вт + чт, 16:00 · 50 мин</div>
@@ -661,7 +663,7 @@ body.js .reveal.in{opacity:1;transform:none}
 группа маленькая, рука каждого ребёнка — под присмотром.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Каллиграфия + грамота">Записаться</a>
 </div>
-<div class="card g3 g7">
+<div class="card g3 g7" id="robototehnika">
   <div class="age">🤖 4–12 лет</div><h3>Робототехника</h3>
   <div class="tag">Ребёнок не смотрит, как делают взрослые, — собирает и программирует сам.</div>
   <div class="meta">🗓 занятие 55 мин · партнёрский курс</div>
@@ -1003,9 +1005,7 @@ body.js .reveal.in{opacity:1;transform:none}
     <details><summary>Мы ещё не определились с расписанием на год</summary>
       <p>Так у большинства в августе! Начните с пробного и диагностики — расписание у нас
       гибкое: если что-то поменяется, переведём в другую группу по тому же предмету.
-      Неделя открытых уроков идёт с 31.08 по 06.09 — в это время знакомиться приходят целыми
-      группами, это самый живой момент. Но прийти на первое условно-бесплатное занятие можно
-      в любое время года. У мини-сада и нулевого класса вместо занятия — бесплатный пробный день.</p></details>
+      Прийти на первое условно-бесплатное занятие можно в любое время года. У мини-сада и нулевого класса вместо занятия — бесплатный пробный день.</p></details>
     <details><summary>Как проходит оплата?</summary>
       <p>Помесячно. У большинства направлений абонемент на 8 занятий; у логопеда,
       ментальной арифметики и робототехники — на 4 занятия; у сада и нулевого класса —

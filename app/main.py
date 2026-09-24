@@ -892,10 +892,17 @@ def _enrollment_groups() -> list[dict]:
 
 
 def _price_line(pr, name):
-    """Строка прайса для группы: у нулевого класса — своя, не «Мини-сад, 20 посещений»."""
+    """Строка прайса для группы: у нулевого класса — своя, не «Мини-сад, 20 посещений».
+
+    24.09.2026 разбор рекламы: у «Раннего развития» три программы с разными ценами,
+    а бралась всегда первая строка — «Музыка и речь» 8 600 ₽. «Первая школа» и
+    «Лицей» на сайте стояли по 8 600 ₽ при 7 800 ₽ в прайсе и в объявлении 060.
+    Программу берём из имени группы («РР.Первая школа_…», «РР.Лицей_…»)."""
     lines = pr["lines"]
-    if "Нулевой" in (name or ""):
-        lines = [l for l in lines if "Нулевой" in l[0]] or lines
+    for key in ("Нулевой", "Первая школа", "Лицей", "Музыка и речь"):
+        if key in (name or ""):
+            lines = [l for l in lines if key in l[0]] or lines
+            break
     return lines[0]
 
 
@@ -3623,7 +3630,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-24.08"
+APP_VERSION = "2026-09-24.09"
 
 
 @app.get("/api/net")
@@ -4162,6 +4169,17 @@ def _lead_to_crm(lead: dict) -> None:
             details.append(f"Комментарий: {lead['note']}")
         if lead.get("roistat"):
             details.append(f"roistat_visit: {lead['roistat']} (сквозная аналитика)")
+        # 25.09.2026 разбор рекламы (T2): канал и ClientID Метрики — чтобы по карточке
+        # было видно, с какой рекламы пришла семья, и можно было вернуть оплату в Метрику
+        if lead.get("ym_cid") or lead.get("yclid") or lead.get("utm"):
+            try:
+                from .ads_voronka import kanal
+                ch = kanal(lead.get("note"), lead.get("utm"), lead.get("roistat"))
+            except Exception:
+                ch = "?"
+            details.append(f"Канал: {ch} · ClientID: {lead.get('ym_cid') or '—'}"
+                           f" · yclid: {lead.get('yclid') or '—'}"
+                           + (f" · вход: {lead['landing']}" if lead.get("landing") else ""))
         if same > 1:
             details.append(f"⚠️ В базе {same} карточек с этим номером — проверьте, к какому ребёнку заявка.")
         details.append("Правило: позвонить в течение 5 минут (скорость = конверсия).")
@@ -4352,7 +4370,16 @@ async def public_lead(request: Request):
             "age": str(payload.get("age") or "").strip()[:20],
             "course": str(payload.get("course") or "").strip()[:80],
             "note": str(payload.get("note") or "").strip()[:300],
-            "roistat": str(payload.get("roistat") or "").strip()[:64]}
+            "roistat": str(payload.get("roistat") or "").strip()[:64],
+            # 25.09.2026 разбор рекламы (T1/T2): ClientID Метрики, yclid, метки первого и
+            # последнего касания (JSON из ku-ref.js) и страница входа. Без них нет цены
+            # оплаты по кампаниям: 63% реальных номеров приходили без меток.
+            "ym_cid": "".join(ch for ch in str(payload.get("ym_cid") or "") if ch.isdigit())[:32],
+            "yclid": "".join(ch for ch in str(payload.get("yclid") or "") if ch.isdigit())[:32],
+            # 25.09.2026: длинный JSON не режем посередине (битый JSON бесполезен) —
+            # ku-ref.js сам укладывается в 1500; если нет, остаются note и yclid
+            "utm": (lambda u: u if len(u) <= 1500 else "")(str(payload.get("utm") or "").strip()),
+            "landing": str(payload.get("landing") or "").strip()[:120]}
 
     def _store() -> int | None:
         with db.get_conn() as conn:
@@ -4360,17 +4387,22 @@ async def public_lead(request: Request):
                 id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
                 child TEXT, age TEXT, course TEXT, note TEXT, roistat TEXT, ip TEXT)""")
             for col, ddl in (("crm_status", "TEXT"), ("attempts", "INTEGER"),
-                             ("last_error", "TEXT"), ("mk_user_id", "INTEGER")):
+                             ("last_error", "TEXT"), ("mk_user_id", "INTEGER"),
+                             # 25.09.2026 разбор рекламы (T2)
+                             ("ym_cid", "TEXT"), ("yclid", "TEXT"), ("utm", "TEXT"),
+                             ("landing", "TEXT")):
                 try:
                     conn.execute(f"ALTER TABLE site_leads ADD COLUMN {col} {ddl}")
                 except Exception:
                     pass
             cur = conn.execute(
-                "INSERT INTO site_leads (ts, phone, child, age, course, note, roistat, ip, crm_status)"
-                " VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO site_leads (ts, phone, child, age, course, note, roistat, ip, crm_status,"
+                " ym_cid, yclid, utm, landing)"
+                " VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (lead["phone"], lead["child"], lead["age"], lead["course"],
                  lead["note"], lead["roistat"], ip,
-                 "throttled" if throttled else "pending"))
+                 "throttled" if throttled else "pending",
+                 lead["ym_cid"], lead["yclid"], lead["utm"], lead["landing"]))
             conn.commit()
             return cur.lastrowid
 
@@ -4424,6 +4456,19 @@ def public_leads_list(limit: int = 50):
         except Exception:
             return {"count": 0, "leads": []}
     return {"count": len(rows), "leads": [dict(r) for r in rows]}
+
+
+@app.get("/api/ads/voronka", dependencies=OWNER_AUTH)
+def api_ads_voronka(days: int = 30, details: bool = False):
+    """Воронка рекламы по каналам (Директ поиск / бренд / РСЯ, Я.Бизнес-Карты, VK,
+    органика, без меток): заявки с сайта → записался → пришёл → оплатил → выручка.
+
+    25.09.2026 разбор рекламы (TR-12): раньше это собирали вручную, 160 запросов
+    к /api/pult/sledy с его пятью последними платежами. Только чтение локальной базы.
+    details=1 — ещё и список семей с каналом и статусами. Там телефоны и выручка
+    по семьям, поэтому доступ владельца, как у остальных /api/ads/*."""
+    from . import ads_voronka
+    return ads_voronka.voronka(days, details)
 
 
 @app.post("/api/broadcast/retext", dependencies=AUTH)

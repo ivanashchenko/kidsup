@@ -29,32 +29,44 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;600&display=swap"></noscript>
 <link rel="stylesheet" href="/static/lp.css">
+<style>
+/* 25.09.2026 разбор рекламы (LP-2): первый экран под запрос «подготовка к школе» — рейтинг,
+   возраст и метро до формы. Стили здесь, а не в lp.css: его подключают 7 страниц,
+   и правило ≤560px поменяло бы шапку на всех. */
+.hero-rating{color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.55);letter-spacing:.02em;text-transform:none;font-size:13px}
+.hero .hero-sub{margin-top:0}
+.hero .hero-fakty{margin:10px 0 0;font-size:16px;line-height:1.45}
+.hero .hero-fakty a{color:inherit}
+.alt-contacts{flex-basis:100%;font-size:14px;font-weight:700;color:var(--muted)}
+.alt-contacts a{color:var(--green-ink);text-decoration:none}
+.alt-contacts .wa-inline{flex-basis:auto}
+@media (max-width:560px){ .hero{padding-top:28px} .hero .brand{margin-bottom:10px} .hero h1{font-size:26px;margin-bottom:10px} }
+</style>
 </head>
 <body>
 
 <header class="hero warm">
   <div class="wrap">
-    <div class="brand">KidsUP · Бульвар Рокоссовского</div>
-    <h1>Читает за 3 месяца.<br>Не по буквам — по-настоящему.</h1>
-    <p>Ребёнок начинает читать словами и понимать прочитанное, а не складывать «эм-а-эм-а».
-    Плюс счёт, письмо, логика и главное, чего школа ждёт больше знаний, — умение сесть,
-    услышать задание и довести его до конца.</p>
-    <p class="hero-fakty" style="margin:10px 0 0;font-size:17px;line-height:1.5"><b>8 400 ₽</b> в месяц — 8 занятий, два раза в неделю. Группы с 16:00 до 19:00. <a href="#groups" style="color:inherit">Посмотреть свободные места →</a></p>
+    <!-- 25.09.2026 разбор рекламы: в заголовке не было слов «подготовка к школе», метро было
+         на 873 px, суббота не упоминалась, хотя объявление 052 её обещает -->
+    <div class="brand">KidsUP · <a class="hero-rating" href="#otzyvy">★ 5,0 · 255 отзывов на Яндекс Картах</a></div>
+    <h1>Подготовка к школе 4–7 лет у м. Бульвар Рокоссовского</h1>
+    <p class="hero-sub">Читает за 3 месяца — словами, а не по буквам. До 8 детей в группе.</p>
+    <p class="hero-fakty"><b>8 400 ₽</b> за 8 занятий в месяц · будни 16:00–19:00 и суббота · <a href="#groups">свободные места →</a></p>
     <form class="mini-lead hero-mini" data-mini="1" action="https://app.kidsup.ru/api/public/lead" method="post">
       <b>Первое занятие — условно-бесплатное. Оставьте номер — подберём группу за один звонок.</b>
       <input id="hero-phone" name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
       <input type="hidden" name="course" value="Подготовка к школе">
       <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
       <button type="submit">Перезвоните мне</button>
-      <a class="wa-inline" href="https://app.kidsup.ru/go/whatsapp?src=podgotovka_hero&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">или напишите в WhatsApp →</a>
+      <span class="alt-contacts">или <a class="wa-inline" href="https://app.kidsup.ru/go/whatsapp?src=podgotovka_hero&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">WhatsApp</a> · <a href="tel:+74951209024">+7 495 120-90-24</a></span>
       <p class="consent-note">Нажимая «Перезвоните мне», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a>.</p>
       <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅ Хотите быстрее — <a href="https://app.kidsup.ru/go/whatsapp?src=podgotovka_hero_ok&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">напишите в WhatsApp</a></span>
     </form>
     <div class="offer-badges">
-      <span>🌿 Первое занятие — условно-бесплатное: не понравится — платить не нужно</span>
-      <span>🎁 −15% на первый абонемент в день первого занятия</span>
-      <span>📍 5 минут от м. Бульвар Рокоссовского</span>
-      <span>💳 Абонемент 8 занятий — 8 400 ₽</span>
+      <span>🎁 −15% новым семьям на первый абонемент при оплате в день первого занятия</span>
+      <span>📍 5 минут от метро, напротив ТЦ «Янтарь»</span>
+      <span>💳 Маткапитал и вычет 13%</span>
     </div>
     <a class="cta" href="#hero-phone">Записаться на первое занятие</a>
     <a class="cta ghost" href="#road">Что будет уметь по месяцам</a>
@@ -86,7 +98,7 @@
   </div>
 </section>
 
-<section>
+<section id="price">
   <div class="wrap">
     <h2>Сколько стоит</h2>
     <div class="price">
@@ -112,6 +124,17 @@
         <li>−10% на второй предмет, второго ребёнка и многодетным семьям;
             скидки не суммируются, действует наибольшая</li></ul>
       </div>
+    </div>
+    <!-- 25.09.2026 разбор рекламы (LP-4): объявления ПШ несут уточнение «Оплата маткапиталом»,
+         а страница ни разу не упоминала ни маткапитал, ни вычет. Блок — как на /english -->
+    <div class="money" id="matkapital">
+      <div><b class="big">Можно оплатить материнским капиталом</b>
+        <p>У центра образовательная лицензия, поэтому маткапитал принимаем на подготовку к школе и на все
+        остальные занятия. Порядок: вы подаёте заявление в Соцфонд, мы готовим договор; первый месяц
+        семья оплачивает сама, после перечисления из Соцфонда деньги возвращаем.</p></div>
+      <div><b class="big">Налоговый вычет 13%</b>
+        <p>Часть оплаты за подготовку к школе можно вернуть налоговым вычетом на обучение ребёнка. Договор
+        и документы для налоговой подготовим — скажите администратору.</p></div>
     </div>
   </div>
 </section>

@@ -239,6 +239,16 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 .sb-sheet .mini-lead{border:0;box-shadow:none;margin:0;border-radius:0}
 .sb-sheet .mini-lead a{display:inline;padding:0;border:0;font:inherit;font-size:12.5px;color:var(--blue-ink,#0F6E96);text-decoration:underline}
 .sb-sheet .mini-lead .ok-msg a{font-size:inherit;color:var(--green-ink,#4E7A18)}
+/* 25.09.2026 разбор рекламы (LP-1): первый экран под запрос «английский для детей» —
+   рейтинг, возраст и метро до формы; телефон и WhatsApp рядом с кнопкой */
+.hero-rating{color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.55);letter-spacing:.02em;text-transform:none;font-size:13px}
+.hero .hero-sub{margin-top:0}
+.hero .hero-fakty{margin:10px 0 0;font-size:16px;line-height:1.45}
+.hero .hero-fakty a{color:inherit}
+.alt-contacts{flex-basis:100%;font-size:14px;font-weight:700;color:var(--muted)}
+.alt-contacts a{color:var(--green-ink);text-decoration:none}
+.alt-contacts .wa-inline{flex-basis:auto}
+@media (max-width:560px){ .hero{padding-top:28px} .hero .brand{margin-bottom:10px} .hero h1{font-size:26px;margin-bottom:10px} }
 /* 24.09.2026: лестница уровней и блок про маткапитал */
 .ladder{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:22px;align-items:end}
 .rung{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:16px 17px}
@@ -256,27 +266,26 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
 
 <header class="hero">
   <div class="wrap">
-    <div class="brand">KidsUP · Бульвар Рокоссовского</div>
-    <h1>Ребёнок заговорит по-английски.<br>Не переведёт — заговорит.</h1>
-    <p>Занятие идёт целиком на английском, без перевода на русский, с первой минуты. До 8 детей
-    в группе — каждый говорит вслух не меньше 12 раз за занятие. Кембриджская лестница:
-    Starters → Movers → Flyers.</p>
-    <p class="hero-fakty" style="margin:10px 0 0;font-size:17px;line-height:1.5"><b>8 400 ₽</b> в месяц — 8 занятий, два раза в неделю. Группы с 16:00 до 19:00, понедельник-среда и вторник-четверг. <a href="#groups" style="color:inherit">Посмотреть свободные места →</a></p>
+    <!-- 25.09.2026 разбор рекламы: с Директа 408 кликов и 0 обращений — первый экран не подтверждал
+         объявление (ни возраста, ни «для детей», ни рейтинга) -->
+    <div class="brand">KidsUP · <a class="hero-rating" href="#otzyvy">★ 5,0 · 255 отзывов на Яндекс Картах</a></div>
+    <h1>Английский для детей 3–12 лет у м. Бульвар Рокоссовского</h1>
+    <p class="hero-sub">Не переведёт — заговорит: занятие целиком на английском, до 8 детей в группе.</p>
+    <p class="hero-fakty"><b>8 400 ₽</b> за 8 занятий в месяц · пн-ср и вт-чт, 16:00–19:00 · <a href="#groups">свободные места →</a></p>
     <form class="mini-lead hero-mini" data-mini="1" action="https://app.kidsup.ru/api/public/lead" method="post">
       <b>Первое занятие — условно-бесплатное. Оставьте номер — подберём группу за один звонок.</b>
       <input id="hero-phone" name="phone" type="tel" inputmode="tel" required placeholder="+7 916 000-00-00" autocomplete="tel" aria-label="Ваш телефон">
       <input type="hidden" name="course" value="Английский язык">
       <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="display:none">
       <button type="submit">Перезвоните мне</button>
-      <a class="wa-inline" href="https://app.kidsup.ru/go/whatsapp?src=english_hero&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">или напишите в WhatsApp →</a>
+      <span class="alt-contacts">или <a class="wa-inline" href="https://app.kidsup.ru/go/whatsapp?src=english_hero&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">WhatsApp</a> · <a href="tel:+74951209024">+7 495 120-90-24</a></span>
       <p class="consent-note">Нажимая «Перезвоните мне», вы соглашаетесь с <a href="https://kidsup.ru/privacy" target="_blank" rel="noopener">политикой обработки персональных данных</a>.</p>
       <span class="ok-msg" hidden>Принято! Позвоним в течение 15 минут ✅ Хотите быстрее — <a href="https://app.kidsup.ru/go/whatsapp?src=english_hero_ok&t=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%A5%D0%BE%D1%87%D1%83%20%D0%B7%D0%B0%D0%BF%D0%B8%D1%81%D0%B0%D1%82%D1%8C%D1%81%D1%8F%20%D0%BD%D0%B0%20%D0%BF%D0%B5%D1%80%D0%B2%D0%BE%D0%B5%20%D0%B7%D0%B0%D0%BD%D1%8F%D1%82%D0%B8%D0%B5" target="_blank" rel="noopener">напишите в WhatsApp</a></span>
     </form>
     <div class="offer-badges">
-      <span>🌿 Первое занятие — условно-бесплатное: не понравится — платить не нужно</span>
-      <span>🎁 −15% на первый абонемент в день первого занятия</span>
-      <span>📍 5 минут от м. Бульвар Рокоссовского</span>
-      <span>💳 Абонемент 8 занятий — 8 400 ₽</span>
+      <span>🎁 −15% новым семьям на первый абонемент при оплате в день первого занятия</span>
+      <span>📍 5 минут от метро, напротив ТЦ «Янтарь»</span>
+      <span>💳 Маткапитал и вычет 13%</span>
     </div>
     <a class="cta" href="#hero-phone">Записаться на первое занятие</a>
     <a class="cta ghost" href="#lestnica">Лестница от 3 лет до Cambridge</a>
@@ -312,7 +321,7 @@ footer b{color:#fff;font-family:Rubik,sans-serif}
   </div>
 </section>
 
-<section style="background:var(--soft);border-block:1px solid var(--line)">
+<section id="price" style="background:var(--soft);border-block:1px solid var(--line)">
   <div class="wrap">
     <h2>Сколько стоит</h2>
     <div class="price">
@@ -727,24 +736,50 @@ fetch('https://app.kidsup.ru/api/public/schedule').then(function(r){return r.jso
 });
 
 /* Заявка — тот же приём, что и на главной странице сайта. */
+/* 25.09.2026 разбор рекламы: метки и ClientID из ku-ref.js (T1), цель lead_error (T4) —
+   только для анализа, в стратегию не ставить */
+function kuT() {
+  try { if (window.__kuRef) return window.__kuRef(); } catch (_) {}
+  /* 25.09.2026 после ревью: ku-ref.js не успел загрузиться или его отрезал блокировщик —
+     раньше метки тогда пропадали совсем. Берём их из адреса, но только utm_*, yclid,
+     ysclid, roistat, rs — без etext, из-за которого note обрезался и терялся yclid */
+  var o = {qs: '', yclid: '', landing: location.pathname.slice(0, 120), utm: '',
+           ym_cid: ((document.cookie.match(/(?:^|; )_ym_uid=([^;]+)/) || [])[1] || '')}, q = [];
+  (location.search || '').slice(1).split('&').forEach(function (kv) {
+    var i = kv.indexOf('='), k, v;
+    try { k = decodeURIComponent(i < 0 ? kv : kv.slice(0, i)).toLowerCase();
+          v = i < 0 ? '' : decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); } catch (_) { return; }
+    if (!v || !/^(utm_[a-z_]+|yclid|ysclid|roistat|rs)$/.test(k)) return;
+    v = v.replace(/[&|]/g, ' ').slice(0, 200); q.push(k + '=' + v);
+    if (k === 'yclid') o.yclid = v;
+  });
+  o.qs = q.join('&').slice(0, 230);
+  return o;
+}
+function kuLeadError(reason, form){
+  try { ym(69569509, 'reachGoal', 'lead_error', {reason: reason, form: form}); } catch (_) {} }
 function normPhone(v){ var s = (v||'').replace(/\D/g,''); if (s.length === 11 && s[0] === '8') s = '7' + s.slice(1);
+  /* 24.09.2026 разбор рекламы: 10 цифр с 9 («916 123 45 67») — тоже номер, как на главной */
+  if (s.length === 10 && s[0] === '9') s = '7' + s;
   return (s.length === 11 && s[0] === '7' && s[1] === '9') ? s : ''; }
 document.getElementById('lead').addEventListener('submit', async function(e){
   e.preventDefault();
   var err = document.getElementById('f-phone-err');
   var p = normPhone(document.getElementById('f-phone').value);
-  if (!p) { err.hidden = false; document.getElementById('f-phone').focus(); return; }
+  if (!p) { err.hidden = false; document.getElementById('f-phone').focus(); kuLeadError('phone', 'full'); return; }
   err.hidden = true;
   var btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true; btn.textContent = 'Отправляем…';
   var rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
+  var t = kuT(), why = 'network';
   try {
     var r = await fetch('https://app.kidsup.ru/api/public/lead', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({name: document.getElementById('f-name').value,
                             age: document.getElementById('f-age').value,
                             phone: p, course: 'Английский язык', roistat: rv,
-                            note: ('страница английского | ' + (location.search || '').slice(1)).slice(0, 250),
+                            note: ('страница английского | ' + (t.qs || '')).slice(0, 250),
+                            ym_cid: t.ym_cid || '', yclid: t.yclid || '', utm: t.utm || '', landing: t.landing || '',
                             website: document.getElementById('f-web').value})});
     var j = await r.json();
     if (j.ok) {
@@ -756,8 +791,10 @@ document.getElementById('lead').addEventListener('submit', async function(e){
         'и подберёт группу по уровню ребёнка.</p></div>';
       return;
     }
+    why = 'rejected';
     throw new Error('bad');
   } catch (_) {
+    kuLeadError(why, 'full');
     btn.disabled = false; btn.textContent = 'Отправить заявку';
     err.textContent = 'Не получилось отправить. Позвоните нам: +7 495 120-90-24'; err.hidden = false;
   }
@@ -773,6 +810,8 @@ k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
 ym(69569509,"init",{clickmap:true,trackLinks:true,accurateTrackBounce:true,webvisor:true});
 </script>
 <noscript><div><img src="https://mc.yandex.ru/watch/69569509" style="position:absolute;left:-9999px" alt="" loading="lazy" decoding="async"></div></noscript>
+<!-- 25.09.2026 разбор рекламы (T1): метки рекламы и ClientID Метрики — в заявку -->
+<script src="/static/ku-ref.js" defer></script>
 <!-- Пиксель VK Рекламы (счётчик 3355457) -->
 <script>
 var _tmr = window._tmr || (window._tmr = []);
@@ -787,11 +826,19 @@ _tmr.push({id: "3355457", type: "pageView", start: (new Date()).getTime()});
 </script>
 <noscript><div><img src="https://top-fwz1.mail.ru/counter?id=3355457;js=na" style="position:absolute;left:-9999px" alt="Top.Mail.Ru" loading="lazy" decoding="async"></div></noscript>
 <script>
+/* 25.09.2026 разбор рекламы (T5): messenger — только WhatsApp, Telegram и MAX, остальное /go/ — цель social.
+   Слушатель один: липкая панель ниже больше не шлёт цель второй раз. */
 document.addEventListener('click', function(e){
   var a = e.target.closest && e.target.closest('a[href*="app.kidsup.ru/go/"]');
   if(!a) return;
-  try { ym(69569509, 'reachGoal', 'messenger'); } catch(_){}
+  var ch = (a.getAttribute('href').match(/\/go\/([a-z]+)/)||[])[1] || 'msg';
+  if (!/^(whatsapp|telegram|max)$/.test(ch)) {
+    try { ym(69569509, 'reachGoal', 'social', {channel: ch}); } catch(_){}
+    return;
+  }
+  try { ym(69569509, 'reachGoal', 'messenger', {channel: ch}); } catch(_){}
   try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'messenger'}); } catch(_){}
+  try { window.VK && VK.Goal && VK.Goal('contact'); } catch(_){}
 }, true);
 </script>
 
@@ -809,12 +856,14 @@ document.addEventListener('click', function(e){
 (function(){var s=document.getElementById('sb-sheet'),b=document.getElementById('sb-msg');if(!s||!b)return;
 b.addEventListener('click',function(e){e.preventDefault();s.hidden=!s.hidden;});
 s.addEventListener('click',function(e){if(!e.target.closest('a'))return;
- try{ym(69569509,'reachGoal','messenger',{src:'english_bar'});}catch(_){}
- try{(window._tmr=window._tmr||[]).push({type:'reachGoal',id:'3355457',goal:'messenger'});}catch(_){}
- try{VK.Goal('contact');}catch(_){} s.hidden=true;});
+ /* 25.09.2026 (T5): цель messenger шлёт общий слушатель /go/ выше — здесь был второй вызов */
+ s.hidden=true;});
 document.addEventListener('click',function(e){if(!s.hidden&&!s.contains(e.target)&&e.target.id!=='sb-msg')s.hidden=true;});})();
 </script>
 <script>
+/* 24.09.2026 разбор рекламы: lp-lead.js здесь не подключён, и липкая форма присылала
+   курс «мини-форма-sticky» вместо английского */
+window.__LP_COURSE = window.__LP_COURSE || 'Английский язык';
 
 /* 17.09: sticky «Записаться» открывает форму из одного поля на месте, а не уводит на форму
    в 14–18 тыс. px ниже (замер офлайн-рендера 390×844). */
@@ -865,25 +914,32 @@ document.querySelectorAll('.mini-lead').forEach(function (f) {
     var btn = f.querySelector('button'), ok = f.querySelector('.ok-msg');
     var rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
     var kind = f.dataset.mini === '0' ? 'hero' : (f.dataset.mini === 'sticky' ? 'sticky' : 'mini');
+    /* 25.09.2026 после ревью: мини-форма уходила на сервер с любым вводом («abc», «12345») —
+       проверяем номер в браузере так же, как полная форма */
+    if (!normPhone(f.phone.value)) { kuLeadError('phone', kind); alert('Проверьте номер телефона: 10 цифр после +7'); f.phone.focus(); return; }
+    var t = kuT();   /* 25.09.2026 (T1): метки и ClientID */
     btn.disabled = true; btn.textContent = 'Отправляем…';
     fetch(f.action, {method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({phone: f.phone.value, course: f.course.value,
                             website: f.website.value, roistat: rv,
-                            note: ('мини-форма ' + kind + ' ' + location.pathname + ' | ' + (location.search || '').slice(1)).slice(0, 250)})})
+                            ym_cid: t.ym_cid || '', yclid: t.yclid || '', utm: t.utm || '', landing: t.landing || '',
+                            note: ('мини-форма ' + kind + ' ' + location.pathname + ' | ' + (t.qs || '')).slice(0, 250)})})
       .then(function (r) { return r.json() })
       .then(function (d) {
         if (d.ok) {
           btn.hidden = true; f.phone.hidden = true; ok.hidden = false;
-          var wa = f.querySelector('.wa-inline'); if (wa) wa.hidden = true;
+          var wa = f.querySelector('.alt-contacts') || f.querySelector('.wa-inline'); if (wa) wa.hidden = true;
           try { ym(69569509, 'reachGoal', 'lead', {form: kind}); } catch (_) {}
           try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'lead'}); } catch (_) {}
           try { window.VK && VK.Goal && VK.Goal('lead'); } catch (_) {}
           try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
         } else {
+          kuLeadError('rejected', kind);
           btn.disabled = false; btn.textContent = 'Перезвоните мне';
           alert(d.error || 'Проверьте номер');
         }
       }).catch(function () {
+        kuLeadError('network', kind);
         btn.disabled = false; btn.textContent = 'Перезвоните мне';
         alert('Не получилось — позвоните нам: +7 495 120-90-24');
       });

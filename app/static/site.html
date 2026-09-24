@@ -418,7 +418,7 @@ body.js .reveal.in{opacity:1;transform:none}
 .vfx-wide .vfx-play{flex:0 0 64px}
 .vfx-wide .vfx-cap{flex:1}
 
-/* Неделя открытых уроков — одиночная карточка вместо сетки событий */
+/* Одиночная карточка вместо сетки событий (с 24.09.2026 — «Как проходит первое занятие») */
 .ev-solo{background:linear-gradient(135deg,rgba(29,167,224,.14),rgba(125,185,40,.10));
   border:1px solid rgba(255,255,255,.16);border-radius:22px;overflow:hidden;
   max-width:62rem;margin:0 auto}
@@ -436,10 +436,12 @@ body.js .reveal.in{opacity:1;transform:none}
 .ev-solo-note{font-size:.9rem;opacity:.75}
 @media(max-width:640px){.ev-solo-head,.ev-solo-body{padding-left:1.15rem;padding-right:1.15rem}
   .ev-solo-head h3{font-size:1.35rem}}
+/* 24.09.2026 разбор рекламы: быстрые ссылки Директа ведут на карточки (#mental и др.) — не прятать под липкой шапкой */
+#cards .card[id]{scroll-margin-top:84px}
 </style>
 
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "ChildCare", "name": "KidsUP", "alternateName": "Детский центр и английский сад KidsUP", "description": "Детский центр и английский сад на Бульваре Рокоссовского: подготовка к школе, английский по программе Cambridge, раннее развитие, мини-сад и нулевой класс, логопед, ИЗО, шахматы, ментальная арифметика. Дети от 1,3 до 12 лет.", "url": "https://kidsup.ru", "telephone": "+74951209024", "address": {"@type": "PostalAddress", "streetAddress": "бульвар Маршала Рокоссовского, 6к1В", "addressLocality": "Москва", "addressRegion": "Москва", "addressCountry": "RU"}, "areaServed": [{"@type": "Place", "name": "Метрогородок"}, {"@type": "Place", "name": "Богородское"}, {"@type": "Place", "name": "Преображенское"}, {"@type": "Place", "name": "Восточный округ Москвы"}], "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "09:00", "closes": "20:00"}], "publicAccess": true, "isAccessibleForFree": false, "audience": {"@type": "PeopleAudience", "suggestedMinAge": 1, "suggestedMaxAge": 12}, "sameAs": ["https://vk.com/club220359229"], "aggregateRating": {"@type": "AggregateRating", "ratingValue": "5.0", "reviewCount": "253", "bestRating": "5", "worstRating": "1"}}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Первое занятие правда бесплатное?", "acceptedAnswer": {"@type": "Answer", "text": "Оно условно-бесплатное: если не понравится — платить не нужно; если остаётесь — занятие входит в первый абонемент. На нём педагог проводит бесплатную диагностику. У мини-сада и нулевого класса — бесплатный пробный день, дальше пробная неделя с зачётом стоимости при покупке месяца. Четыре направления — исключение: на ИЗО и шахматах пробное занятие стоит 850 ₽, на робототехнике — 1 600 ₽, при покупке абонемента сумма идёт в зачёт. На танцах первое занятие входит в абонемент, если остаётесь, иначе — 850 ₽. Место можно закрепить: оплатить первое занятие 1 600 ₽ вперёд — при покупке абонемента сумма идёт в зачёт, не понравится — вернём."}}, {"@type": "Question", "name": "Что будет, если ребёнок заболеет?", "acceptedAnswer": {"@type": "Answer", "text": "С медицинской справкой занятие отрабатывается в группе того же уровня в течение 30 дней, а если такой группы нет — 50% стоимости зачисляем на баланс к следующему абонементу. Без справки занятие считается проведённым. Плюс 3 недели «заморозки» абонемента в учебном году, например на отпуск."}}, {"@type": "Question", "name": "Как понять, в какую группу попадёт ребёнок?", "acceptedAnswer": {"@type": "Answer", "text": "Сначала предмет и уровень, потом время. Английский делим по уровням Cambridge (Starters/Movers/Flyers), подготовку к школе — на группы для нечитающих и читающих. Уровень определяем на первом занятии-диагностике."}}, {"@type": "Question", "name": "Есть ли занятия в выходные?", "acceptedAnswer": {"@type": "Answer", "text": "Да: подготовка к школе по субботам, шахматы в пятницу и воскресенье, ментальная арифметика по воскресеньям. Подберём расписание под вашу неделю."}}, {"@type": "Question", "name": "Ребёнок стеснительный — вдруг не пойдёт на контакт?", "acceptedAnswer": {"@type": "Answer", "text": "Это самый частый страх — и именно поэтому первое занятие ни к чему не обязывает. Группы у нас по 6–8 детей, педагог успевает к каждому и умеет мягко включать «наблюдателей» в игру. Если ребёнку нужно время — посидите рядом на первом занятии. Не пойдёт — вы ничего не платите."}}, {"@type": "Question", "name": "Мы ещё не определились с расписанием на год", "acceptedAnswer": {"@type": "Answer", "text": "Так у большинства в августе! Начните с пробного и диагностики — расписание у нас гибкое: если что-то поменяется, переведём в другую группу по тому же предмету. Неделя открытых уроков идёт с 14 по 20 сентября — в это время знакомиться приходят целыми группами, это самый живой момент. Но прийти на первое условно-бесплатное занятие можно в любое время года. У мини-сада и нулевого класса вместо занятия — бесплатный пробный день."}}, {"@type": "Question", "name": "Как проходит оплата?", "acceptedAnswer": {"@type": "Answer", "text": "Помесячно. У большинства направлений абонемент на 8 занятий; у логопеда, ментальной арифметики и робототехники — на 4 занятия; у сада и нулевого класса — 8/12/20 посещений. Оплатить можно на ресепшене или по ссылке."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "ChildCare", "name": "KidsUP", "alternateName": "Детский центр и английский сад KidsUP", "description": "Детский центр и английский сад на Бульваре Рокоссовского: подготовка к школе, английский по программе Cambridge, раннее развитие, мини-сад и нулевой класс, логопед, ИЗО, шахматы, ментальная арифметика. Дети от 1,3 до 12 лет.", "url": "https://kidsup.ru", "telephone": "+74951209024", "address": {"@type": "PostalAddress", "streetAddress": "бульвар Маршала Рокоссовского, 6к1В", "addressLocality": "Москва", "addressRegion": "Москва", "addressCountry": "RU"}, "areaServed": [{"@type": "Place", "name": "Метрогородок"}, {"@type": "Place", "name": "Богородское"}, {"@type": "Place", "name": "Преображенское"}, {"@type": "Place", "name": "Восточный округ Москвы"}], "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "09:00", "closes": "20:00"}], "publicAccess": true, "isAccessibleForFree": false, "audience": {"@type": "PeopleAudience", "suggestedMinAge": 1, "suggestedMaxAge": 12}, "sameAs": ["https://vk.com/club220359229"], "aggregateRating": {"@type": "AggregateRating", "ratingValue": "5.0", "reviewCount": "255", "bestRating": "5", "worstRating": "1"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Первое занятие правда бесплатное?", "acceptedAnswer": {"@type": "Answer", "text": "Оно условно-бесплатное: если не понравится — платить не нужно; если остаётесь — занятие входит в первый абонемент. На нём педагог проводит бесплатную диагностику. У мини-сада и нулевого класса — бесплатный пробный день, дальше пробная неделя с зачётом стоимости при покупке месяца. Четыре направления — исключение: на ИЗО и шахматах пробное занятие стоит 850 ₽, на робототехнике — 1 600 ₽, при покупке абонемента сумма идёт в зачёт. На танцах первое занятие входит в абонемент, если остаётесь, иначе — 850 ₽. Место можно закрепить: оплатить первое занятие 1 600 ₽ вперёд — при покупке абонемента сумма идёт в зачёт, не понравится — вернём."}}, {"@type": "Question", "name": "Что будет, если ребёнок заболеет?", "acceptedAnswer": {"@type": "Answer", "text": "С медицинской справкой занятие отрабатывается в группе того же уровня в течение 30 дней, а если такой группы нет — 50% стоимости зачисляем на баланс к следующему абонементу. Без справки занятие считается проведённым. Плюс 3 недели «заморозки» абонемента в учебном году, например на отпуск."}}, {"@type": "Question", "name": "Как понять, в какую группу попадёт ребёнок?", "acceptedAnswer": {"@type": "Answer", "text": "Сначала предмет и уровень, потом время. Английский делим по уровням Cambridge (Starters/Movers/Flyers), подготовку к школе — на группы для нечитающих и читающих. Уровень определяем на первом занятии-диагностике."}}, {"@type": "Question", "name": "Есть ли занятия в выходные?", "acceptedAnswer": {"@type": "Answer", "text": "Да: подготовка к школе по субботам, шахматы в пятницу и воскресенье, ментальная арифметика по воскресеньям. Подберём расписание под вашу неделю."}}, {"@type": "Question", "name": "Ребёнок стеснительный — вдруг не пойдёт на контакт?", "acceptedAnswer": {"@type": "Answer", "text": "Это самый частый страх — и именно поэтому первое занятие ни к чему не обязывает. Группы у нас по 6–8 детей, педагог успевает к каждому и умеет мягко включать «наблюдателей» в игру. Если ребёнку нужно время — посидите рядом на первом занятии. Не пойдёт — вы ничего не платите."}}, {"@type": "Question", "name": "Мы ещё не определились с расписанием на год", "acceptedAnswer": {"@type": "Answer", "text": "Так у большинства в августе! Начните с пробного и диагностики — расписание у нас гибкое: если что-то поменяется, переведём в другую группу по тому же предмету. Прийти на первое условно-бесплатное занятие можно в любое время года. У мини-сада и нулевого класса вместо занятия — бесплатный пробный день."}}, {"@type": "Question", "name": "Как проходит оплата?", "acceptedAnswer": {"@type": "Answer", "text": "Помесячно. У большинства направлений абонемент на 8 занятий; у логопеда, ментальной арифметики и робототехники — на 4 занятия; у сада и нулевого класса — 8/12/20 посещений. Оплатить можно на ресепшене или по ссылке."}}]}</script>
 </head>
 <body>
 
@@ -468,6 +470,8 @@ body.js .reveal.in{opacity:1;transform:none}
         <span class="badge">от 1,3 до 12 лет</span>
         <span class="badge">группы 6–8 детей</span>
         <span class="badge">📍 Богородское · у м. Бульвар Рокоссовского</span>
+        <!-- 25.09.2026 разбор рекламы (LP-10): рейтинг в первом экране — главную получают ретаргетинг VK и объявления Центра -->
+        <a class="badge" href="#reviews" style="text-decoration:none">★ 5,0 · 255 отзывов на Яндекс Картах</a>
         <span class="badge" id="live-enrolled" hidden></span>
       </div>
       <h1>Читает за 3 месяца — на подготовке к школе.<br>Говорит по-английски за год.</h1>
@@ -492,7 +496,8 @@ body.js .reveal.in{opacity:1;transform:none}
       </div>
       <div class="cta-row">
         <a class="btn btn-green" href="#courses">Выбрать занятие</a>
-        <a class="btn btn-line" href="#events">📚 Неделя открытых уроков</a>
+        <!-- 24.09.2026 разбор рекламы: «Неделя открытых уроков 14–20.09» закончилась, а первый экран её показывал -->
+        <a class="btn btn-line" href="#signup">Записаться на первое занятие</a>
       </div>
       <p class="hero-geo">📍 б-р Маршала Рокоссовского, 6 к1В · 5 минут от метро
       Бульвар Рокоссовского · напротив ТЦ «Янтарь»</p>
@@ -509,14 +514,17 @@ body.js .reveal.in{opacity:1;transform:none}
   </div>
 </section>
 
+<!-- 24.09.2026 разбор рекламы: блок «Неделя открытых уроков 14–20 сентября» (оффер кончился 20.09)
+     заменён вечнозелёным «Как проходит первое занятие». id="events" оставлен: на него
+     ведут редирект kidsupday.ru и старые ссылки -->
 <section class="events" id="events">
   <div class="wrap">
-    <h2>Неделя открытых уроков</h2>
-    <p class="sub">14–20 сентября. Группы уже стартовали: приходите на обычное
-    занятие своей группы и посмотрите, как всё устроено изнутри.</p>
+    <h2>Как проходит первое занятие</h2>
+    <p class="sub">Первое занятие — условно-бесплатное. Новым семьям при оплате в день
+    пробного — −15% на первый абонемент (мини-сад и нулевой класс — бесплатный пробный день).</p>
     <div class="ev-solo reveal">
       <div class="ev-solo-head">
-        <span class="ev-solo-badge">14–20 сентября</span>
+        <span class="ev-solo-badge">Группы уже занимаются</span>
         <h3>📚 Первое занятие — условно-бесплатное</h3>
       </div>
       <div class="ev-solo-body">
@@ -533,7 +541,7 @@ body.js .reveal.in{opacity:1;transform:none}
           наклейка, за каждые десять наклеек — подарок. Стараться становится интересно.</li>
         </ul>
         <div class="ev-solo-cta">
-          <a class="btn btn-green" href="#signup" data-ev="📚 Открытый урок (14–20.09)">Выбрать открытый урок</a>
+          <a class="btn btn-green" href="#signup">Записаться на первое занятие</a>
           <span class="ev-solo-note">Мест в группах 6–8 — записываемся заранее</span>
         </div>
       </div>
@@ -578,7 +586,7 @@ body.js .reveal.in{opacity:1;transform:none}
       <button data-a="7">7–12 лет</button>
     </div>
     <div class="c-grid" id="cards">
-<div class="card g3">
+<div class="card g3" id="podgotovka">
   <div class="age">✏️ 4–7 лет</div><h3>Подготовка к школе</h3>
   <div class="tag">Научим читать за 3 месяца. Не по буквам — по-настоящему.</div>
   <div class="meta">🗓 2 раза в неделю по 50 мин · будни 16:00–20:00 или суббота утром · 15 групп</div>
@@ -608,7 +616,7 @@ body.js .reveal.in{opacity:1;transform:none}
   <a class="btn btn-green" href="#signup" data-pick="Подготовка к школе">Записаться</a>
   <a class="btn btn-line" href="/podgotovka" style="margin-top:8px">Что будет уметь по месяцам</a>
 </div>
-<div class="card g3 g7">
+<div class="card g3 g7" id="english">
   <div class="age">🇬🇧 3–12 лет</div><h3>Английский язык</h3>
   <div class="tag">Через год ребёнок говорит на английском. Не «знает слова» — говорит.</div>
   <div class="meta">🗓 2 раза в неделю по 50 мин · пн-ср или вт-чт, 16:00–20:00</div>
@@ -635,7 +643,7 @@ body.js .reveal.in{opacity:1;transform:none}
   <a class="btn btn-green" href="#signup" data-pick="Английский язык">Записаться</a>
   <a class="btn btn-line" href="/english" style="margin-top:8px">Что ребёнок умеет по месяцам</a>
 </div>
-<div class="card g1 g3">
+<div class="card g1 g3" id="minisad">
   <div class="age">🌿 2–4 года</div><h3>Английский мини-сад</h3>
   <div class="tag">Полдня, за которые ребёнок получает больше, чем за день в обычном саду.</div>
   <div class="meta">🗓 будни 9:00–13:00 · от 2 до 5 дней в неделю · группа до 15 детей</div>
@@ -657,7 +665,7 @@ body.js .reveal.in{opacity:1;transform:none}
   <a class="btn btn-green" href="#signup" data-pick="Английский мини-сад">Записаться</a>
   <a class="btn btn-line" href="/minisad" style="margin-top:8px">Как устроен день</a>
 </div>
-<div class="card g3">
+<div class="card g3" id="nulevoy">
   <div class="age">🎒 5–7 лет</div><h3>Нулевой класс</h3>
   <div class="tag">Нулевой класс: мягкая репетиция школы за год до школы.</div>
   <div class="meta">🗓 будни 10:00–14:00 · 5 или 3 дня в неделю · группа до 15 детей</div>
@@ -677,7 +685,7 @@ body.js .reveal.in{opacity:1;transform:none}
   <a class="btn btn-green" href="#signup" data-pick="Нулевой класс">Записаться</a>
   <a class="btn btn-line" href="/nulevoy" style="margin-top:8px">Как устроен день</a>
 </div>
-<div class="card g1">
+<div class="card g1" id="rannee">
   <div class="age">🧸 1,3–4 года</div><h3>Раннее развитие</h3>
   <div class="tag">От первых слов до первых «сам!» — три программы по возрасту.</div>
   <div class="meta">🗓 утро (с мамой) и день · группы 6–8 детей · 45–50 мин</div>
@@ -702,7 +710,7 @@ body.js .reveal.in{opacity:1;transform:none}
 в одном месте, с знакомыми лицами.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Раннее развитие">Записаться</a>
 </div>
-<div class="card g1 g3 g7">
+<div class="card g1 g3 g7" id="logoped">
   <div class="age">🗣️ 2–8 лет</div><h3>Логопед</h3>
   <div class="tag">Запуск речи и чистые звуки — пока это решается легко.</div>
   <div class="meta">🗓 индивидуально · Елена: пн/ср/пт вечер + вт/чт утро (50 мин) · Марина: вт/чт вечер, сб (40 мин)</div>
@@ -723,7 +731,7 @@ body.js .reveal.in{opacity:1;transform:none}
 с «р» и «ш» — диагностика у нас в том же здании, в те же дни.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Логопед">Записаться</a>
 </div>
-<div class="card g3 g7">
+<div class="card g3 g7" id="mental">
   <div class="age">🧮 4–12 лет</div><h3>Ментальная арифметика</h3>
   <div class="tag">Считает быстрее калькулятора — а на самом деле тренирует память и концентрацию.</div>
   <div class="meta">🗓 воскресенье · 10:30 и 12:00 (4–6 лет), 14:00 (7–12 лет) · 90 мин</div>
@@ -746,7 +754,7 @@ body.js .reveal.in{opacity:1;transform:none}
 медленно считает» целиком.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Ментальная арифметика">Записаться</a>
 </div>
-<div class="card g7">
+<div class="card g7" id="shahmaty">
   <div class="age">♟️ 6–12 лет</div><h3>Шахматы</h3>
   <div class="tag">Логика и умение думать наперёд: игровая форма для начинающих, разбор партий и турниры для продолжающих.</div>
   <div class="meta">🗓 идёт набор групп · Гр1 (продолжающие): пт 18:00 + вс 11:00 · Гр2 (начинающие): пт 19:00 + вс 12:00 · старт по мере набора</div>
@@ -767,7 +775,7 @@ body.js .reveal.in{opacity:1;transform:none}
   <a class="btn btn-green" href="#signup" data-pick="Шахматы">Записаться</a>
   <a class="btn btn-line" href="/shahmaty" style="margin-top:8px">Четыре ступени обучения</a>
 </div>
-<div class="card g3 g7">
+<div class="card g3 g7" id="izo">
   <div class="age">🎨 4–11 лет</div><h3>ИЗО-студия</h3>
   <div class="tag">Не «порисовать» — четыре темы, в каждой ребёнок доводит работу до результата.</div>
   <div class="meta">🗓 пн + ср, 16:00–20:00 · 4 группы по темам</div>
@@ -791,7 +799,7 @@ body.js .reveal.in{opacity:1;transform:none}
   <a class="btn btn-green" href="#signup" data-pick="ИЗО-студия">Записаться</a>
   <a class="btn btn-line" href="/izo" style="margin-top:8px">Четыре темы студии</a>
 </div>
-<div class="card g7">
+<div class="card g7" id="skorochtenie">
   <div class="age">📖 7–12 лет</div><h3>Скорочтение (техника чтения)</h3>
   <div class="tag">Кто быстро читает — быстро учится. Всё остальное — следствие.</div>
   <div class="meta">🗓 2 раза в неделю по 50 мин</div>
@@ -810,7 +818,7 @@ body.js .reveal.in{opacity:1;transform:none}
 то есть обе опоры школьной скорости.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Скорочтение (техника чтения)">Записаться</a>
 </div>
-<div class="card g7">
+<div class="card g7" id="kalligrafiya">
   <div class="age">✒️ 7–10 лет</div><h3>Каллиграфия + грамота</h3>
   <div class="tag">Если учитель пишет «старайся!» красной ручкой — это к нам.</div>
   <div class="meta">🗓 вт + чт, 16:00 · 50 мин</div>
@@ -829,7 +837,7 @@ body.js .reveal.in{opacity:1;transform:none}
 группа маленькая, рука каждого ребёнка — под присмотром.</p></div></details>
   <a class="btn btn-green" href="#signup" data-pick="Каллиграфия + грамота">Записаться</a>
 </div>
-<div class="card g3 g7">
+<div class="card g3 g7" id="robototehnika">
   <div class="age">🤖 4–12 лет</div><h3>Робототехника</h3>
   <div class="tag">Ребёнок не смотрит, как делают взрослые, — собирает и программирует сам.</div>
   <div class="meta">🗓 4–7 лет: пт 16:00 + вс 14:30 · 7–12 лет: пт 17:00 + вс 15:30 · занятие 60 мин · старт 11 сентября</div>
@@ -1386,9 +1394,7 @@ body.js .reveal.in{opacity:1;transform:none}
     <details><summary>Мы ещё не определились с расписанием на год</summary>
       <p>Так у большинства в августе! Начните с пробного и диагностики — расписание у нас
       гибкое: если что-то поменяется, переведём в другую группу по тому же предмету.
-      Неделя открытых уроков идёт с 14 по 20 сентября — в это время знакомиться приходят целыми
-      группами, это самый живой момент. Но прийти на первое условно-бесплатное занятие можно
-      в любое время года. У мини-сада и нулевого класса вместо занятия — бесплатный пробный день.</p></details>
+      Прийти на первое условно-бесплатное занятие можно в любое время года. У мини-сада и нулевого класса вместо занятия — бесплатный пробный день.</p></details>
     <details><summary>Как проходит оплата?</summary>
       <p>Помесячно. У большинства направлений абонемент на 8 занятий; у логопеда,
       ментальной арифметики и робототехники — на 4 занятия; у сада и нулевого класса —
@@ -1570,10 +1576,7 @@ body.js .reveal.in{opacity:1;transform:none}
 const NAMES = ["Подготовка к школе", "Английский язык", "Английский мини-сад", "Нулевой класс", "Раннее развитие", "Логопед", "Ментальная арифметика", "Шахматы", "ИЗО-студия", "Скорочтение (техника чтения)", "Каллиграфия + грамота", "Робототехника"];
 const sel = document.getElementById('f-course');
 NAMES.forEach(n => { const o = document.createElement('option'); o.textContent = n; sel.append(o); });
-const og1b = document.createElement('optgroup'); og1b.label = 'Открытый урок — первое занятие условно-бесплатное';
-['📚 Открытый урок (14–20.09)']
-  .forEach(n => { const o = document.createElement('option'); o.textContent = n; og1b.append(o); });
-sel.append(og1b);
+/* 24.09.2026 разбор рекламы: пункт «📚 Открытый урок (14–20.09)» убран — неделя закончилась 20.09 */
 const og2 = document.createElement('optgroup'); og2.label = 'Новые направления — лист ожидания';
 ['💃 Спортивно-бальные танцы (лист ожидания)', '⚽ Футбол (лист ожидания)', '🥋 Единоборства (лист ожидания)', '🤸 Акробатика (лист ожидания)', '🩰 Хореография (лист ожидания)', '🎭 Актёрское мастерство (лист ожидания)', '🎤 Техника речи (лист ожидания)']
   .forEach(n => { const o = document.createElement('option'); o.textContent = n; og2.append(o); });
@@ -1619,6 +1622,29 @@ document.getElementById('cards').addEventListener('click', e => {
   const a = e.target.closest('[data-pick]'); if (a) setCourse(a.dataset.pick);
 });
 /* форма → заявка в CRM (запасной путь — WhatsApp) */
+/* 25.09.2026 разбор рекламы: метки и ClientID из ku-ref.js (T1) и цель lead_error (T4) —
+   ошибки отправки отдельно от lead, только для анализа, в стратегию не ставить */
+function kuT() {
+  try { if (window.__kuRef) return window.__kuRef(); } catch (_) {}
+  /* 25.09.2026 после ревью: ku-ref.js не успел загрузиться или его отрезал блокировщик —
+     раньше метки тогда пропадали совсем. Берём их из адреса, но только utm_*, yclid,
+     ysclid, roistat, rs — без etext, из-за которого note обрезался и терялся yclid */
+  var o = {qs: '', yclid: '', landing: location.pathname.slice(0, 120), utm: '',
+           ym_cid: ((document.cookie.match(/(?:^|; )_ym_uid=([^;]+)/) || [])[1] || '')}, q = [];
+  (location.search || '').slice(1).split('&').forEach(function (kv) {
+    var i = kv.indexOf('='), k, v;
+    try { k = decodeURIComponent(i < 0 ? kv : kv.slice(0, i)).toLowerCase();
+          v = i < 0 ? '' : decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); } catch (_) { return; }
+    if (!v || !/^(utm_[a-z_]+|yclid|ysclid|roistat|rs)$/.test(k)) return;
+    v = v.replace(/[&|]/g, ' ').slice(0, 200); q.push(k + '=' + v);
+    if (k === 'yclid') o.yclid = v;
+  });
+  o.qs = q.join('&').slice(0, 230);
+  return o;
+}
+function kuLeadError(reason, form) {
+  try { ym(69569509, 'reachGoal', 'lead_error', {reason: reason, form: form}); } catch (_) {}
+}
 function normPhone(raw) {
   let d = String(raw || '').replace(/\D/g, '');
   if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
@@ -1632,17 +1658,20 @@ document.getElementById('lead').addEventListener('submit', async e => {
   const p = document.getElementById('f-phone').value.trim();
   const c = sel.value;
   const err = document.getElementById('f-phone-err');
-  if (!normPhone(p)) { err.hidden = false; document.getElementById('f-phone').focus(); return; }
+  if (!normPhone(p)) { err.hidden = false; document.getElementById('f-phone').focus(); kuLeadError('phone', 'full'); return; }
   err.hidden = true;
   const btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true; btn.textContent = 'Отправляем…';
   const rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
+  const t = kuT();
+  let why = 'network';
   try {
     const r = await fetch('https://app.kidsup.ru/api/public/lead', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({name: n, age: a, phone: p, course: c, roistat: rv,
                             note: ((window._grp ? 'группа: ' + window._grp + ' | ' : '') +
-                                   (location.search || '').slice(1)).slice(0, 250),
+                                   (t.qs || '')).slice(0, 250),
+                            ym_cid: t.ym_cid || '', yclid: t.yclid || '', utm: t.utm || '', landing: t.landing || '',
                             website: document.getElementById('f-web').value})});
     const j = await r.json();
     if (j.ok && j.throttled) {
@@ -1665,9 +1694,11 @@ document.getElementById('lead').addEventListener('submit', async e => {
         '<a class="btn btn-line" href="https://app.kidsup.ru/go/max?src=site" target="_blank" rel="noopener">MAX</a></div>';
       return;
     }
-    if (j.error) { alert(j.error); btn.disabled = false; btn.textContent = 'Отправить заявку'; return; }
+    if (j.error) { kuLeadError('rejected', 'full'); alert(j.error); btn.disabled = false; btn.textContent = 'Отправить заявку'; return; }
+    why = 'rejected';   /* 25.09.2026 после ревью: ok:false без error — отказ сервера, не сеть */
     throw new Error('fail');
   } catch (_) {
+    kuLeadError(why, 'full');
     // попап-блокер может съесть window.open после await — показываем видимую кнопку
     const txt = encodeURIComponent(`Здравствуйте! Хочу записаться в KidsUP. Ребёнок: ${n || '…'}, ${a || '…'}. Интересует: ${c}. Телефон: ${p}`);
     const box = document.createElement('div');
@@ -1904,6 +1935,8 @@ k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
 ym(69569509,"init",{clickmap:true,trackLinks:true,accurateTrackBounce:true,webvisor:true});
 </script>
 <noscript><div><img src="https://mc.yandex.ru/watch/69569509" style="position:absolute;left:-9999px" alt="" loading="lazy" decoding="async"></div></noscript>
+<!-- 25.09.2026 разбор рекламы (T1): метки рекламы и ClientID Метрики — в заявку -->
+<script src="/static/ku-ref.js" defer></script>
 <!-- Пиксель ВКонтакте (VK-RTRG-401784-8crag, как на kidsup.ru) -->
 <script>!function(){var t=document.createElement("script");t.type="text/javascript",t.async=!0,
 t.src="https://vk.com/js/api/openapi.js?169",t.onload=function(){VK.Retargeting.Init("VK-RTRG-401784-8crag"),VK.Retargeting.Hit()},
@@ -2035,8 +2068,7 @@ document.addEventListener('click', function(e){
 <script>
 window.__applyOffer = function(today){
   // Оффер живёт по календарю сам: после 31.08 счётчик и «цены прошлого
-  // года» умирают, их место занимает Неделя открытых уроков (по 20.09),
-  // после — вечнозелёное условно-бесплатное занятие. Функция принимает
+  // года» умирают, их место занимает вечнозелёное условно-бесплатное занятие. Функция принимает
   // дату параметром, чтобы переключение можно было проверить тестом,
   // не подменяя Date всему документу.
   var y = today.getFullYear();
@@ -2047,15 +2079,8 @@ window.__applyOffer = function(today){
       cnt=document.getElementById('cnt');
   if(!badge||!card) return 'нет элементов';
   if (today <= d(8,31)) return 'старые цены';
-  if (today <= d(9,20)) {
-    badge.textContent='Неделя открытых уроков — 14–20 сентября';
-    title.textContent='📚 Неделя открытых уроков';
-    if(cnt) cnt.style.display='none';
-    var n1=card.querySelector('.note'); if(n1) n1.innerHTML='С 14 по 20 сентября можно прийти на обычное '+
-      'занятие своей группы. Первое занятие — условно-бесплатное: не понравится — '+
-      'платить не нужно.';
-    return 'неделя уроков';
-  }
+  // 24.09.2026 разбор рекламы: ветка «Неделя открытых уроков — 14–20 сентября» убрана,
+  // оффер закончился 20.09 — дальше только вечнозелёное условно-бесплатное занятие.
   badge.textContent='Первое занятие — условно-бесплатное';
   title.textContent='🌿 Присоединяйтесь в течение года';
   if(cnt) cnt.style.display='none';
@@ -2069,10 +2094,16 @@ window.__applyOffer(new Date());
 // они пишут в WhatsApp, а не заполняют форму. Метрика сама такой переход
 // не видит (кнопки ведут через app.kidsup.ru/go/), поэтому цель шлём руками —
 // без неё Директ и ВК неделю оптимизировались в пустоту: 1223 визита, 0 целей.
+// 25.09.2026 разбор рекламы (T5): messenger — только WhatsApp, Telegram и MAX;
+// клики в соцсети (vk, youtube, instagram, tgchannel — 22% переходов) — отдельная цель social.
 document.addEventListener('click', function(e){
   var a = e.target.closest && e.target.closest('a[href*="app.kidsup.ru/go/"]');
   if(!a) return;
   var ch = (a.getAttribute('href').match(/\/go\/([a-z]+)/)||[])[1] || 'msg';
+  if (!/^(whatsapp|telegram|max)$/.test(ch)) {
+    try { ym(69569509, 'reachGoal', 'social', {channel: ch}); } catch(_){}
+    return;
+  }
   try { ym(69569509, 'reachGoal', 'messenger', {channel: ch}); } catch(_){}
   try { (window._tmr = window._tmr || []).push({type: 'reachGoal', id: '3355457', goal: 'messenger'}); } catch(_){}
   try { window.VK && VK.Goal && VK.Goal('contact'); } catch(_){}
@@ -2139,11 +2170,16 @@ document.querySelectorAll('.mini-lead').forEach(function (f) {
     var btn = f.querySelector('button'), ok = f.querySelector('.ok-msg');
     var rv = (document.cookie.match(/roistat_visit=([^;]+)/) || [])[1] || '';
     var kind = f.dataset.mini === '0' ? 'hero' : (f.dataset.mini === 'sticky' ? 'sticky' : 'mini');
+    /* 25.09.2026 после ревью: мини-форма уходила на сервер с любым вводом («abc», «12345») —
+       проверяем номер в браузере так же, как полная форма */
+    if (!normPhone(f.phone.value)) { kuLeadError('phone', kind); alert('Проверьте номер телефона: 10 цифр после +7'); f.phone.focus(); return; }
+    var t = kuT();   /* 25.09.2026 (T1): метки и ClientID */
     btn.disabled = true; btn.textContent = 'Отправляем…';
     fetch(f.action, {method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({phone: f.phone.value, course: f.course.value,
                             website: f.website.value, roistat: rv,
-                            note: ('мини-форма ' + kind + ' ' + location.pathname + ' | ' + (location.search || '').slice(1)).slice(0, 250)})})
+                            ym_cid: t.ym_cid || '', yclid: t.yclid || '', utm: t.utm || '', landing: t.landing || '',
+                            note: ('мини-форма ' + kind + ' ' + location.pathname + ' | ' + (t.qs || '')).slice(0, 250)})})
       .then(function (r) { return r.json() })
       .then(function (d) {
         if (d.ok) {
@@ -2154,10 +2190,12 @@ document.querySelectorAll('.mini-lead').forEach(function (f) {
           try { window.VK && VK.Goal && VK.Goal('lead'); } catch (_) {}
           try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
         } else {
+          kuLeadError('rejected', kind);
           btn.disabled = false; btn.textContent = 'Перезвоните мне';
           alert(d.error || 'Проверьте номер');
         }
       }).catch(function () {
+        kuLeadError('network', kind);
         btn.disabled = false; btn.textContent = 'Перезвоните мне';
         alert('Не получилось — позвоните нам: +7 495 120-90-24');
       });
