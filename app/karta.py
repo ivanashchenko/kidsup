@@ -180,6 +180,8 @@ def rows() -> dict:
             vids.setdefault(r["user_id"], []).append(r["date"])
         notes = {r["user_id"]: r["note"] or "" for r in
                  conn.execute("SELECT user_id, note FROM speech_notes")}
+    from . import karta_otchet as ko, deti_video
+    kontakty = ko.poslednie_kontakty()
     for d in deti:
         d["точки"] = {k: saved.get((d["user_id"], k), {}) for k, _, _ in TOCHKI}
         # старые отметки видео по точкам тоже считаются
@@ -197,6 +199,26 @@ def rows() -> dict:
         slova = re.sub(r"\(.*?\)", "", d["имя"] or "").split()
         d["имя_короткое"] = slova[1] if len(slova) >= 2 else (slova[0] if slova else "")
         d["заметка"] = notes.get(d["user_id"], "") or d["точки"]["t1"].get("note", "")
+        # 25.09: личные сообщения родителю, видео-файлы, флаг «сначала звонок»
+        kt = kontakty.get(d["user_id"], "")
+        d["последний_контакт"] = kt
+        d["дней_без_контакта"] = (today - date.fromisoformat(kt[:10])).days if kt else None
+        d["флаг"] = ko.flag(d["user_id"], d["дорожка"], d["группа"], d["статус"])
+        d["видео_файлы"] = deti_video.spisok(d["user_id"])
+        d["журнал"] = ko.zhurnal(d["user_id"])[:5]
+        d["группа_по_русски"] = ko.gruppa_chelovecheski(d["группа"])
+    # «Двое в фокусе»: в группах, которые занимаются сегодня, — двое, кому
+    # дольше всех не писали лично. Им педагог вечером отправляет весточку.
+    wd = today.weekday()
+    fokus = []
+    for g in sorted({d["группа"] for d in deti}):
+        if wd not in ko.dni_gruppy(g):
+            continue
+        v_gr = [d for d in deti if d["группа"] == g]
+        v_gr.sort(key=lambda d: (d["последний_контакт"] or "0000", d["имя"]))
+        for d in v_gr[:2]:
+            d["фокус"] = True
+            fokus.append(d["user_id"])
     gruppy = sorted({(d["педагог"], d["группа"]) for d in deti})
     return {"дети": deti, "точки": TOCHKI, "ответы": OTVETY, "сегодня": today.isoformat(),
             "текущая_точка": tek,
@@ -207,7 +229,11 @@ def rows() -> dict:
             "не_оформлены": sum(1 for d in deti if d["статус"] != "учится"),
             "без_видео": sum(1 for d in deti if not d["последнее_видео"]),
             "видео_в_месяце": sum(1 for d in deti if d["видео_в_месяце"]),
-            "отчёт_сейчас": sum(1 for d in deti if d["отчёт_сейчас"])}
+            "отчёт_сейчас": sum(1 for d in deti if d["отчёт_сейчас"]),
+            "фокус": fokus,
+            "без_контакта_15": sum(1 for d in deti if d["дней_без_контакта"] is None
+                                   or d["дней_без_контакта"] > 15),
+            "с_флагом": sum(1 for d in deti if d["флаг"])}
 
 
 def save(user_id: int, tochka: str, marks: dict, video_date: str | None = None,
@@ -235,7 +261,8 @@ def save(user_id: int, tochka: str, marks: dict, video_date: str | None = None,
                 report = json.loads(old["report"] or "{}")
             report_date = old["report_date"] or "" if report_date is None else report_date
         rep = {k: str(v)[:400] for k, v in (report or {}).items()
-               if k in ("umeet", "rabotaem", "doma") and str(v).strip()}
+               if k in ("umeet", "rabotaem", "doma", "epizod", "tajm", "uchimsya", "doma_i",
+                        "menyaem", "cel", "zvonok", "podpis", "tekst") and str(v).strip()}
         conn.execute(
             "INSERT INTO speech_cards (user_id, tochka, marks, video_date, note, ts, author, "
             "report, report_date) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id, tochka) "

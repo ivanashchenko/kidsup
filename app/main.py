@@ -3630,7 +3630,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-24.19"
+APP_VERSION = "2026-09-25.03"
 
 
 @app.get("/api/net")
@@ -8393,20 +8393,43 @@ def mesta_page(request: Request):
     return render(request, "mesta.html", active="mesta", t=mesta.tablica())
 
 
-@app.get("/english/karta", response_class=HTMLResponse, dependencies=AUTH)
-def english_karta_page(request: Request):
+def check_pedagog_or_admin(request: Request,
+                           credentials: HTTPBasicCredentials | None = Depends(_security)):
+    """Карточка речи открывается педагогу по ключу из ссылки (?k=, как /pedagog),
+    администратору — по обычному паролю. Решение 25.09: педагоги сами ведут
+    карточку и отправляют родителям отчёты через сервер центра."""
+    k = request.query_params.get("k") or request.headers.get("X-Pedagog-Key") or ""
+    want = db.get_setting("pedagog_key", "")
+    if want and k and secrets.compare_digest(k, want):
+        return
+    check_auth(credentials)
+
+
+PAUTH = [Depends(check_pedagog_or_admin)]
+
+
+def _karta_kid(uid: int) -> dict:
+    from . import karta
+    for d in karta.rows()["дети"]:
+        if d["user_id"] == int(uid):
+            return d
+    raise HTTPException(404, "ребёнка нет в группах английского")
+
+
+@app.get("/english/karta", response_class=HTMLResponse, dependencies=PAUTH)
+def english_karta_page(request: Request, k: str = ""):
     """Карточка речи: форма к разделу 10 методички (см. app/karta.py)."""
     from . import karta
-    return render(request, "karta.html", active="karta", k=karta.rows())
+    return render(request, "karta.html", active="karta", k=karta.rows(), pk=k)
 
 
-@app.get("/api/english/karta", dependencies=AUTH)
+@app.get("/api/english/karta", dependencies=PAUTH)
 def api_english_karta():
     from . import karta
     return karta.rows()
 
 
-@app.post("/api/english/karta", dependencies=AUTH)
+@app.post("/api/english/karta", dependencies=PAUTH)
 def api_english_karta_save(payload: dict = Body(...)):
     """Отметки по одному ребёнку и одной точке замера."""
     from . import karta
@@ -8424,7 +8447,7 @@ def api_english_karta_save(payload: dict = Body(...)):
         raise HTTPException(400, str(e))
 
 
-@app.post("/api/english/karta/video", dependencies=AUTH)
+@app.post("/api/english/karta/video", dependencies=PAUTH)
 def api_english_karta_video(payload: dict = Body(...)):
     """Видео ребёнка снято: {"user_id", "date", "remove": false}. Раз в месяц (методичка, раздел 10)."""
     from . import karta
@@ -8435,11 +8458,128 @@ def api_english_karta_video(payload: dict = Body(...)):
         raise HTTPException(400, str(e))
 
 
-@app.post("/api/english/karta/note", dependencies=AUTH)
+@app.post("/api/english/karta/note", dependencies=PAUTH)
 def api_english_karta_note(payload: dict = Body(...)):
     from . import karta
     return karta.save_note(int(payload.get("user_id") or 0), str(payload.get("note") or ""),
                            str(payload.get("author") or ""))
+
+
+@app.post("/api/english/karta/video-upload", dependencies=PAUTH)
+async def api_english_karta_video_upload(request: Request, user_id: int = 0, date: str = "",
+                                         ext: str = "mp4"):
+    """Ролик с телефона педагога — телом запроса. Сжимается до 720p, если больше 15 МБ."""
+    from . import deti_video, karta
+    import asyncio
+    raw = await request.body()
+    try:
+        r = await asyncio.to_thread(deti_video.save, user_id, raw, ext, date)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    karta.save_video(user_id, r["date"])
+    return r
+
+
+@app.post("/api/english/karta/video-delete", dependencies=PAUTH)
+def api_english_karta_video_delete(payload: dict = Body(...)):
+    from . import deti_video, karta
+    tok = str(payload.get("token") or "")
+    vids = {v["token"]: v for v in deti_video.spisok(int(payload.get("user_id") or 0))}
+    if tok not in vids:
+        raise HTTPException(404, "видео не найдено")
+    deti_video.udalit(tok)
+    if not any(v["date"] == vids[tok]["date"] for t, v in vids.items() if t != tok):
+        karta.save_video(int(payload.get("user_id") or 0), vids[tok]["date"], remove=True)
+    return {"ok": True}
+
+
+@app.get("/v/{name}")
+def deti_video_file(name: str):
+    """Ролик ребёнка по случайной ссылке: его забирает Wazzup при отправке родителю."""
+    from . import deti_video
+    from fastapi.responses import FileResponse
+    p = deti_video.path(name.rsplit(".", 1)[0])
+    if not p:
+        raise HTTPException(404, "нет такого видео")
+    return FileResponse(str(p), media_type="video/mp4")
+
+
+@app.post("/api/english/video/setup", dependencies=OWNER_AUTH)
+def api_english_video_setup():
+    from . import deti_video
+    return deti_video.setup()
+
+
+@app.get("/api/english/video/status", dependencies=AUTH)
+def api_english_video_status():
+    from . import deti_video
+    return deti_video.status()
+
+
+@app.post("/api/english/karta/chernovik", dependencies=PAUTH)
+def api_english_karta_chernovik(payload: dict = Body(...)):
+    """Черновик отчёта из отметок карточки: {"user_id", "tochka", "vvod": {...}}.
+    Поля педагога сохраняются, чтобы черновик не терялся при перезагрузке."""
+    from . import karta, karta_otchet
+    uid = int(payload.get("user_id") or 0)
+    tochka = str(payload.get("tochka") or "")
+    vvod = payload.get("vvod") or {}
+    d = _karta_kid(uid)
+    try:
+        ch = karta_otchet.chernovik(d, tochka, vvod)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    karta.save(uid, tochka, None, report={**vvod, "podpis": ch["podpis"], "tekst": ch["tekst"]})
+    return ch
+
+
+@app.get("/api/english/karta/vvodnoe", dependencies=PAUTH)
+def api_english_karta_vvodnoe(user_id: int, pochemu: str = ""):
+    from . import karta_otchet
+    return {"tekst": karta_otchet.vvodnoe(_karta_kid(user_id), pochemu)}
+
+
+@app.post("/api/english/karta/otpravit", dependencies=PAUTH)
+def api_english_karta_otpravit(payload: dict = Body(...)):
+    """Отправить родителю лично от имени центра: {"user_id", "kind": otchet|vestochka|vvodnoe|video,
+    "podpis", "tekst", "video_token", "tochka", "ignore_warnings": false}."""
+    from . import karta, karta_otchet as ko, deti_video
+    uid = int(payload.get("user_id") or 0)
+    kind = str(payload.get("kind") or "")
+    if kind not in ("otchet", "vestochka", "vvodnoe", "video"):
+        raise HTTPException(400, "неизвестный вид сообщения")
+    d = _karta_kid(uid)
+    podpis = str(payload.get("podpis") or "").strip()
+    tekst = str(payload.get("tekst") or "").strip()
+    teksty = [x for x in (podpis, tekst) if x]
+    if not teksty and kind != "video":
+        raise HTTPException(400, "пустое сообщение")
+    tochka = str(payload.get("tochka") or karta.tekushchaya_tochka())
+    video_url = ""
+    tok = str(payload.get("video_token") or "")
+    if tok:
+        if tok not in {v["token"] for v in deti_video.spisok(uid)}:
+            raise HTTPException(400, "видео не найдено у этого ребёнка")
+        video_url = deti_video.url(tok)
+    if kind == "video" and not video_url:
+        raise HTTPException(400, "выберите видео")
+    rows = karta.rows()["дети"]
+    drugie = sorted({x["имя_короткое"] for x in rows
+                     if x["группа"] == d["группа"] and x["user_id"] != uid and x["имя_короткое"]})
+    oshibki, pred = ko.proverka("\n".join(teksty), d, drugie)
+    if oshibki:
+        raise HTTPException(400, "Не отправлено: " + "; ".join(oshibki))
+    if pred and not payload.get("ignore_warnings"):
+        return {"ok": False, "warnings": pred}
+    if kind == "otchet" and d.get("флаг"):
+        rep = (d["точки"].get(tochka) or {}).get("report") or {}
+        if not rep.get("zvonok"):
+            raise HTTPException(400, "Сначала звонок родителю: " + d["флаг"] +
+                                ". Отметьте «звонок был» и соберите черновик заново.")
+    r = ko.otpravit(d, kind, teksty, video_url, tochka)
+    if r.get("ok") and kind == "otchet":
+        karta.save(uid, tochka, None, report_date=date.today().isoformat())
+    return r
 
 
 @app.get("/nabor", response_class=HTMLResponse, dependencies=AUTH)

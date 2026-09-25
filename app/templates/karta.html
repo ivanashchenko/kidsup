@@ -11,62 +11,80 @@
 .kid .body{padding:0 .8rem .8rem}
 .pill{font-size:12px;border-radius:10px;padding:.1rem .5rem;background:#eef0f7;color:#312783;white-space:nowrap}
 .pill.red{background:#fde8ea;color:#b1000f}.pill.ok{background:#e9f5dc;color:#3d6b0d}.pill.warn{background:#fff3dc;color:#8a5a00}
+.pill.focus{background:#1DA7E0;color:#fff}
 .vchip{display:inline-flex;align-items:center;gap:.25rem;margin:.1rem}
 .vdel{border:0;background:transparent;color:#b1000f;cursor:pointer;font-size:13px;padding:0 .15rem}
 .gh{margin:18px 0 4px;font-size:15px;color:#312783}
-.rep textarea{width:100%;min-height:2.4em;font:inherit;font-size:14px;margin:.15rem 0}
-.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.5rem 0}
+.blk{border-top:1px solid #eef0f7;margin-top:.7rem;padding-top:.5rem}
+.blk h4{margin:.2rem 0 .3rem;font-size:14.5px;color:#312783}
+.blk textarea,.blk input[type=text]{width:100%;font:inherit;font-size:14px;margin:.15rem 0;box-sizing:border-box}
+.blk textarea{min-height:2.6em}
+.blk textarea.big{min-height:11em}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.4rem 0}
 .small{font-size:12.5px;color:#666}
+.alarm{background:#fde8ea;color:#8a000b;border-radius:8px;padding:.4rem .6rem;font-size:13.5px}
+.go{background:#7DB928;color:#fff;border:0;border-radius:8px;padding:.4rem .8rem;cursor:pointer}
+.go:disabled{background:#b9c7a4;cursor:not-allowed}
 table.kt td,table.kt th{font-size:13px;padding:.25rem .35rem}
 </style>
 
 <h1>Карточка речи: английский</h1>
-<p class="muted">Раздел 10 методички (<a href="/english/metodika#zamer">app.kidsup.ru/english/metodika</a>).
-Пункты поведенческие — то, что видно глазом, «да / почти / пока нет». Заполняется внутри обычного
-занятия. <b>Два «пока нет» подряд на двух точках</b> — сначала смотрим посещаемость и домашнее аудио.</p>
+<p class="muted">Раздел 10 и 12 методички (<a href="/english/metodika#otchet">app.kidsup.ru/english/metodika</a>).
+Отметки «да / почти / пока нет» — то, что видно глазом, внутри обычного занятия. Из них собирается черновик
+отчёта родителю. <b>Всё личное уходит родителю лично</b>, с номера центра — никогда в чат группы.</p>
 
 <div class="cards">
   <div class="card"><div class="card-value">{{ k.всего }}</div><div class="card-label">детей в группах (все, кто ходит)</div></div>
-  <div class="card"><div class="card-value">{{ k.видео_в_месяце }} / {{ k.всего }}</div><div class="card-label">видео в этом месяце (норма — каждому)</div></div>
-  <div class="card"><div class="card-value">{{ k.отчёт_сейчас }} / {{ k.всего }}</div><div class="card-label">отчётов родителям: {{ k.текущая_точка_имя|lower }}</div></div>
+  <div class="card"><div class="card-value">{{ k.без_контакта_15 }}</div><div class="card-label">без личного сообщения 15+ дней</div></div>
+  <div class="card"><div class="card-value">{{ k.видео_в_месяце }} / {{ k.всего }}</div><div class="card-label">видео в этом месяце</div></div>
+  <div class="card"><div class="card-value">{{ k.отчёт_сейчас }} / {{ k.всего }}</div><div class="card-label">отчётов: {{ k.текущая_точка_имя|lower }}</div></div>
+  <div class="card"><div class="card-value">{{ k.с_флагом }}</div><div class="card-label">«сначала звонок»</div></div>
   <div class="card"><div class="card-value">{{ k.не_оформлены }}</div><div class="card-label">ходят, но не «учится» в CRM</div></div>
 </div>
 
 <div class="kf" id="flt">
-  <button data-g="" class="on">Все</button>
+  <button data-x="fokus"{% if k.фокус %} class="on"{% endif %}>Фокус сегодня · {{ k.фокус|length }}</button>
+  <button data-g=""{% if not k.фокус %} class="on"{% endif %}>Все</button>
   <button data-p="Маша">Маша</button><button data-p="Илья">Илья</button>
+  <button data-x="nokontakt">Без сообщения 15+ дней</button>
   <button data-x="novideo">Без видео 31+ день</button><button data-x="noreport">Без отчёта</button>
+  <button data-x="flag">Сначала звонок</button>
   {% for g in k.группы %}<button data-g="{{ g.группа }}">{% if '_' in g.группа %}{{ g.группа.split('_')[0] }} {{ g.группа.split('_')[1] }}{% else %}{{ g.группа.split(' · ')[0] }}{% endif %} · {{ g.детей }}</button>{% endfor %}
 </div>
+<p class="small" id="fokus-hint">«Фокус сегодня» — в каждой группе, которая занимается сегодня, двое детей, кому дольше всех
+не писали лично. На занятии присмотритесь к ним и вечером отправьте родителю одну живую фразу (блок «Весточка»).</p>
 
 {% set ns = namespace(g='') %}
 {% for d in k.дети %}
 {% if d.группа != ns.g %}{% set ns.g = d.группа %}<div class="gh" data-grp="{{ d.группа }}" data-ped="{{ d.педагог }}">{{ d.педагог }} · {{ d.группа }}{% if d.дорожка == 'pro' %} · <span class="small">пункты для продвинутых</span>{% endif %}{% if ' · ' in d.группа %} · <span class="small">в карточке все дети группы — кто не ходит в пн и ср, пропустите</span>{% endif %}</div>{% endif %}
-<details class="kid" data-grp="{{ d.группа }}" data-ped="{{ d.педагог }}"
+{% set rep = d.точки[k.текущая_точка].get('report', {}) %}
+<details class="kid" data-uid="{{ d.user_id }}" data-grp="{{ d.группа }}" data-ped="{{ d.педагог }}"
+         data-fokus="{{ 1 if d.фокус else 0 }}" data-flag="{{ 1 if d.флаг else 0 }}"
+         data-nokontakt="{{ 1 if d.дней_без_контакта is none or d.дней_без_контакта > 15 else 0 }}"
          data-novideo="{{ 1 if d.видео_просрочено else 0 }}" data-noreport="{{ 0 if d.отчёт_сейчас else 1 }}">
   <summary>
     <b>{{ d.имя }}</b>
+    {% if d.фокус %}<span class="pill focus">фокус сегодня</span>{% endif %}
     <span class="pill {{ 'ok' if d.статус == 'учится' else 'warn' }}">{{ d.статус }}</span>
+    {% if d.флаг %}<span class="pill red">сначала звонок</span>{% endif %}
+    <span class="pill {{ 'red' if d.дней_без_контакта is none or d.дней_без_контакта > 15 else 'ok' }}">{% if d.последний_контакт %}писали {{ d.последний_контакт[8:10] }}.{{ d.последний_контакт[5:7] }}{% else %}лично не писали{% endif %}</span>
     {% if d.последнее_видео %}<span class="pill {{ 'red' if d.видео_просрочено else 'ok' }}">видео {{ d.последнее_видео[8:10] }}.{{ d.последнее_видео[5:7] }}</span>{% else %}<span class="pill red">видео не снимали</span>{% endif %}
-    <span class="pill {{ 'ok' if d.отчёт_сейчас else '' }}">отчёт {{ k.текущая_точка_имя|lower }}: {{ 'отправлен' if d.отчёт_сейчас else 'нет' }}</span>
-    <span class="small">точек: {{ d.заполнено }}/{{ k.точки|length }}</span>
+    <span class="pill {{ 'ok' if d.отчёт_сейчас else '' }}">отчёт: {{ 'отправлен' if d.отчёт_сейчас else 'нет' }}</span>
   </summary>
   <div class="body">
-    <div class="row">
-      <b>Видео</b> <span class="small">раз в месяц, 30–60 с, ребёнок говорит сам</span>
-      <input type="date" class="vd" data-uid="{{ d.user_id }}" value="{{ k.сегодня }}">
-      <button class="vadd" data-uid="{{ d.user_id }}">Видео снято</button>
-      <span class="vlist" data-uid="{{ d.user_id }}">{% for v in d.видео %}<span class="pill ok vchip" data-date="{{ v }}">{{ v[8:10] }}.{{ v[5:7] }} <button class="vdel" title="Убрать — отмечено по ошибке">✕</button></span>{% endfor %}</span>
-    </div>
-    <div class="scroll">
+    {% if d.флаг %}<div class="alarm"><b>Сначала звонок родителю.</b> {{ d.флаг }}. Плохую новость семья не должна
+    впервые прочитать в письме: позвоните (или попросите администратора), договоритесь, потом отметьте
+    «звонок был» — отчёт соберётся как запись договорённостей.</div>{% endif %}
+
+    <div class="scroll" style="margin-top:.5rem">
     <table class="kt">
       <tr><th>Пункт</th>{% for key, when, what in k.точки %}<th{% if key == k.текущая_точка %} style="background:#eef0f7"{% endif %}>{{ when }}</th>{% endfor %}</tr>
-      {% for pk, ptext in d.пункты %}
+      {% for pk_, ptext in d.пункты %}
       <tr><td>{{ ptext }}</td>
         {% for key, when, what in k.точки %}
-        <td><select data-uid="{{ d.user_id }}" data-tochka="{{ key }}" data-punkt="{{ pk }}" class="m">
+        <td><select data-uid="{{ d.user_id }}" data-tochka="{{ key }}" data-punkt="{{ pk_ }}" class="m">
             <option value="">—</option>
-            {% for o in k.ответы %}<option value="{{ o }}"{% if d.точки[key].get('marks',{}).get(pk) == o %} selected{% endif %}>{{ o }}</option>{% endfor %}
+            {% for o in k.ответы %}<option value="{{ o }}"{% if d.точки[key].get('marks',{}).get(pk_) == o %} selected{% endif %}>{{ o }}</option>{% endfor %}
         </select></td>
         {% endfor %}
       </tr>
@@ -74,38 +92,92 @@ table.kt td,table.kt th{font-size:13px;padding:.25rem .35rem}
     </table>
     </div>
 
-    {% set r = d.точки[k.текущая_точка].get('report', {}) %}
-    <div class="rep" data-uid="{{ d.user_id }}" data-tochka="{{ k.текущая_точка }}" data-name="{{ d.имя_короткое }}">
-      <div class="row"><b>Отчёт родителю · {{ k.текущая_точка_имя|lower }}</b>
-        <span class="small">три строки, конкретно, без «молодец»</span></div>
-      <textarea class="ru" placeholder="Что уже умеет: «понимает все команды занятия без перевода, отвечает о себе целой фразой, рассказывает 4 стиха»">{{ r.get('umeet','') }}</textarea>
-      <textarea class="rr" placeholder="Над чем работаем сейчас — одна вещь: «учимся просить: Can I have…?»">{{ r.get('rabotaem','') }}</textarea>
-      <textarea class="rd" placeholder="Что сделать дома — одно действие: «плейлист группы по 15 минут в машине»">{{ r.get('doma','') }}</textarea>
+    <div class="blk">
+      <h4>Видео — раз в месяц</h4>
+      <div class="small">30–60 секунд, ребёнок говорит сам, других детей в кадре нет. Снимайте в 720p — большие файлы сервер сожмёт.</div>
       <div class="row">
-        <button class="rcopy">Скопировать текст для родителя</button>
-        <label class="small">отправлен <input type="date" class="rdate" value="{{ d.точки[k.текущая_точка].get('report_date','') }}"></label>
+        <input type="file" accept="video/*" class="vfile" data-uid="{{ d.user_id }}">
+        <input type="date" class="vd" data-uid="{{ d.user_id }}" value="{{ k.сегодня }}">
+        <button class="vup" data-uid="{{ d.user_id }}">Загрузить</button>
       </div>
-      {% for key, when, what in k.точки %}{% if key != k.текущая_точка and d.точки[key].get('report_date') %}
-      <div class="small">{{ when }}, отправлен {{ d.точки[key].report_date }}: {{ d.точки[key].report.get('umeet','') }} · {{ d.точки[key].report.get('rabotaem','') }} · {{ d.точки[key].report.get('doma','') }}</div>
-      {% endif %}{% endfor %}
+      <div class="vfiles" data-uid="{{ d.user_id }}">
+        {% for v in d.видео_файлы %}<div class="row vf" data-token="{{ v.token }}">
+          <label><input type="radio" name="v{{ d.user_id }}" value="{{ v.token }}"{% if loop.last %} checked{% endif %}> {{ v.date[8:10] }}.{{ v.date[5:7] }} · {{ v.size_mb }} МБ</label>
+          <a href="{{ v.url }}" target="_blank">посмотреть</a>
+          <button class="vfdel" data-uid="{{ d.user_id }}" data-token="{{ v.token }}">✕ удалить</button>
+        </div>{% endfor %}
+      </div>
+      <div class="small">Отметки без файла (снято, но отправлено не отсюда):
+        <span class="vlist" data-uid="{{ d.user_id }}">{% for v in d.видео %}<span class="pill ok vchip" data-date="{{ v }}">{{ v[8:10] }}.{{ v[5:7] }} <button class="vdel" title="Убрать — отмечено по ошибке">✕</button></span>{% endfor %}</span>
+        <button class="vadd" data-uid="{{ d.user_id }}">+ отметить дату</button>
+      </div>
     </div>
 
-    <input class="n" data-uid="{{ d.user_id }}" style="width:100%;margin-top:.4rem" placeholder="Заметка педагога: что мешает, что получилось" value="{{ d.заметка }}">
+    <div class="blk otch" data-uid="{{ d.user_id }}" data-tochka="{{ k.текущая_точка }}" data-flag="{{ 1 if d.флаг else 0 }}">
+      <h4>Отчёт родителю · {{ k.текущая_точка_имя|lower }}</h4>
+      <div class="small">Черновик собирается из отметок. Руками — только живой эпизод с английскими словами ребёнка.</div>
+      <input type="text" class="epizod" placeholder="Живой эпизод: «в игре в магазин сам попросил: Can I have the red one, please?»" value="{{ rep.get('epizod','') }}">
+      <div class="row">
+        <input type="text" class="tajm" style="width:9em" placeholder="таймкод, 0:20" value="{{ rep.get('tajm','') }}">
+        <label class="small">Сейчас учимся: <select class="uchimsya"><option value="">— из отметок —</option>
+          {% for pk_, ptext in d.пункты %}<option value="{{ pk_ }}"{% if rep.get('uchimsya') == pk_ %} selected{% endif %}>{{ ptext }}</option>{% endfor %}</select></label>
+        <label class="small">Дома: <select class="doma"><option value="0">вариант 1</option><option value="1"{% if rep.get('doma_i') == '1' %} selected{% endif %}>вариант 2</option></select></label>
+      </div>
+      {% if d.флаг %}<div class="row">
+        <label><input type="checkbox" class="zvonok"{% if rep.get('zvonok') %} checked{% endif %}> звонок был, договорились</label>
+        <input type="text" class="menyaem" placeholder="Что меняем мы на занятии" value="{{ rep.get('menyaem','') }}">
+        <input type="text" class="cel" placeholder="Цель на 3–4 недели (по умолчанию — из отметок)" value="{{ rep.get('cel','') }}">
+      </div>{% endif %}
+      <button class="sobrat">Собрать черновик</button>
+      <div class="small">Сообщение 1 — подпись к видео (её перешлют бабушке):</div>
+      <textarea class="podpis">{{ rep.get('podpis','') }}</textarea>
+      <div class="small">Сообщение 2 — отчёт:</div>
+      <textarea class="tekst big">{{ rep.get('tekst','') }}</textarea>
+      <div class="row">
+        <button class="go send-otchet">Отправить родителю: видео + подпись + отчёт</button>
+        <button class="copy-otchet">Скопировать</button>
+        {% if d.отчёт_сейчас %}<span class="pill ok">отправлен {{ d.отчёт_сейчас[8:10] }}.{{ d.отчёт_сейчас[5:7] }}</span>{% endif %}
+      </div>
+    </div>
+
+    <div class="blk vest" data-uid="{{ d.user_id }}">
+      <h4>Весточка — раз в две недели</h4>
+      <textarea class="vtext" placeholder="Одна живая фраза: «Сегодня {{ d.имя_короткое }} сам(а) сказал(а) на прощание Bye-bye! без подсказки. {{ d.педагог }}»"></textarea>
+      <div class="row"><button class="go send-vest">Отправить родителю</button>
+        <label class="small"><input type="checkbox" class="vsvideo"> приложить выбранное видео</label></div>
+    </div>
+
+    <div class="blk vvod" data-uid="{{ d.user_id }}">
+      <h4>Вводное сообщение — один раз, 1–10 октября</h4>
+      <input type="text" class="pochemu" placeholder="Почему в этой группе — одной фразой (необязательно)">
+      <div class="row"><button class="show-vvod">Показать текст</button></div>
+      <textarea class="vvtext big" style="display:none"></textarea>
+      <div class="row"><button class="go send-vvod" style="display:none">Отправить родителю</button></div>
+    </div>
+
+    {% if d.журнал %}<div class="blk"><h4>Что уже уходило лично</h4>
+      {% for j in d.журнал %}<div class="small">{{ j.ts }} · {{ {'otchet':'отчёт','vestochka':'весточка','vvodnoe':'вводное','video':'видео'}.get(j.kind, j.kind) }} · {{ 'ушло' if j.ok else 'не ушло' }} — {{ j.text[:120] }}</div>{% endfor %}
+    </div>{% endif %}
+
+    <input class="n" data-uid="{{ d.user_id }}" style="width:100%;margin-top:.6rem" placeholder="Заметка педагога: что мешает, что получилось" value="{{ d.заметка }}">
   </div>
 </details>
 {% endfor %}
 
 <p id="out" class="muted" style="position:sticky;bottom:0;background:#fff;padding:.5rem 0"></p>
 <script>
+const PK = {{ (pk or '')|tojson }};
 const out = document.getElementById('out');
-async function post(url, body) {
-  out.textContent = 'Сохраняю…';
+const u = p => PK ? p + (p.includes('?') ? '&' : '?') + 'k=' + encodeURIComponent(PK) : p;
+async function post(url, body, quiet) {
+  if (!quiet) out.textContent = 'Сохраняю…';
   try {
-    const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
-    const j = await r.json();
-    out.textContent = j.ok ? 'Сохранено ' + new Date().toLocaleTimeString('ru-RU') : 'Не сохранилось';
-    return j.ok;
-  } catch (e) { out.textContent = 'Не сохранилось — проверьте связь'; return false; }
+    const r = await fetch(u(url), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { out.textContent = (j.detail || 'Ошибка') ; return {ok: false, ...j}; }
+    if (!quiet) out.textContent = j.ok === false ? 'Не сохранилось' : 'Сохранено ' + new Date().toLocaleTimeString('ru-RU');
+    return j;
+  } catch (e) { out.textContent = 'Нет связи — попробуйте ещё раз'; return {ok: false}; }
 }
 function marks(uid, tochka) {
   const m = {};
@@ -116,47 +188,144 @@ document.querySelectorAll('select.m').forEach(e => e.addEventListener('change', 
   post('/api/english/karta', {user_id: +e.dataset.uid, tochka: e.dataset.tochka, marks: marks(e.dataset.uid, e.dataset.tochka)})));
 document.querySelectorAll('input.n').forEach(e => e.addEventListener('change', () =>
   post('/api/english/karta/note', {user_id: +e.dataset.uid, note: e.value})));
-function vchip(uid, d) {
-  const s = document.createElement('span');
-  s.className = 'pill ok vchip'; s.dataset.date = d;
-  s.innerHTML = d.slice(8, 10) + '.' + d.slice(5, 7) + ' <button class="vdel" title="Убрать — отмечено по ошибке">✕</button>';
-  bindDel(s.querySelector('.vdel'), uid);
-  return s;
+
+// --- видео: загрузка файла
+document.querySelectorAll('button.vup').forEach(b => b.addEventListener('click', async ev => {
+  ev.preventDefault();
+  const uid = b.dataset.uid, f = document.querySelector(`input.vfile[data-uid="${uid}"]`).files[0];
+  const d = document.querySelector(`input.vd[data-uid="${uid}"]`).value;
+  if (!f) { out.textContent = 'Выберите файл видео'; return; }
+  const ext = (f.name.split('.').pop() || 'mp4').toLowerCase();
+  b.disabled = true; out.textContent = 'Загружаю ' + (f.size / 1048576).toFixed(0) + ' МБ… большие файлы сервер ещё сжимает — не закрывайте страницу';
+  try {
+    const r = await fetch(u(`/api/english/karta/video-upload?user_id=${uid}&date=${d}&ext=${ext}`), {method: 'POST', body: f});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { out.textContent = j.detail || 'Не загрузилось'; b.disabled = false; return; }
+    const box = document.querySelector(`.vfiles[data-uid="${uid}"]`);
+    const row = document.createElement('div'); row.className = 'row vf'; row.dataset.token = j.token;
+    row.innerHTML = `<label><input type="radio" name="v${uid}" value="${j.token}" checked> ${j.date.slice(8,10)}.${j.date.slice(5,7)} · ${j.size_mb} МБ</label> <a href="${j.url}" target="_blank">посмотреть</a> <button class="vfdel" data-uid="${uid}" data-token="${j.token}">✕ удалить</button>`;
+    box.appendChild(row); bindVfDel(row.querySelector('.vfdel'));
+    out.textContent = 'Видео загружено (' + j.size_mb + ' МБ). Теперь соберите отчёт или отправьте весточку с видео.';
+  } catch (e) { out.textContent = 'Нет связи — попробуйте ещё раз'; }
+  b.disabled = false;
+}));
+function bindVfDel(btn) {
+  btn.addEventListener('click', async ev => {
+    ev.preventDefault();
+    if (!confirm('Удалить это видео?')) return;
+    const j = await post('/api/english/karta/video-delete', {user_id: +btn.dataset.uid, token: btn.dataset.token});
+    if (j.ok) btn.closest('.vf').remove();
+  });
 }
+document.querySelectorAll('.vfdel').forEach(bindVfDel);
+function videoToken(uid) {
+  const r = document.querySelector(`input[name="v${uid}"]:checked`);
+  return r ? r.value : '';
+}
+
+// --- видео: отметка даты без файла
 function bindDel(btn, uid) {
   btn.addEventListener('click', async ev => {
     ev.preventDefault();
     const chip = btn.closest('.vchip');
-    if (!confirm('Убрать видео от ' + chip.dataset.date.split('-').reverse().join('.') + '?')) return;
-    if (await post('/api/english/karta/video', {user_id: +uid, date: chip.dataset.date, remove: true})) {
-      chip.remove(); out.textContent = 'Видео убрано — обновите страницу, чтобы пересчитать счётчики';
-    }
+    if (!confirm('Убрать отметку видео от ' + chip.dataset.date.split('-').reverse().join('.') + '?')) return;
+    const j = await post('/api/english/karta/video', {user_id: +uid, date: chip.dataset.date, remove: true});
+    if (j.ok) chip.remove();
   });
 }
 document.querySelectorAll('.vlist').forEach(l => l.querySelectorAll('.vdel').forEach(b => bindDel(b, l.dataset.uid)));
 document.querySelectorAll('button.vadd').forEach(b => b.addEventListener('click', async ev => {
   ev.preventDefault();
   const uid = b.dataset.uid, d = document.querySelector(`input.vd[data-uid="${uid}"]`).value;
-  if (!d) { out.textContent = 'Выберите дату видео'; return; }
   const list = document.querySelector(`.vlist[data-uid="${uid}"]`);
-  if (list.querySelector(`[data-date="${d}"]`)) { out.textContent = 'Видео за эту дату уже отмечено'; return; }
-  if (await post('/api/english/karta/video', {user_id: +uid, date: d})) list.appendChild(vchip(uid, d));
+  if (!d || list.querySelector(`[data-date="${d}"]`)) { out.textContent = 'Дата пустая или уже отмечена'; return; }
+  const j = await post('/api/english/karta/video', {user_id: +uid, date: d});
+  if (j.ok) {
+    const s = document.createElement('span'); s.className = 'pill ok vchip'; s.dataset.date = d;
+    s.innerHTML = d.slice(8, 10) + '.' + d.slice(5, 7) + ' <button class="vdel">✕</button>';
+    list.appendChild(s); bindDel(s.querySelector('.vdel'), uid);
+  }
 }));
-document.querySelectorAll('.rep').forEach(box => {
+
+// --- отчёт
+async function send(body, btn) {
+  if (btn) btn.disabled = true;
+  let j = await post('/api/english/karta/otpravit', body);
+  if (j.warnings && j.warnings.length) {
+    if (confirm('Проверьте: ' + j.warnings.join('; ') + '. Всё равно отправить?')) {
+      j = await post('/api/english/karta/otpravit', {...body, ignore_warnings: true});
+    }
+  }
+  if (j.ok) out.textContent = (j.dry_run ? 'ТЕСТОВЫЙ РЕЖИМ, никому не ушло: ' : 'Отправлено: ') + (j.log || []).join('; ');
+  else if (j.error) out.textContent = 'Не ушло: ' + j.error;
+  if (btn) btn.disabled = false;
+  return j;
+}
+document.querySelectorAll('.otch').forEach(box => {
   const uid = +box.dataset.uid, tochka = box.dataset.tochka;
-  const rep = () => ({umeet: box.querySelector('.ru').value, rabotaem: box.querySelector('.rr').value, doma: box.querySelector('.rd').value});
-  box.querySelectorAll('textarea, .rdate').forEach(e => e.addEventListener('change', () =>
-    post('/api/english/karta', {user_id: uid, tochka: tochka, report: rep(), report_date: box.querySelector('.rdate').value})));
-  box.querySelector('.rcopy').addEventListener('click', async () => {
-    const r = rep(), mon = '{{ k.текущая_точка_имя|lower }}';
-    const t = `${box.dataset.name}, ${mon}.\nЧто уже умеет: ${r.umeet}\nНад чем работаем: ${r.rabotaem}\nЧто делать дома: ${r.doma}`;
-    try { await navigator.clipboard.writeText(t); out.textContent = 'Текст скопирован — вставьте в чат родителю и отметьте дату отправки'; }
-    catch (e) { prompt('Скопируйте текст', t); }
+  const vvod = () => ({epizod: box.querySelector('.epizod').value, tajm: box.querySelector('.tajm').value,
+    uchimsya: box.querySelector('.uchimsya').value, doma_i: box.querySelector('.doma').value,
+    zvonok: box.querySelector('.zvonok') && box.querySelector('.zvonok').checked ? '1' : '',
+    menyaem: box.querySelector('.menyaem') ? box.querySelector('.menyaem').value : '',
+    cel: box.querySelector('.cel') ? box.querySelector('.cel').value : ''});
+  box.querySelector('.sobrat').addEventListener('click', async ev => {
+    ev.preventDefault();
+    const v = vvod();
+    if (v.epizod.trim().length < 25 || !/[A-Za-z]/.test(v.epizod)) {
+      out.textContent = 'Напишите живой эпизод (от 25 знаков, с английскими словами ребёнка) — без него отчёт звучит как бланк';
+      return;
+    }
+    const j = await post('/api/english/karta/chernovik', {user_id: uid, tochka: tochka, vvod: v});
+    if (j.tekst) {
+      box.querySelector('.podpis').value = j.podpis; box.querySelector('.tekst').value = j.tekst;
+      out.textContent = j.zvonok_nuzhen ? 'Черновик готов, но сначала звонок — отметьте «звонок был»' : 'Черновик готов — прочитайте, поправьте и отправьте';
+    }
+  });
+  box.querySelector('.copy-otchet').addEventListener('click', async ev => {
+    ev.preventDefault();
+    const t = box.querySelector('.podpis').value + '\n\n' + box.querySelector('.tekst').value;
+    try { await navigator.clipboard.writeText(t); out.textContent = 'Скопировано'; } catch (e) { prompt('Скопируйте', t); }
+  });
+  box.querySelector('.send-otchet').addEventListener('click', async ev => {
+    ev.preventDefault();
+    const tok = videoToken(uid);
+    if (!tok && !confirm('Видео не выбрано — отправить отчёт без видео?')) return;
+    if (!confirm('Отправить родителю отчёт' + (tok ? ' с видео' : '') + '?')) return;
+    await send({user_id: uid, kind: 'otchet', tochka: tochka, video_token: tok,
+                podpis: box.querySelector('.podpis').value, tekst: box.querySelector('.tekst').value}, ev.target);
   });
 });
-// фильтры
+document.querySelectorAll('.vest').forEach(box => {
+  const uid = +box.dataset.uid;
+  box.querySelector('.send-vest').addEventListener('click', async ev => {
+    ev.preventDefault();
+    const t = box.querySelector('.vtext').value.trim();
+    const tok = box.querySelector('.vsvideo').checked ? videoToken(uid) : '';
+    if (!t) { out.textContent = 'Напишите фразу'; return; }
+    if (!confirm('Отправить родителю весточку?')) return;
+    const j = await send({user_id: uid, kind: tok ? 'video' : 'vestochka', video_token: tok, tekst: t}, ev.target);
+    if (j.ok) box.querySelector('.vtext').value = '';
+  });
+});
+document.querySelectorAll('.vvod').forEach(box => {
+  const uid = +box.dataset.uid;
+  box.querySelector('.show-vvod').addEventListener('click', async ev => {
+    ev.preventDefault();
+    const r = await fetch(u(`/api/english/karta/vvodnoe?user_id=${uid}&pochemu=${encodeURIComponent(box.querySelector('.pochemu').value)}`));
+    const j = await r.json();
+    const ta = box.querySelector('.vvtext'); ta.value = j.tekst || ''; ta.style.display = '';
+    box.querySelector('.send-vvod').style.display = '';
+  });
+  box.querySelector('.send-vvod').addEventListener('click', async ev => {
+    ev.preventDefault();
+    if (!confirm('Отправить родителю вводное сообщение?')) return;
+    await send({user_id: uid, kind: 'vvodnoe', tekst: box.querySelector('.vvtext').value}, ev.target);
+  });
+});
+
+// --- фильтры
 const kids = [...document.querySelectorAll('details.kid')], heads = [...document.querySelectorAll('.gh')];
-document.querySelectorAll('#flt button').forEach(b => b.addEventListener('click', () => {
+function apply(b) {
   document.querySelectorAll('#flt button').forEach(x => x.classList.remove('on')); b.classList.add('on');
   const g = b.dataset.g, p = b.dataset.p, x = b.dataset.x;
   kids.forEach(k => {
@@ -167,6 +336,8 @@ document.querySelectorAll('#flt button').forEach(b => b.addEventListener('click'
     k.style.display = show ? '' : 'none';
   });
   heads.forEach(h => { h.style.display = kids.some(k => k.dataset.grp === h.dataset.grp && k.style.display !== 'none') ? '' : 'none'; });
-}));
+}
+document.querySelectorAll('#flt button').forEach(b => b.addEventListener('click', () => apply(b)));
+apply(document.querySelector('#flt button.on'));
 </script>
 {% endblock %}

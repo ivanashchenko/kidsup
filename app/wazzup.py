@@ -135,7 +135,10 @@ def _pick(chans: list[dict], transport: str) -> dict | None:
 # Виды, которым лимит на сутки не писан: ответ живому человеку в диалоге
 # и служебные сообщения владельцу. Всё остальное — автоматика, и её
 # количество на одного человека ограничено.
-FREE_KINDS = {"reply", "digest", "owner", "apology"}
+# «pedagog» — личное сообщение педагога родителю о ребёнке (отчёт, видео,
+# весточка), отправляет человек кнопкой в карточке речи; лимит автоматики к
+# нему не относится, окно 9–20 и стоп-лист отказов — относятся.
+FREE_KINDS = {"reply", "digest", "owner", "apology", "pedagog"}
 DAY_LIMIT = 2            # автосообщений одному человеку в сутки
 # Сервисные виды: подтверждение, напоминание о пробном, догон недозвона.
 # Всё остальное — реклама, и её человеку положено не больше ОДНОЙ в день:
@@ -415,6 +418,69 @@ def send_media(phone: str, content_uri: str, transport: str = "whatsapp",
         _remember(r, transport, phone, None, kind)
     log.append(f"{transport} → {phone}: HTTP {r.status_code} {r.text[:120]}")
     return log
+
+def send_media_via(transport: str, phone: str, content_uri: str, dry_run: bool = True,
+                   sender: str | None = None, uid: str | int | None = None,
+                   kind: str = "") -> bool | None:
+    """Файл по ссылке через один канал — с теми же заслонами, что send_via:
+    выбранный номер, blocked_senders, предохранитель. send_media выше их не
+    проходит и может уйти через выведенный номер (25.09)."""
+    phone = _msisdn(phone)
+    chans = channels()
+    if sender:
+        chans = [c for c in chans if c.get("plainId") == sender] or chans
+    ch = _pick(chans, transport)
+    if not ch:
+        return False
+    banned = {x.strip() for x in
+              (db.get_setting("blocked_senders", "") or "").split(",") if x.strip()}
+    num = str(ch.get("plainId") or "")
+    if num in banned or f"{num}:{transport}" in banned:
+        return False
+    if dry_run:
+        return True
+    stop = guard(phone, content_uri, kind, transport)
+    if stop:
+        logging.getLogger("kidsup.wazzup").info("предохранитель (файл): %s → %s", phone[-4:], stop)
+        return None
+    chat_id = chat_id_for(transport, phone, uid) \
+        if transport in ("tgapi", "telegram", "max") else phone
+    if not chat_id:
+        return False
+    r = httpx.post(f"{API}/message", headers=_headers(), json={
+        "channelId": ch["channelId"], "chatType": CHAT_TYPE.get(transport, transport),
+        "chatId": chat_id, "contentUri": content_uri}, timeout=60)
+    if r.status_code in (200, 201):
+        _remember(r, transport, phone, uid, kind)
+        guard_note(phone, content_uri, kind, transport)
+    else:
+        logging.getLogger("kidsup.wazzup").warning(
+            "wazzup файл %s → %s: HTTP %s %s", transport, chat_id, r.status_code, r.text[:160])
+    return r.status_code in (200, 201)
+
+
+def send_pedagog(phone: str, texts: list[str], media: str = "",
+                 uid: str | int | None = None, dry_run: bool = True) -> list[str]:
+    """Личное сообщение от центра родителю: сначала файл (видео), потом тексты,
+    в каждый канал, положенный адресату (WhatsApp всегда, мессенджеры — при
+    живой переписке). WhatsApp — с номера переписки, не WABA и не 0077."""
+    log = []
+    for t in channels_for(phone, uid, mass=False):
+        if t == "wapi":
+            continue          # WABA вне окна пропускает только шаблоны
+        sender = (db.get_setting("chat_whatsapp", CHAT_SENDER) or CHAT_SENDER) if t == "whatsapp" else None
+        oks = []
+        if media:
+            oks.append(send_media_via(t, phone, media, dry_run=dry_run, sender=sender,
+                                      uid=uid, kind="pedagog"))
+        for tx in texts:
+            if tx and tx.strip():
+                oks.append(send_via(t, phone, tx.strip(), dry_run=dry_run, sender=sender,
+                                    uid=uid, kind="pedagog"))
+        state = "ok" if oks and all(o for o in oks) else ("стоп" if None in oks else "fail")
+        log.append(f"{t}({sender or '—'}) → {phone}: {state}")
+    return log or [f"— → {phone}: каналов нет"]
+
 
 def chat_id_for(transport: str, phone: str = "", uid: str | int | None = None) -> str:
     """Идентификатор чата для этого транспорта.
