@@ -9009,6 +9009,16 @@ def english_metodika_page():
     return HTMLResponse(f.read_text(encoding="utf-8"))
 
 
+@app.get("/podgotovka/metodika", response_class=HTMLResponse)
+def psh_metodika_page():
+    """Рабочая методика подготовки к школе — открытая ссылка для педагогов ПШ,
+    по образцу /english/metodika (25.09.2026)."""
+    f = BASE / "static" / "psh_metodika.html"
+    if not f.exists():
+        raise HTTPException(404, "страница не собрана")
+    return HTMLResponse(f.read_text(encoding="utf-8"))
+
+
 @app.get("/day", response_class=HTMLResponse)
 async def day_preview():
     """Лендинг дня открытых дверей 30.08 — для kidsupday.ru. Здесь его можно
