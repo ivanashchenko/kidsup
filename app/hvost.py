@@ -412,8 +412,8 @@ def utro(dry: bool = False) -> dict:
     with db.get_conn() as conn:
         pult._inbox_tries(conn)
         rows = conn.execute(
-            "SELECT id, day, who, text, phone FROM plan_inbox "
-            "WHERE done=0 AND day<? ORDER BY day, id", (segodnya,)).fetchall()
+            "SELECT id, day, who, text, phone, prio FROM plan_inbox "
+            "WHERE done=0 AND day<? ORDER BY day, COALESCE(prio, 250), id", (segodnya,)).fetchall()
         if not rows:
             return itog
         s_daty = min(r["day"] for r in rows)
@@ -435,6 +435,14 @@ def utro(dry: bool = False) -> dict:
                         razgovory[p] = str(ts)
         except Exception:
             pass
+        # Решение Бориса 25.09: хвост пятницы в выходные забирает одна Ира —
+        # делим его на субботу и воскресенье. Если завтра в смене тот же один
+        # человек, чужие дела CRM-уровня (prio 4xx) и всё сверх 20 в день
+        # уходят на завтра, чтобы суббота не утонула.
+        from datetime import date as _d, timedelta as _td
+        zavtra = (_d.fromisoformat(segodnya) + _td(days=1)).isoformat()
+        delit = (len(smena) == 1 and _d.fromisoformat(segodnya).weekday() == 5
+                 and [w for w in pult.duty(zavtra) if w in set(pult.SHORT.values())] == smena)
         nagruzka = {w: conn.execute(
             "SELECT COUNT(*) FROM plan_inbox WHERE done=0 AND day=? AND who=?",
             (segodnya, w)).fetchone()[0] for w in smena}
@@ -457,9 +465,12 @@ def utro(dry: bool = False) -> dict:
                                  (f" — закрыто {segodnya} утром: {'; '.join(sled)}", r["id"]))
                 continue
             novyj = kto
+            den_novyj = segodnya
             if kto in set(pult.SHORT.values()) and smena and kto not in smena:
                 novyj = min(smena, key=lambda w: nagruzka.get(w, 0))
-            if novyj in nagruzka:
+                if delit and ((r["prio"] or 0) >= 400 or nagruzka.get(novyj, 0) >= 20):
+                    den_novyj = zavtra
+            if novyj in nagruzka and den_novyj == segodnya:
                 nagruzka[novyj] += 1
             metka = "" if tekst.startswith("⏳") else f"⏳ с {den[8:10]}.{den[5:7]}: "
             if len(metka) + len(tekst) > 400:
@@ -468,7 +479,27 @@ def utro(dry: bool = False) -> dict:
             itog["по_людям"][novyj] = itog["по_людям"].get(novyj, 0) + 1
             if not dry:
                 conn.execute("UPDATE plan_inbox SET day=?, who=?, text=? WHERE id=?",
-                             (segodnya, novyj, (metka + tekst)[:400], r["id"]))
+                             (den_novyj, novyj, (metka + tekst)[:400], r["id"]))
+    # Задачи смены вчерашнего дня, которые остались у того, кого сегодня нет
+    # (решение Бориса 25.09: недоделанное Аней в пятницу — Ире на выходные).
+    # Переносим только вчерашние: старше — уже устарели, их собирает наряд.
+    if smena:
+        from datetime import date as _d2, timedelta as _td2
+        vchera = (_d2.fromisoformat(segodnya) - _td2(days=1)).isoformat()
+        with db.get_conn() as conn:
+            pult._init(conn)
+            zadachi = conn.execute("SELECT id, who, text FROM pult_tasks WHERE day=? AND done=0",
+                                   (vchera,)).fetchall()
+            for z in zadachi:
+                if z["who"] in set(pult.SHORT.values()) and z["who"] not in smena:
+                    kuda = smena[0]
+                    itog["перенесено"] += 1
+                    itog["по_людям"][kuda] = itog["по_людям"].get(kuda, 0) + 1
+                    if not dry:
+                        t = z["text"] or ""
+                        metka = "" if t.startswith("⏳") else f"⏳ с {vchera[8:10]}.{vchera[5:7]} ({z['who']}): "
+                        conn.execute("UPDATE pult_tasks SET day=?, who=?, text=? WHERE id=?",
+                                     (segodnya, kuda, (metka + t)[:600], z["id"]))
     if not dry:
         log.warning("утро пульта: закрыто %d, перенесено %d (%s)", len(itog["закрыто"]),
                     itog["перенесено"], itog["по_людям"])
