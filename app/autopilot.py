@@ -2725,6 +2725,46 @@ def _reactivated_recently(phone10: str, days: int, uid: int = 0) -> bool:
     return False
 
 
+def _reactivation_count(phone10: str, uid: int = 0) -> int:
+    """Сколько реактивационных писем семья уже получила за всё время: журнал
+    предохранителя (kind='reactivate'; до 24.09 — kind='auto' в 12:0x) и
+    старые метки по карточке. Считаем с запасом — лишнее письмо хуже."""
+    try:
+        with db.get_conn() as conn:
+            dni = {r[0] for r in conn.execute(
+                "SELECT day FROM wazzup_guard WHERE phone=? AND (kind='reactivate' "
+                "OR (kind='auto' AND substr(ts,12,4)='12:0'))", (phone10,))}
+            if uid:
+                dni |= {str(r[0])[:10] for r in conn.execute(
+                    "SELECT ts FROM autopilot_state WHERE kind='reactivate' AND key LIKE ?",
+                    (f"{uid}:w%",))}
+        return len(dni)
+    except Exception:
+        return 3
+
+
+def _reactivation_text(n: int, who: str, about: str) -> str:
+    """Три письма «думающим», каждое о своём. Цен и мест не называем — их
+    называет администратор по живым данным, когда семья ответит."""
+    if n == 0:
+        return (f"Здравствуйте! Это KidsUP на бульваре Рокоссовского. "
+                f"Вы думали про занятия{about}. Учебный год идёт с 31 августа, "
+                f"но {who} может присоединиться в любой момент. "
+                f"Чтобы место точно осталось за вами, можно прийти на первое "
+                f"занятие: оно условно-бесплатное, и на нём же бесплатная "
+                f"диагностика. Написать, какие дни и время ещё свободны?")
+    if n == 1:
+        return (f"Здравствуйте! Это снова KidsUP с бульвара Рокоссовского. "
+                f"Если с занятиями{about} не складывалось по времени — напишите, "
+                f"в какие дни и часы вам удобно, и мы подберём группу под ваш график, "
+                f"а не наоборот. Первое занятие по-прежнему условно-бесплатное: "
+                f"не понравится — платить не нужно.")
+    return (f"Здравствуйте! KidsUP, бульвар Рокоссовского. Не хотим надоедать, "
+            f"поэтому спрошу один раз: занятия{about} сейчас актуальны? "
+            f"Если да — пришлём свободные дни и время. Если нет — просто "
+            f"ответьте «не актуально», и мы больше не будем писать об этом.")
+
+
 def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
     """Одно точное сообщение «думающим», до которых давно не касались.
 
@@ -2806,20 +2846,22 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
         about = f" по {subj}" if subj else ""
         # имя — только в именительном падеже: «для Марк» читается как ошибка
         who = child or "ребёнок"
-        ok = _wa(phone,
-                 f"Здравствуйте! Это KidsUP на бульваре Рокоссовского. "
-                 f"Вы думали про занятия{about}. Учебный год идёт с 31 августа, "
-                 f"но {who} может присоединиться в любой момент. "
-                 f"Чтобы место точно осталось за вами, можно прийти на первое "
-                 f"занятие: оно условно-бесплатное, и на нём же бесплатная "
-                 f"диагностика. Написать, какие дни и время ещё свободны?",
-                 kind="reactivate")
+        # 26.09.2026, Борис: «может как-то изменять тексты каждый раз?» Одно и
+        # то же письмо дважды читается как рассылка. Поэтому три разных письма
+        # по порядку, и третье — последнее: разрешаем сказать «не актуально»,
+        # после него семье реактивация больше не приходит.
+        n_bylo = _reactivation_count(phone, uid)
+        if n_bylo >= 3:
+            continue
+        tekst = _reactivation_text(n_bylo, who, about)
+        ok = _wa(phone, tekst, kind="reactivate")
         if ok:
             try:
                 mk.post("/v1/company/userComments",
                         {"userId": uid, "showToUser": False,
-                         "comment": f"Авто-реактивация «думает»: отправлено личное "
-                                    f"сообщение{about or ' (предмет не определён)'}."})
+                         "comment": f"Авто-реактивация «думает» ({n_bylo + 1} из 3): "
+                                    f"отправлено личное сообщение"
+                                    f"{about or ' (предмет не определён)'}."})
             except Exception:
                 pass
             sent += 1
@@ -3832,15 +3874,20 @@ def discipline_check() -> dict:
 
     worse = [(r, n, prev.get(r)) for r, n in stat.items()
              if prev.get(r) is not None and n >= prev[r] and n > 0]
+    # 26.09.2026, Борис о сообщении «было 4, стало 5»: «Зачем мне это шлешь?
+    # Какая ценность?» Счётчик без имён руководителю сделать нечего. Теперь
+    # это пункт на пульт дежурной — с именами, чтобы было что исправлять.
     if worse and _mark("discipline_alert", _today().isoformat()):
-        lines = ["🤖 Клод: ошибки в CRM не исправляются второй день подряд (срез на утро).", ""]
         for rule, n, was in worse:
             title = next((t for k, t, _ in DISCIPLINE_RULES if k == rule), rule)
             why = next((w for k, _, w in DISCIPLINE_RULES if k == rule), "")
-            lines.append(f"• {title}: было {was}, стало {n} — {why}.")
-        lines += ["", "Замечание озвучено, поведение не изменилось. Нужен разбор на смене."]
-        _wa(db.get_setting("digest_phone") or "79104526673", "\n".join(lines),
-                kind="digest")
+            imena = ", ".join((u.get("name") or str(u["id"]))[:24] for u in bad[:8]) \
+                if rule == "booked_no_join" else ""
+            if not imena:
+                continue     # без имён пункт не выполнить — не шлём никому
+            inbox_add(f"CRM: {title} — {n} (вчера {was}): {imena}. Поставить каждого "
+                      f"в группу 2026/27 на дату пробного или сменить статус — {why}.",
+                      source="дисциплина CRM")
         log.warning("discipline_check: не исправлено — %s", worse)
     mk.close()
     return {"today": stat, "yesterday": prev, "worse": [w[0] for w in worse]}
@@ -3915,8 +3962,13 @@ def wazzup_watchdog() -> dict:
         with db.get_conn() as conn:
             last = conn.execute("SELECT MAX(ts) FROM wazzup_raw").fetchone()[0]
         res["last_event"] = last
-        if last and 9 <= _now().hour < 20:
-            quiet = (_now() - datetime.fromisoformat(last)).total_seconds() / 3600
+        # 26.09: в субботу в 9:02 пришло «нет событий 4 ч» — ночь посчитали
+        # тишиной. Отсчёт — не раньше начала рабочего дня (в выходные с 10:00).
+        start_h = 10 if _now().weekday() >= 5 else 9
+        if last and start_h <= _now().hour < 20:
+            nachalo = _now().replace(hour=start_h, minute=0, second=0, microsecond=0)
+            ot = max(datetime.fromisoformat(last), nachalo)
+            quiet = (_now() - ot).total_seconds() / 3600
             res["quiet_hours"] = round(quiet, 1)
             if quiet >= 4 and _mark("wz_quiet", f"{_today()}:{int(quiet)}"):
                 _wa(db.get_setting("digest_phone") or "79104526673",
@@ -3992,6 +4044,23 @@ RULE_TASK = {
 }
 
 
+def _owner_flag_new(f: dict) -> bool:
+    """Красная находка ещё не уходила руководителю. При первом запуске
+    (меток нет) всё, что уже висит, помечаем без отправки: старое Борис видел."""
+    with db.get_conn() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS autopilot_state (
+            kind TEXT, key TEXT, ts TEXT, PRIMARY KEY (kind, key))""")
+        pervyj = not conn.execute("SELECT 1 FROM autopilot_state WHERE kind IN "
+                                  "('owner_flag','owner_flag_seed') LIMIT 1").fetchone()
+    if pervyj:
+        from . import rules as _rules
+        for x in _rules.open_flags(5000):
+            _mark("owner_flag", str(x.get("id") or x.get("key")))
+        _mark("owner_flag_seed", _today().isoformat())
+        return False
+    return _mark("owner_flag", str(f.get("id") or f.get("key")))
+
+
 def rules_check() -> dict:
     """Следим, что администраторы работают по правилам посещения.
 
@@ -4035,9 +4104,13 @@ def rules_check() -> dict:
             except Exception:
                 log.warning("правила: задача для %s не поставилась", mgr)
 
-        high = [f for f in fresh if f["level"] == "high"]
+        # 26.09: одни и те же скидки от 02.09 и 05.09 приходили каждое утро.
+        # Руководителю — только новая красная находка и только один раз;
+        # полный список всегда на /pravila-kontrol.
+        high = [f for f in fresh if f["level"] == "high"
+                and _owner_flag_new(f)]
         if high:
-            lines = [f"🤖 Клод: {len(high)} нарушений правил, требующих тебя:", ""]
+            lines = [f"🤖 Клод: новые нарушения правил ({len(high)}), нужно твоё решение:", ""]
             lines += [f"• {f['title']} — {(f['detail'] or '')[:90]}" for f in high[:6]]
             lines.append("")
             lines.append("Разбор: https://app.kidsup.ru/pravila-kontrol")
@@ -4083,7 +4156,8 @@ def money_check() -> dict:
                 _task(mk, CHAT_ADMIN, items[0].get("user_id"), obrezat(body, 250))
             except Exception:
                 log.warning("деньги: задача для %s не поставилась", mgr)
-        high = [f for f in flags if f["level"] == "high"]
+        high = [f for f in flags if f["level"] == "high"
+                and _owner_flag_new(f)]
         if high:
             lines = [f"🤖 Клод: {len(high)} денежных расхождений в CRM:", ""]
             lines += [f"• {f['title']} — {(f['detail'] or '')[:80]}" for f in high[:6]]
