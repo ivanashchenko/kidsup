@@ -2696,6 +2696,35 @@ def group_fill(mk: MoyklassClient) -> list[dict]:
     return sorted(out, key=lambda x: (x["got"] / max(1, x["target"]), x["name"]))
 
 
+def _reactivated_recently(phone10: str, days: int, uid: int = 0) -> bool:
+    """Была ли реактивация на этот номер за последние days дней — по журналу
+    предохранителя (пишется только при успешной отправке) и по старым меткам."""
+    edge = (_now() - timedelta(days=days)).isoformat(timespec="seconds")
+    try:
+        with db.get_conn() as conn:
+            if conn.execute("SELECT 1 FROM wazzup_guard WHERE phone=? AND kind='reactivate' "
+                            "AND ts>=? LIMIT 1", (phone10, edge)).fetchone():
+                return True
+            if conn.execute("SELECT 1 FROM autopilot_state WHERE kind='reactivate' "
+                            "AND key LIKE ? AND ts>=? LIMIT 1",
+                            (phone10 + ":%", edge)).fetchone():
+                return True
+            # до 24.09 метка была по карточке «uid:wНЕДЕЛЯ», а отправка писалась
+            # в журнал как kind='auto' — 26.09 из-за этого 14 из 15 семей
+            # получили реактивацию повторно через 9–11 дней
+            if conn.execute("SELECT 1 FROM wazzup_guard WHERE phone=? AND kind='auto' "
+                            "AND substr(ts,12,4)='12:0' AND ts>=? LIMIT 1",
+                            (phone10, edge)).fetchone():
+                return True     # старая реактивация шла в 12:0x с kind='auto'
+            if uid and conn.execute("SELECT 1 FROM autopilot_state WHERE kind='reactivate' "
+                                    "AND key LIKE ? AND ts>=? LIMIT 1",
+                                    (f"{uid}:w%", edge)).fetchone():
+                return True
+    except Exception:
+        return True     # журнал недоступен — лучше промолчать, чем повторить
+    return False
+
+
 def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
     """Одно точное сообщение «думающим», до которых давно не касались.
 
@@ -2764,8 +2793,13 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
         if len(phone) != 10 or uid in busy_uids or phone in busy_phones:
             continue
         # одна реактивация на семью раз в три недели, а не на каждую карточку
-        # каждую неделю (24.09: вал сообщений семьям, которых обзваниваем)
-        if uid in touched or not _mark("reactivate", f"{phone}:p{_today().toordinal() // 21}"):
+        # каждую неделю (24.09: вал сообщений семьям, которых обзваниваем).
+        # 26.09: ключ-«окно» ordinal//21 не работал — окно сменилось через
+        # два дня после смены формата ключа, и семьи, получившие реактивацию
+        # 24.09, получили её снова. Смотрим на сам факт отправки за 21 день.
+        if uid in touched or _reactivated_recently(phone, 21, uid):
+            continue
+        if not _mark("reactivate", f"{phone}:{_today().isoformat()}"):
             continue
         child = _child_name(u.get("name") or "")
         subj = interest.get(uid)

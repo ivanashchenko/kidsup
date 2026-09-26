@@ -3630,7 +3630,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-25.06"
+APP_VERSION = "2026-09-26.02"
 
 
 @app.get("/api/net")
@@ -5272,8 +5272,10 @@ def zadachi_lizy_live():
 
 
 @app.get("/api/guard", dependencies=AUTH)
-def api_guard(hours: int = 24):
-    """Что предохранитель пропустил и что остановил за последние часы."""
+def api_guard(hours: int = 24, kind: str = ""):
+    """Что предохранитель пропустил и что остановил за последние часы.
+    ?kind=reactivate — ещё и список отправок этого вида с телефонами и временем
+    (26.09: без него нельзя было проверить, кому реактивация ушла повторно)."""
     from collections import Counter as _C
     from datetime import datetime as _dt, timedelta as _td
     edge = (_dt.utcnow() + _td(hours=3) - _td(hours=hours)).isoformat(timespec="seconds")
@@ -5286,7 +5288,10 @@ def api_guard(hours: int = 24):
     except Exception:
         pass
     per_phone = _C(r[0] for r in rows)
-    return {"стоп-кран": db.get_setting("messages_off", "0") == "1",
+    spisok = [{"телефон": r[0], "вид": r[1], "канал": r[2], "время": r[3]}
+              for r in rows if kind and r[1] == kind]
+    return {"список": spisok,
+            "стоп-кран": db.get_setting("messages_off", "0") == "1",
             "лимит в сутки на человека": 2,
             "отправок за период": len(rows),
             "по видам": dict(_C(r[1] for r in rows)),
