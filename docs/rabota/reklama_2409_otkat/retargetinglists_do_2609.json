@@ -1,0 +1,42 @@
+{
+ "result": {
+  "RetargetingLists": [
+   {
+    "Type": "RETARGETING",
+    "Id": 42624353,
+    "IsAvailable": "YES",
+    "Scope": "FOR_TARGETS_AND_ADJUSTMENTS",
+    "Name": "KidsUP - живут в 3 км (сегмент 59731549)",
+    "Rules": [
+     {
+      "Arguments": [
+       {
+        "MembershipLifeSpan": 540,
+        "ExternalId": 2059731549
+       }
+      ],
+      "Operator": "ANY"
+     }
+    ]
+   },
+   {
+    "Type": "RETARGETING",
+    "Id": 42624354,
+    "IsAvailable": "YES",
+    "Scope": "FOR_ADJUSTMENTS_ONLY",
+    "Name": "KidsUP - НЕ живут в 3 км - показы выключены",
+    "Rules": [
+     {
+      "Arguments": [
+       {
+        "MembershipLifeSpan": 540,
+        "ExternalId": 2059731549
+       }
+      ],
+      "Operator": "NONE"
+     }
+    ]
+   }
+  ]
+ }
+}
