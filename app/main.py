@@ -3234,6 +3234,35 @@ def api_tvoyklass_ay():
     return tvoyklass.ay_status()
 
 
+@app.get("/api/oplata/plan", dependencies=AUTH)
+def api_oplata_plan(full: int = 0):
+    """Сбор оплат за следующий месяц: кому и что уйдёт (см. app/oplata.py). Не шлёт."""
+    from . import oplata
+    p = oplata.plan()
+    if not full:
+        p["recipients"] = p["recipients"][:5]
+    return p
+
+
+@app.get("/api/oplata/diag", dependencies=AUTH)
+def api_oplata_diag():
+    from . import oplata
+    return oplata.diag()
+
+
+@app.post("/api/oplata/enqueue", dependencies=AUTH)
+def api_oplata_enqueue(payload: dict = Body(default={})):
+    """Поставить семьи в очередь ({"send": true}); отправку ведёт цикл autopilot."""
+    from . import oplata
+    return oplata.enqueue(dry=not payload.get("send"))
+
+
+@app.get("/api/oplata/status", dependencies=AUTH)
+def api_oplata_status():
+    from . import oplata
+    return oplata.status()
+
+
 @app.post("/api/tvoyklass/dosly", dependencies=AUTH)
 def api_tvoyklass_dosly(payload: dict = Body(default={})):
     """Дослать инструкцию тем, чей ответ на присланную почту не ушёл."""
@@ -3630,7 +3659,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-27.01"
+APP_VERSION = "2026-09-27.04"
 
 
 @app.get("/api/net")
@@ -3674,6 +3703,8 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             "anthropic_proxy_secret", "work_hours", "ext_by_day",
             "vk_token", "vk_group_id", "vk_ads_client_id", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "tg_bot_token", "tg_channel", "mango_ext_admins", "pedagog_key", "mk_web_login", "mk_web_password",
             "calls_parsed", "sms_on", "sms_sender_name", "lead_hook_key",
+            # сбор оплат за следующий месяц (app/oplata.py): включение и время старта
+            "oplata_on", "oplata_start",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
             "calls_done",
