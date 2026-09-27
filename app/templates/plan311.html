@@ -139,6 +139,22 @@ details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-to
 <div class="card"><ul>{% for n in d.novye_gruppy %}<li><b>{{ n.gruppa }}</b> — {{ n.interes }}. <span class="muted">Условие: {{ n.uslovie }} · кто: {{ n.kto }}</span></li>{% endfor %}</ul></div>
 {% endif %}
 
+{% if d.mery_nabora %}
+<h2>Как донабрать: полный перечень мер <small>по предметам · кто, срок, ожидаемый эффект</small></h2>
+{% for blk in d.mery_nabora %}
+<div class="card" style="margin-bottom:12px">
+  <div style="font-weight:700;font-size:17px;color:#312783;margin-bottom:4px">{{ blk.predmet }}</div>
+  {% if blk.diagnoz %}<div class="muted" style="margin-bottom:8px">{{ blk.diagnoz }}</div>{% endif %}
+  {% if blk.gruppy %}<details class="more"><summary>Решение по каждой группе ({{ blk.gruppy|length }})</summary><ul>
+    {% for g in blk.gruppy %}<li><b>{{ g.gruppa }}</b> — {{ g.reshenie }}{% if g.kandidaty %}<br><span class="muted">Кого звать: {{ g.kandidaty|join('; ') }}</span>{% endif %}</li>{% endfor %}
+  </ul></details>{% endif %}
+  <ol style="margin:8px 0 0 18px;padding:0">
+    {% for m in blk.mery %}<li style="margin-bottom:6px"><b>{{ m.mera }}</b><br><span class="muted">кто: {{ m.kto }} · ⏱ {{ m.srok }} · ▲ {{ m.effekt }}{% if m.pochemu %} · {{ m.pochemu }}{% endif %}</span></li>{% endfor %}
+  </ol>
+</div>
+{% endfor %}
+{% endif %}
+
 {% if d.po_dnyam %}
 <h2>По дням</h2>
 <div class="days2">{% for r in d.po_dnyam %}<div class="r"><div class="dn">{{ r.den }}</div><div class="cl">{{ r.cel }}</div><div>{{ r.glavnoe }}</div></div>{% endfor %}</div>
