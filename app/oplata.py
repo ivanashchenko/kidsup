@@ -166,24 +166,35 @@ def plan() -> dict:
     """Кому и что отправим. Ничего не отправляет."""
     fam: dict[str, dict] = {}
     skipped_paid = []
+    # 28.09 Борис: «ходят 259, а рассылка на 160 детей — почему?». Каждого
+    # «Учится», кто не попал в рассылку, записываем с причиной.
+    mimo: list[dict] = []
     with db.get_conn() as conn:
         subs = _subs(conn)
         rows = conn.execute(
-            "SELECT u.id, u.name, u.phone, c.id, c.name FROM joins j "
+            "SELECT u.id, u.name, u.phone, c.id, c.name, COALESCE(u.client_state_id,0) FROM joins j "
             "JOIN users u ON u.id = j.user_id JOIN classes c ON c.id = j.class_id "
             "WHERE j.status_id=? AND (c.status IS NULL OR c.status='opened') AND c.name LIKE ? "
-            "AND c.name NOT LIKE ? AND COALESCE(u.client_state_id,0) NOT IN (%s)"
-            % ",".join("?" * len(SKIP_STATES)),
-            (ST_UCHITSYA, SEASON_PREFIX + "%", "%Заявк%", *SKIP_STATES)).fetchall()
-    for uid, name, phone, cid, cls in rows:
+            "AND c.name NOT LIKE ?",
+            (ST_UCHITSYA, SEASON_PREFIX + "%", "%Заявк%")).fetchall()
+    for uid, name, phone, cid, cls, st in rows:
         s = subs.get(uid, [])
-        if not _has_current(s, cid):
-            continue
-        if _covered(s, cid):
+        why = ""
+        if st in SKIP_STATES:
+            why = "статус «не писать»"
+        elif not any((not x["cids"] or cid in x["cids"]) for x in s):
+            why = "нет оплаченного абонемента на группу"
+        elif _covered(s, cid):
             skipped_paid.append({"uid": uid, "child": name, "group": cls})
             continue
+        elif not _has_current(s, cid):
+            why = "абонемент не сентябрьский (" + ", ".join(
+                sorted({x["begin"] for x in s if not x["cids"] or cid in x["cids"]})) + ")"
         p = _p10(phone)
-        if len(p) != 10 or not p.startswith("9"):
+        if not why and (len(p) != 10 or not p.startswith("9")):
+            why = f"нет мобильного номера ({phone or 'пусто'})"
+        if why:
+            mimo.append({"uid": uid, "child": name, "group": cls.replace(SEASON_PREFIX, ""), "почему": why})
             continue
         f = fam.setdefault(p, {"phone": "7" + p, "uids": [], "kids": {}, "groups": []})
         if uid not in f["uids"]:
@@ -203,7 +214,7 @@ def plan() -> dict:
     out.sort(key=lambda f: f["kids"][0][0])
     return {"семей": len(out), "детей": sum(len(f["uids"]) for f in out),
             "уже_оплатили_следующий": len(skipped_paid), "оплатившие": skipped_paid,
-            "recipients": out}
+            "не_попали": mimo, "recipients": out}
 
 
 def diag() -> dict:
@@ -254,7 +265,7 @@ def enqueue(dry: bool = True) -> dict:
                              "VALUES (?, ?, ?, ?, ?, ?)",
                              (CAMPAIGN, f["phone"], json.dumps(f["uids"]), f["text"], f["sms"], now))
     return {"ok": True, "dry_run": dry, "queued": n,
-            **{k: v for k, v in p.items() if k not in ("recipients", "оплатившие")}}
+            **{k: v for k, v in p.items() if k not in ("recipients", "оплатившие", "не_попали")}}
 
 
 def _still_due(uids: list[int]) -> bool:
