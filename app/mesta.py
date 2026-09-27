@@ -386,3 +386,97 @@ def sostav(marker: str = "АЯ") -> dict:
                 out.append({"группа": c["name"], "id": c["id"], "детей": len(gruppa), "дети": gruppa})
     return {"предмет": marker, "групп": len(out), "детей_всего": len(deti),
             "группы": out, "дети": list(deti.values())}
+
+
+def razrez() -> dict:
+    """Поимённый разрез по каждой группе сезона, включая логопедов.
+
+    27.09 владелец: «актуализация в разрезе каждого предмета и каждой группы
+    (в том числе по логопедам): ходит (куплен абонемент) — записан на пробное
+    (указана дата пробного) — мест всего в группе». Счётчики уже есть на /mesta,
+    здесь — имена, чтобы по каждой строке можно было сразу действовать.
+
+    Ходит — статус «Учится» И оплаченный абонемент сезона на эту группу.
+    «Учится» без абонемента — отдельный столбец: это долг, а не ученик.
+    Дата пробного — ближайшая запись ребёнка на занятие этой группы начиная
+    со вчерашнего дня; если впереди записи нет — последняя прошедшая с
+    пометкой «прошла», это сигнал, что пробное надо переназначить.
+    """
+    from datetime import date as _date, timedelta as _td
+    today = _date.today()
+    since = (today - _td(days=1)).isoformat()
+    with db.get_conn() as conn:
+        cls = conn.execute("SELECT id, name, max_students FROM classes WHERE name LIKE '2627_%' "
+                           "AND (status IS NULL OR status = 'opened')").fetchall()
+        paid_idx = _paid_by_class(conn)
+
+        def trial_date(uid: int, cid: int, past_only: bool = False) -> str:
+            if not past_only:
+                r = conn.execute(
+                    "SELECT MIN(l.date) FROM lesson_records lr JOIN lessons l ON l.id=lr.lesson_id "
+                    "WHERE lr.user_id=? AND l.class_id=? AND l.date>=?", (uid, cid, since)).fetchone()
+                if r and r[0]:
+                    return r[0][:10]
+            r = conn.execute(
+                "SELECT MAX(l.date) FROM lesson_records lr JOIN lessons l ON l.id=lr.lesson_id "
+                "WHERE lr.user_id=? AND l.class_id=? AND l.date<?", (uid, cid, today.isoformat())).fetchone()
+            return (r[0][:10] + (" прошла" if not past_only else "")) if r and r[0] else ""
+
+        groups = []
+        for c in cls:
+            n = c["name"] or ""
+            if "Заявк" in n or "лагер" in n.lower() or "летн" in n.lower():
+                continue
+            rows = conn.execute(
+                "SELECT j.user_id, j.status_id, u.name FROM joins j LEFT JOIN users u ON u.id=j.user_id "
+                "WHERE j.class_id=? AND j.status_id IN (?,?,?,?)",
+                (c["id"], ST_UCHITSYA, *ST_ZAPISAN, ST_BYL)).fetchall()
+            paid = paid_idx.get(c["id"], set())
+            hodit, dolg, prob, byl = [], [], [], []
+            for r in rows:
+                nm = r["name"] or f"№{r['user_id']}"
+                if r["status_id"] == ST_UCHITSYA:
+                    (hodit if r["user_id"] in paid else dolg).append(nm)
+                elif r["status_id"] == ST_BYL:
+                    byl.append({"имя": nm, "дата": trial_date(r["user_id"], c["id"], past_only=True)})
+                else:
+                    prob.append({"имя": nm, "дата": trial_date(r["user_id"], c["id"])})
+            short = re.sub(r"^2627_", "", n)
+            cap = c["max_students"] or (1 if short.startswith("ЛГ") else 8)
+            for k, v in CAP_OVERRIDE.items():
+                if short.startswith(k):
+                    cap = v
+            prob.sort(key=lambda x: x["дата"] or "9999")
+            zanyato = len(hodit) + len(dolg) + len(prob) + len(byl)
+            groups.append({
+                "id": c["id"], "name": short, "предмет": _subject(short), "мест": cap,
+                "ходит": sorted(hodit), "без_оплаты": sorted(dolg), "пробное": prob,
+                "были": sorted(byl, key=lambda x: x["дата"]),
+                "свободно": max(cap - zanyato, 0), "перебор": max(zanyato - cap, 0),
+                "пометка": next((v for k, v in {**MERGE, **WAITLIST, **HOLD}.items() if k in n), ""),
+            })
+
+    def key(g):
+        for i, p in enumerate(ORDER + ("ЛГ",)):
+            if g["name"].startswith(p) or p in g["name"][:12]:
+                return (i, g["name"])
+        return (len(ORDER) + 1, g["name"])
+    groups.sort(key=key)
+    # логопед Марина и логопед Елена — отдельными «предметами», у них разные графики
+    for g in groups:
+        if g["name"].startswith("ЛГ"):
+            g["предмет"] = "Логопед " + g["name"].split("_")[0].replace("ЛГ", "").strip()
+    predmety: dict[str, dict] = {}
+    for g in groups:
+        p = predmety.setdefault(g["предмет"], {"групп": 0, "мест": 0, "ходит": 0, "без_оплаты": 0,
+                                               "пробное": 0, "были": 0, "свободно": 0, "группы": []})
+        p["групп"] += 1
+        p["мест"] += g["мест"]
+        for f in ("ходит", "без_оплаты", "пробное", "были"):
+            p[f] += len(g[f])
+        p["свободно"] += g["свободно"]
+        p["группы"].append(g)
+    itogo = {f: sum(p[f] for p in predmety.values())
+             for f in ("групп", "мест", "ходит", "без_оплаты", "пробное", "были", "свободно")}
+    return {"предметы": predmety, "итого": itogo, "сегодня": today.isoformat(),
+            "обновлено": db.get_state("last_light_sync") or db.get_state("last_sync") or ""}

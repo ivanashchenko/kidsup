@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Состав групп — KidsUP{% endblock %}
+{% block content %}
+<style>
+  .sv-sum{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 18px}
+  .sv-pill{background:#eef0fb;border-radius:8px;padding:6px 10px;font-size:14px}
+  .sv-pill b{font-size:18px;color:#312783;margin-right:4px}
+  .sv table{width:100%;border-collapse:collapse;font-size:13px}
+  .sv th{position:sticky;top:0;background:#312783;color:#fff;text-align:left;padding:6px;font-weight:600}
+  .sv td{vertical-align:top;padding:6px;border-bottom:1px solid #e3e4ef}
+  .sv .n{font-weight:700;font-size:15px;color:#312783;margin-right:4px}
+  .sv .who{color:#3b3950;line-height:1.45}
+  .sv .dolg .n{color:#E30613}
+  .sv .dt{color:#1DA7E0;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .sv .old{color:#E30613}
+  .sv .free{font-weight:700;font-size:16px}
+  .sv .full{color:#E30613}
+  .sv .ok{color:#4e8a12}
+  .sv .note{color:#8a7a00;font-size:12px;margin-top:3px}
+  .sv h2{margin:26px 0 4px}
+  .sv .ph{color:#6c6a86;font-size:13px}
+  .sv .grp{font-weight:600;min-width:180px}
+  details.sv-leg{margin:6px 0 12px;color:#6c6a86;font-size:13px}
+</style>
+<div class="sv">
+<h1>Состав групп по предметам</h1>
+<p class="muted">На {{ r.сегодня }}; данные CRM, синхронизация каждые 5 минут (последняя: {{ r.обновлено[:16].replace('T',' ') }}).</p>
+<details class="sv-leg"><summary>Как считается</summary>
+<b>Ходит</b> — статус записи «Учится» и оплаченный абонемент сезона именно на эту группу.
+<b>Учится без оплаты</b> — «Учится», а абонемента на группу нет: долг или не оформлена оплата.
+<b>Пробное</b> — «Записался на пробное» / «Подтвердил заявку»; дата — ближайшая запись на занятие этой группы,
+красным «прошла» — записи впереди нет, пробное надо переназначить.
+<b>Были на пробном</b> — пришли, абонемент не купили (дата пробного).
+<b>Свободно</b> — мест в группе минус все эти дети. У логопедов «мест» — число слотов в карточке группы CRM.
+</details>
+<div class="sv-sum">
+  <span class="sv-pill"><b>{{ r.итого.ходит }}</b>ходят (оплачено)</span>
+  <span class="sv-pill"><b style="color:#E30613">{{ r.итого.без_оплаты }}</b>учатся без оплаты</span>
+  <span class="sv-pill"><b>{{ r.итого.пробное }}</b>записаны на пробное</span>
+  <span class="sv-pill"><b>{{ r.итого.были }}</b>были на пробном</span>
+  <span class="sv-pill"><b>{{ r.итого.мест }}</b>мест в {{ r.итого.групп }} группах</span>
+  <span class="sv-pill"><b>{{ r.итого.свободно }}</b>свободно</span>
+</div>
+<div class="scroll"><table>
+<tr><th>Предмет</th><th>групп</th><th>мест</th><th>ходят</th><th>без оплаты</th><th>пробное</th><th>были</th><th>свободно</th></tr>
+{% for name, p in r.предметы.items() %}
+<tr><td><a href="#p{{ loop.index }}"><b>{{ name }}</b></a></td><td>{{ p.групп }}</td><td>{{ p.мест }}</td><td><b>{{ p.ходит }}</b></td>
+<td style="color:{{ '#E30613' if p.без_оплаты else '#6c6a86' }}">{{ p.без_оплаты }}</td><td>{{ p.пробное }}</td><td>{{ p.были }}</td>
+<td class="free {{ 'ok' if p.свободно < 4 else '' }}">{{ p.свободно }}</td></tr>
+{% endfor %}
+</table></div>
+
+{% for name, p in r.предметы.items() %}
+<h2 id="p{{ loop.index }}">{{ name }}</h2>
+<div class="ph">{{ p.групп }} групп · мест {{ p.мест }} · ходят {{ p.ходит }} · без оплаты {{ p.без_оплаты }} · пробное {{ p.пробное }} · были {{ p.были }} · свободно {{ p.свободно }}</div>
+<div class="scroll"><table>
+<tr><th>Группа</th><th>Мест</th><th>Ходит (абонемент)</th><th>Учится без оплаты</th><th>Записан на пробное (дата)</th><th>Был на пробном</th><th>Свободно</th></tr>
+{% for g in p.группы %}
+<tr>
+<td class="grp">{{ g.name }}{% if g.пометка %}<div class="note">{{ g.пометка }}</div>{% endif %}</td>
+<td>{{ g.мест }}</td>
+<td><span class="n">{{ g.ходит|length }}</span><span class="who">{{ g.ходит|join(', ') }}</span></td>
+<td class="dolg">{% if g.без_оплаты %}<span class="n">{{ g.без_оплаты|length }}</span><span class="who">{{ g.без_оплаты|join(', ') }}</span>{% else %}—{% endif %}</td>
+<td>{% if g.пробное %}<span class="n">{{ g.пробное|length }}</span>{% for x in g.пробное %}<div class="who">{{ x.имя }} <span class="dt {{ 'old' if 'прошла' in x.дата or not x.дата else '' }}">{{ x.дата[8:10] ~ '.' ~ x.дата[5:7] if x.дата else 'без даты' }}{{ ' прошла' if 'прошла' in x.дата else '' }}</span></div>{% endfor %}{% else %}—{% endif %}</td>
+<td>{% if g.были %}<span class="n">{{ g.были|length }}</span>{% for x in g.были %}<div class="who">{{ x.имя }} <span class="dt">{{ x.дата[8:10] ~ '.' ~ x.дата[5:7] if x.дата else '' }}</span></div>{% endfor %}{% else %}—{% endif %}</td>
+<td class="free {{ 'full' if g.перебор else ('ok' if g.свободно < 2 else '') }}">{% if g.перебор %}+{{ g.перебор }} сверх{% else %}{{ g.свободно }}{% endif %}</td>
+</tr>
+{% endfor %}
+</table></div>
+{% endfor %}
+</div>
+{% endblock %}

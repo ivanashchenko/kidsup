@@ -3659,7 +3659,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-27.04"
+APP_VERSION = "2026-09-27.05"
 
 
 @app.get("/api/net")
@@ -8406,6 +8406,19 @@ def api_mesta_voronka_refresh(bg: int = 1):
         return voronka.refresh_comments(mk)
     finally:
         mk.close()
+
+
+@app.get("/mesta/sostav", response_class=HTMLResponse, dependencies=AUTH)
+def mesta_sostav_page(request: Request):
+    """Поимённо по каждой группе и логопеду: ходит (абонемент) — пробное с датой — мест всего."""
+    from . import mesta
+    return render(request, "sostav.html", active="mesta", r=mesta.razrez())
+
+
+@app.get("/api/mesta/razrez", dependencies=AUTH)
+def api_mesta_razrez():
+    from . import mesta
+    return mesta.razrez()
 
 
 @app.get("/api/mesta", dependencies=AUTH)
