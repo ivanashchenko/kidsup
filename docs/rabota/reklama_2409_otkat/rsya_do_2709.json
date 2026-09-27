@@ -1,0 +1,223 @@
+{
+ "c": {
+  "result": {
+   "Campaigns": [
+    {
+     "Id": 714182578,
+     "Name": "KidsUP · РСЯ: район и интересы · Сети",
+     "Status": "ACCEPTED",
+     "State": "SUSPENDED",
+     "DailyBudget": null,
+     "TextCampaign": {
+      "BiddingStrategy": {
+       "Search": {
+        "BiddingStrategyType": "SERVING_OFF"
+       },
+       "Network": {
+        "BiddingStrategyType": "WB_MAXIMUM_CLICKS",
+        "WbMaximumClicks": {
+         "WeeklySpendLimit": 2000000000,
+         "BudgetType": "WEEKLY_BUDGET",
+         "BidCeiling": 20000000
+        }
+       }
+      },
+      "Settings": [
+       {
+        "Option": "ADD_METRICA_TAG",
+        "Value": "YES"
+       },
+       {
+        "Option": "ADD_OPENSTAT_TAG",
+        "Value": "NO"
+       },
+       {
+        "Option": "ADD_TO_FAVORITES",
+        "Value": "NO"
+       },
+       {
+        "Option": "CAMPAIGN_EXACT_PHRASE_MATCHING_ENABLED",
+        "Value": "NO"
+       },
+       {
+        "Option": "DAILY_BUDGET_ALLOWED",
+        "Value": "YES"
+       },
+       {
+        "Option": "ENABLE_AREA_OF_INTEREST_TARGETING",
+        "Value": "YES"
+       },
+       {
+        "Option": "ENABLE_COMPANY_INFO",
+        "Value": "YES"
+       },
+       {
+        "Option": "ENABLE_EXTENDED_AD_TITLE",
+        "Value": "YES"
+       },
+       {
+        "Option": "ENABLE_SITE_MONITORING",
+        "Value": "YES"
+       },
+       {
+        "Option": "EXCLUDE_PAUSED_COMPETING_ADS",
+        "Value": "NO"
+       },
+       {
+        "Option": "MAINTAIN_NETWORK_CPC",
+        "Value": "NO"
+       },
+       {
+        "Option": "REQUIRE_SERVICING",
+        "Value": "NO"
+       },
+       {
+        "Option": "SHARED_ACCOUNT_ENABLED",
+        "Value": "YES"
+       },
+       {
+        "Option": "ALTERNATIVE_TEXTS_ENABLED",
+        "Value": "YES"
+       }
+      ]
+     }
+    }
+   ]
+  }
+ },
+ "g": {
+  "result": {
+   "AdGroups": [
+    {
+     "Id": 5796139006,
+     "Name": "РСЯ · родители района",
+     "Status": "ACCEPTED",
+     "ServingStatus": "ELIGIBLE",
+     "RegionIds": [
+      213
+     ]
+    }
+   ]
+  }
+ },
+ "k": {
+  "result": {
+   "Keywords": [
+    {
+     "Id": 57997694105,
+     "Keyword": "детский центр богородское",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 57997694106,
+     "Keyword": "подготовка к школе",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 57997694107,
+     "Keyword": "английский для детей",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 57997694108,
+     "Keyword": "развивающие занятия для детей",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 57997694109,
+     "Keyword": "детский сад неполного дня",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 57997694110,
+     "Keyword": "логопед для ребенка",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 57997694111,
+     "Keyword": "шахматы для детей",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 57997694112,
+     "Keyword": "робототехника для детей",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 57997694113,
+     "Keyword": "кружки для детей рядом",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 57997694114,
+     "Keyword": "чем занять ребенка после сада",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 205796139006,
+     "Keyword": "---autotargeting",
+     "AdGroupId": 5796139006,
+     "State": "SUSPENDED"
+    }
+   ]
+  }
+ },
+ "a": {
+  "result": {
+   "AudienceTargets": [
+    {
+     "Id": 107809523,
+     "AdGroupId": 5796139006,
+     "RetargetingListId": 42309530,
+     "State": "ON"
+    },
+    {
+     "Id": 107813642,
+     "AdGroupId": 5796139006,
+     "RetargetingListId": 42312056,
+     "State": "ON"
+    },
+    {
+     "Id": 107813643,
+     "AdGroupId": 5796139006,
+     "RetargetingListId": 42312057,
+     "State": "ON"
+    },
+    {
+     "Id": 108019488,
+     "AdGroupId": 5796139006,
+     "RetargetingListId": 42410689,
+     "State": "SUSPENDED"
+    },
+    {
+     "Id": 108019595,
+     "AdGroupId": 5796139006,
+     "RetargetingListId": 42312058,
+     "State": "ON"
+    },
+    {
+     "Id": 108025341,
+     "AdGroupId": 5796139006,
+     "RetargetingListId": 42412804,
+     "State": "ON"
+    },
+    {
+     "Id": 108025342,
+     "AdGroupId": 5796139006,
+     "RetargetingListId": 42412805,
+     "State": "ON"
+    }
+   ]
+  }
+ }
+}
