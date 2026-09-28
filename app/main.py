@@ -3744,7 +3744,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-28.28"
+APP_VERSION = "2026-09-28.29"
 
 
 @app.get("/api/net")
@@ -8797,6 +8797,23 @@ def api_rassylka_tochechnaya(payload: dict = Body(...)):
     return aychat.send(payload.get("items") or [], str(payload.get("kind") or "razovoe"),
                        bool(payload.get("dry_run", True)), bool(payload.get("sms")),
                        int(payload.get("limit") or 30))
+
+
+@app.post("/api/rassylka/otlozhit", dependencies=AUTH)
+def api_rassylka_otlozhit(payload: dict = Body(...)):
+    """Разовые сообщения на потом: {"items":[{"phone","text","sms"}], "due":"YYYY-MM-DDTHH:MM", "kind", "sms"}."""
+    from . import aychat
+    due = str(payload.get("due") or "")
+    if not re.match(r"^\d{4}-\d\d-\d\dT\d\d:\d\d$", due):
+        raise HTTPException(400, "due — YYYY-MM-DDTHH:MM (Москва)")
+    return aychat.otlozhit(payload.get("items") or [], due, str(payload.get("kind") or "razovoe"),
+                           bool(payload.get("sms")))
+
+
+@app.get("/api/rassylka/otlozhit", dependencies=AUTH)
+def api_rassylka_otlozhit_status():
+    from . import aychat
+    return aychat.otlozh_status()
 
 
 @app.get("/api/mango/diag", dependencies=AUTH)

@@ -5023,6 +5023,14 @@ def _loop() -> None:
                         log.info("сбор оплат: %s", r.get("phone", "")[-4:])
                 except Exception:
                     log.exception("сбор оплат упал — продолжаем")
+                # 28.09: отложенные разовые сообщения (aychat.otlozhit) — в свой срок
+                try:
+                    from . import aychat
+                    r = aychat.otlozh_tick()
+                    if r:
+                        log.info("отложенное: %s", r)
+                except Exception:
+                    log.exception("отложенные сообщения упали — продолжаем")
                 # 28.09: сообщения базе 2024/25 порциями (vozvrat_msg_*), с 30.09
                 try:
                     from . import vozvrat
