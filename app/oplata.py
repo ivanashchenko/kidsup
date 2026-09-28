@@ -44,6 +44,7 @@ SEASON_PREFIX = "2627_"
 ST_UCHITSYA = 2
 CUR_FROM, CUR_TO = "2026-08-20", "2026-10-01"   # «абонемент за сентябрь»: начало в этом окне
 NEXT_FROM = "2026-10-01"                         # абонемент следующего месяца
+NEXT_TO = "2026-11-01"                           # первый день после следующего месяца
 SOLD_AFTER = "2026-09-21"                        # куплен в последнюю неделю — считаем за октябрь
 START_AT = "2026-09-28T10:00"                    # решение владельца: «завтра с утра»
 # 28.09 Борис: семьям — «до 1 октября», внутренний крайний срок остаётся 5 октября
@@ -146,14 +147,40 @@ def _subs(conn) -> dict[int, list[dict]]:
     return out
 
 
+_UROKI: dict[int, list[str]] = {}
+
+
+def _uroki(cid: int) -> list[str]:
+    """Даты занятий группы (из синхронизированного расписания), с кэшем на прогон."""
+    if cid not in _UROKI:
+        with db.get_conn() as conn:
+            _UROKI[cid] = sorted({r[0] for r in conn.execute(
+                "SELECT date FROM lessons WHERE class_id=? AND date>=? AND date<?",
+                (cid, CUR_FROM, NEXT_TO))})
+    return _UROKI[cid]
+
+
 def _covered(subs: list[dict], cid: int) -> bool:
-    """Следующий месяц уже оплачен по этой группе."""
+    """Следующий месяц уже оплачен по этой группе.
+
+    28.09: семьи, пришедшие в середине сентября, покупали абонемент «с хвостом»
+    (Макарова: 6 занятий МА с 20.09 — это все воскресенья октября; Козловский —
+    годовой абонемент на 73 занятия), а рассылка просила их оплатить октябрь.
+    Теперь считаем остаток: занятий в абонементе минус занятия группы от его
+    начала до конца месяца. Остатка хватает на весь следующий месяц — оплачено."""
     for s in subs:
         if s["cids"] and cid not in s["cids"]:
             continue
         if s["begin"] >= NEXT_FROM:
             return True
         if s["sold"] >= SOLD_AFTER and s["begin"] >= SOLD_AFTER:
+            return True
+        if s["end"] and s["end"] < NEXT_FROM:
+            continue
+        d = _uroki(cid)
+        do = sum(1 for x in d if s["begin"] <= x < NEXT_FROM)
+        sled = sum(1 for x in d if NEXT_FROM <= x < NEXT_TO)
+        if sled and (s["total"] or 0) - do >= sled:
             return True
     return False
 
@@ -165,6 +192,7 @@ def _has_current(subs: list[dict], cid: int) -> bool:
 
 def plan() -> dict:
     """Кому и что отправим. Ничего не отправляет."""
+    _UROKI.clear()
     fam: dict[str, dict] = {}
     skipped_paid = []
     # 28.09 Борис: «ходят 259, а рассылка на 160 детей — почему?». Каждого
