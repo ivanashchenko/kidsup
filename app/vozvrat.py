@@ -505,6 +505,19 @@ def _tekst(r: dict) -> str:
     return (head + tail)[:600]
 
 
+def _kvoty(kto: list[str], n: int) -> dict[str, int]:
+    """Сколько звонков каждому в смене. 28.09 Борис: «Ане по 50 — она быстро
+    прозванивает». Фиксированные порции — настройка vozvrat_kvota («Аня:50»);
+    остальным — поровну из vozvrat_v_den (24 на двоих, 14 одному)."""
+    kv: dict[str, int] = {}
+    for part in (db.get_setting("vozvrat_kvota", "Аня:50") or "").split(","):
+        k, _, v = part.partition(":")
+        if k.strip() and v.strip().isdigit():
+            kv[k.strip()] = int(v)
+    dolya = -(-n // max(1, len(kto)))
+    return {k: kv.get(k, dolya) for k in kto}
+
+
 def razdat(day: str = "", dry: bool = False, v_den: int = 0) -> dict:
     """Положить в инбокс дежурным порцию звонков на день."""
     from .autopilot import inbox_add
@@ -513,6 +526,7 @@ def razdat(day: str = "", dry: bool = False, v_den: int = 0) -> dict:
     kto = _kto(day)
     if len(kto) == 1:
         n = min(n, 14)                       # один человек в смене — половина порции
+    kvoty = _kvoty(kto, n)
     S = spiski()
     # уже висящие открытые пункты по этим телефонам — не дублируем
     with db.get_conn() as conn:
@@ -522,37 +536,42 @@ def razdat(day: str = "", dry: bool = False, v_den: int = 0) -> dict:
                 ((date.today() - timedelta(days=7)).isoformat(),))}
         except Exception:
             est = set()
-    doli = [("думает", int(n * 0.55)), ("недозвон", int(n * 0.25)), ("база2425", n)]
-    vybor, zanyato = [], set(est)
-    for vid, lim in doli:
-        for r in S[vid]:
-            if len(vybor) >= n or sum(1 for x in vybor if x["вид"] == r["вид"]) >= lim:
-                break
+    zanyato = set(est)
+    pul = {"думает": list(S["думает"]),
+           # гигиену статусов раздаём отдельным пунктом, не звонком
+           "недозвон": [r for r in S["недозвон"] if not r["действие"].startswith("гигиена")],
+           "база2425": list(S["база2425"])}
+
+    def vzyat(vid: str, skolko: int, kuda: list) -> None:
+        while skolko > 0 and pul[vid]:
+            r = pul[vid].pop(0)
             p = _p10(r["телефон"])
             if p in zanyato:
                 continue
-            if vid == "недозвон" and r["действие"].startswith("гигиена"):
-                continue                     # гигиену статусов раздаём отдельным пунктом, не звонком
             zanyato.add(p)
-            vybor.append(r)
-    # «Думает» — это дожим после разговора, роль Лены; звонки «недозвон» и база —
-    # дежурным. Поровну по людям, в смене одна — всё ей.
-    polozheno = Counter()
-    per = -(-len(vybor) // max(1, len(kto)))
-    drugie = [k for k in kto if k != "Лена"] or kto
-    schet = Counter()
-    for r in vybor:
-        if r["вид"] == "думает" and "Лена" in kto and schet["Лена"] < per:
-            who = "Лена"
+            kuda.append(r)
+            skolko -= 1
+
+    # «Думает» — дожим после разговора, роль Лены; «недозвон» и база —
+    # дежурным. Лены в смене нет — «думает» делят остальные.
+    polozheno, vybor = Counter(), []
+    for who in sorted(kto, key=lambda k: k != "Лена"):
+        q, moi = kvoty[who], []
+        if who == "Лена":
+            poryadok = [("думает", q), ("недозвон", q), ("база2425", q)]
+        elif "Лена" in kto:
+            poryadok = [("недозвон", q // 2), ("база2425", q), ("недозвон", q), ("думает", q)]
         else:
-            who = min(drugie, key=lambda k: schet[k])
-            if schet[who] >= per and "Лена" in kto and schet["Лена"] < per:
-                who = "Лена"
-        schet[who] += 1
-        if not dry:
-            inbox_add(_tekst(r), phone=r["телефон"], who=who, source=f"возврат: {r['вид']}")
-        polozheno[f"{who}: {r['вид']}"] += 1
-    return {"ok": True, "день": day, "кому": kto, "в_день": n, "положено": dict(polozheno),
+            poryadok = [("думает", int(q * 0.4)), ("недозвон", q // 3), ("база2425", q),
+                        ("недозвон", q), ("думает", q)]
+        for vid, lim in poryadok:
+            vzyat(vid, min(lim, q - len(moi)), moi)
+        for r in moi:
+            if not dry:
+                inbox_add(_tekst(r), phone=r["телефон"], who=who, source=f"возврат: {r['вид']}")
+            polozheno[f"{who}: {r['вид']}"] += 1
+        vybor += moi
+    return {"ok": True, "день": day, "кому": kto, "квоты": kvoty, "положено": dict(polozheno),
             "очередь": {k: len(S[k]) for k in ("думает", "недозвон", "база2425")},
             "dry_run": dry, "пример": _tekst(vybor[0]) if vybor else ""}
 
@@ -588,8 +607,10 @@ def soobshchenie(r: dict) -> tuple[str, str]:
         abzac = f"В этом сезоне {dlya}есть место в группе: {_programma(o)}{kogda}. {probn}\n\n"
     kogo = _accusative(imya) if imya else "ребёнка"
     tekst = ("Здравствуйте! Это KidsUP на бульваре Рокоссовского 🌿\n\n"
-             "Мы несколько раз вам звонили, но не застали — поэтому пишем. "
-             "Вы уже занимались у нас, и мы будем рады видеть вас снова.\n\n"
+             + ("Мы несколько раз вам звонили" if r.get("попыток", 3) >= 2 else "Мы вам звонили")
+             + ", но не застали — поэтому пишем. "
+             + ("Вы уже занимались у нас, и мы будем рады видеть вас снова.\n\n" if r.get("занятий")
+                else "Вы интересовались занятиями у нас.\n\n")
              + abzac
              + f"Записать {kogo} на первое занятие? Если удобнее другое время или предмет — "
                "напишите, подберём 💛")
@@ -646,6 +667,10 @@ def _mq(conn) -> None:
     conn.execute("""CREATE TABLE IF NOT EXISTS vozvrat_msg (
         phone TEXT PRIMARY KEY, created TEXT, status TEXT DEFAULT 'pending',
         sent TEXT, tried TEXT DEFAULT '', ord INTEGER)""")
+    try:
+        conn.execute("ALTER TABLE vozvrat_msg ADD COLUMN vid TEXT DEFAULT 'база2425'")
+    except Exception:
+        pass
 
 
 def soobshchenie_baza(r: dict) -> tuple[str, str]:
@@ -693,36 +718,108 @@ def soobshchenie_baza(r: dict) -> tuple[str, str]:
     return tekst, sms[:300]
 
 
-def msg_enqueue(dry: bool = True) -> dict:
+def soobshchenie_dumaet(r: dict) -> tuple[str, str]:
+    """«Думает» 7+ дней без живого контакта: напомнить о себе конкретной группой и датой."""
+    from .autopilot import _accusative, _child_name, _genitive
+    imena = {d["uid"]: (_child_name(d["имя"]) or "") for d in r["дети"]}
+    o = (r.get("предложение") or [None])[0]
+    imya = ""
+    if o:
+        imya = next((imena[d["uid"]] for d in r["дети"]
+                     if imena.get(d["uid"]) and (not o.get("для") or o["для"] in d["имя"])), "")
+    tekst = ("Здравствуйте! Это KidsUP на бульваре Рокоссовского 🌿\n\n"
+             f"Вы думали о занятиях {'для ' + _genitive(imya) + ' ' if imya else ''}в этом сезоне — "
+             "напоминаем о себе.\n\n")
+    if o:
+        kogda = (" — ближайшие занятия " + " и ".join(o["даты"])) if o["даты"] else ""
+        probn = (f"Пробное занятие — {PLATNOE[o['предмет']]}, при покупке абонемента идёт в зачёт."
+                 if o["предмет"] in PLATNOE else
+                 "Первое занятие условно-бесплатное: не понравится — платить не нужно.")
+        tekst += f"В группе есть место: {_programma(o)}{kogda}. {probn}\n\n"
+        tekst += (f"Записать {_accusative(imya) if imya else 'ребёнка'} на первое занятие? "
+                  "Если остались вопросы по расписанию, цене или программе — напишите, всё расскажем 💛")
+    else:
+        tekst += ("Подскажите, сколько сейчас лет ребёнку и что интересно — подберём группу "
+                  "и пришлём расписание 💛")
+    tekst += "\n\nЕсли уже не актуально — просто напишите, больше не побеспокоим."
+    if o:
+        sms = (f"KidsUP: {'для ' + _genitive(imya) + ' есть' if imya else 'есть'} место: {_programma(o)}"
+               + (f", {o['даты'][0]}" if o["даты"] else "") + ". "
+               + (f"Пробное {PLATNOE[o['предмет']]}, в зачёт. " if o["предмет"] in PLATNOE
+                  else "Первое занятие условно-бесплатное. ")
+               + "Запись: 84951209024")
+    else:
+        sms = "KidsUP: напоминаем о себе — подберём группу по возрасту. Запись: 84951209024"
+    return tekst, sms[:300]
+
+
+# 28.09 Борис: «3 очереди — давай рассылку по всем (мессенджер + СМС)».
+# Одна очередь vozvrat_msg на все три списка: сначала «думает», потом
+# «недозвон», потом база 2024/25. Текст — свой для каждого вида.
+VIDY_MSG = {"думает": 0, "недозвон": 10000, "база2425": 20000}
+PISALI_DNEY = 5          # писали рекламное за 5 дней — отложить семью в конец
+
+
+def _tekst_msg(r: dict, vid: str) -> tuple[str, str]:
+    if vid == "думает":
+        return soobshchenie_dumaet(r)
+    if vid == "недозвон":
+        return soobshchenie(r)
+    return soobshchenie_baza(r)
+
+
+def _nedavno_pisali(phone: str) -> bool:
+    from .autopilot import _now
+    try:
+        with db.get_conn() as conn:
+            return bool(conn.execute(
+                "SELECT 1 FROM wazzup_guard WHERE phone=? AND ts>=? AND (kind IN "
+                "('reactivate','promo','opros','ay_chat','razovoe') OR kind LIKE 'bc:%') LIMIT 1",
+                (_p10(phone), (_now() - timedelta(days=PISALI_DNEY)).isoformat())).fetchone())
+    except Exception:
+        return False
+
+
+def msg_enqueue(dry: bool = True, vidy: tuple = ("думает", "недозвон", "база2425")) -> dict:
     S = spiski()
     from .autopilot import _now
     now = _now().isoformat(timespec="seconds")
-    n = 0
+    n = Counter()
     with db.get_conn() as conn:
         _mq(conn)
+        if not dry:   # строки базы из первой очереди (до 28.09) — в хвост, за «думает» и «недозвон»
+            conn.execute("UPDATE vozvrat_msg SET vid='база2425', ord=ord+20000 WHERE ord<20000 "
+                         "AND COALESCE(vid,'база2425')='база2425'")
         est = {r[0] for r in conn.execute("SELECT phone FROM vozvrat_msg")}
-        for i, r in enumerate(S["база2425"]):
-            if r["телефон"] in est:
-                continue
-            n += 1
-            if not dry:
-                conn.execute("INSERT INTO vozvrat_msg (phone, created, ord) VALUES (?,?,?)",
-                             (r["телефон"], now, i))
-    return {"ok": True, "dry_run": dry, "в_очередь": n, "всего_в_базе": len(S["база2425"])}
+        for vid in vidy:
+            for i, r in enumerate(S[vid]):
+                if r["телефон"] in est:
+                    continue
+                if vid == "недозвон" and not (r["действие"].startswith("попытка") or r["действие"].startswith("уже")
+                                              or r["действие"].startswith("3 попытки без ответа")):
+                    continue          # «разговор был» и «сообщение уже было» — не пишем
+                est.add(r["телефон"])
+                n[vid] += 1
+                if not dry:
+                    conn.execute("INSERT INTO vozvrat_msg (phone, created, ord, vid) VALUES (?,?,?,?)",
+                                 (r["телефон"], now, VIDY_MSG[vid] + i, vid))
+    return {"ok": True, "dry_run": dry, "в_очередь": dict(n),
+            "в_списках": {k: len(S[k]) for k in vidy}}
 
 
-def msg_preview(n: int = 5) -> list[dict]:
+def msg_preview(n: int = 5, vid: str = "база2425") -> list[dict]:
     S = spiski()
     out = []
-    for r in S["база2425"][:n]:
-        t, sms = soobshchenie_baza(r)
+    for r in S[vid][:n]:
+        t, sms = _tekst_msg(r, vid)
         out.append({"телефон": r["телефон"], "дети": [d["имя"] for d in r["дети"]],
                     "платил": r["платил"], "текст": t, "смс": sms if r["платил"] else "—"})
     return out
 
 
 def msg_tick() -> dict | None:
-    """Из минутного цикла: одна семья раз в 12–18 минут, до vozvrat_msg_v_den в день."""
+    """Из минутного цикла: одна семья за раз, до vozvrat_msg_v_den в день (10:00–19:00),
+    интервал подстраивается под дневной лимит."""
     import random
     if db.get_setting("vozvrat_msg_on", "0") != "1":
         return None
@@ -740,21 +837,26 @@ def msg_tick() -> dict | None:
         _mq(conn)
         if conn.execute("SELECT COUNT(*) FROM vozvrat_msg WHERE sent LIKE ?", (day + "%",)).fetchone()[0] >= lim:
             return None
-        rows = conn.execute("SELECT phone FROM vozvrat_msg WHERE status='pending' ORDER BY ord LIMIT 20").fetchall()
+        rows = conn.execute("SELECT phone, COALESCE(vid,'база2425') FROM vozvrat_msg "
+                            "WHERE status='pending' ORDER BY ord LIMIT 20").fetchall()
     if not rows:
         return None
     S = _spiski_kesh()
-    po_tel = {r["телефон"]: r for r in S["база2425"]}
     from . import aychat
-    for (phone,) in rows:
-        r = po_tel.get(phone)
+    for phone, vid in rows:
+        r = next((x for x in S.get(vid, []) if x["телефон"] == phone), None)
         if not r:
             # за это время семья вернулась, с ней поговорили или стоит «не писать»
             with db.get_conn() as conn:
-                conn.execute("UPDATE vozvrat_msg SET status='skip', tried=tried||'не в базе на момент отправки;' "
+                conn.execute("UPDATE vozvrat_msg SET status='skip', tried=tried||'не в списке на момент отправки;' "
                              "WHERE phone=?", (phone,))
             continue
-        tekst, sms = soobshchenie_baza(r)
+        if _nedavno_pisali(phone):
+            with db.get_conn() as conn:   # писали на днях — в конец своей очереди
+                conn.execute("UPDATE vozvrat_msg SET ord=ord+500, tried=tried||? WHERE phone=?",
+                             (f"{day}: писали за {PISALI_DNEY} дн., отложено;", phone))
+            continue
+        tekst, sms = _tekst_msg(r, vid)
         res = aychat.send([{"phone": phone, "text": tekst, "sms": sms if r["платил"] else ""}],
                           kind="reactivate", dry=False, sms=True, limit=1)
         ok = bool(res.get("отправлено"))
@@ -764,14 +866,20 @@ def msg_tick() -> dict | None:
                           json.dumps(res.get("детали") or res.get("ошибки") or [], ensure_ascii=False)[:300] + ";",
                           phone))
         if ok:
-            _komment(r, sms if r["платил"] else "")
-        db.set_setting("vozvrat_msg_next", (now + timedelta(minutes=random.randint(12, 18)))
+            _komment(r, sms if r["платил"] else "", vid)
+        sred = max(6, 540 // max(1, lim))
+        db.set_setting("vozvrat_msg_next", (now + timedelta(minutes=random.randint(int(sred * 0.8), int(sred * 1.2) + 1)))
                        .isoformat(timespec="seconds"))
-        return {"phone": phone, "ok": ok}
+        return {"phone": phone, "vid": vid, "ok": ok}
     return None
 
 
-def _komment(r: dict, sms: str) -> None:
+KAK_NAZVALI = {"думает": "«думает» — напомнили о себе",
+               "недозвон": "недозвон — «звонили, не застали»",
+               "база2425": "база 2024/25 — «давно не виделись»"}
+
+
+def _komment(r: dict, sms: str, vid: str = "база2425") -> None:
     try:
         from .autopilot import _client, _now
         mk = _client()
@@ -780,8 +888,8 @@ def _komment(r: dict, sms: str) -> None:
             for d in r["дети"][:3]:
                 mk.post("/v1/company/userComments", {
                     "userId": d["uid"], "showToUser": False,
-                    "comment": f"{_now():%d.%m %H:%M} Клод: база 2024/25 — сообщение «давно не виделись» "
-                               f"(WhatsApp{', СМС' if sms else ''}). Предложили: {pred}. Ответ — записать на пробное."})
+                    "comment": f"{_now():%d.%m %H:%M} Клод: {KAK_NAZVALI.get(vid, vid)} "
+                               f"(мессенджер{', СМС' if sms else ''}). Предложили: {pred}. Ответ — записать на пробное."})
         finally:
             mk.close()
     except Exception:
@@ -791,7 +899,8 @@ def _komment(r: dict, sms: str) -> None:
 def msg_status() -> dict:
     with db.get_conn() as conn:
         _mq(conn)
-        st = dict(conn.execute("SELECT status, COUNT(*) FROM vozvrat_msg GROUP BY status").fetchall())
+        st = {f"{v}: {s_}": n for v, s_, n in conn.execute(
+            "SELECT COALESCE(vid,'база2425'), status, COUNT(*) FROM vozvrat_msg GROUP BY 1, 2").fetchall()}
         seg = conn.execute("SELECT COUNT(*) FROM vozvrat_msg WHERE sent LIKE ?",
                            (date.today().isoformat() + "%",)).fetchone()[0]
     return {"по_статусу": st, "сегодня_ушло": seg, "включено": db.get_setting("vozvrat_msg_on", "0") == "1",
