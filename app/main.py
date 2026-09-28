@@ -3257,6 +3257,13 @@ def api_oplata_enqueue(payload: dict = Body(default={})):
     return oplata.enqueue(dry=not payload.get("send"))
 
 
+@app.post("/api/oplata/rebuild", dependencies=AUTH)
+def api_oplata_rebuild():
+    """Пересобрать тексты неотправленных строк (после правки текста)."""
+    from . import oplata
+    return oplata.rebuild_pending()
+
+
 @app.get("/api/oplata/status", dependencies=AUTH)
 def api_oplata_status():
     from . import oplata
@@ -3659,7 +3666,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-28.03"
+APP_VERSION = "2026-09-28.04"
 
 
 @app.get("/api/net")

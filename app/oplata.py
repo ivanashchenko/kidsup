@@ -46,7 +46,8 @@ CUR_FROM, CUR_TO = "2026-08-20", "2026-10-01"   # «абонемент за се
 NEXT_FROM = "2026-10-01"                         # абонемент следующего месяца
 SOLD_AFTER = "2026-09-21"                        # куплен в последнюю неделю — считаем за октябрь
 START_AT = "2026-09-28T10:00"                    # решение владельца: «завтра с утра»
-DEADLINE = "5 октября"
+# 28.09 Борис: семьям — «до 1 октября», внутренний крайний срок остаётся 5 октября
+DEADLINE = "1 октября"
 SKIP_STATES = (146328, 215202, 125954)          # «не писать» и прочие жёсткие
 MONTH = "октябрь"
 MONTH_P = "октября"
@@ -372,6 +373,20 @@ def tick() -> dict | None:
     db.set_setting("oplata_next", (now + timedelta(seconds=random.randint(120, 240)))
                    .isoformat(timespec="seconds"))
     return r
+
+
+def rebuild_pending() -> dict:
+    """Пересобрать тексты ещё не отправленных строк по текущему плану.
+
+    28.09: срок в тексте поменялся (5 → 1 октября), а очередь собрана
+    накануне. Отправленные строки не трогаем; ожидающие — удаляем и ставим
+    заново, заодно выпадают те, кто успел оплатить."""
+    with db.get_conn() as conn:
+        _q(conn)
+        n = conn.execute("DELETE FROM oplata_queue WHERE campaign=? AND status='pending'",
+                         (CAMPAIGN,)).rowcount
+    r = enqueue(dry=False)
+    return {"ok": True, "снято_старых": n, **r}
 
 
 def status() -> dict:
