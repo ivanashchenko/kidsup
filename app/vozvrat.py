@@ -178,16 +178,37 @@ def predlozheniya(deti: list[dict], byvali: set[str], grp: list[dict]) -> list[d
     out = []
     s_vozr = [d for d in deti if d.get("возраст") is not None][:3]
     for i, d in enumerate(s_vozr):
-        for o in predlozhit(d["возраст"], byvali, grp, n=2 if i == 0 else 1):
+        for o in predlozhit(d["возраст"], byvali, grp, n=2 if len(s_vozr) == 1 else 1):
             o["для"] = _imya_korotko(d["имя"]) if len(s_vozr) > 1 else ""
             out.append(o)
     return out
 
 
+KOROTKO = {"Подготовка к школе": "ПШ", "Английский": "англ.", "Раннее развитие": "",
+           "ИЗО": "ИЗО", "Ментальная арифметика": "МА", "Шахматы": "шахматы",
+           "Робототехника": "робототехника"}
+
+
+def _metka(o: dict) -> str:
+    """Короткое имя группы для пункта: «ПШ Гр9», «англ. Гр7», «Музыка и речь Гр7», «МА вс 14:00»."""
+    g = o["группа"]
+    for k in ("Музыка и речь", "Первая школа", "Лицей"):
+        if k in g:
+            m = re.search(r"Группа (\d+)|\(Гр(\d+)\)", g)
+            return f"{k} Гр{(m.group(1) or m.group(2)) if m else ''}".strip()
+    m = re.search(r"\(Гр(\d+)\)|Группа (\d+)", g)
+    kod = f"Гр{m.group(1) or m.group(2)}" if m else ""
+    base = KOROTKO.get(o["предмет"], o["предмет"])
+    if not kod:
+        t = re.findall(r"(пн|вт|ср|чт|пт|сб|вс)", g.lower())
+        kod = " ".join(dict.fromkeys(t)) + (" " + re.findall(r"\d{1,2}:\d{2}", g)[0] if re.findall(r"\d{1,2}:\d{2}", g) else "")
+    return f"{base} {kod}".strip()
+
+
 def _kratko(o: dict) -> str:
-    dat = " или ".join(o["даты"]) if o["даты"] else ""
-    return ((f"{o['для']} → " if o.get("для") else "") + f"{NAZVANIE.get(o['предмет'], o['предмет'])} — {o['группа']} (мест {o['свободно']})"
-            + (f": {dat}" if dat else "") + (f"; пробное {o['пробное']}" if o["предмет"] in PLATNOE else ""))
+    dat = " / ".join(o["даты"]) if o["даты"] else ""
+    return ((f"{o['для']} → " if o.get("для") else "") + _metka(o)
+            + (f": {dat}" if dat else "") + (f" (пробное {PLATNOE[o['предмет']]})" if o["предмет"] in PLATNOE else ""))
 
 
 # ------------------------------------------------------------ данные
@@ -298,6 +319,11 @@ def spiski() -> dict:
             age = nabor._age(nabor._birthday(u[5]), today)
             return {"uid": u[0], "имя": (u[1] or "").strip(), "возраст": age}
 
+        def vzroslye(deti):
+            """Все дети семьи 13+ — нам некуда звать (у нас до 12 лет)."""
+            vz = [d["возраст"] for d in deti if d["возраст"] is not None]
+            return bool(vz) and all(a >= 12.9 for a in vz)
+
         def semya_zanyata(p):
             return any(x[0] in D["uchitsya"] or x[0] in D["seychas"] for x in na_nomere.get(p, []))
 
@@ -314,6 +340,8 @@ def spiski() -> dict:
             if dney < 7 or (posl_pop and (today - date.fromisoformat(posl_pop)).days < 2):
                 continue                               # срок ещё не подошёл / только что набирали
             deti = [rebenok(u) for u in us]
+            if vzroslye(deti):
+                continue
             byv, n, last = _byvali(conn, [u[0] for u in us])
             vozr = next((d["возраст"] for d in deti if d["возраст"] is not None), None)
             dumaet.append({"вид": "думает", "телефон": "7" + p, "дети": deti, "возраст": vozr,
@@ -353,6 +381,8 @@ def spiski() -> dict:
                     deystvie = (f"попытка {len(pop) + 1} из 3 — звонить {kogda}" if len(pop) < 3 else
                                 f"уже {len(pop)} попыток, все в одно время дня — последняя попытка {kogda}, потом сообщение")
             deti = [rebenok(u) for u in us]
+            if vzroslye(deti):
+                continue
             byv, n, last = _byvali(conn, [u[0] for u in us])
             vozr = next((d["возраст"] for d in deti if d["возраст"] is not None), None)
             nedozvon.append({"вид": "недозвон", "телефон": "7" + p, "дети": deti, "возраст": vozr,
@@ -401,6 +431,9 @@ def spiski() -> dict:
                 continue
             us = [r[0] for r in rows]
             deti = [rebenok(u) for u in us]
+            if vzroslye(deti):
+                itog25["семей_дети_13+"] += 1
+                continue
             byv, n, last = _byvali(conn, [u[0] for u in us], GOD25[0], LETO25[1])
             vozr = next((d["возраст"] for d in deti if d["возраст"] is not None), None)
             pred = predlozheniya(deti, byv, grp)
@@ -447,16 +480,14 @@ def _tekst(r: dict) -> str:
     if r["вид"] == "думает":
         head = (f"ДУМАЕТ, {r['дней_без_контакта'] if r['дней_без_контакта'] < 999 else 'много'} дн. без контакта"
                 f"{' (платили раньше)' if r['платил'] else ''}: {deti}.")
-        tail = (" Предложить конкретно: " + pred + ". Итог — в карточку; записали — статус «Записался», "
-                "думают дальше — следующий звонок не позже чем через 7 дней, нет — «Отказ» с причиной.")
+        tail = " Предложить: " + pred + ". Итог и статус — в карточку (думают — звонок через ≤7 дн.)."
     elif r["вид"] == "недозвон":
         head = f"НЕДОЗВОН, {r['действие']}{' (платили раньше)' if r['платил'] else ''}: {deti}."
         tail = (" Дозвонились — предложить: " + pred + "." if r["действие"].startswith("попытка") else "")
     else:
-        head = (f"БАЗА 2024/25 ({r['период']}, {r['занятий']} зан. {', '.join(r['ходил_на'])}"
+        head = (f"БАЗА 2024/25 ({r['период']}, {r['занятий']} зан.{(' ' + ', '.join(r['ходил_на'])) if r['ходил_на'] else ''}"
                 f"{', платили' if r['платил'] else ''}{', в карточке «Отказ» с тех пор' if r['отказ_раньше'] else ''}): {deti}.")
-        tail = (" Начать: «ваш ребёнок занимался у нас в " + ("прошлом году летом" if r["период"] == "лето" else "2024/25 году")
-                + " — в этом сезоне для вашего ребёнка есть группа…». Предложить: " + pred + ". Итог — в карточку.")
+        tail = " Начать: «занимались у нас " + ("летом 2025" if r["период"] == "лето" else "в 2024/25") + " — есть место в группе…». Предложить: " + pred + ". Итог — в карточку."
     return (head + tail)[:600]
 
 
