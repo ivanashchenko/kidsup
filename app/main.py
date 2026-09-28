@@ -3470,6 +3470,13 @@ def api_obzvon():
     return obzvon.spisok()
 
 
+@app.get("/api/statusy/razbor", dependencies=AUTH)
+def api_statusy_razbor(spiski: int = 0):
+    """Прозвон базы «ходили» и открытые статусы «недозвон»/«думает» (см. app/statusy.py)."""
+    from . import statusy
+    return statusy.razbor(spiski=bool(spiski))
+
+
 @app.get("/api/nezvonili", dependencies=AUTH)
 def api_nezvonili(since: str = "", until: str = "", limit: int = 0):
     """Список семей без единого звонка за окно (по умолчанию 01.09.25–31.08.26)."""
@@ -3666,7 +3673,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-28.04"
+APP_VERSION = "2026-09-28.07"
 
 
 @app.get("/api/net")
