@@ -3503,6 +3503,24 @@ def api_vozvrat_napisat(payload: dict = Body(default={})):
                            tolko=payload.get("tolko") or None)
 
 
+@app.get("/api/vozvrat/baza/preview", dependencies=AUTH)
+def api_vozvrat_baza_preview(n: int = 5):
+    from . import vozvrat
+    return vozvrat.msg_preview(n)
+
+
+@app.post("/api/vozvrat/baza/enqueue", dependencies=AUTH)
+def api_vozvrat_baza_enqueue(payload: dict = Body(default={})):
+    from . import vozvrat
+    return vozvrat.msg_enqueue(dry=not payload.get("send"))
+
+
+@app.get("/api/vozvrat/baza/status", dependencies=AUTH)
+def api_vozvrat_baza_status():
+    from . import vozvrat
+    return vozvrat.msg_status()
+
+
 @app.get("/api/statusy/razbor", dependencies=AUTH)
 def api_statusy_razbor(spiski: int = 0):
     """Прозвон базы «ходили» и открытые статусы «недозвон»/«думает» (см. app/statusy.py)."""
@@ -3706,7 +3724,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-28.13"
+APP_VERSION = "2026-09-28.15"
 
 
 @app.get("/api/net")
@@ -3754,6 +3772,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             "oplata_on", "oplata_start",
             # возврат «думает»/«недозвон»/база 2024/25 (app/vozvrat.py): сколько звонков в день и кому
             "vozvrat_v_den", "vozvrat_kto", "vozvrat_on",
+            "vozvrat_msg_on", "vozvrat_msg_start", "vozvrat_msg_v_den",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
             "calls_done",

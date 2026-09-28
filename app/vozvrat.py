@@ -133,8 +133,15 @@ def _blizhaishie(dni: list[str], vremya: list[str], n: int = 2) -> list[str]:
     return out
 
 
+_NAGRUZKA: Counter = Counter()      # сколько раз группу уже предложили в этом расчёте
+
+
 def predlozhit(vozrast, byvali: set[str], grp: list[dict] | None = None, n: int = 2) -> list[dict]:
-    """Куда звать ребёнка: до n групп разных предметов, продолжение — первым."""
+    """Куда звать ребёнка: до n групп разных предметов, продолжение — первым.
+
+    Предложения разносятся по подходящим группам: каждое предложение группы
+    снижает её вес для следующих детей. Иначе всем пятилеткам доставалась
+    одна и та же ПШ Гр9 с четырьмя местами (28.09, предпросмотр рассылки)."""
     if vozrast is None:
         return []
     grp = grp if grp is not None else gruppy()
@@ -143,9 +150,12 @@ def predlozhit(vozrast, byvali: set[str], grp: list[dict] | None = None, n: int 
     for g in grp:
         if not (g["lo"] - 0.3 <= vozrast <= g["hi"] + 0.3):
             continue
-        if g["предмет"] == "Подготовка к школе" and vozrast > 7.4:
-            continue                                   # уже школьник
-        ball = min(g["свободно"], 4)
+        # 28.09, Борис: «учитывать возраст ребёнка на сейчас». В первый класс
+        # идут с 6,5 лет на 1 сентября — кому сейчас больше 6,6, тот, скорее
+        # всего, уже первоклассник: ему английский, шахматы, МА, а не ПШ.
+        if g["предмет"] == "Подготовка к школе" and vozrast > 6.6:
+            continue
+        ball = min(g["свободно"], 4) - 0.7 * _NAGRUZKA[g["name"]] / max(1, g["свободно"])
         if g["предмет"] in byl_predmety:
             ball += 100
         if g["предмет"] in ("Подготовка к школе", "Английский"):
@@ -159,6 +169,7 @@ def predlozhit(vozrast, byvali: set[str], grp: list[dict] | None = None, n: int 
         if g["предмет"] in vzyato:
             continue
         vzyato.add(g["предмет"])
+        _NAGRUZKA[g["name"]] += 1
         out.append({"группа": g["name"], "предмет": g["предмет"], "свободно": g["свободно"],
                     "даты": _blizhaishie(g["дни"], g["время"]),
                     "пробное": (f"платное {PLATNOE[g['предмет']]}, в зачёт абонемента"
@@ -307,6 +318,7 @@ def _byvali(conn, uids: list[int], s: str = "2024-09-01", po: str = "2026-08-30"
 def spiski() -> dict:
     """Три очереди: думает, недозвон, база 2024/25 — с предложением по каждой семье."""
     grp = gruppy()
+    _NAGRUZKA.clear()
     with db.get_conn() as conn:
         D = _dannye(conn)
         today = D["today"]
@@ -608,3 +620,178 @@ def napisat(dry: bool = True, limit: int = 30, tolko: list[str] | None = None) -
     res["целей"] = len(tseli)
     res["тексты"] = [{"телефон": i["phone"], "текст": i["text"], "смс": i["sms"]} for i in items[:limit]] if dry else []
     return res
+
+
+# ------------------------------------------------------------ сообщения базе 2024/25
+# 28.09, решение владельца: к звонкам — сообщение всем семьям базы 2024/25.
+# WhatsApp с номера переписки — порциями (35 в день, одна семья раз в
+# 12–18 минут): одобренных шаблонов WABA нет, а залп холодной базе с живого
+# номера — риск блокировки. СМС — только тем, кто у нас платил. Перед каждой
+# отправкой семья проверяется заново по живым данным: вернулась, поговорили,
+# «не писать» — не пишем. Текст и даты собираются в момент отправки.
+
+_KESH: dict = {"ts": 0.0, "d": None}
+
+
+def _spiski_kesh(max_age: int = 1200) -> dict:
+    import time as _t
+    if _KESH["d"] is None or _t.time() - _KESH["ts"] > max_age:
+        _KESH.update(ts=_t.time(), d=spiski())
+    return _KESH["d"]
+
+
+def _mq(conn) -> None:
+    conn.execute("""CREATE TABLE IF NOT EXISTS vozvrat_msg (
+        phone TEXT PRIMARY KEY, created TEXT, status TEXT DEFAULT 'pending',
+        sent TEXT, tried TEXT DEFAULT '', ord INTEGER)""")
+
+
+def soobshchenie_baza(r: dict) -> tuple[str, str]:
+    from .autopilot import _accusative, _child_name, _genitive
+    imena = {d["uid"]: (_child_name(d["имя"]) or "") for d in r["дети"]}
+    kogda_bylo = {"лето": "Вы были у нас летом 2025 года",
+                  "год и лето": "Вы занимались у нас в 2024/25 году и летом"}.get(
+                      r.get("период"), "Вы занимались у нас в 2024/25 учебном году")
+    ofs = r.get("предложение") or []
+    o = ofs[0] if ofs else None
+    imya = ""
+    if o:
+        imya = next((imena[d["uid"]] for d in r["дети"]
+                     if imena.get(d["uid"]) and (not o.get("для") or o["для"] in d["имя"])), "")
+    tekst = f"Здравствуйте! Это KidsUP на бульваре Рокоссовского 🌿\n\n{kogda_bylo} — давно не виделись!\n\n"
+    if o:
+        kogda = (" — ближайшие занятия " + " и ".join(o["даты"])) if o["даты"] else ""
+        probn = (f"Пробное занятие — {PLATNOE[o['предмет']]}, при покупке абонемента идёт в зачёт."
+                 if o["предмет"] in PLATNOE else
+                 "Первое занятие условно-бесплатное: не понравится — платить не нужно.")
+        tekst += (f"В этом сезоне {'для ' + _genitive(imya) + ' ' if imya else ''}есть место в группе: "
+                  f"{_programma(o)}{kogda}. {probn}\n")
+        dvoe = False
+        for o2 in ofs[1:2]:
+            if o2.get("для") and o2["для"] != o.get("для"):
+                im2 = next((imena[d["uid"]] for d in r["дети"] if o2["для"] in d["имя"] and imena.get(d["uid"])), "")
+                if im2:
+                    tekst += f"Для {_genitive(im2)} тоже есть группа: {_programma(o2)}.\n"
+                    dvoe = True
+        kogo = "детей" if dvoe else (_accusative(imya) if imya else "ребёнка")
+        tekst += (f"\nЗаписать {kogo} на первое занятие? "
+                  "Если удобнее другое время или предмет — напишите, подберём 💛")
+    else:
+        tekst += ("В этом сезоне у нас идёт набор в группы. Подскажите, сколько сейчас лет ребёнку — "
+                  "подберём группу по возрасту и пришлём расписание 💛")
+    tekst += "\n\nЕсли уже не актуально — просто напишите, больше не побеспокоим."
+    if o:
+        sms = (f"KidsUP: давно не виделись! {'Для ' + _genitive(imya) + ' есть' if imya else 'Есть'} место: "
+               f"{_programma(o)}" + (f", {o['даты'][0]}" if o["даты"] else "") + ". "
+               + (f"Пробное {PLATNOE[o['предмет']]}, в зачёт. " if o["предмет"] in PLATNOE
+                  else "Первое занятие условно-бесплатное. ")
+               + "Запись: 84951209024")
+    else:
+        sms = "KidsUP: давно не виделись! Идёт набор в группы на сезон, подберём по возрасту. Запись: 84951209024"
+    return tekst, sms[:300]
+
+
+def msg_enqueue(dry: bool = True) -> dict:
+    S = spiski()
+    from .autopilot import _now
+    now = _now().isoformat(timespec="seconds")
+    n = 0
+    with db.get_conn() as conn:
+        _mq(conn)
+        est = {r[0] for r in conn.execute("SELECT phone FROM vozvrat_msg")}
+        for i, r in enumerate(S["база2425"]):
+            if r["телефон"] in est:
+                continue
+            n += 1
+            if not dry:
+                conn.execute("INSERT INTO vozvrat_msg (phone, created, ord) VALUES (?,?,?)",
+                             (r["телефон"], now, i))
+    return {"ok": True, "dry_run": dry, "в_очередь": n, "всего_в_базе": len(S["база2425"])}
+
+
+def msg_preview(n: int = 5) -> list[dict]:
+    S = spiski()
+    out = []
+    for r in S["база2425"][:n]:
+        t, sms = soobshchenie_baza(r)
+        out.append({"телефон": r["телефон"], "дети": [d["имя"] for d in r["дети"]],
+                    "платил": r["платил"], "текст": t, "смс": sms if r["платил"] else "—"})
+    return out
+
+
+def msg_tick() -> dict | None:
+    """Из минутного цикла: одна семья раз в 12–18 минут, до vozvrat_msg_v_den в день."""
+    import random
+    if db.get_setting("vozvrat_msg_on", "0") != "1":
+        return None
+    from .autopilot import _now
+    now = _now()
+    start = db.get_setting("vozvrat_msg_start", "2026-09-30T10:00") or "2026-09-30T10:00"
+    if now.isoformat(timespec="minutes") < start or not (10 <= now.hour < 19):
+        return None
+    nxt = db.get_setting("vozvrat_msg_next", "") or ""
+    if nxt and now.isoformat(timespec="seconds") < nxt:
+        return None
+    day = now.date().isoformat()
+    lim = int(db.get_setting("vozvrat_msg_v_den", "35") or 35)
+    with db.get_conn() as conn:
+        _mq(conn)
+        if conn.execute("SELECT COUNT(*) FROM vozvrat_msg WHERE sent LIKE ?", (day + "%",)).fetchone()[0] >= lim:
+            return None
+        rows = conn.execute("SELECT phone FROM vozvrat_msg WHERE status='pending' ORDER BY ord LIMIT 20").fetchall()
+    if not rows:
+        return None
+    S = _spiski_kesh()
+    po_tel = {r["телефон"]: r for r in S["база2425"]}
+    from . import aychat
+    for (phone,) in rows:
+        r = po_tel.get(phone)
+        if not r:
+            # за это время семья вернулась, с ней поговорили или стоит «не писать»
+            with db.get_conn() as conn:
+                conn.execute("UPDATE vozvrat_msg SET status='skip', tried=tried||'не в базе на момент отправки;' "
+                             "WHERE phone=?", (phone,))
+            continue
+        tekst, sms = soobshchenie_baza(r)
+        res = aychat.send([{"phone": phone, "text": tekst, "sms": sms if r["платил"] else ""}],
+                          kind="reactivate", dry=False, sms=True, limit=1)
+        ok = bool(res.get("отправлено"))
+        with db.get_conn() as conn:
+            conn.execute("UPDATE vozvrat_msg SET status=?, sent=?, tried=tried||? WHERE phone=?",
+                         ("sent" if ok else "fail", now.isoformat(timespec="seconds") if ok else None,
+                          json.dumps(res.get("детали") or res.get("ошибки") or [], ensure_ascii=False)[:300] + ";",
+                          phone))
+        if ok:
+            _komment(r, sms if r["платил"] else "")
+        db.set_setting("vozvrat_msg_next", (now + timedelta(minutes=random.randint(12, 18)))
+                       .isoformat(timespec="seconds"))
+        return {"phone": phone, "ok": ok}
+    return None
+
+
+def _komment(r: dict, sms: str) -> None:
+    try:
+        from .autopilot import _client, _now
+        mk = _client()
+        try:
+            pred = "; ".join(_kratko(o) for o in r.get("предложение") or []) or "спросили возраст"
+            for d in r["дети"][:3]:
+                mk.post("/v1/company/userComments", {
+                    "userId": d["uid"], "showToUser": False,
+                    "comment": f"{_now():%d.%m %H:%M} Клод: база 2024/25 — сообщение «давно не виделись» "
+                               f"(WhatsApp{', СМС' if sms else ''}). Предложили: {pred}. Ответ — записать на пробное."})
+        finally:
+            mk.close()
+    except Exception:
+        log.exception("vozvrat: комментарий не записан")
+
+
+def msg_status() -> dict:
+    with db.get_conn() as conn:
+        _mq(conn)
+        st = dict(conn.execute("SELECT status, COUNT(*) FROM vozvrat_msg GROUP BY status").fetchall())
+        seg = conn.execute("SELECT COUNT(*) FROM vozvrat_msg WHERE sent LIKE ?",
+                           (date.today().isoformat() + "%",)).fetchone()[0]
+    return {"по_статусу": st, "сегодня_ушло": seg, "включено": db.get_setting("vozvrat_msg_on", "0") == "1",
+            "старт": db.get_setting("vozvrat_msg_start", "2026-09-30T10:00"),
+            "в_день": db.get_setting("vozvrat_msg_v_den", "35")}
