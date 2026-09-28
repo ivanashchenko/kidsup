@@ -3470,6 +3470,39 @@ def api_obzvon():
     return obzvon.spisok()
 
 
+@app.get("/vozvrat", response_class=HTMLResponse, dependencies=AUTH)
+def vozvrat_page(request: Request):
+    """Вернуть и дожать: «думает», «недозвон», база 2024/25 — очередь и предложения."""
+    from . import vozvrat
+    return render(request, "vozvrat.html", active="obzvon", d=vozvrat.spiski())
+
+
+@app.get("/api/vozvrat/spiski", dependencies=AUTH)
+def api_vozvrat_spiski(limit: int = 0):
+    from . import vozvrat
+    d = vozvrat.spiski()
+    if limit:
+        for k in ("думает", "недозвон", "база2425"):
+            d[k] = d[k][:limit]
+    return d
+
+
+@app.post("/api/vozvrat/razdat", dependencies=AUTH)
+def api_vozvrat_razdat(payload: dict = Body(default={})):
+    """Разложить звонки на день по сменам: {"dry": true, "v_den": 24, "day": "YYYY-MM-DD"}."""
+    from . import vozvrat
+    return vozvrat.razdat(str(payload.get("day") or ""), bool(payload.get("dry", True)),
+                          int(payload.get("v_den") or 0))
+
+
+@app.post("/api/vozvrat/napisat", dependencies=AUTH)
+def api_vozvrat_napisat(payload: dict = Body(default={})):
+    """«Звонили — не застали»: {"send": false, "limit": 30, "tolko": ["79…"]} (по умолчанию — показать тексты)."""
+    from . import vozvrat
+    return vozvrat.napisat(dry=not payload.get("send"), limit=int(payload.get("limit") or 30),
+                           tolko=payload.get("tolko") or None)
+
+
 @app.get("/api/statusy/razbor", dependencies=AUTH)
 def api_statusy_razbor(spiski: int = 0):
     """Прозвон базы «ходили» и открытые статусы «недозвон»/«думает» (см. app/statusy.py)."""
@@ -3673,7 +3706,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-28.07"
+APP_VERSION = "2026-09-28.11"
 
 
 @app.get("/api/net")
@@ -3719,6 +3752,8 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             "calls_parsed", "sms_on", "sms_sender_name", "lead_hook_key",
             # сбор оплат за следующий месяц (app/oplata.py): включение и время старта
             "oplata_on", "oplata_start",
+            # возврат «думает»/«недозвон»/база 2024/25 (app/vozvrat.py): сколько звонков в день и кому
+            "vozvrat_v_den", "vozvrat_kto", "vozvrat_on",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
             "calls_done",

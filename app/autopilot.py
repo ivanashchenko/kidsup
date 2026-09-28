@@ -4742,6 +4742,17 @@ def _loop() -> None:
                             hvost.utro()
                         except Exception:
                             log.exception("утро пульта")
+                    # 28.09, решение владельца: каждое утро дежурным — порция
+                    # звонков «думает» (контакт не реже раза в 7 дней), «недозвон»
+                    # (3 попытки в разное время + сообщение → архив) и база
+                    # 2024/25. Сколько и кому — настройки vozvrat_v_den / vozvrat_kto.
+                    if 8 <= now.hour <= 11 and db.get_setting("vozvrat_on", "0") == "1" \
+                            and _mark("vozvrat_razdat", str(_today())):
+                        try:
+                            from . import vozvrat
+                            log.info("возврат: %s", vozvrat.razdat())
+                        except Exception:
+                            log.exception("раздача возврата упала")
                     # наряд: строки живых списков, которые сегодня ничьи,
                     # кладём дежурной в инбокс. Раз в час, рабочее окно.
                     if 9 <= now.hour <= 19 and _mark("slot_hourly_naryad", _hour):

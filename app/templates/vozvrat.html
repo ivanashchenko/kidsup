@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Вернуть и дожать — KidsUP{% endblock %}
+{% block content %}
+<style>
+  .vz-sum{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 16px}
+  .vz-pill{background:#eef0fb;border-radius:8px;padding:6px 10px;font-size:14px}
+  .vz-pill b{font-size:18px;color:#312783;margin-right:4px}
+  .vz table{width:100%;border-collapse:collapse;font-size:13px}
+  .vz th{background:#312783;color:#fff;text-align:left;padding:6px;font-weight:600;position:sticky;top:0}
+  .vz td{vertical-align:top;padding:6px;border-bottom:1px solid #e3e4ef}
+  .vz .sm{font-size:12px;color:#5c5a72}
+  .vz .of{color:#1d6fa0}
+  .vz .hot{color:#E30613;font-weight:600}
+  .vz h2{margin:24px 0 4px}
+  .vz .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+  .vz .tabs a{padding:5px 10px;border-radius:6px;background:#eef0fb;text-decoration:none;color:#312783}
+</style>
+<div class="vz">
+<h1>Вернуть и дожать</h1>
+<p class="muted">На {{ d.дата }}. Живые данные CRM и журнала звонков. Каждое утро дежурным в Пульт уходит порция
+звонков из этих очередей (сколько — настройка «vozvrat_v_den», по умолчанию 24 в день; когда в смене один человек — 14).
+Предложение по каждой семье — только группы, где сейчас есть места и возраст ребёнка подходит ({{ d.групп_с_местами }} групп).</p>
+
+<div class="notice"><b>Правила, утверждённые 28.09.</b>
+«Думает» — следующий живой контакт не позже чем через 7 дней после прошлого разговора; в каждом звонке — конкретная группа и дата.
+«Недозвон» — три попытки в разное время (днём, вечером после 18:00, в выходные), потом сообщение в чат/WhatsApp и «Архив набора».
+Живой контакт — разговор от 20 секунд или сообщение от клиента; наша рассылка контактом не считается.</div>
+
+<div class="vz-sum">
+  <span class="vz-pill"><b>{{ d.думает|length }}</b>«думает» — пора звонить (7+ дней без контакта)</span>
+  <span class="vz-pill"><b>{{ d.недозвон|length }}</b>«недозвон» — следующий шаг</span>
+  <span class="vz-pill"><b>{{ d.база2425|length }}</b>база 2024/25 и лето 2025 — не звонили в этот набор</span>
+</div>
+<div class="tabs"><a href="#dumaet">Думает</a><a href="#nedozvon">Недозвон</a><a href="#baza">База 2024/25</a></div>
+
+<h2 id="dumaet">Думает — {{ d.думает|length }}</h2>
+<p class="muted">Сначала — дети возраста подготовки к школе и английского, внутри — кто платил раньше, потом — кто дольше без контакта.</p>
+<div class="scroll"><table>
+<tr><th>Дети</th><th>Без контакта</th><th>Ходили</th><th>Предложить</th><th>Телефон</th></tr>
+{% for r in d.думает[:200] %}
+<tr>
+  <td>{% for c in r.дети %}<b>{{ c.имя }}</b>{% if c.возраст %} <span class="sm">{{ c.возраст }}</span>{% endif %}<br>{% endfor %}
+      {% if r.платил %}<span class="sm" style="color:#4e8a12">платили раньше</span>{% endif %}</td>
+  <td class="{{ 'hot' if r.дней_без_контакта > 14 else '' }}">{{ r.дней_без_контакта if r.дней_без_контакта < 999 else 'не было' }}{% if r.контакт %}<div class="sm">с {{ r.контакт[8:10] }}.{{ r.контакт[5:7] }}</div>{% endif %}</td>
+  <td class="sm">{{ r.ходил_на|join(', ') or '—' }}{% if r.занятий %} · {{ r.занятий }} зан.{% endif %}</td>
+  <td class="of">{% for o in r.предложение %}<div>{% if o.для %}{{ o.для }} → {% endif %}{{ o.предмет }}: {{ o.группа }} (мест {{ o.свободно }}){% if o.даты %} — {{ o.даты|join(' или ') }}{% endif %}{% if 'платное' in o.пробное %} · пробное {{ o.пробное }}{% endif %}</div>{% else %}<span class="sm">возраст не указан — спросить</span>{% endfor %}</td>
+  <td class="sm"><a href="tel:+{{ r.телефон }}">+{{ r.телефон }}</a></td>
+</tr>
+{% endfor %}
+</table></div>
+
+<h2 id="nedozvon">Недозвон — {{ d.недозвон|length }}</h2>
+<p class="muted">Сначала — кому нужна следующая попытка (с подсказкой, когда звонить), потом — кому пора написать и перевести в архив, потом — у кого разговор был, а статус не поменяли.</p>
+<div class="scroll"><table>
+<tr><th>Дети</th><th>Что сделать</th><th>Попыток с 01.08</th><th>Предложить</th><th>Телефон</th></tr>
+{% for r in d.недозвон[:200] %}
+<tr>
+  <td>{% for c in r.дети %}<b>{{ c.имя }}</b>{% if c.возраст %} <span class="sm">{{ c.возраст }}</span>{% endif %}<br>{% endfor %}
+      {% if r.платил %}<span class="sm" style="color:#4e8a12">платили раньше</span>{% endif %}</td>
+  <td>{{ r.действие }}</td>
+  <td>{{ r.попыток }}{% if r.слоты %}<div class="sm">{{ r.слоты|join(', ') }}</div>{% endif %}</td>
+  <td class="of">{% for o in r.предложение %}<div>{% if o.для %}{{ o.для }} → {% endif %}{{ o.предмет }}: {{ o.группа }}{% if o.даты %} — {{ o.даты|join(' или ') }}{% endif %}</div>{% endfor %}</td>
+  <td class="sm"><a href="tel:+{{ r.телефон }}">+{{ r.телефон }}</a></td>
+</tr>
+{% endfor %}
+</table></div>
+
+<h2 id="baza">База 2024/25 и лето 2025 — {{ d.база2425|length }} семей</h2>
+<p class="muted">Дети, которые ходили у нас с 01.09.2024 по 31.05.2025 или летом 2025 и с сентября 2025 больше не ходили.
+Не входят: кто ходил и позже (они в списке «Вернуть тех, кто ходил»), семьи, где кто-то ходит сейчас, «не писать», «переехал», «13 лет и старше»,
+и те, с кем уже поговорили в этот набор.
+{% set i = d.итог2425 %}Всего детей в тех окнах — {{ i.детей_ходили }}; ходили и позже — {{ i['ходили_и_позже_(есть_в_списке_2025_26)'] }};
+уже говорили в этот набор — {{ i.семей_уже_говорили_в_этот_набор or 0 }} семей. В списке: платили — {{ i.платили }},
+есть группа с местами по возрасту — {{ i.есть_группа_с_местами }}, в карточке «Отказ» с тех пор — {{ i.отказ_раньше }}.</p>
+<div class="scroll"><table>
+<tr><th>Дети</th><th>Когда и что</th><th>Статус</th><th>Предложить</th><th>Телефон</th></tr>
+{% for r in d.база2425[:300] %}
+<tr>
+  <td>{% for c in r.дети %}<b>{{ c.имя }}</b>{% if c.возраст %} <span class="sm">{{ c.возраст }}</span>{% endif %}<br>{% endfor %}
+      {% if r.платил %}<span class="sm" style="color:#4e8a12">платили</span>{% endif %}</td>
+  <td class="sm">{{ r.период }} · {{ r.ходил_на|join(', ') or '—' }} · {{ r.занятий }} зан.<br>последний раз {{ r.последнее[8:10] }}.{{ r.последнее[5:7] }}.{{ r.последнее[2:4] }}</td>
+  <td class="sm">{{ r.статус }}{% if r.набирали_в_этот_набор %}<br>набирали {{ r.набирали_в_этот_набор }} раз, не дозвонились{% endif %}</td>
+  <td class="of">{% for o in r.предложение %}<div>{% if o.для %}{{ o.для }} → {% endif %}{{ o.предмет }}: {{ o.группа }}{% if o.даты %} — {{ o.даты|join(' или ') }}{% endif %}</div>{% else %}<span class="sm">по возрасту мест нет / возраст неизвестен</span>{% endfor %}</td>
+  <td class="sm"><a href="tel:+{{ r.телефон }}">+{{ r.телефон }}</a></td>
+</tr>
+{% endfor %}
+</table></div>
+</div>
+{% endblock %}

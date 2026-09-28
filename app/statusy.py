@@ -163,6 +163,7 @@ def razbor(spiski: bool = False) -> dict:
     ne_doz_popytki = Counter()
     ne_doz_spisok = []
     ne_nabirali = []
+    pogovorili = []
     for p, s in sem_hodili.items():
         b1["семей_ходили"] += 1
         b1["детей_ходили"] += len(s["дети"])
@@ -176,6 +177,9 @@ def razbor(spiski: bool = False) -> dict:
         if kontakt.get(p):
             b1["поговорили"] += 1
             st = sorted(s["статусы"])
+            pogovorili.append({"телефон": "7" + p, "дети": [users[x][1] for x in s["дети"]],
+                               "статусы": [st_names.get(x, str(x)) for x in st],
+                               "разговор": kontakt.get(p, "")})
             itog_pogovorili[", ".join(st_names.get(x, str(x)) for x in st)] += 1
         elif pisali_nam.get(p):
             b1["написали_нам_сами"] += 1
@@ -266,5 +270,6 @@ def razbor(spiski: bool = False) -> dict:
             "не_дозвонились_по_попыткам": dict(ne_doz_popytki),
             "не_дозвонились_список": ne_doz_spisok if spiski else len(ne_doz_spisok),
             "не_набирали_список": ne_nabirali,
+            "поговорили_список": pogovorili if spiski else len(pogovorili),
             "недозвон": srez(NEDOZVON), "думает": srez(DUMAET), "думает_после_пробного": srez(DUMAET_POSLE),
             "все_статусы": dict(voronka.most_common())}
