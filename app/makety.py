@@ -223,7 +223,7 @@ def build_makets(f: dict) -> list[dict]:
 <circle cx="880" cy="1180" r="240" fill="{GREEN}" opacity=".3"/>
 <circle cx="-30" cy="1050" r="190" fill="{BLUE}" opacity=".3"/>
 {_logo(W4 / 2, 40, 230, white=True)}
-{_t(W4 / 2, 330, 34, "детский центр и английский сад", PAPER, "normal", "middle")}
+{_t(W4 / 2, 330, 34, "детский центр и мини-сад", PAPER, "normal", "middle")}
 {_t(W4 / 2, 500, 60, "Научим читать", PAPER, "bold", "middle")}
 {_t(W4 / 2, 574, 60, "за 3 месяца!", AMBER, "bold", "middle")}
 {_t(W4 / 2, 700, 60, "Заговорит по-английски", PAPER, "bold", "middle")}

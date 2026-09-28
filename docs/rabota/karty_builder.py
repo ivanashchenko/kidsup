@@ -61,7 +61,7 @@ def card(key, title, sub, foot_note):
     H.append(f'<div class="foot">{foot_note}</div></div>')
     return "".join(H)
 
-FOOT=("Детский центр и английский сад KidsUP · б-р Маршала Рокоссовского, 6 к1В · "
+FOOT=("Детский центр и мини-сад KidsUP · б-р Маршала Рокоссовского, 6 к1В · "
       "БЦ «Богородский», 7-й подъезд, 2 этаж · kidsup.ru · +7 916 017-09-18")
 out=[f"<style>{CSS}</style>"]
 out.append(card("psh1","Подготовка к школе, 1-й уровень",

@@ -13,6 +13,8 @@ from datetime import date, datetime, timedelta
 from . import config, db
 from .moyklass_client import MoyklassClient, MoyklassError
 
+KURS_PEREIMENOVAT = {"Английский детский сад": "Мини-сад"}
+
 log = logging.getLogger("kidsup.sync")
 
 _sync_thread: threading.Thread | None = None
@@ -83,7 +85,15 @@ def _run_sync(history_months: int | None):
         _stage("Справочники (филиалы, сотрудники, курсы, группы)")
         db.save_simple("filials", client.fetch_optional("/v1/company/filials", ["filials"]))
         db.save_simple("managers", client.fetch_optional("/v1/company/managers", ["managers"]))
-        db.save_simple("courses", client.fetch_optional("/v1/company/courses", ["courses"]))
+        kursy = client.fetch_optional("/v1/company/courses", ["courses"])
+        # 28.09 Борис: «Английский детский сад» вводит родителей в заблуждение
+        # (там английский 2 раза в неделю) — везде «Мини-сад», как «Нулевой класс».
+        # Пока курс в МойКлассе не переименован, приводим имя здесь: по нему
+        # ищутся цены (PRICES), тексты и описания.
+        for k in kursy or []:
+            if (k.get("name") or "").strip() in KURS_PEREIMENOVAT:
+                k["name"] = KURS_PEREIMENOVAT[k["name"].strip()]
+        db.save_simple("courses", kursy)
         db.save_classes(client.fetch_optional("/v1/company/classes", ["classes"]))
         db.save_simple("subscriptions",
                        client.fetch_optional("/v1/company/subscriptions", ["subscriptions"]))

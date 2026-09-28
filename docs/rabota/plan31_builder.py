@@ -262,7 +262,7 @@ A("<div class='scroll'><table><tr><th>Предмет</th><th>Абонемент<
   "<th class='num'>Цена с 1.09</th><th class='num'>Со скидкой −10%</th></tr>")
 SHOW=["Раннее развитие","Подготовка к школе","Английский язык","ИЗО-студия","Шахматы",
       "Ментальная арифметика","Скорочтение (техника чтения)","Каллиграфия + грамота",
-      "Английский детский сад","Робототехника","Логопед"]
+      "Мини-сад","Робототехника","Логопед"]
 def _f(x): return f"{x:,}".replace(",", " ")+" ₽"
 for c in SHOW:
     pr=_P.get(c)
@@ -271,7 +271,7 @@ for c in SHOW:
     first=True
     for title,old,new_ in lines:
         if "разово" in title.lower() or "если не купили" in title: continue
-        rate = 5 if c=="Английский детский сад" else 10
+        rate = 5 if c=="Мини-сад" else 10
         disc = "—" if c in ("Робототехника","Логопед") else (
             f"<b>{_f(round(new_*(100-rate)/100))}</b>"
             + ("" if rate==10 else " <span class='small'>(−5%)</span>"))

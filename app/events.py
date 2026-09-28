@@ -179,7 +179,7 @@ h2.sec{{font-size:1.3rem;font-weight:780;margin:2rem 0 .3rem;color:var(--indigo)
 </style></head><body><div class="wrap">
 <header>
   <h1>Открытие сезона 2026/27</h1>
-  <p class="sub">Детский центр и английский сад KidsUP · бульвар Маршала
+  <p class="sub">Детский центр и мини-сад KidsUP · бульвар Маршала
   Рокоссовского, 6к1В — напротив ТЦ «Янтарь», 5 минут от метро</p>
 </header>
 

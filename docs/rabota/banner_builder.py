@@ -68,7 +68,7 @@ justify-content:space-between;gap:20px}
   <div class="top">
     <img src="__LOGO__">
     <h1>Учим детей<br>тому, что <span>правда<br>пригодится</span></h1>
-    <p>Детский центр и английский сад · Бульвар Рокоссовского</p>
+    <p>Детский центр и мини-сад · Бульвар Рокоссовского</p>
   </div>
 
   <div class="grid">

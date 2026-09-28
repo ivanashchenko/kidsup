@@ -100,7 +100,7 @@ pages.append(f"""<div class='p dark' style='display:flex;flex-direction:column;j
 <div><h1>Дневник<br>достижений</h1><div class='small' style='margin-top:3mm;color:#cfd3ff'>Каждое занятие — наклейка. Десять — подарок. Тридцать — значок ступени.</div></div>
 <div><div class='tiny' style='margin-bottom:1.5mm'>Этот дневник принадлежит</div><div class='line' style='height:9mm'></div>
 <div class='tiny' style='margin:3mm 0 1.5mm'>Направление · педагог</div><div class='line'></div></div>
-<div class='tiny' style='text-align:center'>KidsUP · детский центр и английский сад · kidsup.ru</div></div>""")
+<div class='tiny' style='text-align:center'>KidsUP · детский центр и мини-сад · kidsup.ru</div></div>""")
 # 2. моя карта
 pages.append(f"""<div class='p'><span class='tag'>День первого занятия</span><h2 style='margin-top:3mm'>Моя карта развития</h2>
 <div class='small'>Педагог заполняет после первого занятия. Мама получает такую же карту в WhatsApp — можно вклеить сюда.</div>
@@ -132,7 +132,7 @@ pages.append(f"""<div class='p dark'><h2 style='color:#fff'>Правила пр�
 </ul>
 <div style='position:absolute;left:8mm;right:8mm;bottom:8mm'>
 <div style='display:flex;align-items:center;gap:4mm'><img src='{LOGO_W}' style='height:12mm'>
-<div class='tiny' style='color:#cfd3ff'>Детский центр и английский сад KidsUP<br>{ADDR}<br><b style='color:#fff;font-size:9pt'>{PHONE}</b> · kidsup.ru</div></div></div></div>""")
+<div class='tiny' style='color:#cfd3ff'>Детский центр и мини-сад KidsUP<br>{ADDR}<br><b style='color:#fff;font-size:9pt'>{PHONE}</b> · kidsup.ru</div></div></div></div>""")
 
 html = f"<!doctype html><html><head><meta charset='utf-8'><style>{CSS}</style></head><body>{''.join(pages)}</body></html>"
 OUT_HTML.write_text(html, encoding="utf-8")

@@ -122,7 +122,7 @@ def build(key, title, lead, tiles, nums, quote, marks_title):
     </div>
   </div>
 </div>
-<div class="foot">Детский центр и английский сад KidsUP<br>
+<div class="foot">Детский центр и мини-сад KidsUP<br>
 б-р Маршала Рокоссовского, 6 к1В · БЦ «Богородский», 7-й подъезд, 2 этаж<br>
 kidsup.ru · +7 916 017-09-18</div></div>''')
     # 2. подход
