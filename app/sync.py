@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 from . import config, db
 from .moyklass_client import MoyklassClient, MoyklassError
 
-KURS_PEREIMENOVAT = {"Английский детский сад": "Мини-сад"}
+KURS_PEREIMENOVAT = {"Английский детский сад": "Мини-сад"}   # страховка, если курс в CRM вернут к старому имени
 
 log = logging.getLogger("kidsup.sync")
 

@@ -3725,7 +3725,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-28.21"
+APP_VERSION = "2026-09-28.24"
 
 
 @app.get("/api/net")
@@ -7969,6 +7969,48 @@ def api_ads_vk_users_list(payload: dict = Body(...)):
         return {"http": r.status_code, "phones": n, "body": r.json()}
     except Exception:  # noqa: BLE001
         return {"http": r.status_code, "phones": n, "text": r.text[:500]}
+
+
+@app.post("/api/crm/course-rename", dependencies=OWNER_AUTH)
+def api_crm_course_rename(payload: dict = Body(...)):
+    """Переименовать программу (курс) МойКласса: {"from": "...", "to": "...", "dry": 1}.
+
+    28.09 Борис: «Английский детский сад» → «Мини-сад». По API у программы
+    меняются только переданные поля — тело из одного имени ничего не затирает.
+    Описания программы возвращаем в ответе, чтобы увидеть старые формулировки."""
+    from .moyklass_client import MoyklassClient
+    src, dst = str(payload.get("from") or "").strip(), str(payload.get("to") or "").strip()
+    if not src or not dst:
+        raise HTTPException(400, "нужны from и to")
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        r = mk.get("/v1/company/courses")
+        kursy = r if isinstance(r, list) else r.get("courses") or []
+        k = next((x for x in kursy if (x.get("name") or "").strip() == src), None)
+        if not k:
+            return {"ok": False, "error": f"программы «{src}» нет",
+                    "есть": [x.get("name") for x in kursy][:40]}
+        info = {"course_id": k["id"], "было": k.get("name"),
+                "короткое_описание": k.get("shortDescription"), "описание": (k.get("description") or "")[:1500]}
+        if int(payload.get("dry", 1)):
+            return {"dry_run": True, **info, "станет": dst}
+        body = {"name": dst}
+        for pole in ("shortDescription", "description"):
+            if payload.get(pole):
+                body[pole] = str(payload[pole])
+        try:
+            mk.post(f"/v1/company/courses/{k['id']}", body)
+        except Exception as e:  # noqa: BLE001
+            otvet = getattr(getattr(e, "response", None), "text", "") or ""
+            return {"ok": False, **info, "error": f"{str(e)[:300]} {otvet[:500]}", "поля": sorted(body)}
+        r = mk.get("/v1/company/courses")
+        kursy = r if isinstance(r, list) else r.get("courses") or []
+        nov = next((x for x in kursy if x.get("id") == k["id"]), {})
+        after = nov.get("name")
+        return {"ok": after == dst, **info, "стало": after,
+                "стало_коротко": nov.get("shortDescription"), "стало_описание": (nov.get("description") or "")[:1500]}
+    finally:
+        mk.close()
 
 
 @app.post("/api/crm/class-rename", dependencies=OWNER_AUTH)
