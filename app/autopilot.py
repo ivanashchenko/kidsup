@@ -2875,10 +2875,34 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
         # 24.09, получили её снова. Смотрим на сам факт отправки за 21 день.
         if uid in touched or _reactivated_recently(phone, 21, uid):
             continue
+        # 28.09, разбор 137 отказов: семье, которую сейчас ведут звонками
+        # (утренняя раздача «Вернуть и дожать»), автописьмо поверх звонка —
+        # это тот самый «вал сообщений». Звонили за 7 дней (даже без
+        # ответа) — не пишем, работа идёт голосом.
+        try:
+            with db.get_conn() as conn:
+                zvonili = conn.execute(
+                    "SELECT 1 FROM mango_calls WHERE substr(phone,-10)=? AND ts>=? LIMIT 1",
+                    (phone, (_today() - timedelta(days=7)).isoformat())).fetchone()
+        except Exception:
+            zvonili = None
+        if zvonili:
+            continue
+        # возраст «на сейчас»: 13+ не пишем; подготовку к школе старше 6,6 лет
+        # не предлагаем (Малькову во 2 классе ушло «про подготовку»)
+        try:
+            from . import nabor as _nb
+            vozr = _nb._age(_nb._birthday(json.dumps(u, ensure_ascii=False)), _today())
+        except Exception:
+            vozr = None
+        if vozr is not None and vozr >= 12.9:
+            continue
         if not _mark("reactivate", f"{phone}:{_today().isoformat()}"):
             continue
         child = _child_name(u.get("name") or "")
         subj = interest.get(uid)
+        if subj == "подготовке к школе" and vozr is not None and vozr > 6.6:
+            subj = None
         about = f" по {subj}" if subj else ""
         # имя — только в именительном падеже: «для Марк» читается как ошибка
         who = child or "ребёнок"
@@ -2886,10 +2910,13 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
         # то же письмо дважды читается как рассылка. Поэтому три разных письма
         # по порядку, и третье — последнее: разрешаем сказать «не актуально»,
         # после него семье реактивация больше не приходит.
+        # 28.09: не больше двух писем (разбор отказов: на третьем семьи
+        # отвечали «пока не…»). Второе письмо — сразу прощальное, с
+        # разрешением сказать «не актуально».
         n_bylo = _reactivation_count(phone, uid)
-        if n_bylo >= 3:
+        if n_bylo >= 2:
             continue
-        tekst = _reactivation_text(n_bylo, who, about)
+        tekst = _reactivation_text(0 if n_bylo == 0 else 2, who, about)
         if subj in ("шахматам", "ИЗО-студии"):
             # 27.09: пробное на шахматах и ИЗО платное (850 ₽) — не «условно-бесплатное»
             tekst = tekst.replace("оно условно-бесплатное, и на нём же бесплатная диагностика",
@@ -2902,7 +2929,7 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
             try:
                 mk.post("/v1/company/userComments",
                         {"userId": uid, "showToUser": False,
-                         "comment": f"Авто-реактивация «думает» ({n_bylo + 1} из 3): "
+                         "comment": f"Авто-реактивация «думает» ({n_bylo + 1} из 2): "
                                     f"отправлено личное сообщение"
                                     f"{about or ' (предмет не определён)'}."})
             except Exception:
