@@ -4780,6 +4780,16 @@ def _loop() -> None:
                             log.info("возврат: %s", vozvrat.razdat())
                         except Exception:
                             log.exception("раздача возврата упала")
+                    # 28.09 Борис: прайс Яндекс Карт = прайс приложения. Яндекс берёт
+                    # только файл, поэтому раз в день сверяем отпечаток фида и
+                    # перезагружаем, если цены или состав поменялись.
+                    if 7 <= now.hour <= 10 and db.get_setting("ya_price_auto", "1") == "1" \
+                            and _mark("ya_price", str(_today())):
+                        try:
+                            from . import ya_prays
+                            log.info("прайс Карт: %s", ya_prays.zagruzit())
+                        except Exception:
+                            log.exception("прайс Карт не загружен")
                     # наряд: строки живых списков, которые сегодня ничьи,
                     # кладём дежурной в инбокс. Раз в час, рабочее окно.
                     if 9 <= now.hour <= 19 and _mark("slot_hourly_naryad", _hour):

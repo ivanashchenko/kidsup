@@ -187,19 +187,38 @@ def price_yml():
         "Шахматы": ("/shahmaty", "shahmaty_1.jpg"),
         "Робототехника": ("/robototehnika", "robototehnika_1.jpg"),
     }
-    cats, offers = [], []
-    for ci, (course, pr) in enumerate((c, v) for c, v in PRICES.items() if c not in skip):
-        cats.append(f'<category id="{ci + 1}">{_e(course)}</category>')
-        page, photo = lp.get(course, ("/#courses", ""))
-        url = f"https://kidsup.ru{page}"
-        pic = f"<picture>https://app.kidsup.ru/static/img/lp/{photo}</picture>" if photo else ""
+    # 28.09 Борис: карточку на Картах переводим на этот фид целиком. Нулевой
+    # класс в прайсе лежит внутри «Мини-сада» — на Картах это отдельная категория;
+    # описание позиции — из описаний курсов (/courses), а не служебный заголовок прайса.
+    lp["Нулевой класс"] = ("/nulevoy", "nulevoy_1.jpg")
+    opis = {c["course"]: c for c in descr_mod.COURSES}
+
+    def _desc(kurs: str, zapas: str) -> str:
+        c = opis.get(kurs)
+        if not c:
+            return zapas
+        t = f"{c['tag']} Возраст: {c['age']}. {c['sched'][:1].upper()}{c['sched'][1:]}."
+        t += f" {zapas}." if "пробн" in zapas else ""
+        # на Картах показывают до 250 знаков — длиннее Яндекс обрезает сам, посреди слова
+        return t if len(t) <= 250 else t[:248].rsplit(" ", 1)[0].rstrip(" ,·:;—") + "…"
+
+    cats, offers, cat_id = [], [], {}
+    for course, pr in ((c, v) for c, v in PRICES.items() if c not in skip):
         for li, (title, _old, price) in enumerate(pr["lines"]):
+            kurs = "Нулевой класс" if title.startswith("Нулевой класс") else course
+            if kurs not in cat_id:
+                cat_id[kurs] = len(cat_id) + 1
+                cats.append(f'<category id="{cat_id[kurs]}">{_e(kurs)}</category>')
+            ci = cat_id[kurs] - 1
+            page, photo = lp.get(kurs, ("/#courses", ""))
+            url = f"https://kidsup.ru{page}"
+            pic = f"<picture>https://app.kidsup.ru/static/img/lp/{photo}</picture>" if photo else ""
             oid = f"{ci + 1}-{li + 1}"
-            name = f"{course} · {title}"
-            desc = pr["title"]
+            name = title if title.startswith(("Мини-сад", "Нулевой класс")) else f"{course} · {title}"
+            desc = _desc(kurs, pr["title"])
             offers.append(
                 f'<offer id="{_e(oid)}" available="true"><url>{_e(url)}</url>'
-                f"<price>{int(price)}</price><currencyId>RUR</currencyId><categoryId>{ci + 1}</categoryId>"
+                f"<price>{int(price)}</price><currencyId>RUR</currencyId><categoryId>{cat_id[kurs]}</categoryId>"
                 f"<vendor>KidsUP</vendor>{pic}"
                 f"<name>{_e(name)}</name><description>{_e(desc)}</description></offer>")
     body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -3725,7 +3744,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-28.24"
+APP_VERSION = "2026-09-28.27"
 
 
 @app.get("/api/net")
@@ -3772,7 +3791,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # сбор оплат за следующий месяц (app/oplata.py): включение и время старта
             "oplata_on", "oplata_start",
             # возврат «думает»/«недозвон»/база 2024/25 (app/vozvrat.py): сколько звонков в день и кому
-            "vozvrat_v_den", "vozvrat_kto", "vozvrat_on", "vozvrat_kvota",
+            "vozvrat_v_den", "vozvrat_kto", "vozvrat_on", "vozvrat_kvota", "ya_price_auto",
             "vozvrat_msg_on", "vozvrat_msg_start", "vozvrat_msg_v_den",
             # разобранные записи разговоров: список recording_id, чтобы почасовой
             # разбор не написал в карточку один и тот же звонок дважды
@@ -6661,6 +6680,13 @@ def api_yandex_open(payload: dict = Body(...)):
                              payload.get("actions") or None, bool(payload.get("links")))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"{type(e).__name__}: {e}")
+
+
+@app.post("/api/yandex/price-upload", dependencies=OWNER_AUTH)
+def api_yandex_price_upload(payload: dict = Body(default={})):
+    """Прайс приложения → Яндекс Карты (замена всего прайса карточки): {force, dry, knopka}."""
+    from . import ya_prays
+    return ya_prays.zagruzit(bool(payload.get("force")), bool(payload.get("dry")))
 
 
 @app.get("/api/yandex/shot", dependencies=OWNER_AUTH)

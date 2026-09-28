@@ -1091,6 +1091,11 @@ def ya_open(url: str, wait_ms: int = 6000, max_text: int = 8000,
                         loc.select_option(label=str(st["select"]))
                     else:
                         loc.select_option(str(st["select"]))
+                elif "upload" in st:
+                    # файл с сервера в input[type=file] — прайс Карт (28.09): Яндекс
+                    # Бизнес принимает YML только файлом, ссылку подключить нельзя
+                    pg.locator(st.get("css") or "input[type=file]").nth(int(st.get("nth", 0))) \
+                      .set_input_files(str(st["upload"]))
                 elif "fill" in st:
                     loc = pg.locator(st["css"]) if st.get("css") else pg.get_by_placeholder(st["placeholder"])
                     loc.first.click(timeout=10000)
