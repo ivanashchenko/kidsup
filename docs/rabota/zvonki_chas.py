@@ -26,6 +26,18 @@ AUTH = ("admin", os.environ.get("KIDSUP_ADMIN_PASS", "CGWstart8*"))
 VIA_SERVER = not (KEY and SALT)
 
 
+def _get(url, **kw):
+    # 02.10: прокси регулярно рвёт первое TLS-соединение (Connection reset
+    # by peer) — без повтора весь разбор падал, хотя вторая попытка проходит.
+    for i in range(4):
+        try:
+            return httpx.get(url, **kw)
+        except httpx.TransportError:
+            if i == 3:
+                raise
+            time.sleep(3 * (i + 1))
+
+
 def _call(url, data):
     j = json.dumps(data, separators=(",", ":"))
     sign = hashlib.sha256((KEY + j + SALT).encode()).hexdigest()
@@ -41,7 +53,7 @@ def calls(minutes: int) -> list[dict]:
         # потеряться вместе с обещаниями клиентам. Поэтому пустой ответ с
         # ready=false пробуем ещё дважды, прежде чем поверить в тишину.
         for i in range(3):
-            r = httpx.get(f"{SERVER}/api/calls/list", params={"minutes": minutes},
+            r = _get(f"{SERVER}/api/calls/list", params={"minutes": minutes},
                           auth=AUTH, timeout=240)
             r.raise_for_status()
             j = r.json()
@@ -99,7 +111,7 @@ def transcribe(rows: list[dict]) -> None:
     for x in rows:
         f = f"/tmp/{x['rec'][:12]}.mp3"
         if VIA_SERVER:
-            r = httpx.get(f"{SERVER}/api/calls/recording", params={"id": x["rec"]},
+            r = _get(f"{SERVER}/api/calls/recording", params={"id": x["rec"]},
                           auth=AUTH, timeout=180)
         else:
             r = _call("https://app.mango-office.ru/vpbx/queries/recording/post/",
