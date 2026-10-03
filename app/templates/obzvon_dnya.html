@@ -55,7 +55,9 @@
 <div class="od">
 <main>
   <h1>Обзвон дня — {{ d.who }}, {{ d.day[8:10] }}.{{ d.day[5:7] }}</h1>
-  <p class="sub">Звонки из Пульта одной лентой. Нажали итог — он сразу записывается в карточку МойКласса и в пункт Пульта
+  <div class="tabs" style="margin-bottom:6px">{% for dd, t in dni %}<a class="tab" href="/obzvon-dnya?day={{ dd }}&who={{ d.who }}" aria-selected="{{ 'true' if dd == d.day else 'false' }}" style="text-decoration:none">{{ t }} · {{ dd[8:10] }}.{{ dd[5:7] }}</a>{% endfor %}</div>
+  <p class="sub"><b>Порядок: новые заявки → думают, платили раньше → база 2024/25 → недозвоны.</b> Все разговоры — в МойКласс, как обычно, и итог — кнопкой под контактом.
+  Звонки из Пульта одной лентой, страница обновляется сама раз в 3 минуты. Нажали итог — он сразу записывается в карточку МойКласса и в пункт Пульта
   («не дозвонились» пункт не закрывает). Записали на пробное — не забудьте саму запись в группу в CRM и сообщение семье с датой и адресом.</p>
   <div class="prog" id="prog"></div>
   <div class="tabs" role="tablist" id="tabs"></div>
@@ -66,15 +68,15 @@
 <aside><h2>Свободные места сейчас</h2><p>Первое занятие условно-бесплатное; купили в день пробного — −15% на первый абонемент.</p><div id="leg"></div></aside>
 </div>
 <script>
-const D={{ d|tojson }};
-const WHY={all:'Порядок: новые заявки → «думают, платили раньше» → недозвоны → база 2024/25. В каждом разговоре — конкретная группа и дата на этой или следующей неделе.',
+let D={{ d|tojson }};
+const WHY={all:'Порядок: новые заявки → «думают, платили раньше» → база 2024/25 → недозвоны. В каждом разговоре — конкретная группа и дата на этой или следующей неделе.',
  new:'<strong>Звонить сразу.</strong> Свежая заявка покупает в разы чаще, чем через день.',
  think:'<strong>Самый тёплый запас.</strong> Семьи уже платили нам. Начать: «вы у нас занимались — в группе [день, время] есть место, поставить на пробное на этой неделе?»',
  miss:'<strong>В выходные дозваниваются лучше всего.</strong> Не взяли снова — короткое сообщение в мессенджер с одним предложением и датой.',
  base:'<strong>Ходили у нас в прошлом году.</strong> «Занимались у нас в 2024/25 — есть место в группе…». Дети подросли — сверить возраст с группой.'};
 const LBL={new:'новая',think:'думает',miss:'недозвон',base:'2024/25'};
 const RES=[['zap','Записали'],['dum','Думают'],['ned','Не дозвонились'],['otk','Отказ']];
-let tab='think';try{tab=localStorage.getItem('od_tab')||'think'}catch(e){}
+let tab='new';try{tab=localStorage.getItem('od_tab')||'new'}catch(e){}
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=p=>p&&p.length===11?`+7 ${p.slice(1,4)} ${p.slice(4,7)}-${p.slice(7,9)}-${p.slice(9)}`:(p||'нет телефона');
 function prog(){const c={zap:0,dum:0,ned:0,otk:0};D.items.forEach(x=>{if(x.itog)c[x.itog.itog]++});const n=D.items.filter(x=>x.itog).length;
@@ -92,7 +94,7 @@ function render(){
  items.forEach(x=>{const m=x.itog&&x.itog.itog;const el=document.createElement('article');el.className='card'+(m&&m!=='ned'?' marked':'');
   const kids=x.kids.length?x.kids.map(k=>`${esc(k.n)}${k.age?` <small>${esc(k.age)} г.</small>`:''}`).join(', '):esc(x.name);
   const offers=x.offer.map(o=>`<span class="offer">${esc(o.t)}${o.free===null?'':` · <i class="${o.free?'':'z'}">${o.free?'мест '+o.free:'мест нет'}</i>`}</span>`).join('');
-  el.innerHTML=`<div class="who"><span class="kind k-${x.kind}">${LBL[x.kind]}</span>${kids}<div class="meta">${esc(x.meta)}</div></div>
+  el.innerHTML=`<div class="who"><span class="kind k-${x.kind}">${LBL[x.kind]}</span>${kids}${x.chej&&x.chej!==D.who?` <small>(из Пульта: ${esc(x.chej)})</small>`:''}<div class="meta">${esc(x.meta)}</div></div>
    <div class="phone">${x.phone?`<a href="tel:+${esc(x.phone)}">${fmt(x.phone)}</a>`:'<span class="meta">нет телефона</span>'}</div>
    ${offers?`<div class="offers">${offers}</div>`:''}
    <div class="res">${RES.map(([k,t])=>`<button class="btn ${k}" type="button" data-k="${k}" aria-pressed="${m===k}">${t}</button>`).join('')}
@@ -111,5 +113,10 @@ const idx=k=>{const i=order.findIndex(o=>k.startsWith(o));return i<0?99:i};
 D.legend.sort((a,b)=>idx(a.key)-idx(b.key)||b.free-a.free).forEach(l=>{const g=document.createElement('div');g.className='g';
  g.innerHTML=`<span>${esc(l.key)}</span><b>${l.free} из ${l.mest}</b><span class="n">${esc(l.name)}${l.note?' — '+esc(l.note):''}</span>`;document.getElementById('leg').appendChild(g)});
 document.getElementById('q').oninput=render;document.getElementById('hide').onchange=render;render();
+// Живое обновление: новые заявки и итоги других появляются без перезагрузки; набранные заметки не теряются.
+setInterval(()=>{const a=document.activeElement;if(a&&a.tagName==='INPUT'&&a.id.startsWith('note-')&&a.value)return;
+ fetch('/api/obzvon-dnya?day='+D.day+'&who='+encodeURIComponent(D.who)).then(r=>r.ok?r.json():null).then(j=>{if(!j)return;
+  const notes={};document.querySelectorAll('input[id^="note-"]').forEach(i=>{if(i.value)notes[i.id]=i.value});
+  D=j;render();Object.entries(notes).forEach(([k,v])=>{const i=document.getElementById(k);if(i&&!i.value)i.value=v})}).catch(()=>{})},180000);
 </script>
 {% endblock %}

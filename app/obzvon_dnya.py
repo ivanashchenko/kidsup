@@ -16,9 +16,10 @@ from . import db
 KINDS = {
     "new": "Новые заявки",
     "think": "Думают, платили раньше",
-    "miss": "Недозвоны",
     "base": "База 2024/25",
+    "miss": "Недозвоны",
 }
+# Порядок вкладок — как Борис поставил Ане 03.10: новые → думают → база → недозвоны.
 ITOGI = {
     "zap": "записали на пробное",
     "dum": "думают, перезвонить",
@@ -32,23 +33,44 @@ def _init(conn):
                  "itog TEXT, note TEXT, who TEXT, ts TEXT)")
 
 
-def _kind(text: str, source: str) -> str | None:
-    if "НОВАЯ ЗАЯВКА" in text:
+_NEW = re.compile(r"НОВАЯ ЗАЯВКА|ПРОПУЩЕННЫЙ ЗВОНОК|Летняя заявка|Заявка с Директа|заявка с сайта|"
+                  r"\(карточки нет\)|^Позвонить \+?7\d|^Звонить на|сам звонил")
+_MISS = re.compile(r"НЕДОЗВОН|Недозвон|Последняя попытка|недозвон")
+_BASE = re.compile(r"^БАЗА|Бывшие ученики|летнем лагере|в прошлом году|до весны")
+# Не звонки: переписка, статусы, уборка CRM — это Ира (решение Бориса 03.10).
+_NE_ZVONOK = re.compile(r"Похоже на отказ|Клиент писал, ответа нет|КЛИЕНТ ЖДЁТ ОТВЕТА|^Отказ \(|качество карточек|"
+                        r"без менеджера|^CRM:|Гигиена статусов|Хвост: заявка|Заявка висит «новой»|ИМЕНА КАРТОЧЕК|"
+                        r"\+?734001|Статусы после разбора")
+_THINK = re.compile(r"^ДУМАЕТ|ВЕРНУТЬ|решения нет|ОТЛОЖЕННЫЙ ЗВОНОК")
+
+
+def _chist(text: str) -> str:
+    return re.sub(r"^⏳ с \d\d\.\d\d:\s*", "", text or "").replace("🤖 Клод: ", "").strip()
+
+
+def _kind(text: str, source: str, svoy: bool = True) -> str | None:
+    """Вкладка для пункта. svoy — пункт лежит на том, кто звонит: тогда любой
+    его пункт — звонок (Пульт Ани на 03–04.10 — только обзвон), и то, что не
+    узнали по словам, идёт в «думают» (это семьи, с которыми уже говорили).
+    Чужие пункты (у Иры, Лены) берём только по точным признакам звонка."""
+    t = _chist(text)
+    if _NE_ZVONOK.search(t):
+        return None
+    if _NEW.search(t):
         return "new"
-    t = re.sub(r"^⏳ с \d\d\.\d\d:\s*", "", text).replace("🤖 Клод: ", "")
-    if t.startswith("ДУМАЕТ"):
-        return "think"
-    if t.startswith("НЕДОЗВОН"):
+    if _MISS.search(t):
         return "miss"
-    if t.startswith("БАЗА"):
+    if _BASE.search(t):
         return "base"
-    return None
+    if _THINK.search(t):
+        return "think"
+    return "think" if svoy else None
 
 
 def razobrat(text: str) -> dict:
     """Пункт Пульта → дети, пометка и предложенные группы (без дат: в пунктах,
     перенесённых с прошлых дней, они уже прошли)."""
-    t = re.sub(r"^⏳ с \d\d\.\d\d:\s*", "", text).replace("🤖 Клод: ", "")
+    t = _chist(text)
     if "НОВАЯ ЗАЯВКА" in t:
         m = re.search(r"позвонить в течение 5 минут!\s*(.*)", t)
         rest = m.group(1) if m else t
@@ -89,6 +111,25 @@ def razobrat(text: str) -> dict:
                               + (f" (пробное {platno.group(1)})" if platno else ""))
             elif "возра" in part:
                 offers.append("по возрасту — уточнить")
+    if not kids and not offers and not meta:
+        m = re.search(r"ПРОПУЩЕННЫЙ ЗВОНОК от \+?(\d+)", t)
+        if m:
+            return {"name": "Пропущенный звонок", "kids": [], "offer": [],
+                    "meta": "клиент звонил сам и не дозвонился — перезвонить первым делом"}
+        m = re.match(r"Недозвон, попытка №(\d): (.+?) \+?7\d{10} — (.*)", t)
+        if m:
+            return {"name": m.group(2), "kids": [], "offer": [], "meta": f"попытка {m.group(1)} · {m.group(3)[:260]}"}
+        m = re.match(r"Летняя заявка[^«]*«([^»]+)»,?\s*(?:\d{11},?\s*)?(.*)", t)
+        if m:
+            return {"name": m.group(1), "kids": [], "offer": [], "meta": "летняя заявка без ответа · " + m.group(2)[:260]}
+        m = re.match(r"ВЕРНУТЬ \(([^)]*)\): (.+?): (.*)", t)
+        if m:
+            return {"name": m.group(2), "kids": [], "offer": [], "meta": f"вернуть ({m.group(1)}) · {m.group(3)[:260]}"}
+        # Пункт свободной формы («Орлова Алиса (3 г.), мама …. Утром написать…»):
+        # имя — до первой запятой или двоеточия, остальное — что сделать.
+        m = re.match(r"(.{3,70}?)(?:[,:]|\s—\s)\s*(.*)", t, re.S)
+        name, rest = (m.group(1), m.group(2)) if m else (t[:60], t[60:])
+        return {"name": name.strip(), "kids": [], "meta": rest.strip()[:320], "offer": []}
     return {"name": ", ".join(k["n"] for k in kids) or "—", "kids": kids,
             "meta": meta.strip(" ·"), "offer": offers}
 
@@ -125,19 +166,21 @@ def _legenda() -> list[dict]:
 def spisok(day: str, who: str) -> dict:
     with db.get_conn() as conn:
         _init(conn)
-        rows = conn.execute("SELECT id, text, phone, source, done FROM plan_inbox "
-                            "WHERE day=? AND who=? ORDER BY id", (day, who)).fetchall()
+        rows = conn.execute("SELECT id, who, text, phone, source, done FROM plan_inbox "
+                            "WHERE day=? ORDER BY id", (day,)).fetchall()
         itogi = {r["item_id"]: dict(r) for r in conn.execute(
             "SELECT * FROM obzvon_dnya WHERE item_id IN (%s)" % ",".join(str(r["id"]) for r in rows)
         ).fetchall()} if rows else {}
     items = []
     for r in rows:
-        k = _kind(r["text"], r["source"] or "")
-        if not k:
+        if r["who"] not in (who, "Ира", "Лена", "Аня"):
+            continue
+        k = _kind(r["text"], r["source"] or "", svoy=(r["who"] == who))
+        if not k or (r["who"] != who and (r["done"] or not r["phone"])):
             continue
         it = razobrat(r["text"])
         it.update(id=r["id"], kind=k, phone=r["phone"] or "", done=bool(r["done"]),
-                  itog=itogi.get(r["id"]))
+                  itog=itogi.get(r["id"]), chej=r["who"])
         items.append(it)
     leg = _legenda()
     by = {}

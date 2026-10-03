@@ -3493,9 +3493,20 @@ def api_obzvon():
 def obzvon_dnya_page(request: Request, day: str = "", who: str = "Аня"):
     """Обзвон дня: звонки одного админа из Пульта одной лентой, с итогом звонка."""
     from . import obzvon_dnya, autopilot
-    d = day[:10] or autopilot._today().isoformat()
+    from datetime import date as _d, timedelta as _td
+    segodnya = autopilot._today().isoformat()
+    d = day[:10] or segodnya
     who = who if who in KOLONKI_PULTA else "Аня"
-    return render(request, "obzvon_dnya.html", active="obzvon_dnya", d=obzvon_dnya.spisok(d, who))
+    dni = [(segodnya, "Сегодня"), ((_d.fromisoformat(segodnya) + _td(days=1)).isoformat(), "Завтра")]
+    return render(request, "obzvon_dnya.html", active="obzvon_dnya", d=obzvon_dnya.spisok(d, who), dni=dni)
+
+
+@app.get("/api/obzvon-dnya", dependencies=AUTH)
+def api_obzvon_dnya(day: str = "", who: str = "Аня"):
+    """Те же данные машинным форматом — страница подтягивает их раз в 3 минуты."""
+    from . import obzvon_dnya, autopilot
+    d = day[:10] or autopilot._today().isoformat()
+    return obzvon_dnya.spisok(d, who if who in KOLONKI_PULTA else "Аня")
 
 
 @app.post("/api/obzvon-dnya/itog", dependencies=AUTH)
@@ -3764,7 +3775,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-03.1"
+APP_VERSION = "2026-10-03.2"
 
 
 @app.get("/api/net")
