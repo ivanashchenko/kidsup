@@ -3517,6 +3517,57 @@ def api_obzvon_dnya_itog(payload: dict = Body(...)):
         raise HTTPException(400, str(e))
 
 
+@app.post("/api/tg/webhook/{secret}")
+async def api_tg_webhook(secret: str, request: Request):
+    """Сюда Telegram присылает сообщения рабочих групп (см. app/tg.py).
+    Без Basic auth — Telegram его не умеет; защита — секрет в пути и в заголовке."""
+    from . import tg
+    try:
+        upd = await request.json()
+    except Exception:
+        raise HTTPException(400, "не JSON")
+    try:
+        return tg.prinyat(upd, secret, request.headers.get("x-telegram-bot-api-secret-token"))
+    except PermissionError:
+        raise HTTPException(403, "нет")
+
+
+@app.post("/api/tg/setup", dependencies=OWNER_AUTH)
+def api_tg_setup():
+    """Проверить бота по tg_bot_token и поставить webhook. Ответ — имя бота и статус."""
+    from . import tg
+    try:
+        return tg.setup()
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/tg/chats", dependencies=AUTH)
+def api_tg_chats():
+    from . import tg
+    return {"chats": tg.chats()}
+
+
+@app.get("/api/tg/messages", dependencies=AUTH)
+def api_tg_messages(chat: int = 0, since: str = "", limit: int = 200, q: str = ""):
+    """Сообщения групп: ?chat=<id>&since=YYYY-MM-DDTHH:MM&q=слово&limit=200."""
+    from . import tg
+    return {"messages": tg.messages(chat or None, since, limit, q)}
+
+
+@app.post("/api/tg/send", dependencies=AUTH)
+def api_tg_send(payload: dict = Body(...)):
+    """Ответить в группу: {"chat_id": -100…, "text": "...", "reply_to": msg_id}."""
+    from . import tg
+    chat_id, text = int(payload.get("chat_id") or 0), str(payload.get("text") or "").strip()
+    if not chat_id or not text:
+        raise HTTPException(400, "нужны chat_id и text")
+    try:
+        return tg.send(chat_id, text, int(payload.get("reply_to") or 0) or None)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/vozvrat", response_class=HTMLResponse, dependencies=AUTH)
 def vozvrat_page(request: Request):
     """Вернуть и дожать: «думает», «недозвон», база 2024/25 — очередь и предложения."""
@@ -3772,7 +3823,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-03.3"
+APP_VERSION = "2026-10-03.4"
 
 
 @app.get("/api/net")

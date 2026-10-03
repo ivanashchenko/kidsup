@@ -79,7 +79,7 @@ details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-to
 
 <div class="p3">
 <h1>Как донабрать группы до 311</h1>
-<p class="lead">Разбор на {{ d.дата }} · 6 направлений (группы, математика, свои базы, реклама, воронка, район), затем сводка и две независимые проверки — цифр и правил · оплаченные и пробные на карточках сверху считаются живыми</p>
+<p class="lead">Разбор на {{ d.дата }} · {{ d.napravleniya or 'направления: группы по предметам, воронка, свои базы, реклама, район, продукт и цены, удержание' }}; по каждому направлению — независимая проверка цифр и кандидатов, затем сводка и критик полноты · оплаченные и пробные на карточках сверху считаются живыми</p>
 
 <div class="kpi">
   <div class="c"><div class="n">{{ k.paid }}</div><div class="l">оплаченных детей сезона — уникальных, впервые оплативших с 31.08 (официальный счётчик)</div></div>
@@ -139,6 +139,16 @@ details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-to
 <div class="card"><ul>{% for n in d.novye_gruppy %}<li><b>{{ n.gruppa }}</b> — {{ n.interes }}. <span class="muted">Условие: {{ n.uslovie }} · кто: {{ n.kto }}</span></li>{% endfor %}</ul></div>
 {% endif %}
 
+{% if d.metody_rejting %}
+<h2>Все методы по эффективности <small>{{ d.metody_rejting|length }} методов · сверху — больше детей на рубль и на день · ✓ 311 — двигает счётчик новых детей · ◫ — наполняет группы</small></h2>
+<div class="tasks">
+{% for m in d.metody_rejting %}
+  <div class="t"><div class="n">{{ m.n }}</div><div><span class="who {{ (m.kto or '')|replace(',', ' ')|replace('/', ' ') }}">{{ (m.kto or '')[:14] }}</span></div>
+    <div><div class="b"><b>{{ m.metod }}</b> <span class="muted">· {{ m.napravlenie }}</span><br>{{ m.sut }}</div>
+    <div class="m">▲ {{ m.effekt }}{% if m.k_311 %} · ✓ 311{% endif %}{% if m.napolnenie %} · ◫ группы{% endif %} · ⏱ {{ m.srok }} · 💰 {{ m.zatraty }}{% if m.uverennost is defined and m.uverennost is not none %} · уверенность {{ (m.uverennost * 100)|round|int }}%{% endif %}{% if m.status %} · <b>{{ m.status }}</b>{% endif %}{% if m.proverka %} · проверка: {{ m.proverka }}{% endif %}</div></div></div>
+{% endfor %}
+</div>
+{% endif %}
 {% if d.mery_nabora %}
 <h2>Как донабрать: полный перечень мер <small>по предметам · кто, срок, ожидаемый эффект</small></h2>
 {% for blk in d.mery_nabora %}
