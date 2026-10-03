@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Явка — KidsUP{% endblock %}
+{% block content %}
+<style>
+  .yv{--ink:#1d1a4d;--muted:#5f5d84;--line:#e2e1ef;--chip:#eeedf8;--indigo:#312783;--sky:#1DA7E0;
+      --green:#4f8a12;--amber:#b87400;--red:#c4141f;--green-s:#eaf5dc;--amber-s:#fdf0d9;--red-s:#fbe3e4;--sky-s:#e3f4fb}
+  .yv h1{margin:0 0 4px;color:var(--indigo)}
+  .yv .sub{color:var(--muted);margin:0 0 12px;max-width:80ch}
+  .yv .top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .yv .top input[type=date]{border:1px solid var(--line);border-radius:10px;padding:7px 10px;font:inherit}
+  .yv .pills{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
+  .yv .pill{border-radius:999px;padding:4px 10px;font-weight:600;font-size:13px;background:var(--chip);font-variant-numeric:tabular-nums}
+  .yv .pill.g{background:var(--green-s);color:var(--green)}.yv .pill.a{background:var(--amber-s);color:var(--amber)}.yv .pill.r{background:var(--red-s);color:var(--red)}.yv .pill.s{background:var(--sky-s);color:#0f6f99}
+  .yv .mode{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 13px;margin-bottom:12px;font-size:14px;color:var(--muted)}
+  .yv .mode b{color:var(--ink)}
+  .yv .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;padding:7px 11px;font-size:14px;cursor:pointer;font-weight:600}
+  .yv .btn:hover{border-color:var(--indigo)} .yv .btn.p{background:var(--indigo);border-color:var(--indigo);color:#fff} .yv .btn.p:hover{background:#261e6b}
+  .yv .btn.w{background:var(--amber-s);border-color:var(--amber);color:var(--amber)}
+  .yv .btn[disabled]{opacity:.45;cursor:default}
+  .yv .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px}
+  .yv .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 13px;min-width:0}
+  .yv .card.ok{border-color:#c9e3a6} .yv .card.need{border-color:#f3d9a3}
+  .yv .head{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+  .yv .head .t{font:700 17px ui-monospace,Menlo,monospace;color:var(--indigo)}
+  .yv .head .c{font-weight:600;min-width:0;overflow-wrap:anywhere}
+  .yv .st{font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:6px;font-weight:600}
+  .yv .st.done{background:var(--green-s);color:var(--green)} .yv .st.open{background:var(--amber-s);color:var(--amber)}
+  .yv .meta{color:var(--muted);font-size:12px;margin-bottom:6px}
+  .yv table{width:100%;border-collapse:collapse;font-size:14px}
+  .yv td{padding:3px 4px;border-top:1px solid var(--line);vertical-align:top}
+  .yv td.r{text-align:center;white-space:nowrap;font-size:13px}
+  .yv .was{color:var(--green);font-weight:600} .yv .not{color:var(--red);font-weight:600} .yv .dash{color:#b9b7cc}
+  .yv .act{font-size:12px;border-radius:6px;padding:1px 6px;white-space:nowrap}
+  .yv .act.visit{background:var(--green-s);color:var(--green)} .yv .act.good{background:var(--sky-s);color:#0f6f99}
+  .yv .act.conf{background:var(--red-s);color:var(--red)} .yv .act.rash{background:var(--amber-s);color:var(--amber)}
+  .yv .note{color:var(--muted);font-size:12px}
+  .yv .list{margin:6px 0 0;padding:0;list-style:none;font-size:13px}
+  .yv .list li{padding:2px 0} .yv .list b{font-weight:600}
+  .yv .foot{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+  .yv .foot .why{color:var(--muted);font-size:12px}
+  .yv h2{font-size:17px;margin:18px 0 8px;color:var(--indigo)}
+  .yv .plain{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 13px;font-size:14px}
+  .yv .plain li{margin:3px 0}
+  .yv .log{font-size:13px;color:var(--muted)}
+  .yv .empty{color:var(--muted);padding:16px;text-align:center}
+  .yv .status{margin-left:auto;font-size:13px;color:var(--muted)}
+</style>
+<div class="yv">
+  <h1>Явка по отчётам педагогов</h1>
+  <p class="sub">Педагоги пишут «были / не был» в группу «KidsUP Team» — здесь эти списки сверены с записями на занятия в МойКлассе за день.
+    Кнопка «Отметить» ставит в CRM посещение тем, кто однозначно совпал, и уважительную причину тем, кто не был по болезни или предупредив;
+    «…и провести» ещё и проводит занятие (с этого момента списываются абонементы) — только там, где учтён каждый записанный ребёнок.
+    Спорные имена, «нет в записи» (отработки, пробные без записи, опечатки) и расхождения с уже проведёнными занятиями остаются человеку.</p>
+  <div class="top">
+    <a class="btn" href="/yavka?day={{ prev }}">← {{ prev[8:10] }}.{{ prev[5:7] }}</a>
+    <input type="date" value="{{ d.day }}" onchange="location.href='/yavka?day='+this.value">
+    <a class="btn" href="/yavka?day={{ next }}">{{ next[8:10] }}.{{ next[5:7] }} →</a>
+    <button class="btn" onclick="location.href='/yavka?day={{ d.day }}&refresh=1'">Пересчитать</button>
+    <span class="status">сверка {{ d.ts[11:16] }} · режим авто: <b>{{ {'0':'выключен (только сверка)','1':'отметки','2':'отметки и проведение'}.get(d.auto, d.auto) }}</b></span>
+  </div>
+  {% set it = d.itogo %}
+  <div class="pills">
+    <span class="pill">отчётов {{ it.otchetov }}</span>
+    <span class="pill s">занятий с отчётом {{ it.s_otchetom }} из {{ it.zanyatiy_v_crm }}</span>
+    <span class="pill {{ 'a' if it.ne_provedeno else 'g' }}">не проведено в CRM {{ it.ne_provedeno }}</span>
+    <span class="pill {{ 'a' if it.otmetok_postavit else 'g' }}">отметок поставить {{ it.otmetok_postavit }}</span>
+    <span class="pill g">можно провести {{ it.mozhno_provesti }}</span>
+    <span class="pill {{ 'r' if it.imen_bez_zapisi else '' }}">нет в записи {{ it.imen_bez_zapisi }}</span>
+    <span class="pill {{ 'r' if it.spornyh else '' }}">спорных {{ it.spornyh }}</span>
+    <span class="pill {{ 'r' if it.konfliktov else '' }}">расхождений с CRM {{ it.konfliktov }}</span>
+    <span class="pill {{ 'a' if it.bez_otcheta else '' }}">без отчёта педагога {{ it.bez_otcheta }}</span>
+  </div>
+  <div class="mode">
+    <button class="btn p" id="allMarks" {{ 'disabled' if not it.otmetok_postavit }} onclick="otmetit(null,false,this)">Отметить всё однозначное ({{ it.otmetok_postavit }})</button>
+    <button class="btn w" id="allConduct" {{ 'disabled' if not it.mozhno_provesti }} onclick="otmetit(null,true,this)">Отметить и провести учтённые занятия ({{ it.mozhno_provesti }})</button>
+    <span id="res" class="note"></span>
+  </div>
+
+  {% set lessons = d.lessons|selectattr('reports')|list %}
+  {% if not lessons %}<div class="empty">За этот день отчётов педагогов в «KidsUP Team» пока нет.</div>{% endif %}
+  <div class="grid">
+  {% for L in lessons %}
+    <div class="card {{ 'ok' if L.mozhno_provesti else ('need' if L.n_actions else '') }}" id="l{{ L.lesson_id }}">
+      <div class="head"><span class="t">{{ L.time }}</span><span class="c">{{ L.class }}</span>
+        <span class="st {{ 'done' if L.status == 1 else 'open' }}">{{ 'проведено' if L.status == 1 else 'не проведено' }}</span></div>
+      <div class="meta">{% if L.teacher %}педагог в CRM: {{ L.teacher }} · {% endif %}отчёт: {% for r in L.reports %}{{ r.author or 'без имени' }} {{ r.ts[5:16]|replace('T',' ') }}{{ ', ' if not loop.last }}{% endfor %}
+        · записано {{ L.records|length }}</div>
+      <table>
+        {% for r in L.records %}
+        <tr><td>{{ r.name or ('id ' ~ r.uid) }}{% if r.test %} <span class="note">пробное</span>{% endif %}{% if r.note %} <span class="note">— {{ r.note }}</span>{% endif %}</td>
+          <td class="r">{% if r.report == 'был' %}<span class="was">был</span>{% elif r.report == 'не был' %}<span class="not">не был</span>{% else %}<span class="dash">не упомянут</span>{% endif %}</td>
+          <td class="r">{% if r.crm_visit %}<span class="was">✓ CRM</span>{% elif r.crm_good %}<span class="note">уваж.</span>{% else %}<span class="dash">—</span>{% endif %}</td>
+          <td class="r">{% if r.action == 'visit' %}<span class="act visit">→ посетил</span>{% elif r.action == 'good_reason' %}<span class="act good">→ уваж. причина</span>
+            {% elif r.action == 'conflict_visit' %}<span class="act conf">CRM «был», педагог «не был»</span>{% elif r.action == 'rashozhdenie' %}<span class="act rash">проведено без отметки</span>{% endif %}</td></tr>
+        {% endfor %}
+      </table>
+      {% if L.unmatched or L.ambiguous or L.conflicts %}
+      <ul class="list">
+        {% for u in L.unmatched %}<li>⚠️ <b>{{ u.name }}</b> — {{ u.kind }}{% if u.note %} ({{ u.note }}){% endif %}: нет в записи на занятие — завести запись (отработка/пробное) или это опечатка</li>{% endfor %}
+        {% for a in L.ambiguous %}<li>❓ <b>{{ a.name }}</b> — {{ a.kind }}: подходят {{ a.variants|join(', ') }} — уточнить у педагога</li>{% endfor %}
+        {% for c in L.conflicts %}<li>❗ {{ c }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+      <div class="foot">
+        {% if L.status != 1 %}
+          <button class="btn" {{ 'disabled' if not L.n_actions }} onclick="otmetit({{ L.lesson_id }},false,this)">Отметить ({{ L.n_actions }})</button>
+          <button class="btn w" {{ 'disabled' if not L.mozhno_provesti }} onclick="otmetit({{ L.lesson_id }},true,this)">Отметить и провести</button>
+          {% if not L.mozhno_provesti %}<span class="why">{% if L.ne_upomyanuty %}не упомянуты: {{ L.ne_upomyanuty|join(', ') }}{% elif L.unmatched %}есть имена без записи{% elif L.ambiguous %}есть спорные{% elif L.conflicts %}есть конфликты{% else %}ещё не закончилось или никто не был{% endif %}</span>{% endif %}
+        {% else %}<span class="why">занятие уже проведено — расхождения выше только показываем, в CRM не пишем</span>{% endif %}
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+
+  {% if d.ne_razobrano %}
+  <h2>Отчёты, которые не удалось привязать к занятиям</h2>
+  <div class="plain"><ul>
+    {% for r in d.ne_razobrano %}<li><b>{{ r.ts[5:16]|replace('T',' ') }} {{ r.author }}</b> — {{ (r.subj or ['?'])|join('/') }} {{ r.time or '' }}: {{ r.names|join(', ') }} — <span class="note">{{ r.why }}</span></li>{% endfor %}
+  </ul></div>
+  {% endif %}
+
+  {% if d.bez_otcheta %}
+  <h2>Занятия без отчёта педагога (прошли, в CRM не проведены)</h2>
+  <div class="plain"><ul>
+    {% for b in d.bez_otcheta %}<li><b>{{ b.time }}</b> {{ b.class or ('занятие ' ~ b.lesson_id) }}{% if b.teacher %} — {{ b.teacher }}{% endif %} · записано {{ b.n }}</li>{% endfor %}
+  </ul></div>
+  {% endif %}
+
+  {% if log %}
+  <h2>Что уже записано в МойКласс за этот день</h2>
+  <div class="plain log">
+    {% for r in log %}<div>{{ r.ts[11:16] }} · {{ r.name }} · {{ r.field }}={{ r.value }} · {{ r.who }} · {{ r.result }}</div>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+<script>
+async function otmetit(lessonId, provesti, btn){
+  const what = provesti ? 'Поставить отметки и ПРОВЕСТИ занятия (списание абонементов)?' : 'Поставить однозначные отметки посещения в МойКлассе?';
+  if(!confirm(what)) return;
+  btn.disabled = true; const res = document.getElementById('res'); res.textContent = 'Пишу в МойКласс…';
+  try{
+    const r = await fetch('/api/yavka/otmetit', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({day: '{{ d.day }}', lesson_ids: lessonId ? [lessonId] : null, provesti: provesti})});
+    const j = await r.json();
+    res.textContent = j.ok ? `Готово: поставлено ${j.postavleno}` + (j.skipped && j.skipped.length ? `, пропущено занятий ${j.skipped.length}` : '') : `Ошибки: ${j.oshibok} (${(j.errors||[]).map(e=>e.error).join('; ').slice(0,200)})`;
+    setTimeout(()=>location.href='/yavka?day={{ d.day }}', 1200);
+  }catch(e){ res.textContent = 'Ошибка сети: ' + e; btn.disabled = false; }
+}
+</script>
+{% endblock %}

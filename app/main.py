@@ -2850,7 +2850,7 @@ def export_attendance():
 def export_raw(table: str):
     allowed = {"users", "joins", "payments", "invoices", "classes", "courses",
                "filials", "managers", "subscriptions", "user_subscriptions",
-               "lessons", "lesson_records"}
+               "lessons", "lesson_records", "rooms"}
     if table not in allowed:
         raise HTTPException(404)
     with db.get_conn() as conn:
@@ -3589,6 +3589,77 @@ def api_gruppy_soobsheniya(chat: str = "", since: str = "", limit: int = 200, q:
     return {"messages": gruppy_chaty.messages(chat, since, limit, q)}
 
 
+@app.post("/api/gruppy/pochinit", dependencies=OWNER_AUTH)
+def api_gruppy_pochinit():
+    """Починить время и авторов групповых сообщений по журналу сырых вебхуков и словарю username → имя."""
+    from . import gruppy_chaty
+    return gruppy_chaty.pochinit()
+
+
+@app.get("/gruppy/media", response_class=HTMLResponse, dependencies=AUTH)
+def gruppy_media_page(request: Request, chat: str = "", days: int = 60):
+    """Фото и видео педагогов из рабочих групп — для сториз и постов (отбор, не публикация)."""
+    from . import gruppy_chaty, autopilot
+    since = (autopilot._today() - timedelta(days=max(1, min(int(days), 400)))).isoformat()
+    rows = gruppy_chaty.messages(chat_id=chat, since=since, limit=2000, media_only=True)
+    by_day: dict[str, list] = {}
+    for m in rows:
+        by_day.setdefault(m["ts"][:10], []).append(m)
+    counts: dict[str, dict] = {}
+    for m in gruppy_chaty.messages(since=since, limit=2000, media_only=True):
+        c = counts.setdefault(m["chat_id"], {"chat_id": m["chat_id"], "name": m["chat_name"], "n": 0})
+        c["n"] += 1
+    return render(request, "gruppy_media.html", active="gruppy_media", chat=chat, total=sum(c["n"] for c in counts.values()),
+                  chats=sorted(counts.values(), key=lambda c: -c["n"]), days=sorted(by_day.items(), reverse=True))
+
+
+# --- Явка по отчётам педагогов (app/yavka.py) -------------------------------
+
+@app.get("/yavka", response_class=HTMLResponse, dependencies=AUTH)
+def yavka_page(request: Request, day: str = "", refresh: int = 0):
+    from . import yavka, autopilot
+    d = day or autopilot._today().isoformat()
+    try:
+        data = (yavka.cached(d) if not refresh else None) or yavka.sverka(d)
+    except Exception as e:
+        data = yavka.cached(d) or {"day": d, "lessons": [], "bez_otcheta": [], "ne_razobrano": [], "ts": "",
+                                   "auto": db.get_setting("yavka_auto", "0"),
+                                   "itogo": {k: 0 for k in ("otchetov", "zanyatiy_v_crm", "s_otchetom", "ne_provedeno", "otmetok_postavit",
+                                                            "mozhno_provesti", "imen_bez_zapisi", "spornyh", "konfliktov", "bez_otcheta", "ne_razobrano")}}
+        data["error"] = str(e)[:200]
+    dd = date.fromisoformat(d)
+    return render(request, "yavka.html", active="yavka", d=data, log=yavka.log_rows(d),
+                  prev=(dd - timedelta(days=1)).isoformat(), next=(dd + timedelta(days=1)).isoformat())
+
+
+@app.get("/api/yavka", dependencies=AUTH)
+def api_yavka(day: str = "", refresh: int = 1):
+    """Сверка отчётов педагогов с занятиями дня (JSON). refresh=0 — последняя сохранённая."""
+    from . import yavka, autopilot
+    d = day or autopilot._today().isoformat()
+    return (yavka.cached(d) if not refresh else None) or yavka.sverka(d)
+
+
+@app.get("/api/yavka/otchety", dependencies=AUTH)
+def api_yavka_otchety(day: str = ""):
+    """Разобранные блоки отчётов за день — что парсер вытащил из чата."""
+    from . import yavka, autopilot
+    d = day or autopilot._today().isoformat()
+    return {"day": d, "blocks": yavka._reports(d)}
+
+
+@app.post("/api/yavka/otmetit", dependencies=AUTH)
+def api_yavka_otmetit(payload: dict = Body(...)):
+    """Поставить в МойКлассе однозначные отметки: {"day": "2026-10-02", "lesson_ids": [..]|null, "provesti": false, "dry": false}."""
+    from . import yavka, autopilot
+    d = str(payload.get("day") or autopilot._today().isoformat())
+    ids = payload.get("lesson_ids") or None
+    if ids is not None:
+        ids = [int(x) for x in ids]
+    return yavka.otmetit(d, lesson_ids=ids, provesti=bool(payload.get("provesti")), who=str(payload.get("who") or "страница /yavka"),
+                         dry=bool(payload.get("dry")))
+
+
 @app.post("/api/gruppy/import", dependencies=OWNER_AUTH)
 def api_gruppy_import(payload: dict = Body(...)):
     """Загрузить историю групп, снятую с экрана Wazzup: {"rows": [{chat_id, chat_name, ts, author, username, text, message_id}]}."""
@@ -3872,7 +3943,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-03.8"
+APP_VERSION = "2026-10-03.9"
 
 
 @app.get("/api/net")
@@ -3910,6 +3981,8 @@ async def health():
 
 
 SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
+            # явка по отчётам педагогов (app/yavka.py): 0 — только сверка, 1 — ставить отметки, 2 — и проводить занятия
+            "yavka_auto", "gruppy_avtory",
             "wazzup_dry_run", "digest_phone", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps", "vk_lead_forms",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",

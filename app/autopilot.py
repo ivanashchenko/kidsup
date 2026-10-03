@@ -4929,6 +4929,17 @@ def _loop() -> None:
                     _mark("morning", str(_today()))
                 finally:
                     mk.close()
+            # Явка: вечером сверяем отчёты педагогов из «KidsUP Team» с
+            # занятиями дня (пункт Лизе в Пульт), утром — ещё раз за вчера:
+            # часть педагогов пишет списки ночью или следующим утром
+            for _h, _shift in ((21, 0), (8, 1)):
+                if now.hour == _h and 30 <= now.minute < 40 \
+                        and _mark("yavka", f"{_today()}:{_h}"):
+                    try:
+                        from . import yavka
+                        yavka.nightly((_today() - timedelta(days=_shift)).isoformat())
+                    except Exception:
+                        log.exception("сверка явки не удалась")
             # Сторож задач: утром до смены и вечером после неё. За 21.08 я
             # дважды сам наводил в задачах беспорядок и дважды чинил руками —
             # «сейчас чисто» держится ровно до следующей правки, если никто
