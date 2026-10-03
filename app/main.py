@@ -3601,6 +3601,13 @@ def api_gruppy_soobsheniya(chat: str = "", since: str = "", limit: int = 200, q:
     return {"messages": gruppy_chaty.messages(chat, since, limit, q)}
 
 
+@app.get("/api/komtet/probe", dependencies=OWNER_AUTH)
+def api_komtet_probe():
+    """КОМТЕТ Касса: проверка ключей магазина (только чтение)."""
+    from . import komtet
+    return komtet.probe()
+
+
 @app.get("/api/tbank/probe", dependencies=OWNER_AUTH)
 def api_tbank_probe():
     """Т-Банк T-API (только чтение): видны ли счета и операции за 2 дня."""
@@ -3982,7 +3989,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-03.15"
+APP_VERSION = "2026-10-03.16"
 
 
 @app.get("/api/net")
@@ -4040,7 +4047,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
             "roistat_project", "roistat_key",
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
-            "cam_password", "cam_embeds", "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret", "owner_password", "yandex_audience_token",
+            "cam_password", "cam_embeds", "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
             "hooppy_token", "tbank_terminal", "tbank_terminal_password", "green_api_instance", "green_api_token",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
