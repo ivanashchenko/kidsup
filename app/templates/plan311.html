@@ -194,6 +194,7 @@ details.more summary{cursor:pointer;color:var(--blue);font-size:13.5px;margin-to
 
 <h2>Пульт на три дня <small>живой: то же, что видят админы на <a href="/pult">app.kidsup.ru/pult</a>: та же база, те же галочки. Сверху — дела из плана смены, ниже счётчик того, что прилетело за день</small></h2>
 <div class="days">
+{% if pult_plan %}<div class="card" style="margin-bottom:10px"><b>План по сменам из разбора</b><ul style="margin:6px 0 0">{% for s in pult_plan %}<li style="margin-bottom:4px">{{ s }}</li>{% endfor %}</ul></div>{% endif %}
 {% for day in pult_days %}
   <div class="day">
     <div class="dh">{{ day.title }} <span>{{ day.done }} из {{ day.n }} дел сделано · осталось {{ day.n - day.done }}</span></div>

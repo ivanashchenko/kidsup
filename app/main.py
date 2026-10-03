@@ -3405,7 +3405,11 @@ def plan311_page(request: Request, day: str = ""):
     from . import pult as _pult
     # пульт на три дня: по разбору 21.09 — его дни; в новых разборах пульта
     # в файле нет, показываем живой пульт сегодня, завтра и послезавтра.
-    dni = sorted({r["day"] for r in d.get("pult") or []})
+    # 03.10: в новых разборах pult — список строк «04.10 Аня: единый список…»
+    # (план по сменам словами), а не задачи по дням; строки показываем как
+    # есть, дни берём из живого пульта
+    pult_plan = [x for x in (d.get("pult") or []) if isinstance(x, str)]
+    dni = sorted({r["day"] for r in d.get("pult") or [] if isinstance(r, dict) and r.get("day")})
     if not dni:
         _t0 = date.fromisoformat(_pult.today())
         dni = [(_t0 + timedelta(days=i)).isoformat() for i in range(3)]
@@ -3439,7 +3443,8 @@ def plan311_page(request: Request, day: str = ""):
                   for x in sorted(live.get(who, []), key=lambda x: x["t"])]
             if not rs:                       # день ещё не собран — показываем план
                 rs = sorted(({"t": r["t"], "text": r["text"], "done": 0}
-                             for r in d.get("pult") or [] if r["day"] == dd and r["who"] == who),
+                             for r in d.get("pult") or []
+                             if isinstance(r, dict) and r.get("day") == dd and r.get("who") == who),
                             key=lambda r: r["t"])
             if rs:
                 n_in, d_in = inb.get(who, (0, 0))
@@ -3454,7 +3459,7 @@ def plan311_page(request: Request, day: str = ""):
     PORYADOK = {"почти полная": 0, "есть места": 1, "слабая": 2, "переполнена": 3, "полная": 4}
     gruppy = sorted(gruppy, key=lambda g: (PORYADOK.get(g.get("sostoyanie"), 9), -(g.get("svobodno") or 0)))
     return render(request, "plan311.html", active="plan311", d=d, k=k, kartina=kartina,
-                  istochniki=istochniki, dengi=dengi, pult_days=pult_days,
+                  istochniki=istochniki, dengi=dengi, pult_days=pult_days, pult_plan=pult_plan,
                   istochniki_new=istochniki_new, gruppy=gruppy,
                   svobodno=sum(int(g.get("svobodno") or 0) for g in gruppy))
 
@@ -3943,7 +3948,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-03.10"
+APP_VERSION = "2026-10-03.11"
 
 
 @app.get("/api/net")
