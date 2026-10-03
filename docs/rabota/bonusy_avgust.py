@@ -6,7 +6,8 @@
 записи, созданные с 01.08 по 31.08, а результат по ним смотрим на сегодня:
 пробные начались 31.08, поэтому августовская работа доплачивается сентябрём.
 
-    python3 docs/rabota/bonusy_avgust.py        — собрать docs/bonusy_avgust.html
+    KIDSUP_OWNER_PW=… python3 docs/rabota/bonusy_avgust.py   — собрать docs/bonusy_avgust.html
+    (пароль владельца — только из переменной окружения, в репозитории его нет)
 """
 from __future__ import annotations
 
@@ -28,7 +29,8 @@ RU_MONTH = {8: "августа", 9: "сентября"}
 
 
 def fetch() -> dict:
-    cmd = ["curl", "-s", "-u", "boris:KU-KkI1Uvrd81hWcm", "-G",
+    import os
+    cmd = ["curl", "-s", "-u", "boris:" + os.environ["KIDSUP_OWNER_PW"], "-G",
            "https://app.kidsup.ru/api/bonusy",
            "--data-urlencode", f"since={SINCE}",
            "--data-urlencode", f"until={UNTIL}",
