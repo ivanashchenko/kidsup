@@ -3601,6 +3601,33 @@ def api_gruppy_soobsheniya(chat: str = "", since: str = "", limit: int = 200, q:
     return {"messages": gruppy_chaty.messages(chat, since, limit, q)}
 
 
+@app.get("/api/tbank/probe", dependencies=OWNER_AUTH)
+def api_tbank_probe():
+    """Т-Банк T-API (только чтение): видны ли счета и операции за 2 дня."""
+    from . import tbank
+    return tbank.probe()
+
+
+@app.get("/api/tbank/get", dependencies=OWNER_AUTH)
+def api_tbank_get(path: str, request: Request):
+    """Сырой GET к T-API с IP сервера (только /api/…, только чтение) — для отладки."""
+    from . import tbank
+    params = {k: v for k, v in request.query_params.items() if k != "path"}
+    try:
+        return tbank.get(path, params)
+    except Exception as e:                                           # noqa: BLE001
+        raise HTTPException(400, str(e)[:400])
+
+
+@app.get("/api/tbank/spec", dependencies=OWNER_AUTH)
+def api_tbank_spec():
+    """Публичная спецификация T-API, скачанная с сервера (у меня в песочнице банк не открывается)."""
+    import httpx
+    from . import tbank
+    r = httpx.get("https://business.tbank.ru/openapi/docs/openapi.yaml", timeout=60, verify=tbank._ssl())
+    return Response(r.text, media_type="text/plain")
+
+
 @app.post("/api/gruppy/pochinit", dependencies=OWNER_AUTH)
 def api_gruppy_pochinit():
     """Починить время и авторов групповых сообщений по журналу сырых вебхуков и словарю username → имя."""
@@ -3955,7 +3982,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-03.13"
+APP_VERSION = "2026-10-03.15"
 
 
 @app.get("/api/net")
