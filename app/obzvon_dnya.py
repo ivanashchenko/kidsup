@@ -166,8 +166,17 @@ def _legenda() -> list[dict]:
 def spisok(day: str, who: str) -> dict:
     with db.get_conn() as conn:
         _init(conn)
-        rows = conn.execute("SELECT id, who, text, phone, source, done FROM plan_inbox "
-                            "WHERE day=? ORDER BY id", (day,)).fetchall()
+        # 03.10, Борис: «не надо делить Ане на сегодня и завтра — что не успеет
+        # сегодня, доделает завтра». Поэтому лента одна: всё незакрытое своё за
+        # две недели назад и на завтра вперёд плюс то, что закрыто сегодня.
+        from datetime import date as _d, timedelta as _td
+        d0 = _d.fromisoformat(day)
+        rows = conn.execute("SELECT id, who, text, phone, source, done, day FROM plan_inbox "
+                            "WHERE (day=?) OR (who=? AND done=0 AND day BETWEEN ? AND ?) ORDER BY id",
+                            (day, who, (d0 - _td(days=14)).isoformat(), (d0 + _td(days=1)).isoformat())
+                            ).fetchall()
+        seen = set()
+        rows = [r for r in rows if not (r["id"] in seen or seen.add(r["id"]))]
         itogi = {r["item_id"]: dict(r) for r in conn.execute(
             "SELECT * FROM obzvon_dnya WHERE item_id IN (%s)" % ",".join(str(r["id"]) for r in rows)
         ).fetchall()} if rows else {}

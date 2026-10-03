@@ -3493,12 +3493,9 @@ def api_obzvon():
 def obzvon_dnya_page(request: Request, day: str = "", who: str = "Аня"):
     """Обзвон дня: звонки одного админа из Пульта одной лентой, с итогом звонка."""
     from . import obzvon_dnya, autopilot
-    from datetime import date as _d, timedelta as _td
-    segodnya = autopilot._today().isoformat()
-    d = day[:10] or segodnya
+    d = day[:10] or autopilot._today().isoformat()
     who = who if who in KOLONKI_PULTA else "Аня"
-    dni = [(segodnya, "Сегодня"), ((_d.fromisoformat(segodnya) + _td(days=1)).isoformat(), "Завтра")]
-    return render(request, "obzvon_dnya.html", active="obzvon_dnya", d=obzvon_dnya.spisok(d, who), dni=dni)
+    return render(request, "obzvon_dnya.html", active="obzvon_dnya", d=obzvon_dnya.spisok(d, who))
 
 
 @app.get("/api/obzvon-dnya", dependencies=AUTH)
@@ -3775,7 +3772,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-03.2"
+APP_VERSION = "2026-10-03.3"
 
 
 @app.get("/api/net")
