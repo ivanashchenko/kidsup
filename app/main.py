@@ -3489,6 +3489,26 @@ def api_obzvon():
     return obzvon.spisok()
 
 
+@app.get("/obzvon-dnya", response_class=HTMLResponse, dependencies=AUTH)
+def obzvon_dnya_page(request: Request, day: str = "", who: str = "Аня"):
+    """Обзвон дня: звонки одного админа из Пульта одной лентой, с итогом звонка."""
+    from . import obzvon_dnya, autopilot
+    d = day[:10] or autopilot._today().isoformat()
+    who = who if who in KOLONKI_PULTA else "Аня"
+    return render(request, "obzvon_dnya.html", active="obzvon_dnya", d=obzvon_dnya.spisok(d, who))
+
+
+@app.post("/api/obzvon-dnya/itog", dependencies=AUTH)
+def api_obzvon_dnya_itog(payload: dict = Body(...)):
+    """{"id": пункт Пульта, "itog": "zap|dum|ned|otk", "note": "...", "who": "Аня"}."""
+    from . import obzvon_dnya
+    try:
+        return obzvon_dnya.otmetit(int(payload.get("id") or 0), str(payload.get("itog") or ""),
+                                   str(payload.get("note") or "").strip(), str(payload.get("who") or ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/vozvrat", response_class=HTMLResponse, dependencies=AUTH)
 def vozvrat_page(request: Request):
     """Вернуть и дожать: «думает», «недозвон», база 2024/25 — очередь и предложения."""
@@ -3744,7 +3764,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-09-28.29"
+APP_VERSION = "2026-10-03.1"
 
 
 @app.get("/api/net")

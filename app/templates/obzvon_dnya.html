@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Обзвон дня — KidsUP{% endblock %}
+{% block content %}
+<style>
+  .od{--ink:#1d1a4d;--muted:#5f5d84;--line:#e2e1ef;--chip:#eeedf8;--indigo:#312783;--sky:#1DA7E0;
+      --green:#4f8a12;--amber:#b87400;--red:#c4141f;--green-s:#eaf5dc;--amber-s:#fdf0d9;--red-s:#fbe3e4;--sky-s:#e3f4fb}
+  .od{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+  @media (max-width:900px){.od{grid-template-columns:minmax(0,1fr)}}
+  .od h1{margin:0 0 4px;color:var(--indigo)}
+  .od .sub{color:var(--muted);margin:0 0 10px;max-width:70ch}
+  .od .prog{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
+  .od .pill{border-radius:999px;padding:4px 10px;font-weight:600;font-size:13px;background:var(--chip);font-variant-numeric:tabular-nums}
+  .od .pill.g{background:var(--green-s);color:var(--green)}.od .pill.a{background:var(--amber-s);color:var(--amber)}.od .pill.r{background:var(--red-s);color:var(--red)}
+  .od .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .od .tab{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:7px 11px;font-weight:600;font-size:14px;cursor:pointer}
+  .od .tab b{font-weight:500;color:var(--muted);margin-left:4px}
+  .od .tab[aria-selected="true"]{background:var(--indigo);border-color:var(--indigo);color:#fff}
+  .od .tab[aria-selected="true"] b{color:#fff}
+  .od .why{background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 13px;margin-bottom:10px;color:var(--muted);font-size:14px}
+  .od .why strong{color:var(--ink)}
+  .od .tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .od .tools input[type=search]{flex:1 1 220px;min-width:0;border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-size:15px}
+  .od .tools label{color:var(--muted);font-size:14px;display:flex;gap:6px;align-items:center}
+  .od .list{display:flex;flex-direction:column;gap:9px}
+  .od .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 13px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 14px}
+  .od .card.marked{opacity:.6}
+  .od .who{font-weight:600;font-size:16px;min-width:0}
+  .od .who small{font-weight:500;color:var(--muted)}
+  .od .kind{font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:6px;margin-right:6px;vertical-align:2px;font-weight:600}
+  .od .k-new{background:var(--red-s);color:var(--red)}.od .k-think{background:var(--green-s);color:var(--green)}
+  .od .k-miss{background:var(--amber-s);color:var(--amber)}.od .k-base{background:var(--sky-s);color:#0f6f99}
+  .od .meta{color:var(--muted);font-size:13px;font-weight:400}
+  .od .offers{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+  .od .offer{background:var(--chip);border-radius:8px;padding:3px 8px;font-size:13px}
+  .od .offer i{font-style:normal;color:var(--green);font-weight:600}.od .offer i.z{color:var(--red)}
+  .od .phone{display:flex;gap:6px;align-items:center;justify-self:end}
+  .od .phone a{font:600 15px ui-monospace,Menlo,monospace;white-space:nowrap;text-decoration:none;color:var(--indigo)}
+  .od .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:5px 9px;font-size:13px;cursor:pointer}
+  .od .btn:hover{border-color:var(--indigo)}
+  .od .res{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .od .res input{flex:1 1 200px;min-width:0;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px}
+  .od .btn[aria-pressed="true"].zap{background:var(--green-s);border-color:var(--green);color:var(--green)}
+  .od .btn[aria-pressed="true"].dum{background:var(--amber-s);border-color:var(--amber);color:var(--amber)}
+  .od .btn[aria-pressed="true"].otk{background:var(--red-s);border-color:var(--red);color:var(--red)}
+  .od .btn[aria-pressed="true"].ned{background:var(--chip);border-color:var(--muted)}
+  .od .itog{font-size:12px;color:var(--muted)}
+  .od aside{position:sticky;top:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px;max-height:calc(100vh - 30px);overflow:auto}
+  @media (max-width:900px){.od aside{position:static;max-height:none}}
+  .od aside h2{font-size:15px;margin:0 0 4px;color:var(--indigo)}
+  .od aside p{margin:0 0 8px;color:var(--muted);font-size:13px}
+  .od .g{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;font-size:13px;padding:5px 0;border-top:1px solid var(--line)}
+  .od .g .n{color:var(--muted);grid-column:1/-1;font-size:12px}
+  .od .empty{color:var(--muted);padding:20px;text-align:center}
+</style>
+<div class="od">
+<main>
+  <h1>Обзвон дня — {{ d.who }}, {{ d.day[8:10] }}.{{ d.day[5:7] }}</h1>
+  <p class="sub">Звонки из Пульта одной лентой. Нажали итог — он сразу записывается в карточку МойКласса и в пункт Пульта
+  («не дозвонились» пункт не закрывает). Записали на пробное — не забудьте саму запись в группу в CRM и сообщение семье с датой и адресом.</p>
+  <div class="prog" id="prog"></div>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="why" id="why"></div>
+  <div class="tools"><input type="search" id="q" placeholder="Имя или телефон"><label><input type="checkbox" id="hide"> скрыть с итогом</label></div>
+  <div class="list" id="list"></div>
+</main>
+<aside><h2>Свободные места сейчас</h2><p>Первое занятие условно-бесплатное; купили в день пробного — −15% на первый абонемент.</p><div id="leg"></div></aside>
+</div>
+<script>
+const D={{ d|tojson }};
+const WHY={all:'Порядок: новые заявки → «думают, платили раньше» → недозвоны → база 2024/25. В каждом разговоре — конкретная группа и дата на этой или следующей неделе.',
+ new:'<strong>Звонить сразу.</strong> Свежая заявка покупает в разы чаще, чем через день.',
+ think:'<strong>Самый тёплый запас.</strong> Семьи уже платили нам. Начать: «вы у нас занимались — в группе [день, время] есть место, поставить на пробное на этой неделе?»',
+ miss:'<strong>В выходные дозваниваются лучше всего.</strong> Не взяли снова — короткое сообщение в мессенджер с одним предложением и датой.',
+ base:'<strong>Ходили у нас в прошлом году.</strong> «Занимались у нас в 2024/25 — есть место в группе…». Дети подросли — сверить возраст с группой.'};
+const LBL={new:'новая',think:'думает',miss:'недозвон',base:'2024/25'};
+const RES=[['zap','Записали'],['dum','Думают'],['ned','Не дозвонились'],['otk','Отказ']];
+let tab='think';try{tab=localStorage.getItem('od_tab')||'think'}catch(e){}
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=p=>p&&p.length===11?`+7 ${p.slice(1,4)} ${p.slice(4,7)}-${p.slice(7,9)}-${p.slice(9)}`:(p||'нет телефона');
+function prog(){const c={zap:0,dum:0,ned:0,otk:0};D.items.forEach(x=>{if(x.itog)c[x.itog.itog]++});const n=D.items.filter(x=>x.itog).length;
+ document.getElementById('prog').innerHTML=`<span class="pill">с итогом ${n} из ${D.items.length}</span><span class="pill g">записали ${c.zap}</span><span class="pill a">думают ${c.dum}</span><span class="pill">не дозвонились ${c.ned}</span><span class="pill r">отказ ${c.otk}</span>`}
+function render(){
+ const q=document.getElementById('q').value.trim().toLowerCase(),hide=document.getElementById('hide').checked;
+ const tabs=document.getElementById('tabs');tabs.innerHTML='';
+ Object.entries(Object.assign({all:'Все'},D.kinds)).forEach(([k,t])=>{const n=k==='all'?D.items.length:D.items.filter(x=>x.kind===k).length;
+  const b=document.createElement('button');b.className='tab';b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',k===tab);b.innerHTML=`${esc(t)}<b>${n}</b>`;
+  b.onclick=()=>{tab=k;try{localStorage.setItem('od_tab',k)}catch(e){};render()};tabs.appendChild(b)});
+ document.getElementById('why').innerHTML=WHY[tab]||'';prog();
+ const list=document.getElementById('list');list.innerHTML='';
+ const items=D.items.filter(x=>(tab==='all'||x.kind===tab)&&(!q||(x.name+' '+x.phone).toLowerCase().includes(q))&&!(hide&&x.itog&&x.itog.itog!=='ned'));
+ if(!items.length){list.innerHTML='<div class="empty">В этом списке пусто.</div>';return}
+ items.forEach(x=>{const m=x.itog&&x.itog.itog;const el=document.createElement('article');el.className='card'+(m&&m!=='ned'?' marked':'');
+  const kids=x.kids.length?x.kids.map(k=>`${esc(k.n)}${k.age?` <small>${esc(k.age)} г.</small>`:''}`).join(', '):esc(x.name);
+  const offers=x.offer.map(o=>`<span class="offer">${esc(o.t)}${o.free===null?'':` · <i class="${o.free?'':'z'}">${o.free?'мест '+o.free:'мест нет'}</i>`}</span>`).join('');
+  el.innerHTML=`<div class="who"><span class="kind k-${x.kind}">${LBL[x.kind]}</span>${kids}<div class="meta">${esc(x.meta)}</div></div>
+   <div class="phone">${x.phone?`<a href="tel:+${esc(x.phone)}">${fmt(x.phone)}</a>`:'<span class="meta">нет телефона</span>'}</div>
+   ${offers?`<div class="offers">${offers}</div>`:''}
+   <div class="res">${RES.map(([k,t])=>`<button class="btn ${k}" type="button" data-k="${k}" aria-pressed="${m===k}">${t}</button>`).join('')}
+    <input type="text" id="note-${x.id}" placeholder="коротко: группа и дата / почему" value="${esc(x.itog?x.itog.note:'')}">
+    ${x.itog?`<span class="itog">${esc(x.itog.who||'')} ${esc((x.itog.ts||'').slice(11,16))}</span>`:''}</div>`;
+  el.querySelectorAll('.res .btn').forEach(b=>b.onclick=()=>{const k=b.dataset.k;const note=document.getElementById('note-'+x.id).value.trim();
+   if(k==='zap'&&!note){document.getElementById('note-'+x.id).placeholder='напишите группу и дату пробного';document.getElementById('note-'+x.id).focus();return}
+   b.disabled=true;fetch('/api/obzvon-dnya/itog',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:x.id,itog:k,note:note,who:D.who})})
+   .then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{x.itog={itog:k,note:note,who:D.who,ts:new Date().toISOString()};
+    if(j&&j.oshibka_kommentariya)b.title='Итог сохранён, но комментарий в карточку не записался';render()})
+   .catch(()=>{b.disabled=false;b.textContent='Не сохранилось — ещё раз'})});
+  list.appendChild(el)});
+}
+const order=['ПШ','англ.','Музыка и речь','Первая школа','Лицей','ИЗО','МА','шахматы','робототехника','мини-сад','нулевой класс'];
+const idx=k=>{const i=order.findIndex(o=>k.startsWith(o));return i<0?99:i};
+D.legend.sort((a,b)=>idx(a.key)-idx(b.key)||b.free-a.free).forEach(l=>{const g=document.createElement('div');g.className='g';
+ g.innerHTML=`<span>${esc(l.key)}</span><b>${l.free} из ${l.mest}</b><span class="n">${esc(l.name)}${l.note?' — '+esc(l.note):''}</span>`;document.getElementById('leg').appendChild(g)});
+document.getElementById('q').oninput=render;document.getElementById('hide').onchange=render;render();
+</script>
+{% endblock %}
