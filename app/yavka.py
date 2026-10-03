@@ -29,6 +29,7 @@ KidsUP Team, а в МойКлассе явка не отмечена три дн
 """
 from __future__ import annotations
 
+import collections
 import datetime as dt
 import difflib
 import json
@@ -528,21 +529,20 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
                 touched.add(L["id"])
             elif len(hits) > 1:
                 same_lesson = {L["id"] for L, _ in hits}
-                if len(same_lesson) == 1:
-                    target = list(same_lesson)[0]
-                else:
-                    target = next((L["id"] for L in pool if L["id"] in touched), pool[0]["id"])
-                extra["ambiguous"].append((target, {"name": n, "kind": kind, "note": note,
-                                                    "variants": sorted({names.get(int(r["userId"]), "") for _, r in hits})}))
-                touched.add(target)
+                extra["ambiguous"].append((list(same_lesson)[0] if len(same_lesson) == 1 else None,
+                                           {"name": n, "kind": kind, "note": note,
+                                            "variants": sorted({names.get(int(r["userId"]), "") for _, r in hits})}))
             else:
-                target = pool[0]["id"] if len(pool) == 1 else None
-                if target is None:
-                    # несколько занятий в одно время (ПШ вт-чт и ПШ вт-пт в 16:00): кладём в то, где
-                    # уже нашлись другие дети из этого блока, иначе в первое
-                    target = next((L["id"] for L in pool if L["id"] in touched), pool[0]["id"])
-                extra["unmatched"].append((target, {"name": n, "kind": kind, "note": note}))
-                touched.add(target)
+                extra["unmatched"].append((None, {"name": n, "kind": kind, "note": note}))
+        # имена без адреса кладём в занятие, где нашлось больше всего детей этого
+        # блока (несколько занятий в одно время: ПШ вт-чт и ПШ вт-пт в 16:00,
+        # логопед 11:40 и «Музыка с мамой» 11:45), иначе — в первое из кандидатов
+        home = collections.Counter(lid for lid, _, _, _ in assigned).most_common(1)
+        home = home[0][0] if home else pool[0]["id"]
+        for k in ("ambiguous", "unmatched"):
+            extra[k] = [(t if t is not None else home, item) for t, item in extra[k]]
+            for t, _ in extra[k]:
+                touched.add(t)
         # блок, где почти никто не нашёлся, — не из этих групп (педагог поставил не ту дату,
         # «29/09» вместо 28.09) или не отчёт вовсе: откатываем, чтобы не засорять занятия
         if len(all_names) >= 3 and len(assigned) < 0.4 * len(all_names):
