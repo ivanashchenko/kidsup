@@ -3589,6 +3589,16 @@ def api_gruppy_soobsheniya(chat: str = "", since: str = "", limit: int = 200, q:
     return {"messages": gruppy_chaty.messages(chat, since, limit, q)}
 
 
+@app.post("/api/gruppy/import", dependencies=OWNER_AUTH)
+def api_gruppy_import(payload: dict = Body(...)):
+    """Загрузить историю групп, снятую с экрана Wazzup: {"rows": [{chat_id, chat_name, ts, author, username, text, message_id}]}."""
+    from . import gruppy_chaty
+    rows = payload.get("rows") or []
+    if not isinstance(rows, list) or not rows:
+        raise HTTPException(400, "нужен rows — список сообщений")
+    return gruppy_chaty.import_rows(rows[:5000])
+
+
 @app.post("/api/gruppy/otvet", dependencies=AUTH)
 def api_gruppy_otvet(payload: dict = Body(...)):
     """Написать в группу от Telegram-аккаунта центра: {"chat_id": "4430280960", "text": "..."}."""
@@ -3862,7 +3872,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-03.5"
+APP_VERSION = "2026-10-03.8"
 
 
 @app.get("/api/net")
@@ -5556,6 +5566,43 @@ def api_guard_stop(off: bool = True):
     """Мгновенный стоп-кран для ВСЕХ автосообщений."""
     db.set_setting("messages_off", "1" if off else "0")
     return {"ok": True, "автосообщения": "остановлены" if off else "включены"}
+
+
+@app.post("/api/wazzup/iframe", dependencies=OWNER_AUTH)
+def api_wazzup_iframe(payload: dict = Body(default={})):
+    """Ссылка на окно чатов Wazzup со всей историей — для браузера на сервере.
+
+    03.10: групповые чаты Telegram подключены к Wazzup, а API Wazzup истории
+    не отдаёт; её показывает только их интерфейс. Wazzup выдаёт одноразовую
+    ссылку на iframe для сотрудника CRM: {"scope": "global"} — все чаты,
+    либо {"chat_id": "...", "chat_type": "telegroup"} — один чат."""
+    import httpx as _hx
+    from . import wazzup
+    user = {"id": str(payload.get("user_id") or "klod"), "name": str(payload.get("user_name") or "Клод")}
+    body = {"user": user, "scope": str(payload.get("scope") or "global")}
+    if payload.get("chat_id"):
+        body["scope"] = "card"
+        body["filter"] = [{"chatType": str(payload.get("chat_type") or "telegroup"),
+                           "chatId": str(payload["chat_id"])}]
+    r = _hx.post(f"{wazzup.API}/iframe", headers=wazzup._headers(), json=body, timeout=30)
+    if r.status_code >= 400 and "USER" in r.text.upper():
+        _hx.post(f"{wazzup.API}/users", headers=wazzup._headers(),
+                 json=[{"id": user["id"], "name": user["name"]}], timeout=30)
+        r = _hx.post(f"{wazzup.API}/iframe", headers=wazzup._headers(), json=body, timeout=30)
+    if r.status_code not in (200, 201):
+        raise HTTPException(400, f"Wazzup iframe HTTP {r.status_code}: {r.text[:300]}")
+    return r.json()
+
+
+@app.get("/api/wazzup/users", dependencies=OWNER_AUTH)
+def api_wazzup_users():
+    """Сотрудники, заведённые в Wazzup через интеграцию (id, имя) — чей id годится для iframe."""
+    import httpx as _hx
+    from . import wazzup
+    r = _hx.get(f"{wazzup.API}/users", headers=wazzup._headers(), timeout=30)
+    if r.status_code != 200:
+        raise HTTPException(400, f"Wazzup users HTTP {r.status_code}: {r.text[:300]}")
+    return {"users": r.json()}
 
 
 @app.get("/api/wazzup/channels", dependencies=AUTH)

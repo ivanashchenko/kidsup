@@ -78,6 +78,27 @@ def migrate() -> int:
     return len(rows)
 
 
+def import_rows(rows: list[dict]) -> dict:
+    """Загрузить историю, снятую с экрана Wazzup (у API истории нет):
+    [{chat_id, chat_name, ts, author, username, text, message_id, is_echo}]."""
+    n = 0
+    with db.get_conn() as conn:
+        _init(conn)
+        for r in rows:
+            mid = str(r.get("message_id") or "") or f"wz-{r.get('chat_id')}-{r.get('ts')}-{abs(hash(r.get('text') or ''))}"
+            cur = conn.execute("INSERT OR IGNORE INTO gruppy_chaty (ts, chat_id, chat_name, chat_type, author, username, "
+                               "text, kind, is_echo, message_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                               (str(r.get("ts") or ""), str(r.get("chat_id") or ""), str(r.get("chat_name") or ""),
+                                str(r.get("chat_type") or "telegroup"), str(r.get("author") or ""),
+                                str(r.get("username") or ""), str(r.get("text") or "")[:4000],
+                                str(r.get("kind") or "text"), 1 if r.get("is_echo") else 0, mid))
+            n += cur.rowcount
+        # у строк, пришедших через вебхук до 03.10 без названия чата, проставим его
+        for cid, name in {str(r.get("chat_id")): str(r.get("chat_name")) for r in rows if r.get("chat_name")}.items():
+            conn.execute("UPDATE gruppy_chaty SET chat_name=? WHERE chat_id=? AND (chat_name IS NULL OR chat_name='')", (name, cid))
+    return {"ok": True, "dobavleno": n, "vsego": len(rows)}
+
+
 def chats() -> list[dict]:
     with db.get_conn() as conn:
         _init(conn)
