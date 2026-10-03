@@ -2924,6 +2924,10 @@ def _inbox_store(payload: dict) -> None:
     from . import autopilot
     rows, echoes = [], []
     for msg in payload.get("messages", []):
+        # 03.10: групповые чаты Telegram/WhatsApp (telegroup/whatsgroup) — это
+        # рабочие группы админов, не клиенты; им своя таблица (gruppy_chaty).
+        if (msg.get("chatType") or "").lower() in ("telegroup", "whatsgroup"):
+            continue
         phone = "".join(ch for ch in str(msg.get("chatId") or "") if ch.isdigit())
         if len(phone) < 10:
             continue
@@ -3568,6 +3572,36 @@ def api_tg_send(payload: dict = Body(...)):
         raise HTTPException(400, str(e))
 
 
+@app.get("/api/gruppy/chaty", dependencies=AUTH)
+def api_gruppy_chaty():
+    """Рабочие группы Telegram/WhatsApp, подключённые через Wazzup: id, название, сколько сообщений."""
+    from . import gruppy_chaty
+    if not db.get_setting("gruppy_chaty_perenos"):
+        n = gruppy_chaty.migrate()
+        db.set_setting("gruppy_chaty_perenos", f"{autopilot._now().isoformat(timespec='seconds')} {n}")
+    return {"chats": gruppy_chaty.chats()}
+
+
+@app.get("/api/gruppy/soobsheniya", dependencies=AUTH)
+def api_gruppy_soobsheniya(chat: str = "", since: str = "", limit: int = 200, q: str = ""):
+    """Сообщения группы: ?chat=<id или хвост>&since=YYYY-MM-DDTHH:MM&q=слово&limit=200. is_echo=1 — наши."""
+    from . import gruppy_chaty
+    return {"messages": gruppy_chaty.messages(chat, since, limit, q)}
+
+
+@app.post("/api/gruppy/otvet", dependencies=AUTH)
+def api_gruppy_otvet(payload: dict = Body(...)):
+    """Написать в группу от Telegram-аккаунта центра: {"chat_id": "4430280960", "text": "..."}."""
+    from . import gruppy_chaty
+    chat_id, text = str(payload.get("chat_id") or "").strip(), str(payload.get("text") or "").strip()
+    if not chat_id or not text:
+        raise HTTPException(400, "нужны chat_id и text")
+    try:
+        return gruppy_chaty.send(chat_id, text, str(payload.get("chat_type") or "telegroup"))
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/vozvrat", response_class=HTMLResponse, dependencies=AUTH)
 def vozvrat_page(request: Request):
     """Вернуть и дожать: «думает», «недозвон», база 2024/25 — очередь и предложения."""
@@ -3808,6 +3842,11 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("raw: не сохранилось")
     try:
         _inbox_store(payload)
+        try:
+            from . import gruppy_chaty
+            gruppy_chaty.store(payload)
+        except Exception:
+            logging.getLogger("kidsup.gruppy").exception("групповой чат: не сохранилось")
     except Exception:
         logging.getLogger("kidsup.wazzup").exception("inbox: не сохранилось")
     if not wazzup_forward(payload):
@@ -3823,7 +3862,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-03.4"
+APP_VERSION = "2026-10-03.5"
 
 
 @app.get("/api/net")
