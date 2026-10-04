@@ -98,7 +98,7 @@ function render(){
    ${offers?`<div class="offers">${offers}</div>`:''}
    <div class="res">${RES.map(([k,t])=>`<button class="btn ${k}" type="button" data-k="${k}" aria-pressed="${m===k}">${t}</button>`).join('')}
     <input type="text" id="note-${x.id}" placeholder="коротко: группа и дата / почему" value="${esc(x.itog?x.itog.note:'')}">
-    ${x.itog?`<span class="itog">${esc(x.itog.who||'')} ${esc((x.itog.ts||'').slice(11,16))}</span>`:''}</div>`;
+    ${x.itog?`<span class="itog">${esc(x.itog.who||'')} ${esc((x.itog.ts||'').slice(11,16))}${x.zvonok===false?' · <b style="color:var(--amber)">звонка через Манго не видно — звонили с другого телефона? напишите в примечании</b>':''}</span>`:''}</div>`;
   el.querySelectorAll('.res .btn').forEach(b=>b.onclick=()=>{const k=b.dataset.k;const note=document.getElementById('note-'+x.id).value.trim();
    if(k==='zap'&&!note){document.getElementById('note-'+x.id).placeholder='напишите группу и дату пробного';document.getElementById('note-'+x.id).focus();return}
    b.disabled=true;fetch('/api/obzvon-dnya/itog',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:x.id,itog:k,note:note,who:D.who})})

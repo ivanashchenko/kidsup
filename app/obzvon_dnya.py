@@ -34,6 +34,7 @@ def _init(conn):
 
 
 _NEW = re.compile(r"НОВАЯ ЗАЯВКА|ПРОПУЩЕННЫЙ ЗВОНОК|Летняя заявка|Заявка с Директа|заявка с сайта|"
+                  r"сегмент 1 — живые лиды|лид без записи|"
                   r"\(карточки нет\)|^Позвонить \+?7\d|^Звонить на|сам звонил")
 _MISS = re.compile(r"НЕДОЗВОН|Недозвон|Последняя попытка|недозвон")
 _BASE = re.compile(r"^БАЗА|Бывшие ученики|летнем лагере|в прошлом году|до весны")
@@ -171,7 +172,7 @@ def spisok(day: str, who: str) -> dict:
         # две недели назад и на завтра вперёд плюс то, что закрыто сегодня.
         from datetime import date as _d, timedelta as _td
         d0 = _d.fromisoformat(day)
-        rows = conn.execute("SELECT id, who, text, phone, source, done, day FROM plan_inbox "
+        rows = conn.execute("SELECT id, who, text, phone, source, done, day, prio FROM plan_inbox "
                             "WHERE (day=?) OR (who=? AND done=0 AND day BETWEEN ? AND ?) ORDER BY id",
                             (day, who, (d0 - _td(days=14)).isoformat(), (d0 + _td(days=1)).isoformat())
                             ).fetchall()
@@ -180,6 +181,17 @@ def spisok(day: str, who: str) -> dict:
         itogi = {r["item_id"]: dict(r) for r in conn.execute(
             "SELECT * FROM obzvon_dnya WHERE item_id IN (%s)" % ",".join(str(r["id"]) for r in rows)
         ).fetchall()} if rows else {}
+        # 04.10, Борис: «Аня всё верно отмечает после каждого звонка?» — у 16 из
+        # 103 итогов 03.10 исходящего звонка по номеру не было вовсе. Показываем
+        # у итога, виден ли звонок через Манго в этот день (с личного телефона
+        # не видно — тогда пусть пишет это в примечании).
+        zvonili = set()
+        try:
+            for (ph,) in conn.execute("SELECT phone FROM mango_calls WHERE direction='out' AND ts >= ? AND ts < ?",
+                                      ((d0 - _td(days=1)).isoformat(), (d0 + _td(days=1)).isoformat())):
+                zvonili.add("".join(c for c in str(ph or "") if c.isdigit())[-10:])
+        except Exception:
+            pass
     items = []
     for r in rows:
         if r["who"] not in (who, "Ира", "Лена", "Аня"):
@@ -189,8 +201,14 @@ def spisok(day: str, who: str) -> dict:
             continue
         it = razobrat(r["text"])
         it.update(id=r["id"], kind=k, phone=r["phone"] or "", done=bool(r["done"]),
-                  itog=itogi.get(r["id"]), chej=r["who"])
+                  itog=itogi.get(r["id"]), chej=r["who"], prio=r["prio"])
+        if it["itog"]:
+            it["zvonok"] = "".join(c for c in it["phone"] if c.isdigit())[-10:] in zvonili
         items.append(it)
+    # порядок внутри вкладки: сначала поднятое вручную (prio), в «новых» — свежие
+    # первыми (ночная заявка с сайта не должна стоять под летними хвостами)
+    items.sort(key=lambda x: (x["prio"] if x["prio"] is not None else 999,
+                              -x["id"] if x["kind"] == "new" else x["id"]))
     leg = _legenda()
     by = {}
     for g in leg:
