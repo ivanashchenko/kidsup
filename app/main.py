@@ -1418,6 +1418,7 @@ OWNER_FIELDS = [
     ("tbank_terminal_password", "Т-Банк Интернет-эквайринг — пароль терминала", True),
     ("mk_web_login", "МойКласс — логин технического сотрудника", False),
     ("mk_web_password", "МойКласс — пароль технического сотрудника", True),
+    ("zenmoney_token", "ZenMoney — токен (zerro.app/token): личные счета, только чтение", True),
     ("hooppy_token", "Hooppy — API-токен (Настройки → API): посты, истории, клипы в ВК/Telegram/Instagram", True),
     ("green_api_instance", "Green-API — idInstance (статусы WhatsApp с отдельного номера)", False),
     ("green_api_token", "Green-API — apiTokenInstance", True),
@@ -3989,7 +3990,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-04.2"
+APP_VERSION = "2026-10-04.3"
 
 
 @app.get("/api/net")
@@ -4048,7 +4049,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             "roistat_project", "roistat_key",
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
             "cam_password", "cam_embeds", "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
-            "hooppy_token", "tbank_terminal", "tbank_terminal_password", "green_api_instance", "green_api_token",
+            "hooppy_token", "tbank_terminal", "tbank_terminal_password", "zenmoney_token", "green_api_instance", "green_api_token",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
             "waba_template_id", "waba_templates",
@@ -4073,7 +4074,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
 # скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
 # страница настроек открыта всем, у кого есть пароль администратора.
 SECRET_KEYS = {"cam_password", "anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_secret", "owner_password", "yandex_audience_token",
-               "hooppy_token", "green_api_token", "tbank_terminal_password",
+               "hooppy_token", "green_api_token", "tbank_terminal_password", "zenmoney_token",
                "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password", "yandex_web_password"}
 
 
