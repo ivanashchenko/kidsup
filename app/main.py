@@ -1412,6 +1412,7 @@ OWNER_FIELDS = [
     ("tbank_inn", "ИНН компании для Т-Банка", False),
     ("komtet_login", "Комтет Касса — логин пользователя «только просмотр»", False),
     ("komtet_password", "Комтет Касса — пароль", True),
+    ("komtet_imap_password", "Почта kidsup.claude@yandex.ru — пароль приложения (IMAP), чтобы код входа в Комтет читался сам", True),
     ("komtet_shop_id", "Комтет Касса — ID магазина (Настройки → Магазины)", False),
     ("komtet_secret", "Комтет Касса — секретный ключ магазина", True),
     ("tbank_terminal", "Т-Банк Интернет-эквайринг — TerminalKey (боевой)", False),
@@ -3609,6 +3610,30 @@ def api_komtet_probe():
     return komtet.probe()
 
 
+@app.post("/api/komtet/login", dependencies=OWNER_AUTH)
+def api_komtet_login(payload: dict = Body(default={})):
+    """Вход в кабинет КОМТЕТ: {} — начать (код придёт на почту), {code} — ввести код из письма."""
+    from . import komtet
+    return komtet.login_start(str(payload.get("code") or ""))
+
+
+@app.get("/api/komtet/login", dependencies=OWNER_AUTH)
+def api_komtet_login_status():
+    from . import komtet
+    return komtet.login_status()
+
+
+@app.post("/api/komtet/web", dependencies=OWNER_AUTH)
+def api_komtet_web(payload: dict = Body(default={})):
+    """Кабинет КОМТЕТ (только просмотр) в браузере на сервере: {url, wait_ms, actions:[{js}|{goto}|{wait}]}."""
+    from . import komtet
+    try:
+        return komtet.web(str(payload.get("url") or "https://kassa.komtet.ru/manage"), int(payload.get("wait_ms") or 5000),
+                          int(payload.get("max_text") or 30000), payload.get("actions") or None)
+    except Exception as e:                                           # noqa: BLE001
+        raise HTTPException(500, f"komtet.web: {type(e).__name__}: {str(e)[:300]}")
+
+
 @app.get("/api/tbank/probe", dependencies=OWNER_AUTH)
 def api_tbank_probe():
     """Т-Банк T-API (только чтение): видны ли счета и операции за 2 дня."""
@@ -3990,7 +4015,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-04.3"
+APP_VERSION = "2026-10-04.5"
 
 
 @app.get("/api/net")
@@ -4048,7 +4073,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
             "roistat_project", "roistat_key",
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
-            "cam_password", "cam_embeds", "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
+            "cam_password", "cam_embeds", "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_imap_password", "komtet_code", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
             "hooppy_token", "tbank_terminal", "tbank_terminal_password", "zenmoney_token", "green_api_instance", "green_api_token",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
@@ -4073,7 +4098,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
 # сам прокси. Показываем хвост: убедиться «тот ли вписан» можно,
 # скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
 # страница настроек открыта всем, у кого есть пароль администратора.
-SECRET_KEYS = {"cam_password", "anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_secret", "owner_password", "yandex_audience_token",
+SECRET_KEYS = {"cam_password", "anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_imap_password", "komtet_code", "komtet_secret", "owner_password", "yandex_audience_token",
                "hooppy_token", "green_api_token", "tbank_terminal_password", "zenmoney_token",
                "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password", "yandex_web_password"}
 
