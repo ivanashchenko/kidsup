@@ -9,6 +9,7 @@ pochta_password открывает письмо и достаёт код (осн
 """
 from __future__ import annotations
 
+import json
 import re
 import time
 
@@ -70,9 +71,16 @@ def web_codes(sender: str) -> list[str]:
     subj, rx = SOURCES[sender]
     if not db.get_setting("pochta_password"):
         return []
+    # письма с одной темой Яндекс склеивает в цепочку: строка списка ведёт на
+    # #/thread/…, внутри цепочки первым идёт самое новое письмо (#/message/…)
+    find = ("(() => { for (const a of document.querySelectorAll('a[href*=\"#/message/\"],a[href*=\"#/thread/\"]')) {"
+            " let e = a; for (let i = 0; i < 6 && e; i++, e = e.parentElement) {"
+            " if ((e.innerText || '').includes(%s)) return a.getAttribute('href'); } } return ''; })()" % json.dumps(subj))
+    msg = ("(() => { const a = document.querySelector('a[href*=\"#/message/\"]');"
+           " return location.hash.startsWith('#/thread/') && a ? a.getAttribute('href') : ''; })()")
     with cf.ThreadPoolExecutor(1) as ex:
         r = ex.submit(ya_web, "https://mail.yandex.ru/", 6000, 20000, False, "",
-                      [{"click": subj, "after": 5000}]).result(timeout=240)
+                      [{"goto_js": find}, {"goto_js": msg}]).result(timeout=300)
     return re.findall(rx, r.get("text") or "")
 
 
@@ -188,6 +196,13 @@ def ya_web(url: str = "https://mail.yandex.ru/", wait_ms: int = 5000, max_text: 
             try:
                 if "js" in a:
                     steps.append({"js": str(pg.evaluate(a["js"]))[:3000]})
+                elif "goto_js" in a:
+                    # JS возвращает адрес (#/thread/… или #/message/…) — переходим, если он есть
+                    href = pg.evaluate(a["goto_js"])
+                    steps.append("goto:" + str(href))
+                    if href:
+                        pg.goto("https://mail.yandex.ru/" + str(href).lstrip("/"), wait_until="domcontentloaded", timeout=90000)
+                        pg.wait_for_timeout(int(a.get("after", 5000)))
                 elif "click" in a:
                     pg.get_by_text(a["click"], exact=True).first.click(timeout=8000)
                     pg.wait_for_timeout(int(a.get("after", 2500)))

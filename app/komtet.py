@@ -121,6 +121,13 @@ def web(url: str = "https://kassa.komtet.ru/manage", wait_ms: int = 5000, max_te
                     a = {**a, "result": pg.evaluate(a["js"])}
                 elif "wait" in a:
                     pg.wait_for_timeout(int(a["wait"]))
+                elif "click" in a:
+                    # только переходы по меню; кнопки, которые что-то меняют, не нажимаем
+                    if any(w in a["click"].lower() for w in ("пробить", "возврат", "удал", "закрыть смену", "создать", "сохранить", "отправить")):
+                        raise ValueError("кнопка меняет данные — не нажимаем")
+                    pg.get_by_text(a["click"], exact=False).first.click(timeout=10000)
+                    pg.wait_for_timeout(int(a.get("after", 5000)))
+                    a = {**a, "url": pg.url}
                 elif a.get("goto", "").startswith("https://kassa.komtet.ru/"):
                     pg.goto(a["goto"], wait_until="domcontentloaded", timeout=90000)
                     pg.wait_for_timeout(int(a.get("after", 4000)))

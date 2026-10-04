@@ -112,8 +112,9 @@ def _login_worker() -> None:
                     _login.update(state="timeout")
                     b.close()
                     return
-                pg.locator("input:visible:not([type=hidden]):not([type=checkbox])").last.fill(code)
-                pg.get_by_text("Продолжить", exact=False).last.click(timeout=15000)
+                inp = pg.locator("input:visible:not([type=hidden]):not([type=checkbox])").last
+                inp.fill(code)
+                inp.press("Enter")
                 pg.wait_for_timeout(8000)
                 if "/service/login" in pg.url or "Подтвердите вход" in pg.inner_text("body"):
                     _login.update(state="bad_code", text=pg.inner_text("body")[:300])
