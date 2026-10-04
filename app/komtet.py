@@ -139,59 +139,18 @@ def web(url: str = "https://kassa.komtet.ru/manage", wait_ms: int = 5000, max_te
 # фоне, вводит логин/пароль и до 15 минут ждёт код: либо владелец вносит его
 # (настройка komtet_code через /api/komtet/login {code}), либо — если задан
 # пароль приложения Яндекс-почты komtet_imap_password — код читается из ящика
-# сам. После входа сессия сохраняется в data/komtet_state.json и дальше web()
+# сам (app/pochta_kod.py). После входа сессия сохраняется в data/komtet_state.json и дальше web()
 # ходит без кода, пока КОМТЕТ её не сбросит.
 
-import re as _re
 import threading as _th
 import time as _time
 
 _login = {"state": "idle"}
 
 
-def _code_from_mail(since: float) -> str:
-    pw = db.get_setting("komtet_imap_password") or ""
-    if not pw:
-        return ""
-    import email
-    import imaplib
-    from email.header import decode_header, make_header
-    from email.utils import parsedate_to_datetime
-    m = imaplib.IMAP4_SSL("imap.yandex.ru", 993, timeout=30)
-    try:
-        m.login(db.get_setting("komtet_login"), pw)
-        m.select("INBOX")
-        _, ids = m.search(None, "ALL")
-        for i in reversed(ids[0].split()[-15:]):
-            _, d = m.fetch(i, "(RFC822)")
-            msg = email.message_from_bytes(d[0][1])
-            frm = str(make_header(decode_header(msg.get("From", "")))).lower()
-            if "komtet" not in frm:
-                continue
-            try:
-                if parsedate_to_datetime(msg["Date"]).timestamp() < since - 60:
-                    break
-            except Exception:                                        # noqa: BLE001
-                pass
-            body = ""
-            for part in msg.walk():
-                if part.get_content_type() in ("text/plain", "text/html"):
-                    body += (part.get_payload(decode=True) or b"").decode(part.get_content_charset() or "utf-8", "ignore")
-            body = _re.sub(r"<[^>]+>", " ", body)
-            c = _re.search(r"(?<!\d)(\d{4,8})(?!\d)", body)
-            if c:
-                return c.group(1)
-    finally:
-        try:
-            m.logout()
-        except Exception:                                            # noqa: BLE001
-            pass
-    return ""
-
-
 def _login_worker() -> None:
     from playwright.sync_api import sync_playwright
-    from . import mkweb
+    from . import mkweb, pochta_kod
     t0 = _time.time()
     db.set_setting("komtet_code", "")
     try:
@@ -208,21 +167,13 @@ def _login_worker() -> None:
                 pg.wait_for_timeout(6000)
             if "id.komtet.ru" in pg.url:
                 _login.update(state="wait_code", since=t0, text=pg.inner_text("body")[:300])
-                code = ""
-                while not code and _time.time() - t0 < 900:
-                    _time.sleep(10)
-                    code = (db.get_setting("komtet_code") or "").strip()
-                    if not code:
-                        try:
-                            code = _code_from_mail(t0)
-                        except Exception as e:                       # noqa: BLE001
-                            _login["imap_error"] = str(e)[:200]
+                code = pochta_kod.wait("komtet_code", t0, "komtet", _login)
                 if not code:
                     _login.update(state="timeout")
                     b.close()
                     return
-                inp = pg.locator("input:not([type=hidden]):not([type=email])").first
-                inp.fill(code)
+                # на странице два поля: Email (заполнено) и «Код из email» — берём последнее видимое
+                pg.locator("input:visible:not([type=hidden]):not([type=checkbox])").last.fill(code)
                 pg.get_by_text("Подтвердить вход", exact=False).last.click(timeout=15000)
                 pg.wait_for_timeout(8000)
                 if "id.komtet.ru" in pg.url:

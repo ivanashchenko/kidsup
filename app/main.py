@@ -1412,7 +1412,9 @@ OWNER_FIELDS = [
     ("tbank_inn", "ИНН компании для Т-Банка", False),
     ("komtet_login", "Комтет Касса — логин пользователя «только просмотр»", False),
     ("komtet_password", "Комтет Касса — пароль", True),
-    ("komtet_imap_password", "Почта kidsup.claude@yandex.ru — пароль приложения (IMAP), чтобы код входа в Комтет читался сам", True),
+    ("ivideon_login", "Ivideon — логин пользователя с доступом к камерам", False),
+    ("ivideon_password", "Ivideon — пароль", True),
+    ("komtet_imap_password", "Почта kidsup.claude@yandex.ru — пароль приложения (IMAP), чтобы коды входа в Комтет и Ivideon читались сами", True),
     ("komtet_shop_id", "Комтет Касса — ID магазина (Настройки → Магазины)", False),
     ("komtet_secret", "Комтет Касса — секретный ключ магазина", True),
     ("tbank_terminal", "Т-Банк Интернет-эквайринг — TerminalKey (боевой)", False),
@@ -3610,6 +3612,30 @@ def api_komtet_probe():
     return komtet.probe()
 
 
+@app.post("/api/ivideon/web", dependencies=OWNER_AUTH)
+def api_ivideon_web(payload: dict = Body(default={})):
+    """Кабинет Ivideon (только просмотр) в браузере на сервере: {url, wait_ms, shot, actions}."""
+    from . import ivideon
+    try:
+        return ivideon.web(str(payload.get("url") or ivideon.HOME), int(payload.get("wait_ms") or 6000),
+                           int(payload.get("max_text") or 30000), payload.get("actions") or None, bool(payload.get("shot")))
+    except Exception as e:                                           # noqa: BLE001
+        raise HTTPException(500, f"ivideon.web: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.post("/api/ivideon/login", dependencies=OWNER_AUTH)
+def api_ivideon_login(payload: dict = Body(default={})):
+    """Вход в Ivideon: {} — начать (код придёт на почту), {code} — ввести код из письма."""
+    from . import ivideon
+    return ivideon.login_start(str(payload.get("code") or ""))
+
+
+@app.get("/api/ivideon/login", dependencies=OWNER_AUTH)
+def api_ivideon_login_status():
+    from . import ivideon
+    return ivideon.login_status()
+
+
 @app.post("/api/komtet/login", dependencies=OWNER_AUTH)
 def api_komtet_login(payload: dict = Body(default={})):
     """Вход в кабинет КОМТЕТ: {} — начать (код придёт на почту), {code} — ввести код из письма."""
@@ -4015,7 +4041,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-04.5"
+APP_VERSION = "2026-10-04.7"
 
 
 @app.get("/api/net")
@@ -4073,7 +4099,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
             "roistat_project", "roistat_key",
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
-            "cam_password", "cam_embeds", "tbank_token", "tbank_inn", "komtet_login", "komtet_password", "komtet_imap_password", "komtet_code", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
+            "cam_password", "cam_embeds", "tbank_token", "tbank_inn", "ivideon_login", "ivideon_password", "komtet_login", "komtet_password", "komtet_imap_password", "komtet_code", "ivideon_code", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
             "hooppy_token", "tbank_terminal", "tbank_terminal_password", "zenmoney_token", "green_api_instance", "green_api_token",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
@@ -4098,7 +4124,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
 # сам прокси. Показываем хвост: убедиться «тот ли вписан» можно,
 # скопировать — нет. 22.08 ключ отдавался целиком, и это была дыра:
 # страница настроек открыта всем, у кого есть пароль администратора.
-SECRET_KEYS = {"cam_password", "anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "komtet_password", "komtet_imap_password", "komtet_code", "komtet_secret", "owner_password", "yandex_audience_token",
+SECRET_KEYS = {"cam_password", "anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "ivideon_password", "komtet_password", "komtet_imap_password", "komtet_code", "ivideon_code", "komtet_secret", "owner_password", "yandex_audience_token",
                "hooppy_token", "green_api_token", "tbank_terminal_password", "zenmoney_token",
                "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password", "yandex_web_password"}
 
