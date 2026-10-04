@@ -211,3 +211,38 @@ def login_start(code: str = "") -> dict:
 
 def login_status() -> dict:
     return {**_login, "has_state": _state_path().exists()}
+
+
+# ---------------------------------------------------------------- чеки за период
+ACCOUNT = "8326"   # ИП Иванащенко в кабинете КОМТЕТ (касса Богородский + Клуб Буракова)
+
+
+def cheki(since: str, till: str) -> dict:
+    """Все задачи на печать (чеки) за период — через тот же внутренний API, которым
+    пользуется кабинет (/api/manage/print-tasks, заголовок X-AccountId). Только GET."""
+    import json as _json
+    js = """(async () => {
+      const out = []; let page = 1, total = null;
+      while (page < 200) {
+        const q = new URLSearchParams({date_start: %s + "T00:00:00", date_end: %s + "T23:59:59", page, per_page: 100});
+        const r = await fetch("/api/manage/print-tasks?" + q, {credentials: "include",
+          headers: {"Accept": "application/json", "X-AccountId": %s, "Timezone-offset": "-180", "X-Requested-With": "XMLHttpRequest"}});
+        if (r.status !== 200) return JSON.stringify({error: r.status + " " + (await r.text()).slice(0, 300), items: out});
+        const d = await r.json();
+        const items = d.print_tasks || d.items || d.data || (Array.isArray(d) ? d : []);
+        if (total === null) total = (d.meta && (d.meta.total || d.meta.total_count)) || d.total || null;
+        out.push(...items);
+        if (items.length < 100) break;
+        page++;
+      }
+      return JSON.stringify({total, items: out});
+    })()""" % (_json.dumps(since), _json.dumps(till), _json.dumps(ACCOUNT))
+    r = web(f"https://kassa.komtet.ru/manage/accounts/{ACCOUNT}/print-tasks", 3000, 100, [{"js": js}])
+    if not r.get("ok"):
+        return r
+    a = (r.get("actions") or [{}])[0]
+    if not a.get("ok"):
+        return {"ok": False, "error": a.get("error")}
+    d = _json.loads(a["result"])
+    return {"ok": not d.get("error"), "error": d.get("error"), "total": d.get("total"),
+            "count": len(d.get("items") or []), "items": d.get("items") or []}

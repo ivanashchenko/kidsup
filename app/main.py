@@ -3647,6 +3647,16 @@ def api_ivideon_login_status():
     return ivideon.login_status()
 
 
+@app.get("/api/komtet/cheki", dependencies=OWNER_AUTH)
+def api_komtet_cheki(since: str, till: str):
+    """Чеки КОМТЕТ за период (YYYY-MM-DD), только чтение."""
+    from . import komtet
+    try:
+        return komtet.cheki(since, till)
+    except Exception as e:                                           # noqa: BLE001
+        raise HTTPException(500, f"komtet.cheki: {type(e).__name__}: {str(e)[:300]}")
+
+
 @app.post("/api/komtet/login", dependencies=OWNER_AUTH)
 def api_komtet_login(payload: dict = Body(default={})):
     """Вход в кабинет КОМТЕТ: {} — начать (код придёт на почту), {code} — ввести код из письма."""
@@ -4052,7 +4062,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-04.14"
+APP_VERSION = "2026-10-04.15"
 
 
 @app.get("/api/net")
