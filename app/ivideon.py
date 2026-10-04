@@ -90,6 +90,7 @@ _login = {"state": "idle"}
 def _login_worker() -> None:
     from playwright.sync_api import sync_playwright
     from . import mkweb, pochta_kod
+    old = pochta_kod.snapshot("ivideon")
     t0 = _time.time()
     db.set_setting("ivideon_code", "")
     try:
@@ -106,7 +107,7 @@ def _login_worker() -> None:
                 pg.wait_for_timeout(8000)
             if "/service/login" in pg.url or "Подтвердите вход" in pg.inner_text("body"):
                 _login.update(state="wait_code", since=t0)
-                code = pochta_kod.wait("ivideon_code", t0, "ivideon", _login)
+                code = pochta_kod.wait("ivideon_code", t0, "ivideon", _login, old=old)
                 if not code:
                     _login.update(state="timeout")
                     b.close()

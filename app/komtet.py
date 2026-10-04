@@ -151,6 +151,7 @@ _login = {"state": "idle"}
 def _login_worker() -> None:
     from playwright.sync_api import sync_playwright
     from . import mkweb, pochta_kod
+    old = pochta_kod.snapshot("komtet")
     t0 = _time.time()
     db.set_setting("komtet_code", "")
     try:
@@ -167,7 +168,7 @@ def _login_worker() -> None:
                 pg.wait_for_timeout(6000)
             if "id.komtet.ru" in pg.url:
                 _login.update(state="wait_code", since=t0, text=pg.inner_text("body")[:300])
-                code = pochta_kod.wait("komtet_code", t0, "komtet", _login)
+                code = pochta_kod.wait("komtet_code", t0, "komtet", _login, old=old)
                 if not code:
                     _login.update(state="timeout")
                     b.close()
