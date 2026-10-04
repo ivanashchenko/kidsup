@@ -61,6 +61,12 @@ def web(url: str = HOME, wait_ms: int = 6000, max_text: int = 30000, actions: li
                     a = {**a, "result": pg.evaluate(a["js"])}
                 elif "wait" in a:
                     pg.wait_for_timeout(int(a["wait"]))
+                elif "click_css" in a:
+                    pg.locator(a["click_css"]).nth(int(a.get("nth", 0))).click(timeout=10000)
+                    pg.wait_for_timeout(int(a.get("after", 3000)))
+                elif "click" in a:
+                    pg.get_by_text(a["click"], exact=bool(a.get("exact"))).nth(int(a.get("nth", 0))).click(timeout=10000)
+                    pg.wait_for_timeout(int(a.get("after", 3000)))
                 elif a.get("goto", "").startswith("https://my.ivideon.com/"):
                     pg.goto(a["goto"], wait_until="domcontentloaded", timeout=90000)
                     pg.wait_for_timeout(int(a.get("after", 5000)))
