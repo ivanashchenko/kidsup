@@ -4073,7 +4073,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-04.18"
+APP_VERSION = "2026-10-04.19"
 
 
 @app.get("/api/net")

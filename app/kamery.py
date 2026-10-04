@@ -66,7 +66,15 @@ figure{margin:0;background:#fff;border:1px solid var(--line);border-radius:var(-
        overflow:hidden}
 .frame{position:relative;aspect-ratio:16/9;max-width:100%;background:#0E1020}
 .frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
-figcaption{padding:11px 14px;font-weight:600;font-size:15px}
+figcaption{padding:10px 14px;font-weight:600;font-size:15px;display:flex;align-items:center;
+           justify-content:space-between;gap:10px;flex-wrap:wrap}
+.fs{font:600 14px Inter,sans-serif;color:var(--indigo);background:var(--soft);border:1px solid #DCE6F5;
+    border-radius:10px;padding:7px 12px;cursor:pointer;text-decoration:none}
+.fs:hover{border-color:var(--blue)}
+.frame:fullscreen,.frame:-webkit-full-screen{aspect-ratio:auto;width:100vw;height:100vh;background:#000}
+.how{margin-top:18px;padding:14px 18px;background:#fff;border:1px solid var(--line);border-radius:var(--r);font-size:15px}
+.how b{color:var(--indigo)}
+.how ul{margin:8px 0 0;padding-left:20px}
 .login{max-width:390px;margin:6vh auto 0;background:#fff;border:1px solid var(--line);
        border-radius:var(--r);padding:26px 24px}
 .login label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}
@@ -94,6 +102,31 @@ figcaption{padding:11px 14px;font-weight:600;font-size:15px}
 FOOT = "</div></body></html>"
 
 
+# Полный экран: кнопка разворачивает рамку с камерой (Android, компьютер,
+# iPad); на iPhone Safari не умеет разворачивать чужой блок — открываем видео
+# отдельной вкладкой, там его разворачивает поворот телефона.
+FS_HOW = """
+<div class=how><b>Как смотреть на весь экран</b>
+<ul>
+<li>Нажмите «⛶ На весь экран» под нужной камерой. Выйти — кнопка «Назад» или Esc.</li>
+<li>На iPhone видео откроется отдельной вкладкой — поверните телефон горизонтально.</li>
+<li>Можно и в самом плеере: значок ⛶ в правом нижнем углу видео.</li>
+</ul></div>
+<script>
+document.querySelectorAll('.fs').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var f = b.closest('figure').querySelector('.frame');
+    var go = f.requestFullscreen || f.webkitRequestFullscreen;
+    if (go) {
+      try { var r = go.call(f); if (r && r.catch) r.catch(function () { window.open(b.dataset.src, '_blank'); }); return; }
+      catch (e) {}
+    }
+    window.open(b.dataset.src, '_blank');
+  });
+});
+</script>"""
+
+
 def login_page(error: str = "") -> str:
     err = f'<div class=err>{_html.escape(error)}</div>' if error else ""
     return f"""{HEAD}
@@ -116,8 +149,10 @@ def page() -> str:
             f'<figure><div class=frame><iframe src="{_html.escape(c["src"])}" '
             f'allow="autoplay; fullscreen; encrypted-media" allowfullscreen '
             f'loading=lazy title="{_html.escape(c["name"])}"></iframe></div>'
-            f'<figcaption>{_html.escape(c["name"])}</figcaption></figure>'
-            for c in cams) + '</div>'
+            f'<figcaption><span>{_html.escape(c["name"])}</span>'
+            f'<button class=fs type=button data-src="{_html.escape(c["src"])}">⛶ На весь экран</button>'
+            f'</figcaption></figure>'
+            for c in cams) + '</div>' + FS_HOW
     else:
         body = ('<div class=empty>Камеры ещё не подключены. Если вы видите это '
                 'сообщение — напишите нам в WhatsApp, поможем.</div>')
