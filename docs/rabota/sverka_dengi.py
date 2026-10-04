@@ -428,6 +428,61 @@ for u in old_minus:
 H.append("</table></div><p class=note>Старые минусы — прошлые сезоны (часть, вероятно, маткапитал или не закрытые списания). Решение: списать или выставить — за владельцем.</p>")
 if LIZA:
     H.append("<h3>Файл Лизы — разбор по каждому</h3><div class=tw><table><tr><th>Ребёнок</th><th>Лиза</th><th>Что в МойКлассе / банке / тетради</th><th>Вывод — что сделать</th></tr>" + "".join(f"<tr><td>{e(r['name'])}</td><td>{e(r['liza'])}</td><td>{e(r['mk'])}</td><td>{e(r['vyvod'])}</td></tr>" for r in LIZA) + "</table></div>")
+
+# --- 7. маткапиталы: ОСФР → счёт Буракова → счета KidsUP → баланс клиента в МК → абонемент
+BUR = load("bank_40802810600000603211.json", [])
+if BUR:
+    norm = lambda s: (s or "").replace("ё", "е").lower()
+    moved = [o for o in BUR if o["typeOfOperation"] == "Debit" and o.get("category") == "selfTransferOuter"]
+    rows = []
+    for o in sorted(BUR, key=lambda o: o["operationDate"]):
+        if "СФР" not in (o.get("payer") or {}).get("name", "") or o["operationDate"][:10] < "2026-05-01":
+            continue
+        pp = o.get("payPurpose") or ""
+        m = re.search(r"ФИО обуч\.?\s*([А-ЯЁ][а-яё-]+)\s+([А-ЯЁ][а-яё]+)", pp) or re.search(r"расх\s+([А-ЯЁ][а-яё-]+)\s+([А-ЯЁ][а-яё]+)", pp)
+        fam, im = (m[1], m[2]) if m else ("?", "?")
+        amt, d = o["operationAmount"], msk(o["operationDate"]).date().isoformat()
+        us = [u for u in U.values() if norm(fam) in norm(u["name"]) and norm(im) in norm(u["name"])]
+        ids = {u["id"] for u in us}
+        mkp = [p for p in P if p["userId"] in ids and p["optype"] == "income" and abs(p["summa"] - amt) < 1 and p["date"] >= "2026-04-01"]
+        near = [p for p in P if p["userId"] in ids and p["optype"] == "income" and p.get("paymentTypeId") == 63934
+                and abs((dd(p["date"]) - dd(d)).days) <= 25]
+        tr = [x for x in moved if abs(x["operationAmount"] - amt) < 1 or x["operationAmount"] > amt][:1]
+        bal = sum((u.get("balans") or 0) for u in us)
+        if not us:
+            st, cls = "КАРТОЧКИ НЕТ — деньги в МК не учтены", "bad"
+        elif mkp:
+            p0 = mkp[0]
+            st, cls = f"внесено {ddmm(p0['date'])} ({e(M.get(p0.get('managerId'),'—'))}), баланс сейчас {rub(bal)}", "ok"
+        elif near:
+            st, cls = "в МК другая сумма: " + ", ".join(f"{ddmm(p['date'])} {rub(p['summa'])}" for p in near) + f" — разница", "warn"
+        else:
+            st, cls = f"НЕ ВНЕСЕНО в МК (баланс {rub(bal)})", "bad"
+        rows.append((d, amt, f"{fam} {im}", st, cls))
+    H.append(f"<h2>7. Маткапиталы (ОСФР → счёт Буракова → KidsUP → баланс в МК)</h2><div class=tw><table><tr><th>Пришло</th><th class=n>Сумма</th><th>Ребёнок</th><th>В МойКлассе</th></tr>"
+             + "".join(f"<tr><td>{ddmm(d)}</td><td class=n>{rub(a)}</td><td>{e(n)}</td><td class={c}>{s}</td></tr>" for d, a, n, s, c in rows) + "</table></div>")
+    H.append("<p class=note>С 03.08 все суммы маткапиталов переведены со счёта Буракова на счета KidsUP (основной / маткапитал) в день поступления или в течение недели. После внесения на баланс Лиза должна создать абонемент со списанием с баланса — проверка «баланс висит, абонемента на месяц нет» в таблице ниже.</p>")
+    hang = []
+    for u in U.values():
+        if (u.get("balans") or 0) > 5000:
+            mk_in = [p for p in P if p["userId"] == u["id"] and p.get("paymentTypeId") == 63934 and p["date"] >= "2026-04-01"]
+            if mk_in:
+                octs = [s for s in subs_by[u["id"]] if (s.get("beginDate") or "") >= "2026-10-01"]
+                hang.append((u["name"], u["balans"], len(octs)))
+    if hang:
+        H.append("<h3>Маткапитал лежит на балансе — есть ли абонемент на октябрь</h3><div class=tw><table><tr><th>Клиент</th><th class=n>Баланс</th><th>Абонементов на октябрь</th></tr>" + "".join(f"<tr><td>{e(n)}</td><td class=n>{rub(b)}</td><td class={'ok' if k else 'bad'}>{k or 'нет — создать со списанием с баланса'}</td></tr>" for n, b, k in hang) + "</table></div>")
+
+# --- 8. возвраты: в МК после возврата баланс = 0, абонемент закрыт
+refs = [p for p in P if p["optype"] == "refund" and p["date"] >= "2026-06-01"]
+H.append("<h2>8. Возвраты: проверка в МойКлассе</h2><p class=lead>Правило: остаток абонемента сначала закрывается на баланс, затем возврат с баланса — баланс должен стать 0, абонемент — закрыт. Деньги уходят с личного счёта владельца («Возврат KidsUP») — сверка с ним после подключения ZenMoney.</p><div class=tw><table><tr><th>Дата</th><th>Внёс</th><th class=n>Сумма</th><th>Тип в МК</th><th>Клиент</th><th class=n>Баланс сейчас</th><th>Абонемент после возврата</th></tr>")
+for p in sorted(refs, key=lambda p: p["date"]):
+    u = U.get(p["userId"]) or {}
+    act = [s for s in subs_by[p["userId"]] if s.get("statusId") == 2 and (s.get("sellDate") or "") <= p["date"] and (s.get("visitedCount") or 0) < (s.get("visitCount") or 0) and (s.get("payed") or 0) > 0]
+    note = ("<span class=warn>активный оплаченный абонемент не закрыт: " + "; ".join(f"{ddmm(s['sellDate'])} {rub(s['payed'])} ({s.get('visitedCount')}/{s.get('visitCount')})" for s in act) + "</span>") if act else "<span class=ok>закрыт</span>"
+    bal = u.get("balans") or 0
+    H.append(f"<tr><td>{ddmm(p['date'])}</td><td>{e(man(p))}</td><td class=n>{rub(-p['summa'])}</td><td>{TYPES.get(p.get('paymentTypeId'), p.get('paymentTypeId'))}</td><td>{e(u.get('name') or '')}</td><td class='n {'ok' if abs(bal)<1 else 'warn'}'>{rub(bal)}</td><td>{note}</td></tr>")
+H.append("</table></div>")
+
 H.append("</div></body></html>")
 
 OUT.mkdir(parents=True, exist_ok=True)
