@@ -3734,6 +3734,17 @@ def gruppy_media_page(request: Request, chat: str = "", days: int = 60):
 
 # --- Явка по отчётам педагогов (app/yavka.py) -------------------------------
 
+@app.get("/sverka", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+def sverka_page():
+    """Сверка денег (тетрадь ↔ МойКласс ↔ КОМТЕТ ↔ банк + долги) — только владелец.
+    Страницу собирает docs/rabota/sverka_dengi.py."""
+    from pathlib import Path as _P
+    f = _P(__file__).resolve().parent.parent / "docs" / "rabota" / "kontrol" / "sverka.html"
+    if not f.exists():
+        raise HTTPException(404, "сверка ещё не собрана")
+    return HTMLResponse(f.read_text(encoding="utf-8"))
+
+
 @app.get("/yavka", response_class=HTMLResponse, dependencies=AUTH)
 def yavka_page(request: Request, day: str = "", refresh: int = 0):
     from . import yavka, autopilot
@@ -4062,7 +4073,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-04.17"
+APP_VERSION = "2026-10-04.18"
 
 
 @app.get("/api/net")
