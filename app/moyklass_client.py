@@ -260,11 +260,18 @@ class MoyklassClient:
         """Выгружает все страницы списка."""
         items: list[dict] = []
         offset = 0
+        prev_ids: set = set()
         while True:
             page_params = dict(params or {})
             page_params.update({"offset": offset, "limit": PAGE_LIMIT})
             data = self.get(path, page_params)
             page, total = self._extract_items(data, item_keys)
+            # справочник может не понимать offset и отдавать одну и ту же страницу
+            # по кругу (05.10 так завис полный синк) — повтор страницы = конец
+            ids = {str(x.get("id")) for x in page if isinstance(x, dict)}
+            if page and ids and ids == prev_ids:
+                break
+            prev_ids = ids
             items.extend(page)
             if progress:
                 progress(len(items), total)
@@ -273,9 +280,9 @@ class MoyklassClient:
             offset += len(page)
             if total is not None and offset >= total:
                 break
-            # API может урезать limit (оплаты — по 100), поэтому короткая страница
-            # без счётчика ещё не значит «конец»: останавливаемся на пустой
-            if total is None and len(page) < min(PAGE_LIMIT, 100):
+            # без счётчика: короткая страница — последняя, кроме ровно 100 штук —
+            # это лимит API у /payments, там страницы надо листать дальше
+            if total is None and len(page) < PAGE_LIMIT and len(page) != 100:
                 break
         return items
 
