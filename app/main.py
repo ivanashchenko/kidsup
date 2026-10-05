@@ -3734,6 +3734,33 @@ def gruppy_media_page(request: Request, chat: str = "", days: int = 60):
 
 # --- Явка по отчётам педагогов (app/yavka.py) -------------------------------
 
+@app.get("/api/sync/diag-payments", dependencies=OWNER_AUTH)
+def api_sync_diag_payments():
+    """Диагностика: что отдаёт МойКласс по оплатам за последние дни и что лежит в базе."""
+    from . import sync as _s
+    from .moyklass_client import MoyklassClient
+    import datetime as _dt
+    out = {"last_light_sync": db.get_state("last_light_sync"), "last_sync": db.get_state("last_sync")}
+    with db.get_conn() as conn:
+        r = conn.execute("SELECT COUNT(*), MAX(date), MAX(json_extract(raw,'$.createdAt')) FROM payments").fetchone()
+        out["db"] = list(r)
+    c = MoyklassClient(_s.get_api_key())
+    try:
+        d0 = (_dt.date.today() - _dt.timedelta(days=3)).isoformat(); d1 = _dt.date.today().isoformat()
+        for name, params in (("date", {"date": [d0, d1]}), ("date[]", {"date[]": [d0, d1]}), ("без фильтра", {})):
+            try:
+                r = c.get("/v1/company/payments", {**params, "limit": 100, "offset": 0})
+                ps = r.get("payments") or []
+                out[name] = {"n": len(ps), "stats": {k: v for k, v in r.items() if k != "payments"},
+                             "max_created": max((p.get("createdAt") or "" for p in ps), default=None),
+                             "max_date": max((p.get("date") or "" for p in ps), default=None)}
+            except Exception as e:  # noqa: BLE001
+                out[name] = str(e)[:200]
+    finally:
+        c.close()
+    return out
+
+
 @app.get("/sverka", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def sverka_page():
     """Сверка денег (тетрадь ↔ МойКласс ↔ КОМТЕТ ↔ банк + долги) — только владелец.
@@ -4073,7 +4100,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-05.1"
+APP_VERSION = "2026-10-05.3"
 
 
 @app.get("/api/net")

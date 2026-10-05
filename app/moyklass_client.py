@@ -239,6 +239,12 @@ class MoyklassClient:
             stats = data.get("stats")
             if isinstance(stats, dict):
                 total = stats.get("totalItems")
+                # 05.10.2026: у /payments счётчик вложен глубже — {"stats": {"stats":
+                # {"totalItems": …}}}. Не найдя его, fetch_all считал, что страница
+                # из 100 оплат (лимит API) — последняя, и синк неделями забирал только
+                # первую сотню за период: свежие оплаты в базу не попадали.
+                if total is None and isinstance(stats.get("stats"), dict):
+                    total = stats["stats"].get("totalItems")
             for key in keys:
                 if isinstance(data.get(key), list):
                     return data[key], total
@@ -267,7 +273,9 @@ class MoyklassClient:
             offset += len(page)
             if total is not None and offset >= total:
                 break
-            if total is None and len(page) < PAGE_LIMIT:
+            # API может урезать limit (оплаты — по 100), поэтому короткая страница
+            # без счётчика ещё не значит «конец»: останавливаемся на пустой
+            if total is None and len(page) < min(PAGE_LIMIT, 100):
                 break
         return items
 
