@@ -3735,30 +3735,49 @@ def gruppy_media_page(request: Request, chat: str = "", days: int = 60):
 # --- Явка по отчётам педагогов (app/yavka.py) -------------------------------
 
 @app.get("/api/sync/diag-payments", dependencies=OWNER_AUTH)
-def api_sync_diag_payments():
-    """Диагностика: что отдаёт МойКласс по оплатам за последние дни и что лежит в базе."""
+def api_sync_diag_payments(since: str = "", till: str = ""):
+    """Диагностика постраничной выдачи /payments: что отдаёт API на разных offset/sort."""
     from . import sync as _s
     from .moyklass_client import MoyklassClient
     import datetime as _dt
+    d0 = since or (_dt.date.today() - _dt.timedelta(days=3)).isoformat(); d1 = till or _dt.date.today().isoformat()
     out = {"last_light_sync": db.get_state("last_light_sync"), "last_sync": db.get_state("last_sync")}
     with db.get_conn() as conn:
-        r = conn.execute("SELECT COUNT(*), MAX(date), MAX(json_extract(raw,'$.createdAt')) FROM payments").fetchone()
-        out["db"] = list(r)
+        out["db"] = list(conn.execute("SELECT COUNT(*), MAX(date), MAX(json_extract(raw,'$.createdAt')) FROM payments").fetchone())
     c = MoyklassClient(_s.get_api_key())
     try:
-        d0 = (_dt.date.today() - _dt.timedelta(days=3)).isoformat(); d1 = _dt.date.today().isoformat()
-        for name, params in (("date", {"date": [d0, d1]}), ("date[]", {"date[]": [d0, d1]}), ("без фильтра", {})):
+        for name, params in (("offset0", {"date": [d0, d1], "limit": 100, "offset": 0}),
+                             ("offset100", {"date": [d0, d1], "limit": 100, "offset": 100}),
+                             ("page2", {"date": [d0, d1], "limit": 100, "page": 2}),
+                             ("desc", {"date": [d0, d1], "limit": 100, "sort": "date", "sortDirection": "desc"}),
+                             ("createdAt_desc", {"date": [d0, d1], "limit": 100, "sort": "createdAt", "sortDirection": "desc"})):
             try:
-                r = c.get("/v1/company/payments", {**params, "limit": 100, "offset": 0})
+                r = c.get("/v1/company/payments", params)
                 ps = r.get("payments") or []
-                out[name] = {"n": len(ps), "stats": {k: v for k, v in r.items() if k != "payments"},
+                out[name] = {"n": len(ps), "ids": [p.get("id") for p in ps[:3]] + ["…"] + [p.get("id") for p in ps[-2:]],
                              "max_created": max((p.get("createdAt") or "" for p in ps), default=None),
-                             "max_date": max((p.get("date") or "" for p in ps), default=None)}
+                             "min_created": min((p.get("createdAt") or "" for p in ps), default=None)}
             except Exception as e:  # noqa: BLE001
                 out[name] = str(e)[:200]
     finally:
         c.close()
     return out
+
+
+@app.post("/api/kontrol-oplat/run", dependencies=OWNER_AUTH)
+def api_kontrol_oplat_run(day: str = "", dry: int = 1):
+    """Утренний контроль оплат за день (по умолчанию вчера). dry=1 — только посчитать, без пунктов в инбокс."""
+    from . import kontrol_oplat
+    try:
+        return kontrol_oplat.run(day or None, dry=bool(dry))
+    except Exception as e:                                           # noqa: BLE001
+        raise HTTPException(500, f"kontrol_oplat: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.get("/kontrol-oplat", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+def kontrol_oplat_page(day: str = ""):
+    from . import kontrol_oplat
+    return HTMLResponse(kontrol_oplat.html(day or None))
 
 
 @app.get("/sverka", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -4100,7 +4119,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-05.4"
+APP_VERSION = "2026-10-05.6"
 
 
 @app.get("/api/net")

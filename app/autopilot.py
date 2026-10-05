@@ -4932,6 +4932,13 @@ def _loop() -> None:
             # Явка: вечером сверяем отчёты педагогов из «KidsUP Team» с
             # занятиями дня (пункт Лизе в Пульт), утром — ещё раз за вчера:
             # часть педагогов пишет списки ночью или следующим утром
+            # 05.10, Борис: утренний контроль оплат за вчера (правила 1–4) — в 08:30
+            if now.hour == 8 and 30 <= now.minute < 45 and _mark("kontrol_oplat", str(_today())):
+                try:
+                    from . import kontrol_oplat
+                    threading.Thread(target=kontrol_oplat.run, kwargs={"dry": False}, daemon=True).start()
+                except Exception:
+                    log.exception("контроль оплат не запустился")
             for _h, _shift in ((21, 0), (8, 1)):
                 if now.hour == _h and 30 <= now.minute < 40 \
                         and _mark("yavka", f"{_today()}:{_h}"):
