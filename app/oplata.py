@@ -91,25 +91,48 @@ def _child(full: str) -> str:
 
 # ---------------------------------------------------------------- тексты
 
-def text_for(kids: list[tuple[str, list[str]]]) -> str:
-    """kids = [(имя, [предметы])]. Имена в именительном — без склонений."""
+def _rub(x: float) -> str:
+    x = round(float(x or 0), 2)
+    s = f"{int(x):,}".replace(",", " ")
+    return s if x == int(x) else f"{s},{int(round((x - int(x)) * 100)):02d}"
+
+
+# 05.10 Лиза: «сообщение бота про оплату в личном кабинете путает клиентов:
+# сообщение есть, а ссылки, как правило, нет, если мы не сделали — они не
+# знают, какую сумму платить» (пример — Лукьянец Алексей). Проверка октябрьской
+# рассылки: из 156 семей счёт на октябрь в кабинете был только у 38, у 61 его
+# нет до сих пор; 25 семей переспрашивали ссылку и сумму, шестеро ждали ответа
+# 31–45 часов. Поэтому: личный кабинет упоминаем ТОЛЬКО если счёт на месяц уже
+# выставлен, и тогда называем сумму из счёта. Нет счёта — ни кабинета, ни
+# «оплатите онлайн»: просим ответить, и администратор присылает сумму и ссылку.
+def text_for(kids: list[tuple[str, list[str]]], summa: float = 0) -> str:
+    """kids = [(имя, [предметы])]. Имена в именительном — без склонений.
+    summa — неоплаченный остаток выставленных счетов на месяц (0 — счёта нет)."""
     spisok = "\n".join(f"• {n} — {', '.join(ss)}" if n else f"• {', '.join(ss)}"
                         for n, ss in kids)
     lg = any("логопед" in x for _, ss in kids for x in ss)
     mesto = "место в группе" + (" и время у логопеда" if lg else "")
+    if summa > 0:
+        kak = (f"К оплате за {MONTH}: {_rub(summa)} ₽ — счёт уже выставлен.\n\n"
+               f"Как оплатить:\n"
+               f"• в личном кабинете «Твой Класс» (kidsup.tvoyklass.com) — счёт на эту "
+               f"сумму там, кнопка «Оплатить»;\n"
+               f"• на ресепшене картой или по СБП;\n"
+               f"• или ответьте «ссылка» — пришлём ссылку на эту сумму для оплаты по СБП.")
+    else:
+        kak = (f"Сумма зависит от числа занятий в {MONTH_V} по вашему расписанию, поэтому "
+               f"считаем её для каждой семьи.\n\n"
+               f"Как оплатить:\n"
+               f"• ответьте на это сообщение «ссылка» — администратор посчитает сумму "
+               f"и пришлёт ссылку для оплаты по СБП (с 10 до 20, обычно в течение часа);\n"
+               f"• или на ресепшене картой или по СБП — сумму скажут на месте.")
     return (
         f"Здравствуйте! Это KidsUP 🌿\n\n"
         f"Спасибо, что сентябрь провели с нами! Открываем оплату занятий на {MONTH}:\n"
         f"{spisok}\n\n"
-        f"Просим оплатить до {DEADLINE}. Почему нам важно не откладывать:\n"
-        f"• оплата закрепляет за вами {mesto} — сейчас идёт набор, и новые семьи "
-        f"записываются на свободные места;\n"
-        f"• под точный состав группы педагоги планируют программу месяца и готовят материалы;\n"
-        f"• в первые дни {MONTH_P} не будет очереди на ресепшене — занятия начнутся вовремя.\n\n"
-        f"Как оплатить:\n"
-        f"• в личном кабинете «Твой Класс» — kidsup.tvoyklass.com;\n"
-        f"• на ресепшене картой или по СБП;\n"
-        f"• или ответьте на это сообщение — пришлём ссылку для оплаты по СБП.\n\n"
+        f"Просим оплатить до {DEADLINE} — так {mesto} закрепится за вами: сейчас идёт "
+        f"набор, и новые семьи записываются на свободные места.\n\n"
+        f"{kak}\n\n"
         f"Принимаем материнский капитал, для налогового вычета 13% подготовим справку. "
         f"Если в {MONTH_V} что-то меняется — время, пауза, ещё один предмет — "
         f"просто напишите, всё подберём 💛\n\n"
@@ -117,11 +140,36 @@ def text_for(kids: list[tuple[str, list[str]]]) -> str:
     )
 
 
-def sms_for(kids: list[tuple[str, list[str]]]) -> str:
+def sms_for(kids: list[tuple[str, list[str]]], summa: float = 0) -> str:
     names = ", ".join(n for n, _ in kids if n)
-    return (f"KidsUP: открыта оплата занятий на {MONTH}{f' ({names})' if names else ''}. "
-            f"Просим оплатить до {DEADLINE} — так место в группе закрепится за вами. "
-            f"kidsup.tvoyklass.com или ресепшен, тел. 84951209024")
+    head = f"KidsUP: открыта оплата занятий на {MONTH}{f' ({names})' if names else ''}. "
+    if summa > 0:
+        return (head + f"К оплате {_rub(summa)} руб., счёт в кабинете kidsup.tvoyklass.com. "
+                f"Оплатить до {DEADLINE}, тел. 84951209024")
+    return (head + f"Сумму и ссылку пришлём в WhatsApp — ответьте на наше сообщение "
+            f"или позвоните 84951209024")
+
+
+def _open_invoices(conn, uids: list[int]) -> float:
+    """Неоплаченный остаток счетов на следующий месяц по детям семьи.
+    Счёт относим к месяцу по дате счёта (date) или созданию — не раньше чем за
+    неделю до NEXT_FROM и до NEXT_TO."""
+    if not uids:
+        return 0.0
+    since = (datetime.fromisoformat(NEXT_FROM) - timedelta(days=7)).date().isoformat()
+    total = 0.0
+    q = ",".join("?" * len(uids))
+    for price, payed, created, raw in conn.execute(
+            f"SELECT price, payed, created_at, raw FROM invoices WHERE user_id IN ({q})", uids):
+        try:
+            j = json.loads(raw or "{}")
+        except ValueError:
+            j = {}
+        d = str(j.get("date") or created or "")[:10]
+        if not (since <= d < NEXT_TO):
+            continue
+        total += max(0.0, float(price or 0) - float(payed or 0))
+    return round(total, 2)
 
 
 # ---------------------------------------------------------------- кто
@@ -234,14 +282,18 @@ def plan() -> dict:
             k.append(subj)
         f["groups"].append(cls.replace(SEASON_PREFIX, ""))
     out = []
-    for f in fam.values():
-        kids = list(f["kids"].items())
-        f["text"] = text_for(kids)
-        f["sms"] = sms_for(kids)
-        f["kids"] = kids
-        out.append(f)
+    with db.get_conn() as conn:
+        for f in fam.values():
+            kids = list(f["kids"].items())
+            f["summa"] = _open_invoices(conn, f["uids"])
+            f["text"] = text_for(kids, f["summa"])
+            f["sms"] = sms_for(kids, f["summa"])
+            f["kids"] = kids
+            out.append(f)
     out.sort(key=lambda f: f["kids"][0][0])
     return {"семей": len(out), "детей": sum(len(f["uids"]) for f in out),
+            "со_счётом": sum(1 for f in out if f["summa"] > 0),
+            "без_счёта": sum(1 for f in out if not f["summa"]),
             "уже_оплатили_следующий": len(skipped_paid), "оплатившие": skipped_paid,
             "не_попали": mimo, "recipients": out}
 
