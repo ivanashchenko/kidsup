@@ -197,8 +197,15 @@ def spisok(day: str, who: str) -> dict:
         except Exception:
             pass
     items = []
+    # 05.10, Борис: «Лене все операционные задачи в Пульте, а Ане прозвон базы на
+    # отдельной странице» — чужие пункты (горячие перезвоны Лены) сюда больше не
+    # подтягиваем, иначе один и тот же номер наберут двое. Вернуть прежнее —
+    # настройка obzvon_chuzhie=1.
+    chuzhie = (db.get_setting("obzvon_chuzhie", "0") or "0") == "1"
     for r in rows:
         if r["who"] not in (who, "Ира", "Лена", "Аня"):
+            continue
+        if r["who"] != who and not chuzhie:
             continue
         k = _kind(r["text"], r["source"] or "", svoy=(r["who"] == who))
         if not k or (r["who"] != who and (r["done"] or not r["phone"])):
