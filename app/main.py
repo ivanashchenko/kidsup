@@ -3764,6 +3764,18 @@ def api_sync_diag_payments(since: str = "", till: str = ""):
     return out
 
 
+@app.get("/bez-oplaty", response_class=HTMLResponse, dependencies=AUTH)
+def bez_oplaty_page():
+    """Дети, которые ходят без оплаченного абонемента на текущий месяц
+    (06.10.2026, Борис: «ходят без оплаты — 91 — дай полный список на отдельной
+    странице»). Файл собирается разбором по выгрузке МойКласса и выкладывается
+    вместе с docs/ — страница статическая, дата данных указана в шапке."""
+    p = Path(__file__).resolve().parent.parent / "docs" / "rabota" / "kontrol" / "bez_oplaty.html"
+    if not p.exists():
+        raise HTTPException(404, "список ещё не собран")
+    return HTMLResponse(p.read_text(encoding="utf-8"))
+
+
 @app.post("/api/kontrol-oplat/run", dependencies=OWNER_AUTH)
 def api_kontrol_oplat_run(day: str = "", dry: int = 1):
     """Утренний контроль оплат за день (по умолчанию вчера). dry=1 — только посчитать, без пунктов в инбокс."""
@@ -4119,7 +4131,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-06.4"
+APP_VERSION = "2026-10-06.5"
 
 
 @app.get("/api/net")
