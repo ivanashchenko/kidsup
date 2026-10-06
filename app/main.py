@@ -3764,6 +3764,40 @@ def api_sync_diag_payments(since: str = "", till: str = ""):
     return out
 
 
+@app.get("/api/kadry", dependencies=AUTH)
+def api_kadry(day: str = ""):
+    """Кадры с камер по занятиям дня (фото-явка, пилот 06.10.2026): что снято, что подсчитано."""
+    from . import kadry
+    return {"day": day, "items": kadry.spisok(day), "камеры": sorted(kadry.cam_rooms())}
+
+
+@app.post("/api/kadry/snap", dependencies=AUTH)
+def api_kadry_snap(payload: dict = Body(...)):
+    """Ручной кадр комнаты: {"room": "К1"}. Для проверки привязки камер к комнатам."""
+    from . import kadry
+    return kadry.snap_room(str(payload.get("room") or ""))
+
+
+@app.post("/api/kadry/ocenka", dependencies=AUTH)
+def api_kadry_ocenka(payload: dict = Body(...)):
+    """Подсчёт по кадру: {"key": "<lesson_id[_2]>", "deti": 5, "vzroslye": 1, "note": "…"}."""
+    from . import kadry
+    d, v = payload.get("deti"), payload.get("vzroslye")
+    return kadry.ocenka(str(payload.get("key") or ""), None if d is None else int(d),
+                        None if v is None else int(v), str(payload.get("note") or ""))
+
+
+@app.get("/kadry/file/{day}/{name}", dependencies=AUTH)
+def kadry_file(day: str, name: str):
+    from . import kadry
+    if not re.fullmatch(r"\d{4}-\d\d-\d\d", day) or not re.fullmatch(r"[\w.-]+\.png", name):
+        raise HTTPException(400, "плохой путь")
+    p = kadry.DIR / day / name
+    if not p.exists():
+        raise HTTPException(404, "нет кадра")
+    return Response(p.read_bytes(), media_type="image/png")
+
+
 @app.get("/bez-oplaty", response_class=HTMLResponse, dependencies=AUTH)
 def bez_oplaty_page():
     """Дети, которые ходят без оплаченного абонемента на текущий месяц
@@ -4131,7 +4165,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-06.5"
+APP_VERSION = "2026-10-06.6"
 
 
 @app.get("/api/net")

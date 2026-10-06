@@ -4980,6 +4980,13 @@ def _loop() -> None:
                     poll_calls()
                 except Exception:
                     log.exception("poll_calls упал — продолжаем")
+            # фото-явка (пилот 06.10): кадр с камеры через 10 минут после начала занятия
+            if 8 <= now.hour < 21:
+                try:
+                    from . import kadry
+                    kadry.tick(now)
+                except Exception:
+                    log.exception("кадры с камер упали — продолжаем")
             # Клод-диспетчер: ответы команде в мессенджерах раз в минуту
             if 8 <= now.hour < 22:
                 try:
