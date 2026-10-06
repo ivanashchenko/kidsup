@@ -266,9 +266,16 @@ def _dannye(conn) -> dict:
         "SELECT DISTINCT j.user_id FROM joins j JOIN classes c ON c.id = j.class_id "
         "WHERE c.name LIKE ? AND c.name NOT LIKE ? AND j.status_id = 2", ("2627_%", "%Заявк%"))}
     platil = {r[0] for r in conn.execute("SELECT DISTINCT user_id FROM payments WHERE summa > 0")}
+    # 06.10, Аня: семьям из листа ожидания (каллиграфия, РР 1,3 — группа полная) ушло
+    # «есть место: английский». Кто ждёт конкретное направление/группу — тому не
+    # предлагаем другое: лист ожидания новых направлений (2627_Заявки_*) и заявки в
+    # полные группы (join «новая заявка» в учебную группу).
+    zhdut = {r[0] for r in conn.execute(
+        "SELECT DISTINCT j.user_id FROM joins j JOIN classes c ON c.id = j.class_id "
+        "WHERE c.name LIKE ? AND (c.name LIKE ? OR j.status_id = 50509)", ("2627_%", "%Заявк%"))}
     return {"today": today, "st": st_names, "mertvye": mertvye, "users": users, "zhivoy": zhivoy,
             "popytki": popytki, "pisali_nam": pisali_nam, "my_pisali": my_pisali,
-            "seychas": seychas, "uchitsya": uchitsya, "platil": platil}
+            "seychas": seychas, "uchitsya": uchitsya, "platil": platil, "zhdut": zhdut}
 
 
 def _semi(D: dict, uids) -> dict[str, list]:
@@ -341,10 +348,19 @@ def spiski() -> dict:
         def semya_zanyata(p):
             return any(x[0] in D["uchitsya"] or x[0] in D["seychas"] for x in na_nomere.get(p, []))
 
+        def semya_zhdet(p):
+            """Семья в листе ожидания — ждёт своё направление, чужое не предлагаем (06.10)."""
+            return any(x[0] in D["zhdut"] for x in na_nomere.get(p, []))
+
+        zhdut_semey = Counter()
+
         # ---- думает
         dumaet = []
         for p, us in _semi(D, [u[0] for u in D["users"].values() if u[3] == DUMAET]).items():
             if any(x[3] in D["mertvye"] for x in na_nomere.get(p, [])):
+                continue
+            if semya_zhdet(p):
+                zhdut_semey["думает"] += 1
                 continue
             if all(x[0] in D["uchitsya"] for x in us):
                 continue                               # уже учится — статус просто не обновили
@@ -373,6 +389,9 @@ def spiski() -> dict:
         nedozvon = []
         for p, us in _semi(D, [u[0] for u in D["users"].values() if u[3] == NEDOZVON]).items():
             if any(x[3] in D["mertvye"] for x in na_nomere.get(p, [])) or semya_zanyata(p):
+                continue
+            if semya_zhdet(p):
+                zhdut_semey["недозвон"] += 1
                 continue
             k = kontakt(p)
             pop = sorted(D["popytki"].get(p, []))
@@ -474,7 +493,8 @@ def spiski() -> dict:
     itog25["есть_группа_с_местами"] = sum(1 for r in baza if r["предложение"])
     itog25["отказ_раньше"] = sum(1 for r in baza if r["отказ_раньше"])
     return {"дата": today.isoformat(), "думает": dumaet, "недозвон": nedozvon, "база2425": baza,
-            "итог2425": dict(itog25), "групп_с_местами": len(grp)}
+            "итог2425": dict(itog25), "групп_с_местами": len(grp),
+            "лист_ожидания_исключено": dict(zhdut_semey)}
 
 
 # ------------------------------------------------------------ раздача по сменам
@@ -903,6 +923,8 @@ def msg_status() -> dict:
             "SELECT COALESCE(vid,'база2425'), status, COUNT(*) FROM vozvrat_msg GROUP BY 1, 2").fetchall()}
         seg = conn.execute("SELECT COUNT(*) FROM vozvrat_msg WHERE sent LIKE ?",
                            (date.today().isoformat() + "%",)).fetchone()[0]
+        otpr = [{"phone": p, "vid": v, "sent": s} for p, v, s in conn.execute(
+            "SELECT phone, COALESCE(vid,'база2425'), sent FROM vozvrat_msg WHERE status='sent' ORDER BY sent")]
     return {"по_статусу": st, "сегодня_ушло": seg, "включено": db.get_setting("vozvrat_msg_on", "0") == "1",
             "старт": db.get_setting("vozvrat_msg_start", "2026-09-30T10:00"),
-            "в_день": db.get_setting("vozvrat_msg_v_den", "35")}
+            "в_день": db.get_setting("vozvrat_msg_v_den", "35"), "отправлено": otpr}
