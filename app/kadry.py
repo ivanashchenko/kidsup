@@ -55,8 +55,7 @@ def cam_rooms() -> dict[str, str]:
 
 def _room_names(conn) -> dict[int, str]:
     try:
-        return {int(r[0]): json.loads(r[1] or "{}").get("name") or str(r[0])
-                for r in conn.execute("SELECT id, raw FROM rooms").fetchall()}
+        return {int(r[0]): (r[1] or "") for r in conn.execute("SELECT id, name FROM rooms").fetchall()}
     except Exception:  # noqa: BLE001
         return {}
 
@@ -114,6 +113,7 @@ def tick(now: datetime | None = None) -> list[str]:
     """Раз в минуту: какие занятия начались AFTER_MIN минут назад в комнатах с камерами."""
     from .autopilot import _now
     now = now or _now()
+    now = now.replace(tzinfo=None)      # сравниваем с наивными begin/end — иначе TypeError каждую минуту
     cams = cam_rooms()
     if not cams:
         return []
@@ -149,12 +149,12 @@ def tick(now: datetime | None = None) -> list[str]:
                 if not (when <= now < when + timedelta(minutes=2)):
                     continue
                 key = f"{lid}{suffix}"
-                recs = [r for r in (j.get("records") or []) if not r.get("test")]
-                otm = sum(1 for r in recs if r.get("visit"))
+                zap, otm = conn.execute("SELECT COUNT(*), COALESCE(SUM(visit),0) FROM lesson_records WHERE lesson_id=?",
+                                        (lid,)).fetchone()
                 cur = conn.execute("INSERT OR IGNORE INTO kadry (key, lesson_id, day, ts, room, class_name, begin_time, "
                                    "end_time, zapisano, otmecheno, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                                    (key, lid, day, now.isoformat(timespec="minutes"), room, cname[5:], bt[:5],
-                                    (et or "")[:5], len(j.get("records") or []), otm, st))
+                                    (et or "")[:5], int(zap or 0), int(otm or 0), st))
                 if cur.rowcount:
                     with _lock:
                         if key in _busy:
