@@ -252,9 +252,20 @@ def messages(chat_id: str = "", since: str = "", limit: int = 200, q: str = "", 
     return out[::-1]
 
 
+PODPIS = "🤖 Клод (ассистент Бориса)"
+
+
 def send(chat_id: str, text: str, chat_type: str = "telegroup") -> dict:
-    """Написать в группу от имени канала Wazzup (Telegram-аккаунт центра)."""
+    """Написать в группу от имени канала Wazzup (Telegram-аккаунт центра).
+
+    06.10.2026, Борис: «пиши в чат администраторов, только чтобы было понятно,
+    что это ты». Сообщение уходит с аккаунта центра, и без подписи его читают
+    как слова Бориса. Поэтому каждое сообщение начинается с PODPIS — всегда,
+    а не по памяти того, кто его составляет."""
     from . import wazzup
+    text = (text or "").strip()
+    if not text.startswith("🤖"):
+        text = f"{PODPIS}:\n{text}"
     chans = wazzup.channels()
     ch = wazzup._pick(chans, "tgapi" if chat_type == "telegroup" else "whatsapp")
     if not ch:
