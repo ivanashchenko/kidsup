@@ -4119,7 +4119,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-05.7"
+APP_VERSION = "2026-10-06.1"
 
 
 @app.get("/api/net")
@@ -4879,6 +4879,16 @@ async def public_lead(request: Request):
             "utm": (lambda u: u if len(u) <= 1500 else "")(str(payload.get("utm") or "").strip()),
             "landing": str(payload.get("landing") or "").strip()[:120]}
 
+    # 06.10.2026, разбор «заявок без меток»: 9 из 30 таких заявок за две недели —
+    # боты. Они шлют POST прямо сюда с course «мини-форма-hero», но без note и
+    # landing, которые настоящая мини-форма на сайте добавляет всегда
+    # («мини-форма hero / | …»), и без визита Roistat. IP заграничные и хостинги
+    # (201.34.156.103 — 6 раз один номер, 173.239.216.77, 185.132.187.222), номера
+    # чужие: 04.10 Лена 4 раза звонила по такой «заявке» 79268679860. Пишем в
+    # журнал со статусом spam_nojs (его видно в /api/public/leads), в CRM не шлём.
+    nojs = (lead["course"].startswith("мини-форма") and not lead["note"]
+            and not lead["landing"] and not lead["roistat"])
+
     def _store() -> int | None:
         with db.get_conn() as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS site_leads (
@@ -4899,12 +4909,15 @@ async def public_lead(request: Request):
                 " VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (lead["phone"], lead["child"], lead["age"], lead["course"],
                  lead["note"], lead["roistat"], ip,
-                 "throttled" if throttled else "pending",
+                 "spam_nojs" if nojs else ("throttled" if throttled else "pending"),
                  lead["ym_cid"], lead["yclid"], lead["utm"], lead["landing"]))
             conn.commit()
             return cur.lastrowid
 
     lead["lead_id"] = await run_in_threadpool(_store)
+    if nojs:
+        log.warning("заявка +%s с IP %s без признаков формы сайта — в журнал как spam_nojs", digits, ip)
+        return JSONResponse({"ok": True}, headers=_PUB_CORS)
     if throttled:
         log.warning("лимит заявок с IP %s: заявка +%s сохранена в журнал без CRM", ip, digits)
         return JSONResponse({"ok": True, "throttled": True}, headers=_PUB_CORS)

@@ -232,4 +232,62 @@ def voronka(days: int = 30, details: bool = False) -> dict:
         out["semi"] = [{**{k: v for k, v in f.items() if k != "uids"},
                         "uids": sorted(f["uids"])}
                        for f in sorted(fam.values(), key=lambda x: x["first"])]
+    try:
+        out["roistat"] = roistat_zayavki(days)
+    except Exception as e:  # noqa: BLE001 — воронка по сайту важнее
+        out["roistat"] = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
     return out
+
+
+# 06.10.2026, Борис: «проверь, почему заявки с сайта теряют метку». Итог проверки:
+# метки на сайте не теряются, а воронка выше видит только формы сайта (site_leads).
+# Люди с рекламы в основном ЗВОНЯТ: за 22.09–05.10 по Roistat Директ дал 5 заявок
+# (4 звонка), VK — 3 (все звонки), а в site_leads от них по одной. Звонки Roistat
+# сам связывает с визитом и заводит карточку («Заявки через Roistat»), поэтому
+# считаем ещё и его заявки — по источнику визита.
+def _rs_kanal(visit: dict | None) -> str:
+    if not visit:
+        return "без визита"
+    s = (((visit.get("source") or {}).get("system_name_by_level")) or ["?"])[0] or "?"
+    if s.startswith("direct"):
+        return "Директ"
+    if s.startswith("vk"):
+        return "VK"
+    return {"seo": "Поиск (SEO)", "direct_visits": "Прямые заходы",
+            "yandex.business": "Я.Бизнес / Карты", "2gis.maps": "2ГИС",
+            "bot": "боты"}.get(s, s)
+
+
+def roistat_zayavki(days: int = 30) -> dict:
+    """Заявки Roistat (формы и звонки коллтрекинга) по источнику визита. Только чтение."""
+    import httpx
+    key, proj = db.get_setting("roistat_key"), db.get_setting("roistat_project")
+    if not key or not proj:
+        return {"error": "нет roistat_key / roistat_project"}
+    base, prm = "https://cloud.roistat.com/api/v1/", {"project": proj, "key": key}
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00+0300")
+    orders = httpx.post(base + "project/integration/order/list", params=prm, timeout=60, json={
+        "filters": [{"field": "creation_date", "operation": ">", "value": since}],
+        "limit": 1000}).json().get("data") or []
+    vids = sorted({str(o.get("visit_id")) for o in orders if o.get("visit_id") not in (None, 0, "0", "")})
+    visits: dict[str, dict] = {}
+    for i in range(0, len(vids), 200):
+        for v in httpx.post(base + "project/site/visit/list", params=prm, timeout=60, json={
+                "filters": [{"field": "id", "operation": "in", "value": vids[i:i + 200]}],
+                "limit": 200}).json().get("data") or []:
+            visits[str(v.get("id"))] = v
+    agg: dict[str, dict] = {}
+    for o in orders:
+        ch = _rs_kanal(visits.get(str(o.get("visit_id"))))
+        st = (o.get("status") or {}).get("name") if isinstance(o.get("status"), dict) else str(o.get("status") or "")
+        a = agg.setdefault(ch, {"kanal": ch, "zayavok": 0, "zvonki": 0, "zapisalis": 0,
+                                "uchitsya": 0, "otkaz": 0, "vyruchka": 0.0})
+        a["zayavok"] += 1
+        a["zvonki"] += o.get("source_type") == "calltracking"
+        a["zapisalis"] += "Записался" in st or "Посетил" in st
+        a["uchitsya"] += st == "Учится"
+        a["otkaz"] += st.startswith("Отказ")
+        a["vyruchka"] += float(o.get("revenue") or 0)
+    return {"zayavok": len(orders), "kanaly": sorted(agg.values(), key=lambda a: -a["zayavok"]),
+            "pravila": "заявка Roistat = запись в группу МойКласса, созданная Roistat (форма или звонок); "
+                       "канал — по источнику визита, к которому Roistat её привязал"}
