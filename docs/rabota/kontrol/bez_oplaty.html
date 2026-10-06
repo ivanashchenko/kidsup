@@ -3,286 +3,213 @@
 :root{--indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613;--ink:#221F3B;--muted:#6A6F87;--line:#E4E8F3;--soft:#F5F8FD}
 *{box-sizing:border-box}body{margin:0;background:#FBFCFE;color:var(--ink);font:15px/1.5 Inter,-apple-system,"Segoe UI",Roboto,sans-serif}
 .wrap{max-width:1180px;margin:0 auto;padding:22px 16px 60px}h1{font:700 24px/1.2 Rubik,sans-serif;color:var(--indigo);margin:0 0 6px}
-.lead{color:var(--muted);margin:0 0 14px;max-width:80ch}.kpi{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px}
-.kpi div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px}.kpi b{display:block;font-size:20px;color:var(--indigo)}
+.lead{color:var(--muted);margin:0 0 14px;max-width:90ch}.kpi{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px}
+.kpi div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;cursor:pointer}.kpi div.on{outline:2px solid var(--blue)}.kpi b{display:block;font-size:20px;color:var(--indigo)}
 .tools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}.tools input{flex:1 1 240px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px}
-.tools label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:14px}
 h2{font:700 18px Rubik,sans-serif;color:var(--indigo);margin:24px 0 6px}h2 small{font:500 14px Inter,sans-serif;color:var(--muted);margin-left:8px}
 h3{font:600 15px Inter,sans-serif;margin:14px 0 6px;color:var(--ink)}h3 small{color:var(--muted);font-weight:500;margin-left:6px}
 table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 th,td{padding:8px 10px;text-align:left;border-top:1px solid var(--line);vertical-align:top}th{background:var(--soft);font-weight:600;font-size:13px;color:var(--muted);border-top:0}
 td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}td a{color:var(--indigo);text-decoration:none}
-.tag{display:inline-block;font-size:12px;font-weight:600;border-radius:7px;padding:2px 8px;white-space:nowrap}
+.tag{display:inline-block;font-size:12px;font-weight:600;border-radius:7px;padding:2px 8px;white-space:nowrap;margin:1px 2px 1px 0}
 .bal{background:#eef8e6;color:#3f6a12}.inv{background:#fdf0d9;color:#8a5a00}.debt{background:#fbe3e4;color:#a3201a}.nov{background:var(--soft);color:var(--muted)}.ask{background:#e3f4fb;color:#0b5f85}
 .hidden{display:none}.note{margin-top:22px;padding:12px 16px;background:var(--soft);border:1px solid #DCE6F5;border-radius:12px;font-size:14px;color:var(--muted)}
+.plan{margin:0 0 18px;padding:12px 16px;background:#fff;border:1px solid var(--line);border-radius:12px}.plan ol{margin:6px 0 0 18px;padding:0}.plan li{margin:4px 0}
 @media (max-width:760px){th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){display:none}}
 </style></head><body><div class=wrap>
 <h1>Ходят без оплаты за октябрь</h1>
-<p class=lead>Дети со статусом «Учится» в группе сезона, у которых нет оплаченного абонемента с действием в октябре (деньгами или списанием с баланса). Данные МойКласса на 06.10 13:00. Пробные и заявки не считаются.</p>
-<div class=kpi><div><b>91</b>записей «ребёнок — группа»</div><div><b>701 096 ₽</b>ожидается по ценам групп</div><div><b>9</b>можно закрыть с баланса</div><div><b>26</b>уже были на занятиях в октябре</div></div>
+<p class=lead>Дети со статусом «Учится» в группах сезона, у которых в октябре есть хотя бы одно занятие без оплаченного абонемента (по отметке «оплачено» на записи и по абонементам ребёнка, включая годовые и на несколько групп). Данные МойКласса на 07.10 01:10. Пробные и заявки не считаются. Явка за 05–06.10 ещё не закрыта — колонка «Был в октябре» по ней неполная.</p>
+<div class=kpi>
+<div data-f="" class=on><b>43</b>записей «ребёнок — группа» · 42 детей</div>
+<div data-f=""><b>282 212 ₽</b>ожидается по ценам групп</div>
+<div data-f="bal"><b>5</b>завести абонемент с баланса</div>
+<div data-f="inv"><b>10</b>счёт есть, не оплачен</div>
+<div data-f="next"><b>5</b>ходят, остаток не оплачен</div>
+<div data-f="nov"><b>23</b>в октябре ещё не были</div>
+<div data-f="debt"><b>9</b>долг на балансе</div>
+</div>
+<div class=plan><b>Порядок (Борис, 06.10):</b><ol>
+<li><b>Лиза</b> — сначала закрыть явку за 05.10 и 06.10, иначе «был / не был» врёт.</li>
+<li><b>Лена</b> — у кого деньги на балансе (обычно маткапитал): завести абонементы на октябрь — тег «завести абонемент с баланса».</li>
+<li><b>Лена</b> — кто ходит, а остаток месяца не оплачен, и у кого счёт выставлен: напоминание со ссылкой (автонапоминание уходит 07.10 в 10:30 тем, кому про оплату не писали 3 дня).</li>
+<li><b>Аня</b> — кто из плативших в октябре ещё не был: после закрытия явки позвонить и выяснить, ходит ли, — тег «в октябре ещё не был».</li>
+<li><b>Лена</b> — абонементы, которые кончаются в ближайшие 10 дней без следующего (список внизу): предложить продление до последнего занятия.</li>
+</ol></div>
 <div class=tools><input id=q type=search placeholder="Имя, телефон, группа, педагог"><label><input type=checkbox id=onlyv> только те, кто уже ходил в октябре</label></div>
-<h2 data-t>Татьяна Першина<small>24 детей · 195 344 ₽</small></h2>
-<h3 data-g>ПШ_вт-пт_16:00_4-5 лет_ПШ1 нечитающие (Гр8)<small>2 · 12 624 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Гурова Полина</td><td><a href="tel:+79261546648">+7 926 154-66-48</a></td><td>—</td><td>2026-09-01–2026-09-30 3570 ₽</td><td>2026-09-21 500 ₽</td><td class=n>0</td><td class=n>6 312</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Сергеева Анна (скидка 10% многодет.)</td><td><a href="tel:+79853871777">+7 985 387-17-77</a></td><td>—</td><td>2026-09-01–2026-09-30 3510 ₽</td><td>2026-09-18 1500 ₽</td><td class=n>1 888</td><td class=n>6 312</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h2 data-t>Татьяна Першина<small>10 · 77 085 ₽</small></h2>
+<h3 data-g>ПШ_вт-пт_17:00_5-7 лет_ПШ1 нечитающие (Гр9)<small>3 · 24 570 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="1" data-tags="debt inv next"><td>Белокурова Вероника</td><td><a href="tel:+79859904799">+7 985 990-47-99</a></td><td>02, 06</td><td class=n>9 / 2</td><td>2026-10-01–2026-10-31 9450 ₽ (не оплачен)</td><td>2026-10-06 500 ₽</td><td class=n>-9 450</td><td class=n>9 450</td><td><span class="tag inv">счёт выставлен, не оплачен</span><span class="tag ask">ходит, остаток месяца не оплачен</span><span class="tag debt">долг на балансе</span></td></tr>
+<tr data-v="1" data-tags="next"><td>Смирнов Роман</td><td><a href="tel:+79852280602">+7 985 228-06-02</a></td><td>06</td><td class=n>9 / 2</td><td>2026-09-02–2026-10-01 8505 ₽</td><td>2026-09-14 1 ₽</td><td class=n>0</td><td class=n>7 560</td><td><span class="tag ask">ходит, остаток месяца не оплачен</span></td></tr>
+<tr data-v="1" data-tags="debt next"><td>Хамитова Альфия</td><td><a href="tel:+79067380875">+7 906 738-08-75</a></td><td>06</td><td class=n>4 / 1</td><td>2026-10-01–2026-10-31 9450 ₽ (не оплачен)</td><td>2026-09-17 5670 ₽</td><td class=n>-9 450</td><td class=n>7 560</td><td><span class="tag ask">ходит, остаток месяца не оплачен</span><span class="tag debt">долг на балансе</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_вт-пт_17:00_5-7 лет_ПШ1 нечитающие (Гр9)<small>4 · 27 824 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Анищенкова Алена</td><td><a href="tel:+79773392275">+7 977 339-22-75</a></td><td>02</td><td>2026-09-05–2026-10-04 7560 ₽</td><td>2026-09-08 7560 ₽</td><td class=n>0</td><td class=n>6 956</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-<tr data-v="1"><td>Белокурова Вероника</td><td><a href="tel:+79859904799">+7 985 990-47-99</a></td><td>02</td><td>2026-09-01–2026-09-30 6300 ₽</td><td>2026-09-18 6300 ₽</td><td class=n>0</td><td class=n>6 956</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-<tr data-v="0"><td>Смирнов Роман</td><td><a href="tel:+79852280602">+7 985 228-06-02</a></td><td>—</td><td>2026-09-02–2026-10-01 8505 ₽</td><td>2026-09-14 1 ₽</td><td class=n>0</td><td class=n>6 956</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Хамитова Альфия</td><td><a href="tel:+79067380875">+7 906 738-08-75</a></td><td>—</td><td>2026-09-07–2026-09-07 850 ₽</td><td>2026-09-17 5670 ₽</td><td class=n>0</td><td class=n>6 956</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h3 data-g>ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)<small>2 · 15 885 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="1" data-tags="inv next"><td>Власова Варвара</td><td><a href="tel:+79265733606">+7 926 573-36-06</a></td><td>02, 06</td><td class=n>9 / 2</td><td>2026-10-01–2026-10-31 8505 ₽ (не оплачен)</td><td>2026-09-10 1500 ₽</td><td class=n>1 500</td><td class=n>8 505</td><td><span class="tag inv">счёт выставлен, не оплачен</span><span class="tag ask">ходит, остаток месяца не оплачен</span></td></tr>
+<tr data-v="0" data-tags="nov"><td>Чистякова Арина</td><td><a href="tel:+79163317715">+7 916 331-77-15</a></td><td>—</td><td class=n>4 / 0</td><td>2026-08-11–2026-09-10 7379 ₽</td><td>2026-08-11 7379 ₽</td><td class=n>0</td><td class=n>7 380</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_вт-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр10)<small>1 · 9 450 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Сталмакова Таисия (МАКС)</td><td><a href="tel:+79772922259">+7 977 292-22-59</a></td><td>02</td><td>2026-09-15–2026-10-14 5250 ₽</td><td>2026-09-15 1500 ₽</td><td class=n>0</td><td class=n>9 450</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
+<h3 data-g>ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)<small>1 · 6 300 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="inv nov"><td>Комаров Илья</td><td><a href="tel:+79997878536">+7 999 787-85-36</a></td><td>—</td><td class=n>4 / 0</td><td>2026-10-12–2026-11-11 6300 ₽ (не оплачен)</td><td>2026-09-02 1500 ₽</td><td class=n>0</td><td class=n>6 300</td><td><span class="tag inv">счёт выставлен, не оплачен</span><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)<small>4 · 29 608 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Гетман Василиса</td><td><a href="tel:+79653669529">+7 965 366-95-29</a></td><td>—</td><td>2026-09-01–2026-09-30 922 ₽</td><td>2026-09-05 1500 ₽</td><td class=n>0</td><td class=n>7 402</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Новикова София</td><td><a href="tel:+79296417074">+7 929 641-70-74</a></td><td>—</td><td>2026-08-27–2026-09-26 9225 ₽</td><td>2026-09-03 1000 ₽</td><td class=n>38 412</td><td class=n>7 402</td><td><span class="tag bal">оплатить с баланса</span></td></tr>
-<tr data-v="0"><td>Панкратова Александра</td><td><a href="tel:+79265978327">+7 926 597-83-27</a></td><td>—</td><td>2026-09-01–2026-10-11 4200 ₽</td><td>2026-10-01 18450 ₽</td><td class=n>10 050</td><td class=n>7 402</td><td><span class="tag bal">оплатить с баланса</span></td></tr>
-<tr data-v="0"><td>Чистякова Арина</td><td><a href="tel:+79163317715">+7 916 331-77-15</a></td><td>—</td><td>2026-08-11–2026-09-10 7379 ₽</td><td>2026-08-11 7379 ₽</td><td class=n>0</td><td class=n>7 402</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h3 data-g>ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)<small>2 · 17 955 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Садофьев Владимир</td><td><a href="tel:+79067230054">+7 906 723-00-54</a></td><td>—</td><td class=n>9 / 2</td><td>2026-09-01–… 8505 ₽</td><td>2026-09-10 1500 ₽</td><td class=n>0</td><td class=n>8 505</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
+<tr data-v="1" data-tags="debt inv next"><td>Хамитова Альфия</td><td><a href="tel:+79067380875">+7 906 738-08-75</a></td><td>01</td><td class=n>5 / 1</td><td>2026-10-01–2026-10-31 9450 ₽ (не оплачен)</td><td>2026-09-17 5670 ₽</td><td class=n>-9 450</td><td class=n>9 450</td><td><span class="tag inv">счёт выставлен, не оплачен</span><span class="tag ask">ходит, остаток месяца не оплачен</span><span class="tag debt">долг на балансе</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_вт-чт_16:00_4-5 лет_ПШ1 нечитающие (Гр1)<small>1 · 9 450 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Терентьева София</td><td><a href="tel:+79857763311">+7 985 776-33-11</a></td><td>—</td><td>2026-10-01–2026-11-15 4200 ₽</td><td>2026-09-30 4200 ₽</td><td class=n>0</td><td class=n>9 450</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h3 data-g>ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)<small>1 · 9 225 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="1" data-tags="bal next"><td>Новикова София</td><td><a href="tel:+79296417074">+7 929 641-70-74</a></td><td>01</td><td class=n>9 / 1</td><td>2026-10-01–2026-10-31 9450 ₽</td><td>2026-09-03 1000 ₽</td><td class=n>28 962</td><td class=n>9 225</td><td><span class="tag bal">завести абонемент с баланса</span><span class="tag ask">ходит, остаток месяца не оплачен</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)<small>2 · 17 010 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Романова Дарина МК</td><td><a href="tel:+79629025003">+7 962 902-50-03</a></td><td>01</td><td>2026-09-03–None 7560 ₽</td><td>2026-09-18 68985 ₽</td><td class=n>68 984</td><td class=n>8 505</td><td><span class="tag bal">оплатить с баланса</span></td></tr>
-<tr data-v="0"><td>Сорокин Денис</td><td><a href="tel:+79055389799">+7 905 538-97-99</a></td><td>—</td><td>2026-09-08–2026-10-07 6247 ₽</td><td>2026-07-14 15800 ₽</td><td class=n>1 732</td><td class=n>8 505</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h3 data-g>ПШ_ср-пт_18:00_4-5 лет_ПШ1 нечитающие (Гр14)<small>1 · 3 150 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Адаркина Елизавета</td><td><a href="tel:+79091531604">+7 909 153-16-04</a></td><td>—</td><td class=n>9 / 1</td><td>2026-09-01–2026-09-30 3150 ₽</td><td>2026-09-19 3150 ₽</td><td class=n>0</td><td class=n>3 150</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)<small>2 · 18 900 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Козловский Глеб</td><td><a href="tel:+79252259553">+7 925 225-95-53</a></td><td>01</td><td>2026-09-08–2027-09-07 63367 ₽</td><td>2026-09-08 63367 ₽</td><td class=n>0</td><td class=n>9 450</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-<tr data-v="1"><td>Степанян Даниелла</td><td><a href="tel:+79169114554">+7 916 911-45-54</a></td><td>01</td><td>2026-10-01–2026-10-31 5250 ₽</td><td>2026-09-29 5250 ₽</td><td class=n>0</td><td class=n>9 450</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
+<h2 data-t>Елена Попова (логопед)<small>6 · 15 000 ₽</small></h2>
+<h3 data-g>ЛГ Елена_Ср_09:30<small>1 · 2 500 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Зиньковская Виктория</td><td><a href="tel:+79057131920">+7 905 713-19-20</a></td><td>—</td><td class=n>8 / 0</td><td>2026-10-05–2026-10-05 2500 ₽</td><td>2026-10-05 2500 ₽</td><td class=n>0</td><td class=n>2 500</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)<small>2 · 14 700 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Козлова Екатерина</td><td><a href="tel:+79261349724">+7 926 134-97-24</a></td><td>01</td><td>2026-09-01–2026-09-30 8400 ₽</td><td>2026-09-08 8400 ₽</td><td class=n>0</td><td class=n>7 350</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-<tr data-v="0"><td>Малакеева Ева</td><td><a href="tel:+79854247674">+7 985 424-76-74</a></td><td>—</td><td>2026-10-01–2026-10-31 5000 ₽ (не оплачен)</td><td>2026-09-02 5625 ₽</td><td class=n>-5 000</td><td class=n>7 350</td><td><span class="tag inv">счёт выставлен, не оплачен</span></td></tr>
+<h3 data-g>ЛГ Елена_Ср_11:30<small>1 · 2 500 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Крамаренко Милана (телеграмм)</td><td><a href="tel:+79266565105">+7 926 656-51-05</a></td><td>—</td><td class=n>4 / 0</td><td>2026-10-05–2026-10-05 2500 ₽</td><td>2026-10-05 2500 ₽</td><td class=n>0</td><td class=n>2 500</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_пн 19:00 + сб 10:00_5-7 лет_ПШ1 нечитающие (Гр12)<small>1 · 8 978 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Комаров Илья</td><td><a href="tel:+79997878536">+7 999 787-85-36</a></td><td>—</td><td>2026-10-12–2026-11-11 6300 ₽ (не оплачен)</td><td>2026-09-02 8505 ₽</td><td class=n>0</td><td class=n>8 978</td><td><span class="tag inv">счёт выставлен, не оплачен</span></td></tr>
+<h3 data-g>ЛГ Елена_Ср_12:10<small>1 · 2 500 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Кулаков Михаил</td><td><a href="tel:+79089880280">+7 908 988-02-80</a></td><td>—</td><td class=n>4 / 0</td><td>2026-10-05–2026-10-05 2500 ₽</td><td>2026-10-05 2500 ₽</td><td class=n>0</td><td class=n>2 500</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_пн-чт_17:00_4-5 лет_ПШ1 нечитающие (Гр6)<small>2 · 18 900 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Садофьев Владимир</td><td><a href="tel:+79067230054">+7 906 723-00-54</a></td><td>—</td><td>2026-09-01–None 8505 ₽</td><td>2026-09-10 1500 ₽</td><td class=n>0</td><td class=n>9 450</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="1"><td>Хамитова Альфия</td><td><a href="tel:+79067380875">+7 906 738-08-75</a></td><td>01</td><td>2026-09-07–2026-09-07 850 ₽</td><td>2026-09-17 5670 ₽</td><td class=n>0</td><td class=n>9 450</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
+<h3 data-g>ЛГ Елена_Ср_16:00<small>1 · 2 500 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Зиньковская Дарья</td><td><a href="tel:+79057131920">+7 905 713-19-20</a></td><td>—</td><td class=n>8 / 0</td><td>2026-10-06–2026-11-05 7140 ₽</td><td>2026-10-06 7140 ₽</td><td class=n>0</td><td class=n>2 500</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)<small>2 · 18 900 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Новикова София</td><td><a href="tel:+79296417074">+7 929 641-70-74</a></td><td>01</td><td>2026-08-27–2026-09-26 9225 ₽</td><td>2026-09-03 1000 ₽</td><td class=n>38 412</td><td class=n>9 450</td><td><span class="tag bal">оплатить с баланса</span></td></tr>
-<tr data-v="1"><td>Панкратова Александра</td><td><a href="tel:+79265978327">+7 926 597-83-27</a></td><td>01</td><td>2026-09-01–2026-10-11 4200 ₽</td><td>2026-10-01 18450 ₽</td><td class=n>10 050</td><td class=n>9 450</td><td><span class="tag bal">оплатить с баланса</span></td></tr>
+<h3 data-g>ЛГ Елена_Ср_18:00<small>1 · 2 500 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Кульков Максим</td><td><a href="tel:+79998714222">+7 999 871-42-22</a></td><td>—</td><td class=n>8 / 0</td><td>2026-10-01–2026-10-31 9450 ₽</td><td>2026-09-30 9450 ₽</td><td class=n>0</td><td class=n>2 500</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>ПШ_ср-пт_18:00_4-5 лет_ПШ1 нечитающие (Гр14)<small>1 · 9 000 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Адаркина Елизавета</td><td><a href="tel:+79091531604">+7 909 153-16-04</a></td><td>—</td><td>2026-09-01–2026-09-30 3150 ₽</td><td>2026-09-19 3150 ₽</td><td class=n>0</td><td class=n>9 000</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h3 data-g>ЛГ Елена_Ср_19:00<small>1 · 2 500 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Саркулова Камилла</td><td><a href="tel:+79251416579">+7 925 141-65-79</a></td><td>—</td><td class=n>4 / 0</td><td>2026-10-05–2026-10-05 2500 ₽</td><td>2026-10-05 2500 ₽</td><td class=n>0</td><td class=n>2 500</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h2 data-t>Татьяна Дубровская<small>6 детей · 98 382 ₽</small></h2>
-<h3 data-g>Мини-сад_9:00-13:00<small>3 · 80 850 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Кабанник Кирилл</td><td><a href="tel:+79093905457">+7 909 390-54-57</a></td><td>01, 02</td><td>2026-10-01–2026-11-07 24383 ₽</td><td>2026-10-02 24383 ₽</td><td class=n>0</td><td class=n>26 950</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-<tr data-v="0"><td>Маринин Михаил</td><td><a href="tel:+79169212510">+7 916 921-25-10</a></td><td>—</td><td>2026-09-24–2026-09-24 2700 ₽</td><td>2026-09-24 2700 ₽</td><td class=n>0</td><td class=n>26 950</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Рощепкин Владислав</td><td><a href="tel:+79153422366">+7 915 342-23-66</a></td><td>—</td><td>2026-09-09–2026-09-09 2500 ₽</td><td>2026-09-11 5000 ₽</td><td class=n>18 500</td><td class=n>26 950</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h2 data-t>Марина Буракова (логопед)<small>6 · 15 950 ₽</small></h2>
+<h3 data-g>ЛГ Марина_Вт_16:00<small>1 · 2 700 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Пугачев Павел</td><td><a href="tel:+79153327267">+7 915 332-72-67</a></td><td>—</td><td class=n>4 / 0</td><td>2026-09-29–2026-09-29 2700 ₽</td><td>2026-09-29 2700 ₽</td><td class=n>0</td><td class=n>2 700</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)<small>3 · 17 532 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Боликова Варвара</td><td><a href="tel:+79268160624">+7 926 816-06-24</a></td><td>—</td><td>2026-09-01–2026-09-30 5625 ₽</td><td>2026-09-02 5625 ₽</td><td class=n>0</td><td class=n>5 844</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Киселева Александра</td><td><a href="tel:+79065007231">+7 906 500-72-31</a></td><td>—</td><td>2026-09-01–2026-09-30 4143 ₽</td><td>2026-09-16 4143 ₽</td><td class=n>0</td><td class=n>5 844</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Орлова Варвара</td><td><a href="tel:+79257838238">+7 925 783-82-38</a></td><td>—</td><td>2026-09-01–2026-09-30 2925 ₽</td><td>2026-09-18 2925 ₽</td><td class=n>0</td><td class=n>5 844</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h3 data-g>ЛГ Марина_Вт_16:50<small>1 · 2 700 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="bal nov"><td>Мухаметшин Даниэль</td><td><a href="tel:+79175686599">+7 917 568-65-99</a></td><td>—</td><td class=n>4 / 0</td><td>2026-09-01–2026-09-30 19950 ₽</td><td>2026-09-02 28816 ₽</td><td class=n>8 867</td><td class=n>2 700</td><td><span class="tag bal">завести абонемент с баланса</span><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h2 data-t>Елена Казанцева<small>10 детей · 86 768 ₽</small></h2>
-<h3 data-g>РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3<small>2 · 13 130 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Нистратова Агата</td><td><a href="tel:+79015187892">+7 901 518-78-92</a></td><td>—</td><td>2026-09-01–2026-10-14 5375 ₽</td><td>2026-09-09 5375 ₽</td><td class=n>0</td><td class=n>6 565</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="1"><td>Хохлов Родион</td><td><a href="tel:+79892865730">+7 989 286-57-30</a></td><td>03</td><td>2026-10-01–2026-10-31 9675 ₽ (не оплачен)</td><td>2026-09-02 9675 ₽</td><td class=n>-9 675</td><td class=n>6 565</td><td><span class="tag inv">счёт выставлен, не оплачен</span></td></tr>
+<h3 data-g>ЛГ Марина_Вт_17:40<small>1 · 2 700 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Бутаков Михаил</td><td><a href="tel:+79262551114">+7 926 255-11-14</a></td><td>—</td><td class=n>4 / 0</td><td>2026-09-29–2026-09-29 2700 ₽</td><td>2026-09-29 2700 ₽</td><td class=n>0</td><td class=n>2 700</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8<small>2 · 19 300 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Кириллова Виктория</td><td><a href="tel:+79258918322">+7 925 891-83-22</a></td><td>—</td><td>2026-09-07–2026-10-06 6396 ₽</td><td>2026-09-07 6396 ₽</td><td class=n>0</td><td class=n>9 650</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="1"><td>Самчук Егор</td><td><a href="tel:+79858190030">+7 985 819-00-30</a></td><td>02</td><td>2026-09-01–2026-10-14 7687 ₽</td><td>2026-08-31 922 ₽</td><td class=n>1 075</td><td class=n>9 650</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
+<h3 data-g>ЛГ Марина_Вт_18:30<small>1 · 2 700 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Бакланов Семён</td><td><a href="tel:+79031415124">+7 903 141-51-24</a></td><td>—</td><td class=n>4 / 0</td><td>2026-10-03–2026-10-03 2700 ₽</td><td>2026-10-03 2700 ₽</td><td class=n>0</td><td class=n>2 700</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2<small>1 · 9 138 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Синько София</td><td><a href="tel:+79890917076">+7 989 091-70-76</a></td><td>—</td><td>2026-10-01–2026-10-31 9675 ₽ (не оплачен)</td><td>2026-09-04 8600 ₽</td><td class=n>-9 675</td><td class=n>9 138</td><td><span class="tag inv">счёт выставлен, не оплачен</span></td></tr>
+<h3 data-g>ЛГ Марина_Вт_19:20<small>1 · 2 700 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Нафиков Назар</td><td><a href="tel:+79150961183">+7 915 096-11-83</a></td><td>—</td><td class=n>4 / 0</td><td>2026-09-29–2026-09-29 2700 ₽</td><td>2026-09-29 2700 ₽</td><td class=n>0</td><td class=n>2 700</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3<small>4 · 38 700 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Власов Даниил</td><td><a href="tel:+79151316404">+7 915 131-64-04</a></td><td>—</td><td>2026-09-23–2026-10-28 6630 ₽</td><td>2026-09-23 6630 ₽</td><td class=n>0</td><td class=n>9 675</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Нистратова Агата</td><td><a href="tel:+79015187892">+7 901 518-78-92</a></td><td>—</td><td>2026-09-01–2026-10-14 5375 ₽</td><td>2026-09-09 5375 ₽</td><td class=n>0</td><td class=n>9 675</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Пойда Анна</td><td><a href="tel:+79264636909">+7 926 463-69-09</a></td><td>—</td><td>—</td><td>—</td><td class=n>0</td><td class=n>9 675</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Степанов Михаил</td><td><a href="tel:+79190291413">+7 919 029-14-13</a></td><td>—</td><td>2026-10-01–2026-10-31 9675 ₽</td><td>2026-10-02 9675 ₽</td><td class=n>0</td><td class=n>9 675</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h3 data-g>ЛГ Марина_Сб_10:00<small>1 · 2 450 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Бирюкова Мирослава</td><td><a href="tel:+79265973895">+7 926 597-38-95</a></td><td>—</td><td class=n>5 / 0</td><td>2026-09-26–2026-09-26 2450 ₽</td><td>2026-09-26 2450 ₽</td><td class=n>0</td><td class=n>2 450</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
+</tbody></table>
+<h2 data-t>Елена Казанцева<small>5 · 38 850 ₽</small></h2>
+<h3 data-g>РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3<small>1 · 9 675 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="1" data-tags="debt inv next"><td>Хохлов Родион</td><td><a href="tel:+79892865730">+7 989 286-57-30</a></td><td>03</td><td class=n>9 / 1</td><td>2026-10-01–2026-10-31 9675 ₽ (не оплачен)</td><td>2026-09-02 9675 ₽</td><td class=n>-9 675</td><td class=n>9 675</td><td><span class="tag inv">счёт выставлен, не оплачен</span><span class="tag ask">ходит, остаток месяца не оплачен</span><span class="tag debt">долг на балансе</span></td></tr>
+</tbody></table>
+<h3 data-g>РР.Музыка и речь_Группа 5_пн - пт_11:00_1,8 - 2.2<small>1 · 9 675 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="debt inv nov"><td>Синько София</td><td><a href="tel:+79890917076">+7 989 091-70-76</a></td><td>—</td><td class=n>9 / 2</td><td>2026-10-01–2026-10-31 9675 ₽ (не оплачен)</td><td>2026-09-04 8600 ₽</td><td class=n>-9 675</td><td class=n>9 675</td><td><span class="tag inv">счёт выставлен, не оплачен</span><span class="tag nov">в октябре ещё не был — выяснить</span><span class="tag debt">долг на балансе</span></td></tr>
+</tbody></table>
+<h3 data-g>РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3<small>2 · 13 000 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Власов Даниил</td><td><a href="tel:+79151316404">+7 915 131-64-04</a></td><td>—</td><td class=n>4 / 0</td><td>2026-09-23–2026-10-28 6630 ₽</td><td>2026-09-23 6630 ₽</td><td class=n>0</td><td class=n>6 500</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
+<tr data-v="0" data-tags="nov"><td>Пойда Анна</td><td><a href="tel:+79264636909">+7 926 463-69-09</a></td><td>—</td><td class=n>1 / 0</td><td>—</td><td>—</td><td class=n>0</td><td class=n>6 500</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
 <h3 data-g>РР.Музыка и речь_Группа 8_сб_17:30_2.3 - 3 года<small>1 · 6 500 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Пиунова Алиса</td><td><a href="tel:+79251661432">+7 925 166-14-32</a></td><td>—</td><td>2026-10-01–2026-10-31 6500 ₽ (не оплачен)</td><td>2026-08-31 6750 ₽</td><td class=n>-6 500</td><td class=n>6 500</td><td><span class="tag inv">счёт выставлен, не оплачен</span></td></tr>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="debt inv nov"><td>Пиунова Алиса</td><td><a href="tel:+79251661432">+7 925 166-14-32</a></td><td>—</td><td class=n>5 / 1</td><td>2026-10-01–2026-10-31 6500 ₽ (не оплачен)</td><td>2026-08-31 6750 ₽</td><td class=n>-6 500</td><td class=n>6 500</td><td><span class="tag inv">счёт выставлен, не оплачен</span><span class="tag nov">в октябре ещё не был — выяснить</span><span class="tag debt">долг на балансе</span></td></tr>
 </tbody></table>
-<h2 data-t>Илья Ярославцев<small>6 детей · 54 888 ₽</small></h2>
-<h3 data-g>АЯ_вт-чт_16:00_10-12 лет_Pre-A1 Starters (Гр5)<small>3 · 27 483 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Михавилов Семен</td><td><a href="tel:+79164713342">+7 916 471-33-42</a></td><td>—</td><td>2026-09-01–2026-09-30 8400 ₽</td><td>2026-09-06 8400 ₽</td><td class=n>0</td><td class=n>9 161</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="1"><td>Михавилова Алиса</td><td><a href="tel:+79164713342">+7 916 471-33-42</a></td><td>01</td><td>2026-09-01–2026-09-30 7560 ₽</td><td>2026-09-06 7560 ₽</td><td class=n>0</td><td class=n>9 161</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-<tr data-v="1"><td>Сорокина Полина</td><td><a href="tel:+79055389799">+7 905 538-97-99</a></td><td>01</td><td>2026-09-08–2026-10-07 6247 ₽</td><td>2026-07-14 15800 ₽</td><td class=n>3 232</td><td class=n>9 161</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
+<h2 data-t>Екатерина Чепурнова<small>4 · 58 910 ₽</small></h2>
+<h3 data-g>Нулевой класс_10:00-14:00<small>1 · 37 950 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="1" data-tags="bal next"><td>Даскалова София МК</td><td><a href="tel:+79990025612">+7 999 002-56-12</a></td><td>02, 05, 06</td><td class=n>22 / 4</td><td>2026-08-31–2026-09-29 37950 ₽</td><td>2026-09-09 500 ₽</td><td class=n>281 175</td><td class=n>37 950</td><td><span class="tag bal">завести абонемент с баланса</span><span class="tag ask">ходит, остаток месяца не оплачен</span></td></tr>
 </tbody></table>
-<h3 data-g>АЯ_вт-чт_17:00_5-7 лет_Pre-A1 Starters (Гр6)<small>1 · 8 505 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Кузнецов Федор (скидка 10% многодет.)</td><td><a href="tel:+79637766599">+7 963 776-65-99</a></td><td>01</td><td>2026-09-01–2026-10-31 10710 ₽</td><td>2026-09-22 1 ₽</td><td class=n>0</td><td class=n>8 505</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
+<h3 data-g>ПШ_вт-чт_17:00_5-7 лет_ПШ1 нечитающие (Гр2)<small>1 · 7 560 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="1" data-tags="bal next"><td>Романова Дарина МК</td><td><a href="tel:+79629025003">+7 962 902-50-03</a></td><td>01, 06</td><td class=n>9 / 2</td><td>2026-09-03–… 7560 ₽</td><td>2026-09-18 68985 ₽</td><td class=n>68 985</td><td class=n>7 560</td><td><span class="tag bal">завести абонемент с баланса</span><span class="tag ask">ходит, остаток месяца не оплачен</span></td></tr>
 </tbody></table>
-<h3 data-g>АЯ_вт-чт_19:00_8-11 лет_A1 Movers (Гр8)<small>2 · 18 900 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Исаев Федор</td><td><a href="tel:+79263936933">+7 926 393-69-33</a></td><td>01</td><td>2026-09-01–2026-09-30 8505 ₽</td><td>2026-09-02 8505 ₽</td><td class=n>0</td><td class=n>9 450</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-<tr data-v="1"><td>Козловский Глеб</td><td><a href="tel:+79252259553">+7 925 225-95-53</a></td><td>01</td><td>2026-09-08–2027-09-07 63367 ₽</td><td>2026-09-08 63367 ₽</td><td class=n>0</td><td class=n>9 450</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
+<h3 data-g>ПШ_вт-чт_19:00_5-7 лет_ПШ1 нечитающие (Гр4)<small>2 · 13 400 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="1" data-tags="next"><td>Козлова Екатерина</td><td><a href="tel:+79261349724">+7 926 134-97-24</a></td><td>01</td><td class=n>9 / 2</td><td>2026-09-01–2026-09-30 8400 ₽</td><td>2026-09-08 1500 ₽</td><td class=n>0</td><td class=n>8 400</td><td><span class="tag ask">ходит, остаток месяца не оплачен</span></td></tr>
+<tr data-v="1" data-tags="debt inv next"><td>Малакеева Ева</td><td><a href="tel:+79854247674">+7 985 424-76-74</a></td><td>06</td><td class=n>4 / 1</td><td>2026-10-01–2026-10-31 5000 ₽ (не оплачен)</td><td>2026-09-02 1500 ₽</td><td class=n>-5 000</td><td class=n>5 000</td><td><span class="tag inv">счёт выставлен, не оплачен</span><span class="tag ask">ходит, остаток месяца не оплачен</span><span class="tag debt">долг на балансе</span></td></tr>
 </tbody></table>
-<h2 data-t>Екатерина Чепурнова<small>2 детей · 47 986 ₽</small></h2>
-<h3 data-g>Нулевой класс_10:00-14:00<small>2 · 47 986 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Даскалова София МК</td><td><a href="tel:+79990025612">+7 999 002-56-12</a></td><td>02</td><td>2026-08-31–2026-09-29 37950 ₽</td><td>2026-09-09 500 ₽</td><td class=n>281 175</td><td class=n>23 993</td><td><span class="tag bal">оплатить с баланса</span></td></tr>
-<tr data-v="1"><td>Новиков Лев</td><td><a href="tel:+79037219422">+7 903 721-94-22</a></td><td>02, 01</td><td>2026-10-01–2026-11-07 35500 ₽</td><td>2026-10-02 1600 ₽</td><td class=n>0</td><td class=n>23 993</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
+<h2 data-t>Виктория Короткова<small>3 · 19 638 ₽</small></h2>
+<h3 data-g>ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины великих художников<small>1 · 4 900 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="1" data-tags="debt inv next"><td>Горелова Алиса</td><td><a href="tel:+79169053361">+7 916 905-33-61</a></td><td>05</td><td class=n>4 / 1</td><td>2026-10-01–2026-10-31 4900 ₽ (не оплачен)</td><td>2026-09-12 4900 ₽</td><td class=n>-4 900</td><td class=n>4 900</td><td><span class="tag inv">счёт выставлен, не оплачен</span><span class="tag ask">ходит, остаток месяца не оплачен</span><span class="tag debt">долг на балансе</span></td></tr>
 </tbody></table>
-<h2 data-t>Мария Колотушкина<small>6 детей · 46 160 ₽</small></h2>
-<h3 data-g>АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)<small>1 · 5 000 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Смирнов Роман</td><td><a href="tel:+79852280602">+7 985 228-06-02</a></td><td>—</td><td>2026-09-02–2026-10-01 8505 ₽</td><td>2026-09-14 1 ₽</td><td class=n>0</td><td class=n>5 000</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h3 data-g>ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись<small>2 · 14 738 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Егоренкова Таисия</td><td><a href="tel:+79256462930">+7 925 646-29-30</a></td><td>—</td><td class=n>3 / 1</td><td>2026-09-01–2026-09-30 7087 ₽</td><td>2026-09-07 7087 ₽</td><td class=n>0</td><td class=n>7 088</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
+<tr data-v="1" data-tags="next"><td>Лукьянец Алексей</td><td><a href="tel:+79035394798">+7 903 539-47-98</a></td><td>05</td><td class=n>8 / 1</td><td>2026-09-01–2026-09-30 7650 ₽</td><td>2026-09-02 7650 ₽</td><td class=n>0</td><td class=n>7 650</td><td><span class="tag ask">ходит, остаток месяца не оплачен</span></td></tr>
 </tbody></table>
-<h3 data-g>АЯ_пн-ср_18:00_6-7 лет_Pre-A1 Starters (Гр3)<small>1 · 7 560 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Гетман Василиса</td><td><a href="tel:+79653669529">+7 965 366-95-29</a></td><td>—</td><td>2026-09-01–2026-09-30 922 ₽</td><td>2026-09-05 1500 ₽</td><td class=n>0</td><td class=n>7 560</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h2 data-t>Илья Ярославцев<small>3 · 23 100 ₽</small></h2>
+<h3 data-g>АЯ_вт-чт_16:00_10-12 лет_Pre-A1 Starters (Гр5)<small>2 · 15 960 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Михавилов Семен</td><td><a href="tel:+79164713342">+7 916 471-33-42</a></td><td>—</td><td class=n>9 / 2</td><td>2026-09-01–2026-09-30 8400 ₽</td><td>2026-09-06 8400 ₽</td><td class=n>0</td><td class=n>8 400</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
+<tr data-v="1" data-tags="next"><td>Михавилова Алиса</td><td><a href="tel:+79164713342">+7 916 471-33-42</a></td><td>01, 06</td><td class=n>9 / 2</td><td>2026-09-01–2026-09-30 7560 ₽</td><td>2026-09-06 7560 ₽</td><td class=n>0</td><td class=n>7 560</td><td><span class="tag ask">ходит, остаток месяца не оплачен</span></td></tr>
 </tbody></table>
-<h3 data-g>АЯ_пн-ср_19:00_9-11 лет_A1-A2 Movers-Flyers (Гр4)<small>4 · 33 600 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Ильин Роман</td><td><a href="tel:+79269709251">+7 926 970-92-51</a></td><td>—</td><td>—</td><td>—</td><td class=n>0</td><td class=n>8 400</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Исаев Тимур</td><td><a href="tel:+79263936933">+7 926 393-69-33</a></td><td>—</td><td>2026-09-01–2026-09-30 8505 ₽</td><td>2026-09-02 8505 ₽</td><td class=n>0</td><td class=n>8 400</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Попов Егор</td><td><a href="tel:+79165300132">+7 916 530-01-32</a></td><td>—</td><td>2026-08-31–2026-11-29 9225 ₽</td><td>2026-08-31 9225 ₽</td><td class=n>0</td><td class=n>8 400</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Романова Милана МК</td><td><a href="tel:+79629025003">+7 962 902-50-03</a></td><td>—</td><td>2026-08-31–2026-09-29 9225 ₽</td><td>2026-09-18 70650 ₽</td><td class=n>70 650</td><td class=n>8 400</td><td><span class="tag bal">оплатить с баланса</span></td></tr>
+<h3 data-g>АЯ_вт-чт_18:00_6-7 лет_Pre-A1 Starters с нуля (Гр7)<small>1 · 7 140 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Панишева Екатерина</td><td><a href="tel:+79265656490">+7 926 565-64-90</a></td><td>—</td><td class=n>5 / 0</td><td>2026-10-01–2026-10-31 9450 ₽</td><td>2026-10-02 9450 ₽</td><td class=n>0</td><td class=n>7 140</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h2 data-t>Виктория Короткова<small>8 детей · 44 520 ₽</small></h2>
-<h3 data-g>ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины великих художников<small>2 · 8 820 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Горелова Алиса</td><td><a href="tel:+79169053361">+7 916 905-33-61</a></td><td>—</td><td>2026-10-01–2026-10-31 7000 ₽ (не оплачен)</td><td>2026-09-12 4900 ₽</td><td class=n>-4 900</td><td class=n>4 410</td><td><span class="tag inv">счёт выставлен, не оплачен</span></td></tr>
-<tr data-v="0"><td>Судакова Александра</td><td><a href="tel:+79263255865">+7 926 325-58-65</a></td><td>—</td><td>2026-09-07–2026-10-06 4165 ₽</td><td>2026-09-07 4165 ₽</td><td class=n>0</td><td class=n>4 410</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h2 data-t>Мария Колотушкина<small>2 · 16 785 ₽</small></h2>
+<h3 data-g>АЯ_пн-ср_19:00_9-11 лет_A1-A2 Movers-Flyers (Гр4)<small>2 · 16 785 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Ильин Роман</td><td><a href="tel:+79269709251">+7 926 970-92-51</a></td><td>—</td><td class=n>1 / 0</td><td>—</td><td>—</td><td class=n>0</td><td class=n>7 560</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
+<tr data-v="1" data-tags="bal next"><td>Романова Милана МК</td><td><a href="tel:+79629025003">+7 962 902-50-03</a></td><td>05</td><td class=n>8 / 1</td><td>2026-08-31–2026-09-29 9225 ₽</td><td>2026-09-18 70650 ₽</td><td class=n>70 650</td><td class=n>9 225</td><td><span class="tag bal">завести абонемент с баланса</span><span class="tag ask">ходит, остаток месяца не оплачен</span></td></tr>
 </tbody></table>
-<h3 data-g>ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка<small>3 · 16 800 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Блажевская Агата</td><td><a href="tel:+79163303444">+7 916 330-34-44</a></td><td>—</td><td>2026-09-01–2026-09-30 3675 ₽</td><td>2026-03-30 15275 ₽</td><td class=n>1 025</td><td class=n>5 600</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Рахманов Федор МК</td><td><a href="tel:+79163170414">+7 916 317-04-14</a></td><td>—</td><td>2026-10-01–2026-10-31 9450 ₽</td><td>2026-09-30 66150 ₽</td><td class=n>56 700</td><td class=n>5 600</td><td><span class="tag bal">оплатить с баланса</span></td></tr>
-<tr data-v="0"><td>Семенова Мария</td><td><a href="tel:+79036649004">+7 903 664-90-04</a></td><td>—</td><td>2026-09-01–2026-10-14 6885 ₽</td><td>2026-08-27 6885 ₽</td><td class=n>0</td><td class=n>5 600</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h2 data-t>Татьяна Дубровская<small>2 · 9 769 ₽</small></h2>
+<h3 data-g>РР.Лицей_ср-пт_17:00_3-4 года_Лицей для малышей (Гр2)<small>2 · 9 769 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Боликова Варвара</td><td><a href="tel:+79268160624">+7 926 816-06-24</a></td><td>—</td><td class=n>1 / 0</td><td>2026-09-01–2026-09-30 5625 ₽</td><td>2026-09-02 5625 ₽</td><td class=n>0</td><td class=n>5 625</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
+<tr data-v="0" data-tags="nov"><td>Киселева Александра</td><td><a href="tel:+79065007231">+7 906 500-72-31</a></td><td>—</td><td class=n>9 / 1</td><td>2026-09-01–2026-09-30 4143 ₽</td><td>2026-09-16 4143 ₽</td><td class=n>0</td><td class=n>4 144</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись<small>3 · 18 900 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Егоренкова Таисия</td><td><a href="tel:+79256462930">+7 925 646-29-30</a></td><td>—</td><td>2026-09-01–2026-09-30 7087 ₽</td><td>2026-09-07 7087 ₽</td><td class=n>0</td><td class=n>6 300</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Лукьянец Алексей</td><td><a href="tel:+79035394798">+7 903 539-47-98</a></td><td>—</td><td>2026-09-01–2026-09-30 7650 ₽</td><td>2026-09-02 7650 ₽</td><td class=n>0</td><td class=n>6 300</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Семенова Мария</td><td><a href="tel:+79036649004">+7 903 664-90-04</a></td><td>—</td><td>2026-09-01–2026-10-14 6885 ₽</td><td>2026-08-27 6885 ₽</td><td class=n>0</td><td class=n>6 300</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h2 data-t>Ирина Семёнова<small>1 · 5 000 ₽</small></h2>
+<h3 data-g>РР.Первая школа_Группа 5_вс_11:00_2 - 3 года<small>1 · 5 000 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="debt inv nov"><td>Шевякова Алиса</td><td><a href="tel:+79779815911">+7 977 981-59-11</a></td><td>—</td><td class=n>4 / 1</td><td>2026-10-01–2026-10-31 5000 ₽ (не оплачен)</td><td>2026-09-13 3187 ₽</td><td class=n>-5 000</td><td class=n>5 000</td><td><span class="tag inv">счёт выставлен, не оплачен</span><span class="tag nov">в октябре ещё не был — выяснить</span><span class="tag debt">долг на балансе</span></td></tr>
 </tbody></table>
-<h2 data-t>Ирина Семёнова<small>5 детей · 27 476 ₽</small></h2>
-<h3 data-g>РР.Первая школа_Группа 2_вт - чт_11:00_1,7 - 2 года<small>3 · 24 276 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Копылова Анастасия</td><td><a href="tel:+79031316253">+7 903 131-62-53</a></td><td>—</td><td>2026-10-01–2026-10-31 8775 ₽ (не оплачен)</td><td>2026-09-17 4143 ₽</td><td class=n>-8 775</td><td class=n>8 092</td><td><span class="tag inv">счёт выставлен, не оплачен</span></td></tr>
-<tr data-v="1"><td>Коряковская Оливия</td><td><a href="tel:+79853584926">+7 985 358-49-26</a></td><td>01</td><td>2026-09-01–2026-10-31 9945 ₽</td><td>2026-09-22 9945 ₽</td><td class=n>0</td><td class=n>8 092</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-<tr data-v="1"><td>Странченко Роберт</td><td><a href="tel:+79163180088">+7 916 318-00-88</a></td><td>01</td><td>2026-09-01–2026-10-31 9945 ₽</td><td>2026-09-22 9945 ₽</td><td class=n>0</td><td class=n>8 092</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
+<h2 data-t>Шахматная школа (партнёр)<small>1 · 2 125 ₽</small></h2>
+<h3 data-g>ШАХ_Группа 2_пт 19:00 + вс 12:00_6-12 начинающие<small>1 · 2 125 ₽</small></h3>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
+<tr data-v="0" data-tags="nov"><td>Русанов Максим</td><td><a href="tel:+79251580899">+7 925 158-08-99</a></td><td>—</td><td class=n>3 / 0</td><td>2026-09-01–2026-09-30 3655 ₽</td><td>2026-09-20 3655 ₽</td><td class=n>0</td><td class=n>2 125</td><td><span class="tag nov">в октябре ещё не был — выяснить</span></td></tr>
 </tbody></table>
-<h3 data-g>РР.Первая школа_Группа 5_вс_11:00_2 - 3 года<small>2 · 3 200 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Сабирова Мария</td><td><a href="tel:+79604614040">+7 960 461-40-40</a></td><td>04</td><td>2026-09-01–2026-09-30 3187 ₽</td><td>2026-09-13 3187 ₽</td><td class=n>0</td><td class=n>1 600</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-<tr data-v="0"><td>Шевякова Алиса</td><td><a href="tel:+79779815911">+7 977 981-59-11</a></td><td>—</td><td>2026-09-01–2026-09-30 3187 ₽</td><td>2026-09-13 3187 ₽</td><td class=n>0</td><td class=n>1 600</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
+<h2 id=ending>Абонементы кончаются в ближайшие 10 дней, следующего нет<small>12</small></h2>
+<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Группа</th><th>Педагог</th><th>Кончается</th><th>Осталось занятий</th><th>Баланс</th><th>Цена</th></tr></thead><tbody>
+<tr><td>Судакова Александра</td><td><a href="tel:+79263255865">+7 926 325-58-65</a></td><td>ИЗО_Группа 1_пн - ср_16:00_6 - 11 лет_Картины великих художников</td><td>Виктория Короткова</td><td>2026-10-06</td><td class=n>1</td><td class=n>0</td><td class=n>4 165</td></tr>
+<tr><td>Апсатарова Дания</td><td><a href="tel:+79691344999">+7 969 134-49-99</a></td><td>ЛГ Елена_Ср_17:00</td><td>Елена Попова (логопед)</td><td>2026-10-07</td><td class=n>1</td><td class=n>0</td><td class=n>2 500</td></tr>
+<tr><td>Параскив Мария</td><td><a href="tel:+79277195664">+7 927 719-56-64</a></td><td>АЯ_пн-ср_17:00_3-5 лет_Pre-A1 Starters (Гр2)</td><td>Мария Колотушкина</td><td>2026-10-07</td><td class=n>2</td><td class=n>0</td><td class=n>6 615</td></tr>
+<tr><td>Панкратова Александра</td><td><a href="tel:+79265978327">+7 926 597-83-27</a></td><td>ПШ_пн-чт_18:00_4-7 лет_ПШ2 читающие (Гр7)</td><td>Татьяна Першина</td><td>2026-10-11</td><td class=n>1</td><td class=n>825</td><td class=n>4 200</td></tr>
+<tr><td>Панкратова Александра</td><td><a href="tel:+79265978327">+7 926 597-83-27</a></td><td>ПШ_вт-пт_19:00_4-7 лет_ПШ2 читающие (Гр11)</td><td>Татьяна Першина</td><td>2026-10-11</td><td class=n>2</td><td class=n>825</td><td class=n>4 200</td></tr>
+<tr><td>Семенова Мария</td><td><a href="tel:+79036649004">+7 903 664-90-04</a></td><td>ИЗО_Группа 2_пн - ср_17:00_4 - 11 лет_Лепка</td><td>Виктория Короткова</td><td>2026-10-14</td><td class=n>4</td><td class=n>0</td><td class=n>6 885</td></tr>
+<tr><td>Семенова Мария</td><td><a href="tel:+79036649004">+7 903 664-90-04</a></td><td>ИЗО_Группа 3_пн - ср_18:00_5 - 11 лет_Живопись</td><td>Виктория Короткова</td><td>2026-10-14</td><td class=n>4</td><td class=n>0</td><td class=n>6 885</td></tr>
+<tr><td>Степанян Даниелла</td><td><a href="tel:+79169114554">+7 916 911-45-54</a></td><td>ПШ_вт-чт_18:00_4-7 лет_ПШ2 читающие (Гр3)</td><td>Екатерина Чепурнова</td><td>2026-10-14</td><td class=n>3</td><td class=n>0</td><td class=n>8 505</td></tr>
+<tr><td>Самчук Егор</td><td><a href="tel:+79858190030">+7 985 819-00-30</a></td><td>РР.Музыка и речь_Группа 4_пн - пт_10:00_1,3 - 1,8</td><td>Елена Казанцева</td><td>2026-10-14</td><td class=n>4</td><td class=n>1 075</td><td class=n>7 688</td></tr>
+<tr><td>Нистратова Агата</td><td><a href="tel:+79015187892">+7 901 518-78-92</a></td><td>РР.Музыка и речь_Группа 6_пн - пт_12:00_2.2 - 3</td><td>Елена Казанцева</td><td>2026-10-14</td><td class=n>1</td><td class=n>0</td><td class=n>4 300</td></tr>
+<tr><td>Нистратова Агата</td><td><a href="tel:+79015187892">+7 901 518-78-92</a></td><td>РР.Музыка и речь_Группа 3_ср - сб_11:45_2,2 - 3</td><td>Елена Казанцева</td><td>2026-10-14</td><td class=n>2</td><td class=n>0</td><td class=n>5 375</td></tr>
+<tr><td>Сидорова Марьяна</td><td><a href="tel:+79055844717">+7 905 584-47-17</a></td><td>РР.Первая школа_Группа 3_вт - чт_12:00_2 - 3 года</td><td>Ирина Семёнова</td><td>2026-10-14</td><td class=n>1</td><td class=n>0</td><td class=n>5 801</td></tr>
 </tbody></table>
-<h2 data-t>Дарина Габдуллина<small>3 детей · 24 886 ₽</small></h2>
-<h3 data-g>МА_вс_10:30_продолжающие<small>1 · 7 686 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Русанов Максим</td><td><a href="tel:+79251580899">+7 925 158-08-99</a></td><td>04</td><td>2026-09-01–2026-09-30 2125 ₽</td><td>2026-09-20 3655 ₽</td><td class=n>0</td><td class=n>7 686</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-</tbody></table>
-<h3 data-g>МА_вс_12:00_4-6 лет<small>1 · 8 600 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Русанов Максим</td><td><a href="tel:+79251580899">+7 925 158-08-99</a></td><td>—</td><td>2026-09-01–2026-09-30 2125 ₽</td><td>2026-09-20 3655 ₽</td><td class=n>0</td><td class=n>8 600</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>МА_вс_14:00_7-12 лет<small>1 · 8 600 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Макарова Дарина</td><td><a href="tel:+79150210291">+7 915 021-02-91</a></td><td>04</td><td>2026-09-20–2026-10-31 6375 ₽</td><td>2026-09-20 6375 ₽</td><td class=n>0</td><td class=n>8 600</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-</tbody></table>
-<h2 data-t>Марина Буракова<small>8 детей · 20 792 ₽</small></h2>
-<h3 data-g>ЛГ Марина_Вт_16:00<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Пугачев Павел</td><td><a href="tel:+79153327267">+7 915 332-72-67</a></td><td>—</td><td>2026-09-29–2026-09-29 2700 ₽</td><td>2026-09-29 2700 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Марина_Вт_16:50<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Мухаметшин Даниэль</td><td><a href="tel:+79175686599">+7 917 568-65-99</a></td><td>—</td><td>2026-09-01–2026-09-30 19950 ₽</td><td>2026-09-02 28816 ₽</td><td class=n>8 867</td><td class=n>2 599</td><td><span class="tag bal">оплатить с баланса</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Марина_Вт_17:40<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Бутаков Михаил</td><td><a href="tel:+79262551114">+7 926 255-11-14</a></td><td>—</td><td>2026-09-29–2026-09-29 2700 ₽</td><td>2026-09-29 2700 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Марина_Вт_18:30<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Бакланов Семён</td><td><a href="tel:+79031415124">+7 903 141-51-24</a></td><td>—</td><td>2026-10-03–2026-10-03 2700 ₽</td><td>2026-10-03 2700 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Марина_Вт_19:20<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Нафиков Назар</td><td><a href="tel:+79150961183">+7 915 096-11-83</a></td><td>—</td><td>2026-09-29–2026-09-29 2700 ₽</td><td>2026-09-29 2700 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Марина_Сб_09:10<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Бирюков Мирон</td><td><a href="tel:+79265973895">+7 926 597-38-95</a></td><td>—</td><td>2026-09-26–2026-09-26 2450 ₽</td><td>2026-09-26 2450 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Марина_Сб_10:00<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Бирюкова Мирослава</td><td><a href="tel:+79265973895">+7 926 597-38-95</a></td><td>—</td><td>2026-09-26–2026-09-26 2450 ₽</td><td>2026-09-26 2450 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Марина_Чт_17:40<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Маринин Михаил</td><td><a href="tel:+79169212510">+7 916 921-25-10</a></td><td>—</td><td>2026-09-24–2026-09-24 2700 ₽</td><td>2026-09-24 2700 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h2 data-t>Робототехника (партнёр)<small>3 детей · 19 800 ₽</small></h2>
-<h3 data-g>Робототехника_пт 16:00 + вс 14:30_4-7 лет<small>1 · 6 600 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="1"><td>Новиков Лев</td><td><a href="tel:+79037219422">+7 903 721-94-22</a></td><td>02</td><td>2026-10-01–2026-11-07 35500 ₽</td><td>2026-10-02 1600 ₽</td><td class=n>0</td><td class=n>6 600</td><td><span class="tag ask">ходит, оплаты нет</span></td></tr>
-</tbody></table>
-<h3 data-g>Робототехника_пт 17:00 + вс 15:30_7-12 лет<small>2 · 13 200 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Анохин Дмитрий</td><td><a href="tel:+79857234107">+7 985 723-41-07</a></td><td>—</td><td>2026-09-20–2026-10-11 2720 ₽</td><td>2026-09-20 2720 ₽</td><td class=n>0</td><td class=n>6 600</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Омиров Тимур</td><td><a href="tel:+79160601742">+7 916 060-17-42</a></td><td>—</td><td>2026-10-01–2026-10-31 4410 ₽</td><td>2026-09-30 4410 ₽</td><td class=n>0</td><td class=n>6 600</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h2 data-t>Шахматная школа<small>4 детей · 18 500 ₽</small></h2>
-<h3 data-g>ШАХ_Группа 2_пт 19:00 + вс 12:00_6-12 начинающие<small>4 · 18 500 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Литовченко Мирослава</td><td><a href="tel:+79258064002">+7 925 806-40-02</a></td><td>—</td><td>2026-09-27–2026-09-27 1600 ₽</td><td>2026-09-27 1600 ₽</td><td class=n>0</td><td class=n>4 625</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Макарова Дарина</td><td><a href="tel:+79150210291">+7 915 021-02-91</a></td><td>—</td><td>2026-09-20–2026-10-31 6375 ₽</td><td>2026-09-20 6375 ₽</td><td class=n>0</td><td class=n>4 625</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Русанов Александр</td><td><a href="tel:+79251580899">+7 925 158-08-99</a></td><td>—</td><td>2026-09-01–2026-09-30 1250 ₽</td><td>2026-09-26 1250 ₽</td><td class=n>0</td><td class=n>4 625</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-<tr data-v="0"><td>Русанов Максим</td><td><a href="tel:+79251580899">+7 925 158-08-99</a></td><td>—</td><td>2026-09-01–2026-09-30 2125 ₽</td><td>2026-09-20 3655 ₽</td><td class=n>0</td><td class=n>4 625</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h2 data-t>Елена Попова<small>6 детей · 15 594 ₽</small></h2>
-<h3 data-g>ЛГ Елена_Ср_09:30<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Зиньковская Виктория</td><td><a href="tel:+79057131920">+7 905 713-19-20</a></td><td>—</td><td>2026-10-05–2026-10-05 2500 ₽</td><td>2026-10-05 2500 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Елена_Ср_11:30<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Крамаренко Милана (телеграмм)</td><td><a href="tel:+79266565105">+7 926 656-51-05</a></td><td>—</td><td>2026-10-05–2026-10-05 2500 ₽</td><td>2026-10-05 2500 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Елена_Ср_12:10<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Кулаков Михаил</td><td><a href="tel:+79089880280">+7 908 988-02-80</a></td><td>—</td><td>2026-10-05–2026-10-05 2500 ₽</td><td>2026-10-05 2500 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Елена_Ср_16:00<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Зиньковская Дарья</td><td><a href="tel:+79057131920">+7 905 713-19-20</a></td><td>—</td><td>2026-10-05–2026-10-05 2500 ₽</td><td>2026-10-05 2500 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Елена_Ср_18:00<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Кульков Максим</td><td><a href="tel:+79998714222">+7 999 871-42-22</a></td><td>—</td><td>2026-10-01–2026-10-31 9450 ₽</td><td>2026-09-30 2500 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<h3 data-g>ЛГ Елена_Ср_19:00<small>1 · 2 599 ₽</small></h3>
-<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>
-<tr data-v="0"><td>Саркулова Камилла</td><td><a href="tel:+79251416579">+7 925 141-65-79</a></td><td>—</td><td>2026-10-05–2026-10-05 2500 ₽</td><td>2026-10-05 2500 ₽</td><td class=n>0</td><td class=n>2 599</td><td><span class="tag nov">в октябре ещё не был</span></td></tr>
-</tbody></table>
-<div class=note>«Ожидается» — медиана цены оплаченных октябрьских абонементов этой группы (нет — по курсу). Последний абонемент берётся из локальной копии МойКласса: удалённые там абонементы могут ещё отображаться. Баланс с минусом — долг. Список пересобирается по запросу, не обновляется сам.</div>
+<p class=note>Как считали: берём записи детей на занятия октября в группах сезона (статус «Учится»); занятие считается оплаченным по отметке МойКласса «оплачено» на записи или по оплаченному абонементу ребёнка, действующему в октябре и покрывающему группу. Пара «ребёнок — группа» в списке, если есть хотя бы одно неоплаченное занятие месяца. Логопеды часто платят за разовые занятия на месте — их строки нужно сверить с кассовым журналом. Пересчёт: docs/rabota/bez_oplaty_build.py.</p>
 <script>
-const q=document.getElementById('q'),ov=document.getElementById('onlyv');
-function go(){const s=q.value.trim().toLowerCase(),v=ov.checked;document.querySelectorAll('tbody tr').forEach(tr=>{const ok=(!s||tr.innerText.toLowerCase().includes(s))&&(!v||tr.dataset.v==='1');tr.classList.toggle('hidden',!ok)});
-document.querySelectorAll('table').forEach(t=>{const vis=t.querySelectorAll('tbody tr:not(.hidden)').length;t.classList.toggle('hidden',!vis);t.previousElementSibling.classList.toggle('hidden',!vis)});
-document.querySelectorAll('h2[data-t]').forEach(h=>{let e=h.nextElementSibling,any=false;while(e&&e.tagName!=='H2'){if(e.tagName==='H3'&&!e.classList.contains('hidden'))any=true;e=e.nextElementSibling}h.classList.toggle('hidden',!any)})}
-q.oninput=go;ov.onchange=go;
+const q=document.getElementById('q'),ov=document.getElementById('onlyv');let f='';
+function apply(){const s=q.value.trim().toLowerCase();document.querySelectorAll('tbody tr').forEach(tr=>{const ok=(!s||tr.textContent.toLowerCase().includes(s)||tr.closest('table').previousElementSibling.textContent.toLowerCase().includes(s))&&(!ov.checked||tr.dataset.v==='1')&&(!f||(tr.dataset.tags||'').split(' ').includes(f));tr.classList.toggle('hidden',!ok)});
+document.querySelectorAll('h3[data-g]').forEach(h=>{const t=h.nextElementSibling;const vis=t.querySelectorAll('tbody tr:not(.hidden)').length;h.classList.toggle('hidden',!vis);t.classList.toggle('hidden',!vis)});
+document.querySelectorAll('h2[data-t]').forEach(h=>{let n=h.nextElementSibling,vis=false;while(n&&n.tagName!=='H2'){if(n.tagName==='H3'&&!n.classList.contains('hidden'))vis=true;n=n.nextElementSibling}h.classList.toggle('hidden',!vis)});}
+q.addEventListener('input',apply);ov.addEventListener('change',apply);
+document.querySelectorAll('.kpi div').forEach(d=>d.addEventListener('click',()=>{f=d.dataset.f||'';document.querySelectorAll('.kpi div').forEach(x=>x.classList.toggle('on',x===d));apply()}));
 </script></div></body></html>
