@@ -24,6 +24,12 @@
   .od .list{display:flex;flex-direction:column;gap:9px}
   .od .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 13px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 14px}
   .od .card.marked{opacity:.6}
+  .od .sec{margin:14px 0 2px;padding:9px 13px;border-radius:12px;background:var(--indigo);color:#fff}
+  .od .sec b{display:block;font-size:16px}
+  .od .sec span{font-size:14px;opacity:.85}
+  .od .sec.later{background:var(--chip);color:var(--ink)}
+  .od .num{display:inline-block;min-width:30px;font-weight:700;color:var(--indigo);font-variant-numeric:tabular-nums}
+  .od .star{font-size:11px;font-weight:700;color:var(--amber);background:var(--amber-s);border-radius:6px;padding:2px 6px;margin-left:6px;vertical-align:2px}
   .od .who{font-weight:600;font-size:16px;min-width:0}
   .od .who small{font-weight:500;color:var(--muted)}
   .od .kind{font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:6px;margin-right:6px;vertical-align:2px;font-weight:600}
@@ -55,7 +61,7 @@
 <div class="od">
 <main>
   <h1>Обзвон — {{ d.who }}</h1>
-  <p class="sub"><b>Порядок: новые заявки → думают, платили раньше → база 2024/25 → недозвоны.</b> Все разговоры — в МойКласс, как обычно, и итог — кнопкой под контактом.
+  <p class="sub"><b>С чего начать — вкладка «План на сегодня»: звоните по номерам сверху вниз.</b> Все разговоры — в МойКласс, как обычно, и итог — кнопкой под контактом.
   Одна лента: что не успели сегодня, остаётся здесь на завтра. Страница обновляется сама раз в 3 минуты. Нажали итог — он сразу записывается в карточку МойКласса и в пункт Пульта
   («не дозвонились» пункт не закрывает). Записали на пробное — не забудьте саму запись в группу в CRM и сообщение семье с датой и адресом.</p>
   <div class="prog" id="prog"></div>
@@ -68,14 +74,20 @@
 </div>
 <script>
 let D={{ d|tojson }};
-const WHY={all:'Порядок: новые заявки → «думают, платили раньше» → база 2024/25 → недозвоны. В каждом разговоре — конкретная группа и дата на этой или следующей неделе.',
+const WHY={plan:'<strong>Звоните сверху вниз.</strong> Номер у карточки — порядок. Шаги привязаны ко времени: днём берут трубку одни семьи, вечером — другие. После каждого звонка — итог кнопкой.',all:'Весь список без порядка. Порядок на сегодня — во вкладке «План на сегодня». В каждом разговоре — конкретная группа и дата на этой или следующей неделе.',
  new:'<strong>Звонить сразу.</strong> Свежая заявка покупает в разы чаще, чем через день.',
  think:'<strong>Самый тёплый запас.</strong> Семьи уже платили нам. Начать: «вы у нас занимались — в группе [день, время] есть место, поставить на пробное на этой неделе?»',
  miss:'<strong>В выходные дозваниваются лучше всего.</strong> Не взяли снова — короткое сообщение в мессенджер с одним предложением и датой.',
  base:'<strong>Ходили у нас в прошлом году.</strong> «Занимались у нас в 2024/25 — есть место в группе…». Дети подросли — сверить возраст с группой.'};
 const LBL={new:'новая',think:'думает',miss:'недозвон',base:'2024/25'};
 const RES=[['zap','Записали'],['dum','Думают'],['ned','Не дозвонились'],['otk','Отказ']];
-let tab='new';try{tab=localStorage.getItem('od_tab')||'new'}catch(e){}
+let tab='plan';try{tab=localStorage.getItem('od_tab2')||'plan'}catch(e){}
+// 06.10.2026, Борис: «Ане — с чего начать, приоритизируй на странице, чтобы было понятно».
+// Вкладка «План на сегодня»: шаги по времени суток, внутри — сначала поднятые в приоритет (★).
+const SHAGI=[['new','Сразу — новые заявки','свежая заявка покупает в разы чаще, чем через день'],
+ ['base','Шаг 1 · 10:00–13:00 — бывшие ученики','больше всего занятий у нас — возвращаются охотнее всех'],
+ ['think','Шаг 2 · 13:00–17:00 — «думают»','сначала те, с кем говорили недавно'],
+ ['miss','Шаг 3 · 18:00–20:00 — недозвоны','днём не берут — звонить вечером, не взяли: одно сообщение в мессенджер']];
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=p=>p&&p.length===11?`+7 ${p.slice(1,4)} ${p.slice(4,7)}-${p.slice(7,9)}-${p.slice(9)}`:(p||'нет телефона');
 function prog(){const c={zap:0,dum:0,ned:0,otk:0};D.items.forEach(x=>{if(x.itog)c[x.itog.itog]++});const n=D.items.filter(x=>x.itog).length;
@@ -83,17 +95,30 @@ function prog(){const c={zap:0,dum:0,ned:0,otk:0};D.items.forEach(x=>{if(x.itog)
 function render(){
  const q=document.getElementById('q').value.trim().toLowerCase(),hide=document.getElementById('hide').checked;
  const tabs=document.getElementById('tabs');tabs.innerHTML='';
- Object.entries(Object.assign({all:'Все'},D.kinds)).forEach(([k,t])=>{const n=k==='all'?D.items.length:D.items.filter(x=>x.kind===k).length;
+ Object.entries(Object.assign({plan:'План на сегодня',all:'Все'},D.kinds)).forEach(([k,t])=>{const live=D.items.filter(x=>!(x.done&&!x.itog));const n=(k==='all'||k==='plan')?live.length:live.filter(x=>x.kind===k).length;
   const b=document.createElement('button');b.className='tab';b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',k===tab);b.innerHTML=`${esc(t)}<b>${n}</b>`;
-  b.onclick=()=>{tab=k;try{localStorage.setItem('od_tab',k)}catch(e){};render()};tabs.appendChild(b)});
+  b.onclick=()=>{tab=k;try{localStorage.setItem('od_tab2',k)}catch(e){};render()};tabs.appendChild(b)});
  document.getElementById('why').innerHTML=WHY[tab]||'';prog();
  const list=document.getElementById('list');list.innerHTML='';
- const items=D.items.filter(x=>(tab==='all'||x.kind===tab)&&(!q||(x.name+' '+x.phone).toLowerCase().includes(q))&&!(hide&&x.itog&&x.itog.itog!=='ned'));
+ // 06.10: пункт закрыт в Пульте без итога звонка (дубль, уже клиент, отказ по переписке) — звонить не нужно
+ let items=D.items.filter(x=>!(x.done&&!x.itog)).filter(x=>(tab==='all'||tab==='plan'||x.kind===tab)&&(!q||(x.name+' '+x.phone).toLowerCase().includes(q))&&!(hide&&x.itog&&x.itog.itog!=='ned'));
  if(!items.length){list.innerHTML='<div class="empty">В этом списке пусто.</div>';return}
- items.forEach(x=>{const m=x.itog&&x.itog.itog;const el=document.createElement('article');el.className='card'+(m&&m!=='ned'?' marked':'');
+ const sec={};
+ if(tab==='plan'){
+  const pr=x=>x.prio==null?500:x.prio, late=x=>pr(x)>=900;
+  const ordered=[];
+  SHAGI.forEach(([k,t,h])=>{const g=items.filter(x=>x.kind===k&&!late(x)).sort((a,b)=>pr(a)-pr(b));
+   if(g.length){sec[g[0].id]={t,h};ordered.push(...g)}});
+  const rest=items.filter(late);
+  if(rest.length){sec[rest[0].id]={t:'В конце — ждут направлений, которых у нас нет',h:'танцы, акробатика, хореография, каллиграфия: предложить то, что есть, без нажима',later:1};ordered.push(...rest)}
+  items=ordered;
+ }
+ let n=0;
+ items.forEach(x=>{if(sec[x.id]){const h=document.createElement('div');h.className='sec'+(sec[x.id].later?' later':'');h.innerHTML=`<b>${esc(sec[x.id].t)}</b><span>${esc(sec[x.id].h)}</span>`;list.appendChild(h)}
+  n++;const m=x.itog&&x.itog.itog;const el=document.createElement('article');el.className='card'+(m&&m!=='ned'?' marked':'');
   const kids=x.kids.length?x.kids.map(k=>`${esc(k.n)}${k.age?` <small>${esc(k.age)} г.</small>`:''}`).join(', '):esc(x.name);
   const offers=x.offer.map(o=>`<span class="offer">${esc(o.t)}${o.free===null?'':` · <i class="${o.free?'':'z'}">${o.free?'мест '+o.free:'мест нет'}</i>`}</span>`).join('');
-  el.innerHTML=`<div class="who"><span class="kind k-${x.kind}">${LBL[x.kind]}</span>${kids}${x.chej&&x.chej!==D.who?` <small>(из Пульта: ${esc(x.chej)})</small>`:''}<div class="meta">${esc(x.meta)}</div></div>
+  el.innerHTML=`<div class="who">${tab==='plan'?`<span class="num">${n}.</span>`:''}<span class="kind k-${x.kind}">${LBL[x.kind]}</span>${kids}${tab==='plan'&&x.prio!=null&&x.prio<900?'<span class="star">★ начать с этого</span>':''}${x.chej&&x.chej!==D.who?` <small>(из Пульта: ${esc(x.chej)})</small>`:''}<div class="meta">${esc(x.meta)}</div></div>
    <div class="phone">${x.phone?`<a href="tel:+${esc(x.phone)}">${fmt(x.phone)}</a>`:'<span class="meta">нет телефона</span>'}</div>
    ${offers?`<div class="offers">${offers}</div>`:''}
    <div class="res">${RES.map(([k,t])=>`<button class="btn ${k}" type="button" data-k="${k}" aria-pressed="${m===k}">${t}</button>`).join('')}
