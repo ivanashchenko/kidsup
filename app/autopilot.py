@@ -2830,6 +2830,12 @@ def reactivate_thinkers(mk: MoyklassClient, cap: int = 15) -> int:
     busy_uids = {j.get("userId") for j in joins
                  if j.get("statusId") in {2, 5, 50509, 58131, 58132, 83760}
                  and "аявк" not in cls.get(j.get("classId"), "").lower()}
+    # 06.10, Аня: семьям из листа ожидания (группы «Заявки_*»: МиР, каллиграфия,
+    # танцы…) уходило «вы думали про занятия… написать свободные дни» — они ждут
+    # конкретное направление, место им сообщает администратор. Не пишем.
+    busy_uids |= {j.get("userId") for j in joins
+                  if j.get("statusId") in {2, 5, 50509, 58131, 58132, 83760}
+                  and "аявк" in cls.get(j.get("classId"), "").lower()}
     busy_phones: set[str] = set()
     try:
         with db.get_conn() as conn:
