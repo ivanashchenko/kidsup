@@ -146,7 +146,9 @@ def tick(now: datetime | None = None) -> list[str]:
             if (end - begin) >= timedelta(hours=3):
                 moments.append((begin + timedelta(minutes=LONG_AFTER_MIN), "_2"))
             for when, suffix in moments:
-                if not (when <= now < when + timedelta(minutes=2)):
+                # окно 6 минут: минутный цикл автопилота утром бывает занят дольше
+                # двух минут (07.10 пропущен кадр мини-сада 09:10)
+                if not (when <= now < when + timedelta(minutes=6)):
                     continue
                 key = f"{lid}{suffix}"
                 zap, otm = conn.execute("SELECT COUNT(*), COALESCE(SUM(visit),0) FROM lesson_records WHERE lesson_id=?",
