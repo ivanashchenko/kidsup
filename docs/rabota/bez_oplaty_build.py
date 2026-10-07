@@ -135,6 +135,14 @@ for r in records:
     if l["date"] > TODAY:
         p["future"] += 1
 
+# последний визит ребёнка (любая группа) — чтобы понимать, давно ли не ходит
+last_visit = {}
+for r in records:
+    if r.get("visit") and not r.get("test"):
+        l = lessons.get(r["lessonId"])
+        if l and (l.get("date") or "") <= TODAY:
+            last_visit[r["userId"]] = max(last_visit.get(r["userId"], ""), l["date"])
+
 rows = []
 for (uid, cid), p in pairs.items():
     u = users.get(uid) or {}
@@ -193,6 +201,7 @@ for (uid, cid), p in pairs.items():
                      + ("" if sub_paid(last_sub) else " (не оплачен)")) if last_sub else "—",
         "unpaid_sub": [{"id": s["id"], "price": s.get("price"), "payed": s.get("payed"), "begin": s.get("beginDate"), "end": s.get("endDate")} for s in unpaid_sub],
         "last_pay": f"{last_pay.get('date')} {int(float(last_pay.get('summa') or 0))} ₽" if last_pay else "—",
+        "last_visit": last_visit.get(uid, "—"),
         "tags": tags,
     })
 
@@ -226,4 +235,4 @@ print("были в месяце без оплаты (ask):", sum(1 for r in rows
 print("абонементы кончаются в 10 дней без следующего:", len(ending))
 for e in ending: print(f"   до {e['end']} {e['name'][:26]:26s} {e['group'][:36]:36s} ост.{e['left']} бал {e['balance']} цена {e['price']}")
 for r in rows:
-    print(f"  {r['teacher'][:18]:18s} {r['group'][:38]:38s} {r['name'][:26]:26s} зап{r['recs']:2d} покр{r['covered']:2d} был {','.join(r['visited']) or '—':8s} бал {r['balance']:>7} цена {r['price']:>6} {','.join(r['tags'])}")
+    print(f"  {r['teacher'][:18]:18s} {r['group'][:38]:38s} {r['name'][:26]:26s} зап{r['recs']:2d} покр{r['covered']:2d} был {','.join(r['visited']) or '—':8s} посл.визит {r['last_visit']} бал {r['balance']:>7} цена {r['price']:>6} {','.join(r['tags'])}")

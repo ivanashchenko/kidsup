@@ -103,11 +103,11 @@ for t in sorted(by_t, key=lambda k: -sum(len(v) for v in by_t[k].values())):
     for g in sorted(groups):
         rs = groups[g]
         out.append(f'<h3 data-g>{e(g)}<small>{len(rs)} · {rub(sum(r["price"] for r in rs))} ₽</small></h3>')
-        out.append('<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>')
+        out.append('<table><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Был в октябре</th><th>Последний визит</th><th>Занятий / оплачено</th><th>Последний абонемент</th><th>Последний платёж</th><th>Баланс</th><th>Ожидается</th><th>Что делать</th></tr></thead><tbody>')
         for r in sorted(rs, key=lambda x: x["name"]):
             tags = "".join(f'<span class="tag {TAG[t][0]}">{TAG[t][1]}</span>' for t in ORDER + ["debt"] if t in r["tags"] and (t != "debt" or True))
             out.append(f'<tr data-v="{1 if r["visited"] else 0}" data-tags="{" ".join(r["tags"])}"><td>{e(r["name"])}</td><td>{tel(r["phone"])}</td>'
-                       f'<td>{", ".join(r["visited"]) or "—"}</td><td class=n>{r["recs"]} / {r["covered"]}</td><td>{e(r["last_sub"])}</td><td>{e(r["last_pay"])}</td>'
+                       f'<td>{", ".join(r["visited"]) or "—"}</td><td>{e(r.get("last_visit","—"))}</td><td class=n>{r["recs"]} / {r["covered"]}</td><td>{e(r["last_sub"])}</td><td>{e(r["last_pay"])}</td>'
                        f'<td class=n>{rub(r["balance"])}</td><td class=n>{rub(r["price"])}</td><td>{tags}</td></tr>')
         out.append('</tbody></table>')
 
