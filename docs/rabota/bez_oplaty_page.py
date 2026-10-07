@@ -71,6 +71,7 @@ th,td{{padding:8px 10px;text-align:left;border-top:1px solid var(--line);vertica
 td.n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}td a{{color:var(--indigo);text-decoration:none}}
 .tag{{display:inline-block;font-size:12px;font-weight:600;border-radius:7px;padding:2px 8px;white-space:nowrap;margin:1px 2px 1px 0}}
 .bal{{background:#eef8e6;color:#3f6a12}}.inv{{background:#fdf0d9;color:#8a5a00}}.debt{{background:#fbe3e4;color:#a3201a}}.nov{{background:var(--soft);color:var(--muted)}}.ask{{background:#e3f4fb;color:#0b5f85}}
+.st{{width:100%;min-width:220px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:14px Inter,sans-serif}}.st.saved{{border-color:var(--green)}}
 .hidden{{display:none}}.note{{margin-top:22px;padding:12px 16px;background:var(--soft);border:1px solid #DCE6F5;border-radius:12px;font-size:14px;color:var(--muted)}}
 .plan{{margin:0 0 18px;padding:12px 16px;background:#fff;border:1px solid var(--line);border-radius:12px}}.plan ol{{margin:6px 0 0 18px;padding:0}}.plan li{{margin:4px 0}}
 @media (max-width:760px){{th:nth-child(4),td:nth-child(4),th:nth-child(5),td:nth-child(5){{display:none}}}}
@@ -95,6 +96,28 @@ td.n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}td 
 </ol></div>
 <div class=tools><input id=q type=search placeholder="Имя, телефон, группа, педагог"><label><input type=checkbox id=onlyv> только те, кто уже ходил в октябре</label></div>''')
 
+
+nov_rows = [r for r in rows if "nov" in r["tags"]]
+nov_rows.sort(key=lambda r: ("ЛГ" in r["group"], r.get("last_visit") or "—"))
+out.append(f'<h2 id=nov>Ещё не были в октябре<small>{len(nov_rows)} · статус пишут админы, сохраняется сразу</small></h2>')
+out.append('<table id=novtab><thead><tr><th>Ребёнок</th><th>Телефон</th><th>Группа</th><th>Педагог</th><th>Последний визит</th><th>Деньги</th><th>Статус (что знаем / что сказали)</th></tr></thead><tbody>')
+for r in nov_rows:
+    dengi = []
+    if "inv" in r["tags"]:
+        dengi.append(f'<span class="tag inv">счёт {rub(r["price"])} не оплачен</span>')
+    if "bal" in r["tags"]:
+        dengi.append(f'<span class="tag bal">на балансе {rub(r["balance"])}</span>')
+    if "debt" in r["tags"] and "inv" not in r["tags"]:
+        dengi.append(f'<span class="tag debt">долг {rub(-r["balance"])}</span>')
+    if not dengi:
+        dengi.append(f'<span class="tag nov">к оплате {rub(r["price"])}</span>')
+    key = f'{r["uid"]}:{r["class_id"]}'
+    out.append(f'<tr data-v="0" data-tags="{" ".join(r["tags"])}"><td>{e(r["name"])}</td><td>{tel(r["phone"])}</td><td>{e(r["group"])}</td><td>{e(r["teacher"])}</td>'
+               f'<td>{e(r.get("last_visit","—"))}</td><td>{"".join(dengi)}</td>'
+               f'<td><input class=st data-key="{key}" placeholder="например: болел, вернётся чт 08.10 / ушли / оплатят в пт" value=""></td></tr>')
+out.append('</tbody></table>')
+
+out.append('<h2>Все записи по педагогам и группам</h2>')
 for t in sorted(by_t, key=lambda k: -sum(len(v) for v in by_t[k].values())):
     groups = by_t[t]
     n = sum(len(v) for v in groups.values())
@@ -119,10 +142,14 @@ out.append('</tbody></table>')
 out.append('''<p class=note>Как считали: берём записи детей на занятия октября в группах сезона (статус «Учится»); занятие считается оплаченным по отметке МойКласса «оплачено» на записи или по оплаченному абонементу ребёнка, действующему в октябре и покрывающему группу. Пара «ребёнок — группа» в списке, если есть хотя бы одно неоплаченное занятие месяца. Логопеды часто платят за разовые занятия на месте — их строки нужно сверить с кассовым журналом. Пересчёт: docs/rabota/bez_oplaty_build.py.</p>
 <script>
 const q=document.getElementById('q'),ov=document.getElementById('onlyv');let f='';
-function apply(){const s=q.value.trim().toLowerCase();document.querySelectorAll('tbody tr').forEach(tr=>{const ok=(!s||tr.textContent.toLowerCase().includes(s)||tr.closest('table').previousElementSibling.textContent.toLowerCase().includes(s))&&(!ov.checked||tr.dataset.v==='1')&&(!f||(tr.dataset.tags||'').split(' ').includes(f));tr.classList.toggle('hidden',!ok)});
+function apply(){const s=q.value.trim().toLowerCase();document.querySelectorAll('tbody tr').forEach(tr=>{const ok=(!s||tr.textContent.toLowerCase().includes(s)||(tr.closest('table').previousElementSibling||{textContent:''}).textContent.toLowerCase().includes(s))&&(!ov.checked||tr.dataset.v==='1')&&(!f||(tr.dataset.tags||'').split(' ').includes(f));tr.classList.toggle('hidden',!ok)});
 document.querySelectorAll('h3[data-g]').forEach(h=>{const t=h.nextElementSibling;const vis=t.querySelectorAll('tbody tr:not(.hidden)').length;h.classList.toggle('hidden',!vis);t.classList.toggle('hidden',!vis)});
 document.querySelectorAll('h2[data-t]').forEach(h=>{let n=h.nextElementSibling,vis=false;while(n&&n.tagName!=='H2'){if(n.tagName==='H3'&&!n.classList.contains('hidden'))vis=true;n=n.nextElementSibling}h.classList.toggle('hidden',!vis)});}
 q.addEventListener('input',apply);ov.addEventListener('change',apply);
 document.querySelectorAll('.kpi div').forEach(d=>d.addEventListener('click',()=>{f=d.dataset.f||'';document.querySelectorAll('.kpi div').forEach(x=>x.classList.toggle('on',x===d));apply()}));
+fetch('/api/bez-oplaty/status',{credentials:'same-origin'}).then(r=>r.json()).then(st=>{document.querySelectorAll('input.st').forEach(i=>{const v=st[i.dataset.key];if(v){i.value=v.text;i.title=(v.who||'')+' '+(v.ts||'');i.classList.add('saved')}})}).catch(()=>{});
+let who=localStorage.getItem('bo_who')||'';
+document.querySelectorAll('input.st').forEach(i=>{let t;const save=()=>{clearTimeout(t);t=setTimeout(()=>{if(!who){who=prompt('Кто пишет статус? (имя)')||'';try{localStorage.setItem('bo_who',who)}catch(e){}}
+fetch('/api/bez-oplaty/status',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:i.dataset.key,text:i.value,who})}).then(()=>{i.classList.toggle('saved',!!i.value)}).catch(()=>{i.classList.remove('saved')})},600)};i.addEventListener('input',save);i.addEventListener('change',save)});
 </script></div></body></html>''')
 sys.stdout.write("\n".join(out))

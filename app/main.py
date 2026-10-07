@@ -3810,6 +3810,39 @@ def bez_oplaty_page():
     return HTMLResponse(p.read_text(encoding="utf-8"))
 
 
+def _bez_oplaty_status_init(conn) -> None:
+    conn.execute("CREATE TABLE IF NOT EXISTS bez_oplaty_status (key TEXT PRIMARY KEY, text TEXT, who TEXT, ts TEXT)")
+
+
+@app.get("/api/bez-oplaty/status", dependencies=AUTH)
+def api_bez_oplaty_status():
+    """Статусы по детям из списка /bez-oplaty («болел, вернётся чт», «ушли», «оплатят в пт»):
+    {key: {text, who, ts}}, key = "<uid>:<class_id>". 07.10.2026, Борис: «таблица, кто ещё
+    не был в октябре, и какой-то статус»."""
+    with db.get_conn() as conn:
+        _bez_oplaty_status_init(conn)
+        rows = conn.execute("SELECT key, text, who, ts FROM bez_oplaty_status").fetchall()
+    return {r[0]: {"text": r[1], "who": r[2], "ts": r[3]} for r in rows}
+
+
+@app.post("/api/bez-oplaty/status", dependencies=AUTH)
+def api_bez_oplaty_status_set(payload: dict = Body(...)):
+    """{"key": "uid:class_id", "text": "...", "who": "Аня"} — пустой text удаляет статус."""
+    from . import autopilot
+    key = str(payload.get("key") or "").strip()
+    if not key:
+        raise HTTPException(400, "key")
+    text = str(payload.get("text") or "").strip()[:300]
+    with db.get_conn() as conn:
+        _bez_oplaty_status_init(conn)
+        if text:
+            conn.execute("INSERT OR REPLACE INTO bez_oplaty_status (key, text, who, ts) VALUES (?,?,?,?)",
+                         (key, text, str(payload.get("who") or "")[:40], autopilot._now().isoformat(timespec="minutes")))
+        else:
+            conn.execute("DELETE FROM bez_oplaty_status WHERE key=?", (key,))
+    return {"ok": True, "key": key}
+
+
 @app.post("/api/kontrol-oplat/run", dependencies=OWNER_AUTH)
 def api_kontrol_oplat_run(day: str = "", dry: int = 1):
     """Утренний контроль оплат за день (по умолчанию вчера). dry=1 — только посчитать, без пунктов в инбокс."""
@@ -4165,7 +4198,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-07.1"
+APP_VERSION = "2026-10-07.2"
 
 
 @app.get("/api/net")
