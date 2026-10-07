@@ -30,6 +30,10 @@ AFTER_MIN = 10            # первый кадр — через 10 минут �
 LONG_AFTER_MIN = 120      # второй кадр для занятий длиннее 3 часов
 _lock = threading.Lock()
 _busy: set[str] = set()
+# кадры снимаем по одному: 07.10 в 16:10 четыре Chromium стартовали разом и все
+# четыре кадра оказались заставкой плеера (21,8 КБ, кнопка play)
+_snap_lock = threading.Lock()
+MIN_BYTES = 80000         # настоящий кадр 600 КБ – 1 МБ, заставка плеера ~22 КБ
 
 
 def _init(conn) -> None:
@@ -85,8 +89,9 @@ def snap(src: str, path: Path, wait_ms: int = 9000) -> dict:
         except Exception:  # noqa: BLE001
             pass
         b.close()
-    return {"ok": path.exists() and path.stat().st_size > 20000, "bytes": path.stat().st_size if path.exists() else 0,
-            "text": txt}
+    size = path.stat().st_size if path.exists() else 0
+    # живой плеер пишет «LIVE» и время; заставка — только «Live» внизу
+    return {"ok": size > MIN_BYTES and "LIVE" in txt, "bytes": size, "text": txt}
 
 
 def _do_snap(key: str, meta: dict, src: str) -> None:
@@ -94,7 +99,12 @@ def _do_snap(key: str, meta: dict, src: str) -> None:
         day = meta["day"]
         fname = f"{meta['ts'][11:16].replace(':', '')}_{meta['room']}_{meta['lesson_id']}{meta.get('suffix', '')}.png"
         path = DIR / day / fname
-        r = snap(src, path)
+        for attempt in range(3):
+            with _snap_lock:
+                r = snap(src, path, wait_ms=9000 + 5000 * attempt)
+            if r["ok"]:
+                break
+            log.warning("кадр %s пустой (%s байт), попытка %s", key, r["bytes"], attempt + 1)
         err = "" if r["ok"] else f"кадр пустой ({r['bytes']} байт) {r['text'][:80]}"
         with db.get_conn() as conn:
             _init(conn)
@@ -176,7 +186,8 @@ def snap_room(room: str) -> dict:
         return {"ok": False, "error": f"нет камеры для {room}", "камеры": sorted(cam_rooms())}
     now = _now()
     path = DIR / now.strftime("%Y-%m-%d") / f"{now.strftime('%H%M')}_{room}_manual.png"
-    r = snap(src, path)
+    with _snap_lock:
+        r = snap(src, path)
     return {**r, "file": f"{now.strftime('%Y-%m-%d')}/{path.name}"}
 
 
