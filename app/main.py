@@ -4198,7 +4198,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-08.3"
+APP_VERSION = "2026-10-08.4"
 
 
 @app.get("/api/net")
@@ -6456,7 +6456,9 @@ def api_plan_inbox_add(payload: dict = Body(...)):
         raise HTTPException(400, f"колонки «{who}» на пульте нет: {', '.join(sorted(KOLONKI_PULTA))}")
     if not who:
         who = autopilot._duty_name()
-    tekst = autopilot.obrezat(str(payload.get("text") or ""), 400)
+    # 08.10.2026: предел 400 → 700. Метка сегмента обзвона («С5 · Думают — свежие: »)
+    # и дописанные итоги звонков съедали хвост пункта — там, где были группа и дата.
+    tekst = autopilot.obrezat(str(payload.get("text") or ""), 700)
     if not tekst:
         raise HTTPException(400, "пустой текст пункта")
     with db.get_conn() as conn:
@@ -6475,7 +6477,10 @@ def api_plan_inbox_edit(payload: dict = Body(...)):
     iid = int(payload.get("id") or 0)
     sets, args = [], []
     if payload.get("text"):
-        sets.append("text=?"); args.append(str(payload["text"])[:400])
+        # 08.10.2026: правка резала молча на 400 символах посреди слова — теперь
+        # тот же предел, что у нового пункта, и обрыв по границе предложения.
+        from . import autopilot as _ap
+        sets.append("text=?"); args.append(_ap.obrezat(str(payload["text"]), 700))
     if "tries" in payload:
         sets.append("tries=?"); args.append(int(payload.get("tries") or 0))
     # 24.09: у пунктов про чат Wazzup в поле телефона лежал id чата — пульт

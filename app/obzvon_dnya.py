@@ -289,7 +289,7 @@ def otmetit(item_id: int, itog: str, note: str, who: str) -> dict:
         conn.execute("INSERT OR REPLACE INTO obzvon_dnya (item_id, itog, note, who, ts) VALUES (?,?,?,?,?)",
                      (item_id, itog, note[:300], who[:20], datetime.now().isoformat(timespec="seconds")))
         pometka = f"итог {now} ({who or 'админ'}): {ITOGI[itog]}" + (f" — {note[:150]}" if note else "")
-        conn.execute("UPDATE plan_inbox SET done=?, text=substr(text||' — '||?, 1, 600) WHERE id=?",
+        conn.execute("UPDATE plan_inbox SET done=?, text=substr(text||' — '||?, 1, 900) WHERE id=?",
                      (0 if itog == "ned" else 1, pometka, item_id))
         phone = row["phone"] or ""
     kartochka = None
