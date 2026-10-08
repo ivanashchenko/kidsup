@@ -35,6 +35,9 @@
   .od .kind{font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:6px;margin-right:6px;vertical-align:2px;font-weight:600}
   .od .k-new{background:var(--red-s);color:var(--red)}.od .k-think{background:var(--green-s);color:var(--green)}
   .od .k-miss{background:var(--amber-s);color:var(--amber)}.od .k-base{background:var(--sky-s);color:#0f6f99}
+  .od .kind[class*="k-s"]{background:var(--chip);color:var(--indigo)}
+  .od .k-s1,.od .k-s2{background:var(--red-s);color:var(--red)}.od .k-s3,.od .k-s4{background:var(--green-s);color:var(--green)}
+  .od .k-s7{background:var(--amber-s);color:var(--amber)}.od .k-s9{background:var(--sky-s);color:#0f6f99}
   .od .meta{color:var(--muted);font-size:13px;font-weight:400}
   .od .offers{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
   .od .offer{background:var(--chip);border-radius:8px;padding:3px 8px;font-size:13px}
@@ -84,10 +87,13 @@ const RES=[['zap','Записали'],['dum','Думают'],['ned','Не доз
 let tab='plan';try{tab=localStorage.getItem('od_tab2')||'plan'}catch(e){}
 // 06.10.2026, Борис: «Ане — с чего начать, приоритизируй на странице, чтобы было понятно».
 // Вкладка «План на сегодня»: шаги по времени суток, внутри — сначала поднятые в приоритет (★).
-const SHAGI=[['new','Сразу — новые заявки','свежая заявка покупает в разы чаще, чем через день'],
+const OLD_SHAGI=[['new','Сразу — новые заявки','свежая заявка покупает в разы чаще, чем через день'],
  ['base','Шаг 1 · 10:00–13:00 — бывшие ученики','больше всего занятий у нас — возвращаются охотнее всех'],
  ['think','Шаг 2 · 13:00–17:00 — «думают»','сначала те, с кем говорили недавно'],
  ['miss','Шаг 3 · 18:00–20:00 — недозвоны','днём не берут — звонить вечером, не взяли: одно сообщение в мессенджер']];
+// 08.10.2026, Борис: сегменты С1–С9 по вероятности записи на пробное (из текста пунктов) — впереди старых шагов.
+const segShagi=()=>(D.segments||[]).map(s=>[s.kind,s.t,s.h]).concat(OLD_SHAGI);
+const lbl=k=>LBL[k]||(k&&k[0]==='s'?'С'+k.slice(1):k);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=p=>p&&p.length===11?`+7 ${p.slice(1,4)} ${p.slice(4,7)}-${p.slice(7,9)}-${p.slice(9)}`:(p||'нет телефона');
 function prog(){const c={zap:0,dum:0,ned:0,otk:0};D.items.forEach(x=>{if(x.itog)c[x.itog.itog]++});const n=D.items.filter(x=>x.itog).length;
@@ -96,9 +102,10 @@ function render(){
  const q=document.getElementById('q').value.trim().toLowerCase(),hide=document.getElementById('hide').checked;
  const tabs=document.getElementById('tabs');tabs.innerHTML='';
  Object.entries(Object.assign({plan:'План на сегодня',all:'Все'},D.kinds)).forEach(([k,t])=>{const live=D.items.filter(x=>!(x.done&&!x.itog));const n=(k==='all'||k==='plan')?live.length:live.filter(x=>x.kind===k).length;
+  if(!n&&k!=='plan'&&k!=='all')return;
   const b=document.createElement('button');b.className='tab';b.type='button';b.setAttribute('role','tab');b.setAttribute('aria-selected',k===tab);b.innerHTML=`${esc(t)}<b>${n}</b>`;
   b.onclick=()=>{tab=k;try{localStorage.setItem('od_tab2',k)}catch(e){};render()};tabs.appendChild(b)});
- document.getElementById('why').innerHTML=WHY[tab]||'';prog();
+ document.getElementById('why').innerHTML=WHY[tab]||esc(((D.segments||[]).find(s=>s.kind===tab)||{}).h||'');prog();
  const list=document.getElementById('list');list.innerHTML='';
  // 06.10: пункт закрыт в Пульте без итога звонка (дубль, уже клиент, отказ по переписке) — звонить не нужно
  let items=D.items.filter(x=>!(x.done&&!x.itog)).filter(x=>(tab==='all'||tab==='plan'||x.kind===tab)&&(!q||(x.name+' '+x.phone).toLowerCase().includes(q))&&!(hide&&x.itog&&x.itog.itog!=='ned'));
@@ -107,7 +114,7 @@ function render(){
  if(tab==='plan'){
   const pr=x=>x.prio==null?500:x.prio, late=x=>pr(x)>=900;
   const ordered=[];
-  SHAGI.forEach(([k,t,h])=>{const g=items.filter(x=>x.kind===k&&!late(x)).sort((a,b)=>pr(a)-pr(b));
+  segShagi().forEach(([k,t,h])=>{const g=items.filter(x=>x.kind===k&&!late(x)).sort((a,b)=>pr(a)-pr(b));
    if(g.length){sec[g[0].id]={t,h};ordered.push(...g)}});
   const rest=items.filter(late);
   if(rest.length){sec[rest[0].id]={t:'В конце — ждут направлений, которых у нас нет',h:'танцы, акробатика, хореография, каллиграфия: предложить то, что есть, без нажима',later:1};ordered.push(...rest)}
@@ -118,7 +125,7 @@ function render(){
   n++;const m=x.itog&&x.itog.itog;const el=document.createElement('article');el.className='card'+(m&&m!=='ned'?' marked':'');
   const kids=x.kids.length?x.kids.map(k=>`${esc(k.n)}${k.age?` <small>${esc(k.age)} г.</small>`:''}`).join(', '):esc(x.name);
   const offers=x.offer.map(o=>`<span class="offer">${esc(o.t)}${o.free===null?'':` · <i class="${o.free?'':'z'}">${o.free?'мест '+o.free:'мест нет'}</i>`}</span>`).join('');
-  el.innerHTML=`<div class="who">${tab==='plan'?`<span class="num">${n}.</span>`:''}<span class="kind k-${x.kind}">${LBL[x.kind]}</span>${kids}${tab==='plan'&&x.prio!=null&&x.prio<900?'<span class="star">★ начать с этого</span>':''}${x.chej&&x.chej!==D.who?` <small>(из Пульта: ${esc(x.chej)})</small>`:''}<div class="meta">${esc(x.meta)}</div></div>
+  el.innerHTML=`<div class="who">${tab==='plan'?`<span class="num">${n}.</span>`:''}<span class="kind k-${x.kind}">${esc(lbl(x.kind))}</span>${kids}${tab==='plan'&&x.prio!=null&&x.prio<900?'<span class="star">★ начать с этого</span>':''}${x.chej&&x.chej!==D.who?` <small>(из Пульта: ${esc(x.chej)})</small>`:''}<div class="meta">${esc(x.meta)}</div></div>
    <div class="phone">${x.phone?`<a href="tel:+${esc(x.phone)}">${fmt(x.phone)}</a>`:'<span class="meta">нет телефона</span>'}</div>
    ${offers?`<div class="offers">${offers}</div>`:''}
    <div class="res">${RES.map(([k,t])=>`<button class="btn ${k}" type="button" data-k="${k}" aria-pressed="${m===k}">${t}</button>`).join('')}
