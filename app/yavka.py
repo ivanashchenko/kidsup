@@ -708,9 +708,13 @@ def _log(day, lesson_id, record_id, uid, name, field, value, who, result):
 
 # ---------------------------------------------------------------- расписание
 
-def nightly(day: str | None = None, who: str = "Лиза") -> dict:
+def nightly(day: str | None = None, who: str = "Лена") -> dict:
     """Вечером (и утром за вчера): сверка → пункт в Пульт. При yavka_auto≥1 —
-    ещё и отметки (2 — и проведение учтённых занятий)."""
+    ещё и отметки (2 — и проведение учтённых занятий).
+
+    09.10.2026: пункт шёл Лизе, а с 08.10 (решение Бориса) Лиза ведёт только
+    деньги, явка и «проведено» — у Лены. В её выходной пункт утром уйдёт
+    дежурной вместе с остальным хвостом (hvost.utro)."""
     from . import autopilot
     day = day or autopilot._today().isoformat()
     res = sverka(day)
