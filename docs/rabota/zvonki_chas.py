@@ -62,6 +62,24 @@ def calls(minutes: int) -> list[dict]:
             if i < 2:
                 print(f"выгрузка Манго не успела, попытка {i + 2} из 3")
                 time.sleep(10)
+        # 10.10: вечером, когда звонков за час просто нет, Манго на пустое окно
+        # тоже отвечает ready=false — и разбор трижды подряд пугал «выгрузка не
+        # готова», хотя окно шире сразу приходило готовым. Проверяем окном на
+        # 3 часа длиннее: если оно готово, тишина в нашем окне настоящая.
+        wide = min(minutes + 180, 900)
+        r = _get(f"{SERVER}/api/calls/list", params={"minutes": wide},
+                 auth=AUTH, timeout=240)
+        r.raise_for_status()
+        j = r.json()
+        if j.get("calls") or j.get("ready"):
+            since = time.time() - minutes * 60
+            mine = [c for c in j.get("calls", []) if (c.get("start") or 0) >= since]
+            last = max((c.get("start") or 0 for c in j.get("calls", [])), default=0)
+            last_s = (datetime.datetime.fromtimestamp(last, datetime.timezone(datetime.timedelta(hours=3)))
+                      .strftime("%H:%M") if last else "—")
+            print(f"окно {wide} мин готово: звонков в последних {minutes} мин — {len(mine)}, "
+                  f"последний звонок в {last_s} МСК")
+            return mine
         print("ВНИМАНИЕ: Манго так и не отдала выгрузку — это не значит, "
               "что звонков не было; следующий разбор возьмёт окно шире")
         return []
