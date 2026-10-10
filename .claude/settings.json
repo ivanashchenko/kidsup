@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Workflow",
+      "mcp__Claude_Code_Remote__read_documentation",
+      "mcp__Claude_Code_Remote__list_triggers",
+      "mcp__Claude_Code_Remote__get_trigger",
+      "mcp__Claude_Code_Remote__update_trigger",
+      "mcp__Claude_Code_Remote__create_trigger",
+      "mcp__Claude_Code_Remote__send_later"
+    ]
+  }
+}
