@@ -38,7 +38,15 @@ def load(name):
     return json.load(open(SRC / f"{name}.json", encoding="utf-8"))
 
 
-users = {u["id"]: u for u in load("users")}
+# 10.10.2026: синк не стирает карточки, удалённые в МойКлассе, и они всплывали в
+# списке как должники (Чистякова Арина — Лиза и Ира не нашли её ни по телефону, ни
+# по фамилии). Такие uid исключаем; список — kontrol/udaleny.json, если он есть.
+UDALENY = {10751931, 10987992}
+_ud = Path(__file__).resolve().parent / "kontrol" / "udaleny.json"
+if _ud.exists():
+    UDALENY |= {int(x) for x in json.load(open(_ud, encoding="utf-8"))}
+
+users = {u["id"]: u for u in load("users") if u["id"] not in UDALENY}
 classes = {c["id"]: c for c in load("classes")}
 courses = {c["id"]: c for c in load("courses")}
 lessons = {l["id"]: l for l in load("lessons")}
@@ -110,7 +118,8 @@ for i in invoices:
     inv_by_user[i["userId"]].append(i)
 
 # --- учится: (uid, cid) со статусом 2
-uchitsya = {(j["userId"], j["classId"]): j for j in joins if j.get("statusId") == 2 and real_class(j["classId"])}
+uchitsya = {(j["userId"], j["classId"]): j for j in joins
+            if j.get("statusId") == 2 and real_class(j["classId"]) and j["userId"] not in UDALENY}
 
 # --- записи месяца по парам
 pairs = defaultdict(lambda: {"recs": 0, "covered": 0, "visited": [], "visited_uncovered": 0, "future": 0})
