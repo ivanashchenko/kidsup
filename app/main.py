@@ -3400,13 +3400,19 @@ def plan311_page(request: Request, day: str = ""):
         # 29.09», а в числе сидели дети с пробным на 01.10, 04.10 и даже
         # 07.11 — владелец планировал донабор из ресурса, которого до конца
         # сентября не будет. Считаем отдельно тех, кто успевает до срока.
-        srok = date(2026, 9, 30).isoformat()
-        uspeut = [r for r in (v.get("списки") or {}).get("ждём", [])
-                  if ((r.get("пробное") or {}).get("дата") or "") < srok]
+        # 10.10.2026: срок был прибит к 30.09, и с октября карточка писала
+        # «63 оплаты в день на 1 дн. до 30.09». Рубеж теперь 31.10, сегодня
+        # считается — сегодняшние оплаты ещё впереди. «ждём» с октября лежит
+        # в корне ответа воронки, а не в «списки».
+        srok_d = date(2026, 10, 31)
+        srok = srok_d.isoformat()
+        zhdem = v.get("ждём") or (v.get("списки") or {}).get("ждём", [])
+        uspeut = [r for r in zhdem
+                  if ((r.get("пробное") or {}).get("дата") or "") <= srok]
         if uspeut:
             k["trials_do_sroka"] = len(uspeut)
             k["trials_pozzhe"] = max(0, k["trials"] - len(uspeut))
-        left = max(1, (date(2026, 9, 30) - date.today()).days)
+        left = max(1, (srok_d - date.today()).days + 1)
         k["days_left"] = left
         k["per_day"] = str(round(k["gap"] / left, 1)).replace(".", ",")
     except Exception:
