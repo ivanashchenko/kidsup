@@ -66,7 +66,8 @@ def calls(minutes: int) -> list[dict]:
         # тоже отвечает ready=false — и разбор трижды подряд пугал «выгрузка не
         # готова», хотя окно шире сразу приходило готовым. Проверяем окном на
         # 3 часа длиннее: если оно готово, тишина в нашем окне настоящая.
-        wide = min(minutes + 180, 900)
+        # 11.10: утром после ночи и 5 часов бывают пустыми — берём не меньше суток.
+        wide = min(max(minutes + 180, 1440), 2880)
         r = _get(f"{SERVER}/api/calls/list", params={"minutes": wide},
                  auth=AUTH, timeout=240)
         r.raise_for_status()
