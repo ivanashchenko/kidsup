@@ -29,11 +29,12 @@ VIA_SERVER = not (KEY and SALT)
 def _get(url, **kw):
     # 02.10: прокси регулярно рвёт первое TLS-соединение (Connection reset
     # by peer) — без повтора весь разбор падал, хотя вторая попытка проходит.
-    for i in range(4):
+    # 11.10: дважды за утро обрыв держался дольше 18 с — даём ~45 с.
+    for i in range(6):
         try:
             return httpx.get(url, **kw)
         except httpx.TransportError:
-            if i == 3:
+            if i == 5:
                 raise
             time.sleep(3 * (i + 1))
 
@@ -129,12 +130,21 @@ def transcribe(rows: list[dict]) -> None:
     ok = []
     for x in rows:
         f = f"/tmp/{x['rec'][:12]}.mp3"
-        if VIA_SERVER:
-            r = _get(f"{SERVER}/api/calls/recording", params={"id": x["rec"]},
-                          auth=AUTH, timeout=180)
-        else:
-            r = _call("https://app.mango-office.ru/vpbx/queries/recording/post/",
-                      {"recording_id": x["rec"], "action": "download"})
+        # 11.10: обрыв на одной записи ронял весь разбор, и уже расшифрованные
+        # звонки не попадали в calls_done — следующий запуск делал их заново.
+        # Теперь запись, которая не скачалась, пропускаем (останется «НОВ»
+        # до следующего часа), а каждую разобранную отмечаем сразу.
+        try:
+            if VIA_SERVER:
+                r = _get(f"{SERVER}/api/calls/recording", params={"id": x["rec"]},
+                              auth=AUTH, timeout=180)
+            else:
+                r = _call("https://app.mango-office.ru/vpbx/queries/recording/post/",
+                          {"recording_id": x["rec"], "action": "download"})
+        except httpx.TransportError as e:
+            print(x["t"], x["phone"], "запись не скачалась:", type(e).__name__,
+                  "— возьмём в следующий разбор", flush=True)
+            continue
         if r.status_code != 200 or len(r.content) < 1000:
             print(x["t"], x["phone"], "запись недоступна", r.status_code, flush=True)
             continue
@@ -145,8 +155,8 @@ def transcribe(rows: list[dict]) -> None:
               f"{x['phone']} ({x['dur']}с)\n{txt}\n", flush=True)
         os.remove(f)
         ok.append(x["rec"])
-    mark_done(ok)
-    print("ГОТОВО, разобрано:", len(ok))
+        mark_done([x["rec"]])
+    print("ГОТОВО, разобрано:", len(ok), "из", len(rows))
 
 
 if __name__ == "__main__":
