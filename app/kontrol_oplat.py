@@ -189,9 +189,17 @@ def run(day: str | None = None, dry: bool = False) -> dict:
              "(" + ", ".join(f"{name(p['userId'])} {p['summa']:g}" for p in nal) + "). Прислать фото страницы тетради за день в чат «Администраторы».", "Лиза")
 
     # ── A4. маткапитал: ОСФР на счёт Буракова → приход «перевод на счёт» в МК ─
+    # 11.10: на этот счёт приходит маткапитал и клуба Буракова (Люберцы). Их
+    # детей в нашем МойКлассе нет, вносить их нельзя — а контроль каждое утро
+    # ставил Лизе «внести 107 300 за Орлову Софью»: Орлова, Камышанова, Каретин
+    # и Марушин висели у неё по три одинаковых пункта. Флажим только детей с
+    # нашей карточкой; «некачественный лид» (125954) — так помечены контакты
+    # клуба, они не в счёт.
     if bank_ok:
         try:
             from . import tbank
+            nashi = [(u.get("name") or "").lower().replace("ё", "е") for u in users.values()
+                     if u.get("clientStateId") != 125954]
             bur = tbank.statement(ACC_BUR, (d0 - timedelta(days=7)).isoformat(), day)
             for o in bur:
                 if o["typeOfOperation"] != "Credit" or "СФР" not in (o.get("payer") or {}).get("name", ""):
@@ -201,6 +209,10 @@ def run(day: str | None = None, dry: bool = False) -> dict:
                 m = re.search(r"ФИО обуч\.?\s*([А-ЯЁ][а-яё-]+)\s+([А-ЯЁ][а-яё]+)", pp)
                 fam, im = (m[1], m[2]) if m else ("?", "?")
                 amt = o["operationAmount"]
+                if m and not any(fam.lower().replace("ё", "е") in n and im.lower().replace("ё", "е") in n for n in nashi):
+                    flag("A. Маткапитал", f"Маткапитал {rub(amt)} за {fam} {im} ({od[8:]}.{od[5:7]}) — нашей карточки нет: "
+                         "клуб Буракова (Люберцы), в наш МойКласс не вносим.", level="ok")
+                    continue
                 hit = [p for p in pays if p.get("paymentTypeId") == T_PEREVOD and abs((p.get("summa") or 0) - amt) < 1
                        and p["date"] >= od]
                 if not hit:
@@ -300,8 +312,20 @@ def run(day: str | None = None, dry: bool = False) -> dict:
     (OUT_DIR / f"{day}.json").write_text(json.dumps(R, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
     if not dry:
         from . import autopilot
+        # 11.10: inbox_add ловит дубль только в пределах дня, а невыполненный
+        # пункт утром переезжает на новый день с «⏳ с 08.10:» — и тот же сигнал
+        # (маткапитал за неделю, тип возврата) ложился вторым и третьим пунктом.
+        # Пока такой пункт открыт, новый не ставим.
+        with db.get_conn() as conn:
+            try:
+                otkryto = "\n".join(r[0] or "" for r in conn.execute(
+                    "SELECT text FROM plan_inbox WHERE done=0 AND day>=?", ((d0 - timedelta(days=14)).isoformat(),)))
+            except Exception:  # noqa: BLE001 — таблицы ещё нет
+                otkryto = ""
         n = 0
         for who, text, ph in R["inbox"]:
+            if text[:120] in otkryto:
+                continue
             if autopilot.inbox_add(text, ph, who, source=f"контроль оплат {day[8:]}.{day[5:7]}"):
                 n += 1
         autopilot.inbox_add(summary, "", "Борис", source="контроль оплат")
