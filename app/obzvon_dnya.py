@@ -215,11 +215,16 @@ def spisok(day: str, who: str) -> dict:
         # 103 итогов 03.10 исходящего звонка по номеру не было вовсе. Показываем
         # у итога, виден ли звонок через Манго в этот день (с личного телефона
         # не видно — тогда пусть пишет это в примечании).
-        zvonili = set()
+        # 11.10, Борис: «почему в некоторых кнопка „не дозвонились“ как будто
+        # выделена?» — итог «не дозвонились» не закрывает пункт, и отметка 03.10
+        # висела на нём и через неделю, со временем без даты и с ложным «звонка
+        # через Манго не видно»: звонки искали только у дня страницы. Теперь
+        # звонок ищем у дня самого итога (±1 день).
+        zvonili: dict[str, set] = {}
         try:
-            for (ph,) in conn.execute("SELECT phone FROM mango_calls WHERE direction='out' AND ts >= ? AND ts < ?",
-                                      ((d0 - _td(days=1)).isoformat(), (d0 + _td(days=1)).isoformat())):
-                zvonili.add("".join(c for c in str(ph or "") if c.isdigit())[-10:])
+            for ph, ts in conn.execute("SELECT phone, ts FROM mango_calls WHERE direction='out' AND ts >= ? AND ts < ?",
+                                       ((d0 - _td(days=16)).isoformat(), (d0 + _td(days=1)).isoformat())):
+                zvonili.setdefault("".join(c for c in str(ph or "") if c.isdigit())[-10:], set()).add(str(ts or "")[:10])
         except Exception:
             pass
     items = []
@@ -243,7 +248,15 @@ def spisok(day: str, who: str) -> dict:
         if ms:
             it["seg"] = ms.group(2).strip()
         if it["itog"]:
-            it["zvonok"] = "".join(c for c in it["phone"] if c.isdigit())[-10:] in zvonili
+            den = str(it["itog"].get("ts") or "")[:10]
+            # итог прошлых дней — это прошлая попытка, а не сегодняшняя отметка
+            it["itog_staryi"] = bool(den) and den < day
+            try:
+                d_it = _d.fromisoformat(den)
+                okno = {(d_it + _td(days=k)).isoformat() for k in (-1, 0, 1)}
+            except ValueError:
+                okno = set()
+            it["zvonok"] = bool(zvonili.get("".join(c for c in it["phone"] if c.isdigit())[-10:], set()) & okno)
         items.append(it)
     # Сегменты С1–С9, которые есть в ленте: название — из текста пункта (или по
     # умолчанию), подсказка — из SEGMENTY. Вкладки на странице идут по номеру.
@@ -269,7 +282,7 @@ def spisok(day: str, who: str) -> dict:
                        for k in [re.sub(r"\s*\(.*$", "", o.split(" → ")[-1]).strip()]]
     schet = {k: 0 for k in ITOGI}
     for it in items:
-        if it["itog"]:
+        if it["itog"] and not it.get("itog_staryi"):   # счёт — только итоги этого дня
             schet[it["itog"]["itog"]] = schet.get(it["itog"]["itog"], 0) + 1
     return {"day": day, "who": who, "items": items, "legend": [g for g in leg if g["free"] > 0],
             "kinds": kinds, "segments": segments, "itogi": ITOGI, "schet": schet}

@@ -96,7 +96,7 @@ const segShagi=()=>(D.segments||[]).map(s=>[s.kind,s.t,s.h]).concat(OLD_SHAGI);
 const lbl=k=>LBL[k]||(k&&k[0]==='s'?'С'+k.slice(1):k);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=p=>p&&p.length===11?`+7 ${p.slice(1,4)} ${p.slice(4,7)}-${p.slice(7,9)}-${p.slice(9)}`:(p||'нет телефона');
-function prog(){const c={zap:0,dum:0,ned:0,otk:0};D.items.forEach(x=>{if(x.itog)c[x.itog.itog]++});const n=D.items.filter(x=>x.itog).length;
+function prog(){const c={zap:0,dum:0,ned:0,otk:0},sv=x=>x.itog&&!x.itog_staryi;D.items.forEach(x=>{if(sv(x))c[x.itog.itog]++});const n=D.items.filter(sv).length;
  document.getElementById('prog').innerHTML=`<span class="pill">с итогом ${n} из ${D.items.length}</span><span class="pill g">записали ${c.zap}</span><span class="pill a">думают ${c.dum}</span><span class="pill">не дозвонились ${c.ned}</span><span class="pill r">отказ ${c.otk}</span>`}
 function render(){
  const q=document.getElementById('q').value.trim().toLowerCase(),hide=document.getElementById('hide').checked;
@@ -122,19 +122,19 @@ function render(){
  }
  let n=0;
  items.forEach(x=>{if(sec[x.id]){const h=document.createElement('div');h.className='sec'+(sec[x.id].later?' later':'');h.innerHTML=`<b>${esc(sec[x.id].t)}</b><span>${esc(sec[x.id].h)}</span>`;list.appendChild(h)}
-  n++;const m=x.itog&&x.itog.itog;const el=document.createElement('article');el.className='card'+(m&&m!=='ned'?' marked':'');
+  n++;const m=x.itog&&!x.itog_staryi&&x.itog.itog;const el=document.createElement('article');el.className='card'+(m&&m!=='ned'?' marked':'');
   const kids=x.kids.length?x.kids.map(k=>`${esc(k.n)}${k.age?` <small>${esc(k.age)} г.</small>`:''}`).join(', '):esc(x.name);
   const offers=x.offer.map(o=>`<span class="offer">${esc(o.t)}${o.free===null?'':` · <i class="${o.free?'':'z'}">${o.free?'мест '+o.free:'мест нет'}</i>`}</span>`).join('');
   el.innerHTML=`<div class="who">${tab==='plan'?`<span class="num">${n}.</span>`:''}<span class="kind k-${x.kind}">${esc(lbl(x.kind))}</span>${kids}${tab==='plan'&&x.prio!=null&&x.prio<900?'<span class="star">★ начать с этого</span>':''}${x.chej&&x.chej!==D.who?` <small>(из Пульта: ${esc(x.chej)})</small>`:''}<div class="meta">${esc(x.meta)}</div></div>
    <div class="phone">${x.phone?`<a href="tel:+${esc(x.phone)}">${fmt(x.phone)}</a>`:'<span class="meta">нет телефона</span>'}</div>
    ${offers?`<div class="offers">${offers}</div>`:''}
    <div class="res">${RES.map(([k,t])=>`<button class="btn ${k}" type="button" data-k="${k}" aria-pressed="${m===k}">${t}</button>`).join('')}
-    <input type="text" id="note-${x.id}" placeholder="коротко: группа и дата / почему" value="${esc(x.itog?x.itog.note:'')}">
-    ${x.itog?`<span class="itog">${esc(x.itog.who||'')} ${esc((x.itog.ts||'').slice(11,16))}${x.zvonok===false?' · <b style="color:var(--amber)">звонка через Манго не видно — звонили с другого телефона? напишите в примечании</b>':''}</span>`:''}</div>`;
+    <input type="text" id="note-${x.id}" placeholder="коротко: группа и дата / почему" value="${esc(x.itog&&!x.itog_staryi?x.itog.note:'')}">
+    ${x.itog?`<span class="itog">${x.itog_staryi?'прошлая попытка: '+esc((D.itogi||{})[x.itog.itog]||'')+' · ':''}${esc(x.itog.who||'')} ${esc(x.itog_staryi?(x.itog.ts||'').slice(8,10)+'.'+(x.itog.ts||'').slice(5,7)+' ':'')}${esc((x.itog.ts||'').slice(11,16))}${x.zvonok===false?' · <b style="color:var(--amber)">звонка через Манго не видно — звонили с другого телефона? напишите в примечании</b>':''}</span>`:''}</div>`;
   el.querySelectorAll('.res .btn').forEach(b=>b.onclick=()=>{const k=b.dataset.k;const note=document.getElementById('note-'+x.id).value.trim();
    if(k==='zap'&&!note){document.getElementById('note-'+x.id).placeholder='напишите группу и дату пробного';document.getElementById('note-'+x.id).focus();return}
    b.disabled=true;fetch('/api/obzvon-dnya/itog',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:x.id,itog:k,note:note,who:D.who})})
-   .then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{x.itog={itog:k,note:note,who:D.who,ts:new Date().toISOString()};
+   .then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{x.itog={itog:k,note:note,who:D.who,ts:new Date().toISOString()};x.itog_staryi=false;x.zvonok=true;
     if(j&&j.oshibka_kommentariya)b.title='Итог сохранён, но комментарий в карточку не записался';render()})
    .catch(()=>{b.disabled=false;b.textContent='Не сохранилось — ещё раз'})});
   list.appendChild(el)});
