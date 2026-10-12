@@ -259,7 +259,7 @@ document.querySelectorAll('.row').forEach(row => {{
 def main():
     import sys
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    mid = int(sys.argv[1]) if len(sys.argv) > 1 else 232805
+    mid = int(sys.argv[1]) if len(sys.argv) > 1 else 202856  # 12.10.2026: Аня уволена
     rows = collect(mid)
     print(f"{STAFF.get(mid, mid)}: {len(rows)} задач в очереди, "
           f"просрочено {sum(1 for r in rows if r['overdue'])}")

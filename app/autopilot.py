@@ -907,11 +907,20 @@ def sync_admin_phones(mk: MoyklassClient) -> dict:
     return out
 
 
-def _admins() -> list[dict]:
+# 12.10.2026: Аня (232805) уволена. Настройки call_admins и admin_schedule
+# Борис правит сам, но пока в них остаётся её id, через _admins/_admins_today
+# ей уходили бы смена, заявки с сайта и наряды. Уволенных отсекаем здесь;
+# имена для старых записей остаются в MANAGER_NAMES.
+UVOLENY = {232805}
+
+
+def _admins(vse: bool = False) -> list[dict]:
+    """vse=True — вместе с уволенными: только для имён в отчётах за прошлые дни."""
     try:
-        return json.loads(db.get_setting("call_admins") or "[]")
+        admins = json.loads(db.get_setting("call_admins") or "[]")
     except ValueError:
         return []
+    return admins if vse else [a for a in admins if a.get("managerId") not in UVOLENY]
 
 
 def _admins_today() -> list[dict]:
@@ -2496,13 +2505,14 @@ def _duty_manager() -> int:
     try:
         sched = _json.loads(db.get_setting("admin_schedule", "") or "{}")
         v = sched.get(str(_today()))
-        if isinstance(v, list) and v:
-            return int(v[0])
-        if v:
-            return int(v)
+        # 12.10.2026: в графике может остаться уволенная — её пропускаем
+        ids = [int(x) for x in (v if isinstance(v, list) else [v]) if x]
+        ids = [x for x in ids if x not in UVOLENY]
+        if ids:
+            return ids[0]
     except Exception:
         pass
-    return 232805
+    return 202856            # 12.10.2026: Аня (232805) уволена — запасная Лена
 
 
 def confirm_joins(mk: MoyklassClient) -> None:
@@ -2672,7 +2682,8 @@ def evening_recall(mk: MoyklassClient) -> None:
     n = len(missed)
     if not n:
         return
-    duty = _duty_manager() if "_duty_manager" in globals() else 232805
+    # 12.10.2026: Аня (232805) уволена — запасная Лена
+    duty = _duty_manager() if "_duty_manager" in globals() else 202856
     mk.post("/v1/company/tasks", {
         "managerIds": [duty], "categoryId": 44337,
         "beginDate": f"{_today()}T13:55:00+00:00",
@@ -4096,7 +4107,9 @@ def audit_yesterday() -> dict:
 # правила, переписка и организационное — на Лизе: у неё это основная работа,
 # а у них список обзвона иначе тонет в чужих делах.
 CHAT_ADMIN = 154181                       # Лиза
-CALL_ADMINS = {232763, 232805, 202856}    # Ира, Аня, Лена
+# 12.10.2026: Аня (232805) уволена — из звонящих убрана; в MANAGER_NAMES
+# остаётся, чтобы старые задачи и отчёты подписывались её именем.
+CALL_ADMINS = {232763, 202856}            # Ира, Лена
 MANAGER_NAMES = {84116: "Борис", 154181: "Лиза", 202856: "Лена",
                  229704: "Маша", 232763: "Ира", 232805: "Аня"}
 
@@ -4496,6 +4509,23 @@ def team_chat_tick() -> None:
     if not db.get_setting("anthropic_api_key"):
         return
     team = _team_phones()
+    # 12.10.2026: Аня уволена — в _team_phones остаётся (рассылка ей не уйдёт),
+    # но как сотруднице диспетчер ей больше не отвечает.
+    uvol = set()
+    try:
+        for mid, ph in json.loads(db.get_setting("admin_phones") or "{}").items():
+            if str(mid).isdigit() and int(mid) in UVOLENY and ph:
+                uvol.add(ph[-10:])
+        with db.get_conn() as conn:
+            for r in conn.execute("SELECT id, raw FROM managers").fetchall():
+                if r["id"] in UVOLENY:
+                    ph = "".join(c for c in str(json.loads(r["raw"] or "{}").get("phone") or "")
+                                 if c.isdigit())
+                    if len(ph) >= 10:
+                        uvol.add(ph[-10:])
+    except Exception:
+        pass
+    team = {p: n for p, n in team.items() if p not in uvol}
     if not team:
         return
     last = int(db.get_state("team_chat_last_id") or 0)

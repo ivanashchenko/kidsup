@@ -341,7 +341,7 @@ def _closed_without_touch(mk: MoyklassClient, day: str) -> dict:
 
 
 def check(mk: MoyklassClient, fix: bool = True) -> dict:
-    from .autopilot import _real_number
+    from .autopilot import _real_number, UVOLENY
 
     today = date.today().isoformat()
     tasks = _open_tasks(mk)
@@ -363,6 +363,16 @@ def check(mk: MoyklassClient, fix: bool = True) -> dict:
             if fix and _rewrite(mk, t, day=today,
                                 close_why="призрак поверх моего же закрытия"):
                 fixed["призрак"] += 1
+            continue
+
+        # 12.10.2026: Аня уволена — её открытые задачи не поднимаем на
+        # «сегодня» за ней, а отдаём дежурной: иначе каждое утро у неё в CRM
+        # «сегодняшние» задачи с клиентами, а сами клиенты не достаются никому.
+        if (t.get("managerIds") or [None])[0] in UVOLENY:
+            b = {**t, "beginDate": f"{today}T{msk_hour(t.get('beginDate'))}:00+03:00"} \
+                if cur and cur < today else t
+            if fix and _reassign(mk, b, _duty() or 202856):
+                fixed["уволенная → дежурной"] += 1
             continue
 
         # Срочность живёт часы. Стоящая в будущем срочная задача — либо

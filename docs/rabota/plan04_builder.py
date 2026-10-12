@@ -2,7 +2,9 @@
 """План на пятницу 04.09 для Ани и Иры: проблемы и прогресс четырёх дней 31.08–03.09,
 срочные поручения Бориса (робототехника 1/2 раза в неделю, шахматы и робототехника
 сегодня не идут), дожим, реактивация, хвосты инбокса."""
-import json, re, html as H, collections, base64, urllib.request
+import json, re, html as H, collections, base64, urllib.request, os, sys
+# 12.10.2026: зашитый пароль убран (Аня уволена, общий пароль меняется) — только из окружения
+PASS = os.environ.get("KIDSUP_ADMIN_PASS") or sys.exit("задайте KIDSUP_ADMIN_PASS — пароль app.kidsup.ru")
 BASE = "/home/user/kidsup/docs/rabota"
 D = json.load(open(f"{BASE}/den_0409.json"))
 Dn = json.load(open(f"{BASE}/den_0309.json"))
@@ -15,7 +17,7 @@ A_ = "<span class='w w-a'>Аня</span>"; I_ = "<span class='w w-i'>Ира</span
 short = lambda g: re.sub(r"^2627_", "", g or "")
 
 def api(path):
-    req = urllib.request.Request("https://app.kidsup.ru" + path, headers={"Authorization": "Basic " + base64.b64encode(b"admin:CGWstart8*").decode()})
+    req = urllib.request.Request("https://app.kidsup.ru" + path, headers={"Authorization": "Basic " + base64.b64encode(("admin:" + PASS).encode()).decode()})
     return json.load(urllib.request.urlopen(req, timeout=30))
 inbox03 = api("/api/plan/inbox?day=2026-09-03")
 inbox03 = inbox03 if isinstance(inbox03, list) else inbox03.get("items", [])

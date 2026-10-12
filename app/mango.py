@@ -312,8 +312,9 @@ _API = "https://app.kidsup.ru/api/settings"
 
 
 def _srv_auth():
+    # 12.10.2026: зашитый пароль убран (Аня уволена, пароль меняется)
     from . import db
-    return ("admin", db.get_setting("admin_pass", "CGWstart8*"))
+    return db.admin_auth()
 
 
 def parsed() -> set[str]:

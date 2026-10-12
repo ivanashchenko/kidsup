@@ -32,7 +32,11 @@ from . import db
 MSK = ZoneInfo("Europe/Moscow")
 API = "https://app.mango-office.ru/vpbx"
 PORTAL = "https://app.kidsup.ru"
-AUTH = ("admin", os.environ.get("APP_PASSWORD", "CGWstart8*"))
+# 12.10.2026: Аня уволена, пароль меняется — зашитое умолчание убрано.
+# Пароль берётся при запросе (db.admin_auth: APP_PASSWORD / admin_pass /
+# KIDSUP_ADMIN_PASS), чтобы без него модуль хотя бы импортировался.
+def _auth() -> tuple[str, str]:
+    return db.admin_auth()
 
 # Добавочные 20 и 21 — «Клуб Буракова», чужой центр в том же здании.
 # Их разговоры не наши: не скачиваем, не расшифровываем, не считаем.
@@ -44,8 +48,12 @@ PARTNER = {"20"}  # Надежда, Клуб Буракова — звонит �
 # приписывает звонки человеку, которого нет на смене, — и статистика,
 # и замечания уходят не тому. Поэтому карта только подсказка, а решает
 # график смен: см. who_for_ext().
-EXT_DEFAULT = {"10": "Ира", "12": "Лена", "15": "Аня", "20": "Надежда"}
-MANAGER_BY_NAME = {"Ира": 232763, "Лена": 202856, "Аня": 232805,
+# 12.10.2026: Аня уволена — доб.15 (её ноутбук) больше ничей: звонок с него
+# подписываем добавочным (ключ оставлен, чтобы day_report его считал), а её
+# id в графике сменой не считаем. who_for_ext зовут только на сегодня —
+# старые разборы это не переписывает.
+EXT_DEFAULT = {"10": "Ира", "12": "Лена", "15": "доб.15", "20": "Надежда"}
+MANAGER_BY_NAME = {"Ира": 232763, "Лена": 202856,
                    "Маша": 229704, "Лиза": 154181}
 
 
@@ -53,7 +61,7 @@ def _schedule() -> dict:
     """График смен. Сначала с прода: разбор часто идёт из контейнера, где
     локальная база отстаёт на неделю и графика в ней просто нет."""
     try:
-        r = httpx.get(f"{PORTAL}/api/settings", auth=AUTH, timeout=60)
+        r = httpx.get(f"{PORTAL}/api/settings", auth=_auth(), timeout=60)
         s = json.loads(r.json().get("admin_schedule") or "{}")
         if s:
             return s
@@ -188,7 +196,7 @@ def done_ids() -> set[str]:
     """Разобранные записи. Читаем с прода: локальный каталог не переживает
     перезапуск контейнера, а настройка переживает."""
     try:
-        r = httpx.get(f"{PORTAL}/api/settings", auth=AUTH, timeout=90)
+        r = httpx.get(f"{PORTAL}/api/settings", auth=_auth(), timeout=90)
         return set(json.loads(r.json().get("calls_done") or "[]"))
     except Exception:
         try:
@@ -201,7 +209,7 @@ def mark_done(ids) -> int:
     cur = done_ids() | {str(i) for i in ids if i}
     out = sorted(cur)
     json.dump(out, open(f"{SP}/calls_done.json", "w"))
-    httpx.post(f"{PORTAL}/api/settings", auth=AUTH, timeout=90,
+    httpx.post(f"{PORTAL}/api/settings", auth=_auth(), timeout=90,
                json={"key": "calls_done", "value": json.dumps(out)})
     return len(out)
 
@@ -292,12 +300,12 @@ def mark_touched(days: int = 10) -> int:
         if len(d) == 10:
             phones.add(d)
     try:
-        cur = json.loads(httpx.get(f"{PORTAL}/api/settings", auth=AUTH, timeout=60)
+        cur = json.loads(httpx.get(f"{PORTAL}/api/settings", auth=_auth(), timeout=60)
                          .json().get("called_phones") or "[]")
     except Exception:
         cur = []
     out = sorted(set(cur) | phones)
-    httpx.post(f"{PORTAL}/api/settings", auth=AUTH, timeout=90,
+    httpx.post(f"{PORTAL}/api/settings", auth=_auth(), timeout=90,
                json={"key": "called_phones", "value": json.dumps(out)})
     return len(out)
 

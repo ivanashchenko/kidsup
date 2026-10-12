@@ -209,6 +209,24 @@ def get_setting(key: str, default: str = "") -> str:
     return env or default
 
 
+def admin_auth() -> tuple[str, str]:
+    """Логин и пароль для запросов служебных модулей к app.kidsup.ru.
+
+    12.10.2026: Аня уволена, общий пароль admin знали все админы — Борис его
+    меняет. Раньше пароль был зашит в код значением по умолчанию; теперь
+    сначала config.APP_PASSWORD (на сервере это ровно тот пароль, который
+    проверяет вход, — после смены он не устареет), затем настройка
+    admin_pass (или KIDSUP_ADMIN_PASS в окружении) — для контейнера разбора.
+    Нет ни того, ни другого — понятная ошибка в момент запроса, а не при
+    импорте: остальное приложение продолжает работать.
+    """
+    pw = config.APP_PASSWORD or get_setting("admin_pass", "")
+    if not pw:
+        raise RuntimeError("пароль app.kidsup.ru не задан: настройка admin_pass, "
+                           "KIDSUP_ADMIN_PASS или APP_PASSWORD")
+    return ("admin", pw)
+
+
 def set_setting(key: str, value: str) -> None:
     with get_conn() as conn:
         conn.execute(

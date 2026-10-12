@@ -20,10 +20,13 @@ SALT = db.get_setting("mango_salt")
 # 08.09.2026: контейнер откатили — локальная база с ключами Манго пропала, и
 # разбор встал. Если ключей нет, идём через сервер: /api/calls/list и
 # /api/calls/recording подписывают запрос своим ключом. Пароль — из окружения
-# (KIDSUP_ADMIN_PASS) или общий админский.
+# (KIDSUP_ADMIN_PASS). 12.10.2026: зашитый общий пароль убран — его знала
+# уволенная Аня, Борис его меняет.
 SERVER = os.environ.get("KIDSUP_SERVER", "https://app.kidsup.ru")
-AUTH = ("admin", os.environ.get("KIDSUP_ADMIN_PASS", "CGWstart8*"))
+AUTH = ("admin", os.environ.get("KIDSUP_ADMIN_PASS", ""))
 VIA_SERVER = not (KEY and SALT)
+if VIA_SERVER and not AUTH[1]:
+    sys.exit("нет ключей Манго и не задан KIDSUP_ADMIN_PASS — через сервер не пройти")
 
 
 def _get(url, **kw):

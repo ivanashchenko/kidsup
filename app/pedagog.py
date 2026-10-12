@@ -127,7 +127,9 @@ def save(payload: dict) -> dict:
         from . import autopilot
         names = {202856: "Лена", 232805: "Аня", 232763: "Ира", 154181: "Лиза"}
         duty = autopilot._admins_today() or []
-        who = names.get((duty[0] or {}).get("managerId"), "Аня") if duty else "Аня"
+        # 12.10.2026: Аня уволена — запасная теперь Лена (имя Ани в names
+        # оставлено для старых записей)
+        who = names.get((duty[0] or {}).get("managerId"), "Лена") if duty else "Лена"
         with db.get_conn() as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS plan_inbox (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT,
                             who TEXT, text TEXT, phone TEXT, source TEXT, done INTEGER DEFAULT 0)""")

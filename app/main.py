@@ -1708,7 +1708,8 @@ def callaudit_page(request: Request):
         by_user[uid] = {"date": (t.get("beginDate") or "")[:10],
                         "manager": (t.get("managerIds") or [None])[0],
                         "done": bool(t.get("isComplete"))}
-    names = {a["managerId"]: a["name"] for a in autopilot._admins()}
+    # 12.10.2026: _admins() не отдаёт уволенных — для подписей старых задач берём всех
+    names = {a["managerId"]: a["name"] for a in autopilot._admins(vse=True)}
     names[84116] = "Борис"
     names[154181] = "Лиза"
     rows = []
@@ -1765,7 +1766,8 @@ def journal_page(request: Request, day: str = ""):
     поимённо, без вебхуков и без входа в интерфейс.
     """
     d = day or autopilot._today().isoformat()
-    names = {a["managerId"]: a["name"] for a in autopilot._admins()}
+    # 12.10.2026: _admins() не отдаёт уволенных — журнал за прошлые дни подписываем всеми
+    names = {a["managerId"]: a["name"] for a in autopilot._admins(vse=True)}
     names.update({84116: "Борис", 154181: "Лиза"})
     rows = []
     with db.get_conn() as conn:
@@ -2618,6 +2620,9 @@ def api_pult_task_edit(payload: dict = Body(...)):
         sets.append("t=?"); args.append(str(payload.get("t") or "")[:5])
     # 24.09: перестановка по графику смен — задача уходит к тому, кто в смене.
     if str(payload.get("who") or "").strip():
+        # 12.10.2026: Аня уволена — задачи на неё не переставляем
+        if str(payload["who"]).strip()[:20] in pult.UVOLENY:
+            raise HTTPException(400, "Аня уволена 12.10.2026 — дело ставьте дежурной")
         sets.append("who=?"); args.append(str(payload["who"]).strip()[:20])
     if str(payload.get("day") or "").strip():
         sets.append("day=?"); args.append(str(payload["day"]).strip()[:10])
@@ -2660,6 +2665,10 @@ def api_pult_tasks_set(payload: dict = Body(...)):
     who = str(payload.get("who") or "").strip()
     if not who:
         raise HTTPException(400, "who обязателен")
+    # 12.10.2026: Аня уволена. Перенаправлять нельзя — replace=True стёр бы
+    # чужую колонку, поэтому отказ с понятной причиной.
+    if who in pult.UVOLENY:
+        raise HTTPException(400, "Аня уволена 12.10.2026 — дело ставьте дежурной")
     n = pult.set_tasks(d, who, payload.get("items") or [], bool(payload.get("replace", True)))
     return {"ok": True, "day": d, "who": who, "задач": n}
 
@@ -3105,7 +3114,8 @@ def _msg_to_crm(phone: str, chat_type: str) -> None:
         with db.get_conn() as conn:
             _inbox_init(conn)
             now = autopilot._now()
-            who = (autopilot._admins_today() or autopilot._admins() or [{}])[0].get("name") or "Аня"
+            # 12.10.2026: Аня уволена — запасная теперь Лена
+            who = (autopilot._admins_today() or autopilot._admins() or [{}])[0].get("name") or "Лена"
             conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) VALUES (?,?,?,?,?,?)",
                          (now.date().isoformat(), now.isoformat(timespec="minutes"),
                           {"Анна Инкина": "Аня", "Елена Кузнецова": "Лена",
@@ -3515,21 +3525,24 @@ def api_obzvon():
     return obzvon.spisok()
 
 
+# 12.10.2026: Аня уволена — без who страница открывалась на её колонке.
+# Теперь по умолчанию дежурная сегодня (autopilot._duty_name, запасная — Лена).
+# Явный who=Аня по-прежнему открывает её старые дни: это история.
 @app.get("/obzvon-dnya", response_class=HTMLResponse, dependencies=AUTH)
-def obzvon_dnya_page(request: Request, day: str = "", who: str = "Аня"):
+def obzvon_dnya_page(request: Request, day: str = "", who: str = ""):
     """Обзвон дня: звонки одного админа из Пульта одной лентой, с итогом звонка."""
     from . import obzvon_dnya, autopilot
     d = day[:10] or autopilot._today().isoformat()
-    who = who if who in KOLONKI_PULTA else "Аня"
+    who = who if who in KOLONKI_PULTA else (autopilot._duty_name() or "Лена")
     return render(request, "obzvon_dnya.html", active="obzvon_dnya", d=obzvon_dnya.spisok(d, who))
 
 
 @app.get("/api/obzvon-dnya", dependencies=AUTH)
-def api_obzvon_dnya(day: str = "", who: str = "Аня"):
+def api_obzvon_dnya(day: str = "", who: str = ""):
     """Те же данные машинным форматом — страница подтягивает их раз в 3 минуты."""
     from . import obzvon_dnya, autopilot
     d = day[:10] or autopilot._today().isoformat()
-    return obzvon_dnya.spisok(d, who if who in KOLONKI_PULTA else "Аня")
+    return obzvon_dnya.spisok(d, who if who in KOLONKI_PULTA else (autopilot._duty_name() or "Лена"))
 
 
 @app.post("/api/obzvon-dnya/itog", dependencies=AUTH)
@@ -4686,7 +4699,9 @@ def _lead_to_crm(lead: dict) -> None:
     # Кто за какой трубкой. 28.08 16:00 Ира ушла с доб.12 (трубка глючит)
     # на доб.10; Аня — ноутбук доб.15. Менять здесь при каждой пересадке:
     # по этой карте мгновенный перезвон по заявке набирает дежурного.
-    MGR_EXT = {232763: "10", 232805: "15", 202856: "12"}
+    # 12.10.2026: Аня уволена — 232805/доб.15 убраны, чтобы АТС не набирала
+    # её ноутбук с заявкой клиента.
+    MGR_EXT = {232763: "10", 202856: "12"}
     try:
         from . import mango as _mango
         hour = autopilot._now().hour
@@ -6460,6 +6475,10 @@ def api_plan_inbox_add(payload: dict = Body(...)):
     who = str(payload.get("who") or "").strip()[:20]
     if who and who not in KOLONKI_PULTA:
         raise HTTPException(400, f"колонки «{who}» на пульте нет: {', '.join(sorted(KOLONKI_PULTA))}")
+    # 12.10.2026: Аня уволена — пункт на её имя (старые рутины) отдаём дежурной
+    from .pult import UVOLENY
+    if who in UVOLENY:
+        who = ""
     if not who:
         who = autopilot._duty_name()
     # 08.10.2026: предел 400 → 700. Метка сегмента обзвона («С5 · Думают — свежие: »)
@@ -6527,6 +6546,10 @@ def api_plan_inbox_move(payload: dict = Body(...)):
     ids = [int(x) for x in (payload.get("ids") or []) if str(x).isdigit()]
     if not to_who and not to_day:
         raise HTTPException(400, "нужно to_who и/или to_day")
+    # 12.10.2026: Аня уволена — переносить дела ей нельзя (с неё — можно)
+    from .pult import UVOLENY
+    if to_who in UVOLENY:
+        raise HTTPException(400, "Аня уволена 12.10.2026 — дело ставьте дежурной")
     sets, args = [], []
     if to_who:
         sets.append("who=?"); args.append(to_who)
@@ -9566,7 +9589,11 @@ async def ochered_page(manager: int = 0):
             mid = (v[0] if isinstance(v, list) else v) or 0
         except Exception:
             mid = 0
-    mid = mid or 232805
+        # 12.10.2026: Аня (232805) уволена — если она осталась в графике,
+        # очередь берём у дежурной по autopilot (уволенных он пропускает)
+        if mid in autopilot.UVOLENY:
+            mid = autopilot._duty_manager()
+    mid = mid or 202856      # 12.10.2026: Аня (232805) уволена — запасная Лена
     try:
         rows = callqueue.collect(mid)
     except Exception as e:

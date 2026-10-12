@@ -42,7 +42,7 @@ CHAT_ADMIN = 154181
 # Статус записи «Пробное занятие» — в этом статусе ребёнок попадает в
 # группу как гость, а не как оплативший ученик.
 JOIN_TRIAL = 58132
-DUTY = 232805
+DUTY = 202856  # 12.10.2026: Аня (232805) уволена — запасная Лена
 # Часы работы центра по Москве: с 9:00 до 20:00. Сообщение, пришедшее
 # в девять вечера, читается как беспокойство, а ответить на него всё
 # равно некому — администратор уже ушёл.
@@ -62,9 +62,10 @@ def _auto_join() -> bool:
 
 def _inbox(who: str, text: str, phone: str, source: str) -> None:
     """Дело для админа в блок «Появилось за день» (задачи в CRM не создаём)."""
+    # 12.10.2026: пароль больше не зашит — db.admin_auth() (Аня уволена, пароль меняется)
     try:
         httpx.post("https://app.kidsup.ru/api/plan/inbox",
-                   auth=("admin", db.get_setting("admin_pass", "CGWstart8*")),
+                   auth=db.admin_auth(),
                    json={"who": who, "text": text[:400], "phone": phone,
                          "source": source[:40]}, timeout=60)
     except Exception as e:  # noqa: BLE001
@@ -75,7 +76,7 @@ def _duty_name() -> str:
     """Имя дежурной на сегодня; не достучались — кладём Лене."""
     try:
         r = httpx.get("https://app.kidsup.ru/api/duty",
-                      auth=("admin", db.get_setting("admin_pass", "CGWstart8*")),
+                      auth=db.admin_auth(),
                       timeout=60).json()
         full = ((r.get("duty") or [{}])[0].get("name") or "").split()
         return full[0] if full else "Лена"
@@ -172,7 +173,7 @@ NEG_RE = re.compile(r"не\s+подход|не\s+смож|не\s+получ|не
 def _dialogs(day: str | None = None) -> list[dict]:
     day = day or date.today().isoformat()
     r = httpx.get(f"https://app.kidsup.ru/api/dialogs?day={day}",
-                  auth=("admin", db.get_setting("admin_pass", "CGWstart8*")),
+                  auth=db.admin_auth(),
                   timeout=120)
     d = r.json()
     return d if isinstance(d, list) else (d.get("dialogs") or [])

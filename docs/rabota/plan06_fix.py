@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """Коррекция плана на воскресенье 06.09 по фактам субботы: звонки Манго по добавочным,
 покрытие списков плана, оплаты и записи в CRM, явка, инбокс, чаты без ответа."""
-import re, json, html as H, collections, urllib.request, base64
+import re, json, html as H, collections, urllib.request, base64, os, sys
+# 12.10.2026: зашитый пароль убран (Аня уволена, общий пароль меняется) — только из окружения
+PASS = os.environ.get("KIDSUP_ADMIN_PASS") or sys.exit("задайте KIDSUP_ADMIN_PASS — пароль app.kidsup.ru")
 B = "/home/user/kidsup"
 esc = lambda x: H.escape(str(x or ""))
 p05 = open(f"{B}/docs/plan_05sen.html", encoding="utf-8").read()
@@ -29,7 +31,7 @@ talked = {p for p, v in dialed.items() if max(x["dur"] for x in v) >= 30}
 lessons = json.load(open(f"{B}/docs/rabota/lessons_0609.json"))
 pays = json.load(open(f"{B}/docs/rabota/pays_0509.json"))
 crm = json.load(open(f"{B}/docs/rabota/crm_0509.json"))
-req = urllib.request.Request("https://app.kidsup.ru/api/plan/inbox?day=2026-09-05", headers={"Authorization": "Basic " + base64.b64encode(b"admin:CGWstart8*").decode()})
+req = urllib.request.Request("https://app.kidsup.ru/api/plan/inbox?day=2026-09-05", headers={"Authorization": "Basic " + base64.b64encode(("admin:" + PASS).encode()).decode()})
 ib = json.load(urllib.request.urlopen(req, timeout=30)); ib = ib if isinstance(ib, list) else ib.get("items", [])
 open_ib = [x for x in ib if not x.get("done") and x.get("who") in ("Аня", "Ира", "Лиза")]
 

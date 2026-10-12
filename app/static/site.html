@@ -398,7 +398,6 @@ body.js .reveal.in{opacity:1;transform:none}
 .v-item figcaption{font-size:.8rem;color:var(--muted);margin-top:.45rem;max-width:238px}
 
 .av-founder img{object-position:50% 30%}
-.av-anya img{object-position:50% 30%;transform:scale(1.12);transform-origin:50% 35%}
 .av-lena img{object-position:50% 40%}
 
 .vfx{position:relative;flex:0 0 auto;display:flex;flex-direction:column;
@@ -1097,8 +1096,6 @@ body.js .reveal.in{opacity:1;transform:none}
     <p style="color:var(--muted)">Заявка не уходит «в отдел продаж» — вам перезвонит
     один из наших администраторов. Они в центре каждый день и знают каждую группу.</p>
     <div class="t-grid">
-      <div class="tcard reveal"><span class="av av-anya"><img src="/static/img/adm_anya.jpg" alt="Аня" loading="lazy"></span>
-        <h3>Аня</h3><p>Знает расписание наизусть и подберёт группу за один звонок.</p></div>
       <div class="tcard reveal"><span class="av"><img src="/static/img/adm_ira.jpg" alt="Ира" loading="lazy"></span>
         <h3>Ира</h3><p>Ответит на вопросы по оплате и абонементам.</p></div>
       <div class="tcard reveal"><span class="av av-lena"><img src="/static/img/adm_lena.jpg" alt="Лена" loading="lazy"></span>
@@ -1689,7 +1686,7 @@ document.getElementById('lead').addEventListener('submit', async e => {
       try { window.roistat && window.roistat.event && window.roistat.event.send('lead'); } catch (_) {}
       e.target.setAttribute('role', 'status'); e.target.setAttribute('aria-live', 'polite');
       e.target.innerHTML = '<div class="done"><h3>✅ Заявка отправлена!</h3>' +
-        '<p>Вам перезвонит администратор — Аня, Лена или Ира — в рабочие часы обычно в течение 15 минут. Если удобнее вечером, просто скажите ей об этом.</p>' +
+        '<p>Вам перезвонит администратор — Лена или Ира — в рабочие часы обычно в течение 15 минут. Если удобнее вечером, просто скажите ей об этом.</p>' +
         '<p>Не хочется ждать звонка? Напишите нам:</p>' +
         '<a class="btn btn-green" href="https://app.kidsup.ru/go/whatsapp?src=site" target="_blank" rel="noopener">WhatsApp</a>' +
         '<a class="btn btn-line" href="https://app.kidsup.ru/go/telegram?src=site" target="_blank" rel="noopener">Telegram</a>' +

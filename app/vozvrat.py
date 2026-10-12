@@ -14,7 +14,7 @@
 сменам: пункт в инбокс на семью — что за семья, что уже было, какую группу
 с местами и на какие даты предлагать. Сколько в день — настройка
 vozvrat_v_den (по умолчанию 24), кому — дежурные из vozvrat_kto
-(по умолчанию Аня, Ира и Лена: «думает» — дожим после разговора, это Лене;
+(по умолчанию Лена и Ира — Аня уволена 12.10.2026: «думает» — дожим после разговора, это Лене;
 «недозвон» и база — дежурным).
 
 Предложение строится по живым местам (mesta.razrez): только группы, где
@@ -502,9 +502,11 @@ def spiski() -> dict:
 def _kto(day: str) -> list[str]:
     from . import pult
     dezh = pult.duty(day)
-    hotim = [x.strip() for x in (db.get_setting("vozvrat_kto", "Аня,Ира,Лена") or "").split(",") if x.strip()]
+    # 12.10.2026: Аня уволена — из умолчаний убрана, запасная Лена.
+    # Живое значение vozvrat_kto лежит в настройках, его правит Борис.
+    hotim = [x.strip() for x in (db.get_setting("vozvrat_kto", "Лена,Ира") or "").split(",") if x.strip()]
     svoi = [x for x in dezh if x in hotim]
-    return svoi or [x for x in dezh if x != "Лиза"] or ["Аня"]
+    return svoi or [x for x in dezh if x != "Лиза"] or ["Лена"]
 
 
 def _tekst(r: dict) -> str:
@@ -528,9 +530,11 @@ def _tekst(r: dict) -> str:
 def _kvoty(kto: list[str], n: int) -> dict[str, int]:
     """Сколько звонков каждому в смене. 28.09 Борис: «Ане по 50 — она быстро
     прозванивает». Фиксированные порции — настройка vozvrat_kvota («Аня:50»);
-    остальным — поровну из vozvrat_v_den (24 на двоих, 14 одному)."""
+    остальным — поровну из vozvrat_v_den (24 на двоих, 14 одному).
+    12.10.2026: Аня уволена — умолчание пустое, все в смене делят поровну;
+    фиксированную порцию кому-то задаёт Борис в настройке."""
     kv: dict[str, int] = {}
-    for part in (db.get_setting("vozvrat_kvota", "Аня:50") or "").split(","):
+    for part in (db.get_setting("vozvrat_kvota", "") or "").split(","):
         k, _, v = part.partition(":")
         if k.strip() and v.strip().isdigit():
             kv[k.strip()] = int(v)

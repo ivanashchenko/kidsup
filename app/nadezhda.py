@@ -64,9 +64,10 @@ def _inbox(text: str, phone: str) -> None:
     """Дело для дежурной в блок «Появилось за день»."""
     import httpx
     from . import db as _db
+    # 12.10.2026: пароль больше не зашит — _db.admin_auth() (Аня уволена, пароль меняется)
     try:
         r = httpx.get("https://app.kidsup.ru/api/duty",
-                      auth=("admin", _db.get_setting("admin_pass", "CGWstart8*")),
+                      auth=_db.admin_auth(),
                       timeout=60).json()
         full = ((r.get("duty") or [{}])[0].get("name") or "").split()
         who = full[0] if full else "Лена"
@@ -74,7 +75,7 @@ def _inbox(text: str, phone: str) -> None:
         who = "Лена"
     try:
         httpx.post("https://app.kidsup.ru/api/plan/inbox",
-                   auth=("admin", _db.get_setting("admin_pass", "CGWstart8*")),
+                   auth=_db.admin_auth(),
                    json={"who": who, "text": text[:400], "phone": phone,
                          "source": "звонок Надежды"}, timeout=60)
     except Exception as e:  # noqa: BLE001
