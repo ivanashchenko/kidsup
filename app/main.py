@@ -3829,6 +3829,19 @@ def bez_oplaty_page():
     return HTMLResponse(p.read_text(encoding="utf-8"))
 
 
+@app.get("/ne-oplatili", response_class=HTMLResponse, dependencies=AUTH)
+def ne_oplatili_page():
+    """Отдельная таблица «кто ещё не оплатил за октябрь и почему» (Борис, 13.10 01:30):
+    дети в группах без оплаченного абонемента на остаток месяца, причина и действие на день,
+    логопед отдельно (платят за занятие). Статическая страница из docs/, пересборка —
+    okt/ne_oplatili_page.py по выгрузке МойКласса; статусы админов — /api/bez-oplaty/status
+    с тем же ключом uid:class_id, что и на /bez-oplaty."""
+    p = Path(__file__).resolve().parent.parent / "docs" / "rabota" / "kontrol" / "ne_oplatili_oktyabr.html"
+    if not p.exists():
+        raise HTTPException(404, "таблица ещё не собрана")
+    return HTMLResponse(p.read_text(encoding="utf-8"))
+
+
 def _bez_oplaty_status_init(conn) -> None:
     conn.execute("CREATE TABLE IF NOT EXISTS bez_oplaty_status (key TEXT PRIMARY KEY, text TEXT, who TEXT, ts TEXT)")
 
