@@ -2972,25 +2972,37 @@ def _wz_contact_phones(payload: dict) -> dict:
 
     Это contact.phone входящего сообщения (у Telegram; его же читает tvoyklass)
     и contactData[].phone в событиях о контактах. Наши ответы (isEcho) не берём:
-    чей там contact, по вебхуку не проверить. Номер — от десяти цифр, в виде
-    chatId WhatsApp (7XXXXXXXXXX), чтобы совпадал с остальной перепиской семьи."""
+    чей там contact, по вебхуку не проверить. Номер — в виде chatId WhatsApp
+    (79XXXXXXXXX), чтобы совпадал с остальной перепиской семьи."""
     from .wazzup import _msisdn
     out: dict = {}
 
     def _take(ct, cid, raw) -> None:
-        ct, cid, p = str(ct or "").lower(), str(cid or ""), _msisdn(raw or "")
-        if ct and cid and len(p) >= 10 and ct not in ("whatsapp", "telegroup", "whatsgroup"):
+        ct, cid, p = str(ct or "").lower(), str(cid or ""), _msisdn(str(raw or ""))
+        # 14.10, ревью: только российский мобильный — 11 цифр, 79… (как
+        # otkaz._is_phone). Дальше по цепочке берут последние десять цифр и
+        # приписывают +7: иностранный +380… или городской без кода страны
+        # стал бы в автокарточке CRM чужим номером. Telegram и MAX и так
+        # регистрируют аккаунт по мобильному.
+        if ct and cid and len(p) == 11 and p.startswith("79") \
+                and ct not in ("whatsapp", "telegroup", "whatsgroup"):
             out[(ct, cid)] = p
 
-    for msg in payload.get("messages") or []:
-        if isinstance(msg, dict) and not msg.get("isEcho") and isinstance(msg.get("contact"), dict):
-            _take(msg.get("chatType"), msg.get("chatId"), msg["contact"].get("phone"))
-    for key in ("contacts", "createContact"):
-        block = payload.get(key)
-        for c in (block if isinstance(block, list) else [block]):
-            for cd in ((c.get("contactData") or []) if isinstance(c, dict) else []):
-                if isinstance(cd, dict):
-                    _take(cd.get("chatType"), cd.get("chatId"), cd.get("phone"))
+    # 14.10, ревью: кривое событие (contactData не список и т. п.) не должно
+    # ронять запись всех сообщений события — берём то, что успели разобрать.
+    try:
+        for msg in payload.get("messages") or []:
+            if isinstance(msg, dict) and not msg.get("isEcho") and isinstance(msg.get("contact"), dict):
+                _take(msg.get("chatType"), msg.get("chatId"), msg["contact"].get("phone"))
+        for key in ("contacts", "createContact"):
+            block = payload.get(key)
+            for c in (block if isinstance(block, list) else [block]):
+                cds = c.get("contactData") if isinstance(c, dict) else None
+                for cd in (cds if isinstance(cds, list) else []):
+                    if isinstance(cd, dict):
+                        _take(cd.get("chatType"), cd.get("chatId"), cd.get("phone"))
+    except Exception:  # noqa: BLE001
+        logging.getLogger("kidsup.wazzup").warning("номер из события не разобран", exc_info=True)
     return out
 
 
@@ -3006,9 +3018,80 @@ def _chat_id_phone(chat_type: str, digits: str) -> str:
     # (otkaz._is_phone и наряд принимают его за номер) и дальше по цепочке
     # становится +79… — чужим номером, по которому наряд позовёт звонить,
     # а автокарточка запишет в CRM.
+    # 14.10, ревью: опасна не только девятка. Id на 3, 4 и 8 (у новых
+    # Telegram-аккаунтов 8XXXXXXXXX) autopilot._real_number тоже считает
+    # номером, и после клика по кнопке Telegram _msg_to_crm может завести
+    # карточку «+78…». Так было и до 14.10; пульт теперь берёт канал из
+    # chat_type, а не из вида номера. Перевести и эти id в «без номера» —
+    # отдельная задача.
     if len(digits) == 10 and digits[0] != "9":
         return digits
     return ""
+
+
+def _wz_tables(conn) -> None:
+    """wazzup_inbox и wazzup_outbox — создать, если базы ещё нет, и добавить колонки."""
+    conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_inbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+        chat_type TEXT, text TEXT, message_id TEXT UNIQUE)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_outbox (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
+        message_id TEXT UNIQUE, text TEXT)""")
+    for ddl in ("ALTER TABLE wazzup_outbox ADD COLUMN author_id TEXT",
+                "ALTER TABLE wazzup_outbox ADD COLUMN author_name TEXT",
+                "ALTER TABLE wazzup_outbox ADD COLUMN message_id TEXT",
+                "ALTER TABLE wazzup_outbox ADD COLUMN text TEXT"):
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass
+
+
+def _chat_to_phone(conn, ct: str, cid: str, phone: str) -> None:
+    """Номер чата мессенджера стал известен — переносим под него то, что уже
+    лежит по этому чату (14.10, ревью).
+
+    Без переноса переписка рвалась надвое. Вопрос, пришедший без номера,
+    оставался в wazzup_inbox_nophone, а чат со связкой из блока «без номера»
+    уходит — если номер принёс не новый вопрос, а событие createContact,
+    вопрос пропадал и оттуда, и из основного списка. А десятизначный id чата
+    до 14.10 сам писался в wazzup_inbox/outbox как «телефон»: наш ответ под
+    настоящим номером старое входящее не закрывал (висело «без ответа» до двух
+    суток), а первое сообщение под номером считалось первым в чате и могло
+    сопоставиться с чужим кликом по кнопке.
+
+    Переносятся только записи: автокарточка, otkaz и разбор визита по ним не
+    запускаются — это не новые сообщения. Клик сопоставляем, только если первое
+    перенесённое входящее моложе CLICK_MATCH_MINUTES: так номер, пришедший
+    событием сразу после первого сообщения, не теряет заявку с кнопки."""
+    from . import autopilot
+    _wz_tables(conn)
+    d = "".join(ch for ch in cid if ch.isdigit())
+    # номер-chatId MAX (7/8+9…) — настоящий номер, его не трогаем
+    if len(d) >= 10 and d != phone and not (len(d) == 11 and d[0] in "78" and d[1] == "9"):
+        conn.execute("UPDATE wazzup_inbox SET phone=? WHERE phone=? AND lower(chat_type)=?",
+                     (phone, d, ct))
+        conn.execute("UPDATE wazzup_outbox SET phone=? WHERE phone=?", (phone, d))
+    moved = conn.execute(
+        "SELECT ts, text, message_id, is_echo, author_id, author_name FROM wazzup_inbox_nophone "
+        "WHERE chat_type=? AND chat_id=? ORDER BY ts, id", (ct, cid)).fetchall()
+    if not moved:
+        return
+    for ts, text, mid, echo, aid, aname in moved:
+        if echo:
+            conn.execute(
+                "INSERT OR IGNORE INTO wazzup_outbox (ts, phone, message_id, text, "
+                "author_id, author_name) VALUES (?, ?, ?, ?, ?, ?)",
+                (ts, phone, mid, text, aid or "", aname or ""))
+        else:
+            conn.execute(
+                "INSERT OR IGNORE INTO wazzup_inbox (ts, phone, chat_type, text, message_id) "
+                "VALUES (?, ?, ?, ?, ?)", (ts, phone, ct, text, mid))
+    conn.execute("DELETE FROM wazzup_inbox_nophone WHERE chat_type=? AND chat_id=?", (ct, cid))
+    first_in = next((r for r in moved if not r[3]), None)
+    border = (autopilot._now() - timedelta(minutes=CLICK_MATCH_MINUTES)).isoformat(timespec="seconds")
+    if first_in and str(first_in[0] or "") >= border:
+        _match_click(conn, first_in[0], phone, ct)
 
 
 def _inbox_store(payload: dict) -> None:
