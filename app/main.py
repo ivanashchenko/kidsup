@@ -3024,62 +3024,63 @@ def _inbox_store(payload: dict) -> None:
             continue
         if str(msg.get("chatId") or ""):
             msgs.append(msg)
-    pairs = _wz_contact_phones(payload)
-    if not msgs and not pairs:
-        return
+    # 14.10: у WhatsApp chatId и есть номер — как было, база не нужна. У
+    # мессенджеров номер — из события, затем запомненный по этому чату,
+    # затем сам chatId (_chat_id_phone); нет нигде — чат идёт без телефона.
+    known = _wz_contact_phones(payload)
+    chats = {((m.get("chatType") or "").lower(), str(m.get("chatId") or "")) for m in msgs}
+    chats = {c for c in chats if c[0] not in ("whatsapp", "") and c not in known}
+    if known or chats:
+        with db.get_conn() as conn:
+            _nophone_init(conn)
+            now_ts = autopilot._now().isoformat(timespec="seconds")
+            for (ct, cid), p in known.items():
+                conn.execute(
+                    "INSERT INTO wazzup_chat_phone (chat_type, chat_id, phone, ts) VALUES (?, ?, ?, ?) "
+                    "ON CONFLICT(chat_type, chat_id) DO UPDATE SET phone=excluded.phone, ts=excluded.ts",
+                    (ct, cid, p, now_ts))
+            for ct, cid in chats:
+                r = conn.execute("SELECT phone FROM wazzup_chat_phone WHERE chat_type=? AND chat_id=?",
+                                 (ct, cid)).fetchone()
+                if r and r[0]:
+                    known[(ct, cid)] = r[0]
     rows, echoes, nophone = [], [], []
+    for msg in msgs:
+        ct, cid = (msg.get("chatType") or "").lower(), str(msg.get("chatId") or "")
+        phone = ("" if ct in ("whatsapp", "") else known.get((ct, cid), "")) \
+            or _chat_id_phone(ct, "".join(ch for ch in cid if ch.isdigit()))
+        ts = autopilot._now().isoformat(timespec="seconds")
+        if not phone:
+            contact = msg.get("contact") if isinstance(msg.get("contact"), dict) else {}
+            ntext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
+            nophone.append((ts, ct[:12], cid[:64], str(contact.get("name") or "")[:80],
+                            ntext[:500], str(msg.get("messageId") or "") or None,
+                            1 if msg.get("isEcho") else 0,
+                            str(msg.get("authorId") or ""), str(msg.get("authorName") or "")))
+            continue
+        if msg.get("isEcho"):
+            etext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
+            # authorId — это managerId сотрудника в МойКлассе; у отправок
+            # через API его нет, и там остаётся только authorName «Admin».
+            # Без этого поля нельзя сказать, кто из админов писал клиенту:
+            # журнал вебхука хранит лишь последние 300 событий, то есть
+            # полдня, и считать по нему можно только задним числом.
+            echoes.append((ts, phone, str(msg.get("messageId") or ""), etext[:500],
+                           str(msg.get("authorId") or ""),
+                           str(msg.get("authorName") or "")))
+            continue
+        text = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
+        rows.append((ts, phone, (msg.get("chatType") or "")[:12], text[:500],
+                     str(msg.get("messageId") or "")))
+    if not rows and not echoes and not nophone:
+        return
     with db.get_conn() as conn:
-        _nophone_init(conn)
-        now_ts = autopilot._now().isoformat(timespec="seconds")
-        for (ct, cid), p in pairs.items():
-            conn.execute(
-                "INSERT INTO wazzup_chat_phone (chat_type, chat_id, phone, ts) VALUES (?, ?, ?, ?) "
-                "ON CONFLICT(chat_type, chat_id) DO UPDATE SET phone=excluded.phone, ts=excluded.ts",
-                (ct, cid, p, now_ts))
-        for msg in msgs:
-            ct, cid = (msg.get("chatType") or "").lower(), str(msg.get("chatId") or "")
-            digits = "".join(ch for ch in cid if ch.isdigit())
-            # 14.10: у WhatsApp chatId и есть номер — как было. У мессенджеров —
-            # номер из события, затем запомненный по этому чату, затем сам chatId.
-            phone = ""
-            if ct not in ("whatsapp", ""):
-                phone = pairs.get((ct, cid), "")
-                if not phone:
-                    known = conn.execute("SELECT phone FROM wazzup_chat_phone "
-                                         "WHERE chat_type=? AND chat_id=?", (ct, cid)).fetchone()
-                    phone = (known[0] if known else "") or ""
-            phone = phone or _chat_id_phone(ct, digits)
-            ts = autopilot._now().isoformat(timespec="seconds")
-            if not phone:
-                contact = msg.get("contact") if isinstance(msg.get("contact"), dict) else {}
-                ntext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
-                nophone.append((ts, ct[:12], cid[:64], str(contact.get("name") or "")[:80],
-                                ntext[:500], str(msg.get("messageId") or "") or None,
-                                1 if msg.get("isEcho") else 0,
-                                str(msg.get("authorId") or ""), str(msg.get("authorName") or "")))
-                continue
-            if msg.get("isEcho"):
-                etext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
-                # authorId — это managerId сотрудника в МойКлассе; у отправок
-                # через API его нет, и там остаётся только authorName «Admin».
-                # Без этого поля нельзя сказать, кто из админов писал клиенту:
-                # журнал вебхука хранит лишь последние 300 событий, то есть
-                # полдня, и считать по нему можно только задним числом.
-                echoes.append((ts, phone, str(msg.get("messageId") or ""), etext[:500],
-                               str(msg.get("authorId") or ""),
-                               str(msg.get("authorName") or "")))
-                continue
-            text = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
-            rows.append((ts, phone, (msg.get("chatType") or "")[:12], text[:500],
-                         str(msg.get("messageId") or "")))
         if nophone:
+            _nophone_init(conn)
             conn.executemany(
                 "INSERT OR IGNORE INTO wazzup_inbox_nophone (ts, chat_type, chat_id, contact_name, "
                 "text, message_id, is_echo, author_id, author_name) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", nophone)
-    if not rows and not echoes:
-        return
-    with db.get_conn() as conn:
         conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_inbox (
             id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
             chat_type TEXT, text TEXT, message_id TEXT UNIQUE)""")
