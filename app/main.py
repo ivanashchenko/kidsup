@@ -3190,6 +3190,13 @@ def _inbox_store(payload: dict) -> None:
                 "INSERT OR IGNORE INTO wazzup_inbox_nophone (ts, chat_type, chat_id, contact_name, "
                 "text, message_id, is_echo, author_id, author_name) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", nophone)
+            # 14.10, ревью: связка могла появиться между первым и вторым блоком
+            # (createContact в параллельном потоке) — дотягиваем в той же транзакции
+            for _ct, _cid in {(r[1], r[2]) for r in nophone}:
+                _r = conn.execute("SELECT phone FROM wazzup_chat_phone WHERE chat_type=? AND chat_id=?",
+                                  (_ct, _cid)).fetchone()
+                if _r and _r[0]:
+                    _chat_to_phone(conn, _ct, _cid, _r[0])
         _wz_tables(conn)
         if rows:
             conn.executemany(
@@ -4098,18 +4105,27 @@ def kontrol_oplat_page(day: str = ""):
 # 14.10.2026, Борис: ежедневная сверка честности — правки, удаления и проводки
 # задним числом в МойКлассе (app/sverka_chestnosti.py). Чтение — админу: его же
 # читает вечерняя рутина 21:00 вместо пометки «история действий: нет пароля».
+# 14.10, ревью: day принимается только как ГГГГ-ММ-ДД (раньше ?day=../lk_tokens
+# отдавал чужой файл), а прогон руками — только владельцу: проверяемые не должны
+# запускать проверку себя.
 @app.get("/api/sverka-chestnosti", dependencies=AUTH)
 def api_sverka_chestnosti(day: str = ""):
     from . import sverka_chestnosti
-    return sverka_chestnosti.load(day or None)
+    try:
+        return sverka_chestnosti.load(day or None)
+    except ValueError:
+        raise HTTPException(404, "нет такого дня")
 
 
-@app.post("/api/sverka-chestnosti/run", dependencies=AUTH)
+@app.post("/api/sverka-chestnosti/run", dependencies=OWNER_AUTH)
 def api_sverka_chestnosti_run(day: str = "", dry: int = 1):
-    """Прогон руками: dry=1 — только отчёт, dry=0 — ещё пункты в инбокс. Только чтение МойКласса."""
+    """Прогон руками: dry=1 — только отчёт (ничего не запоминает и не пишет),
+    dry=0 — как утренний: файл дня, лента, пункты в инбокс. Только чтение МойКласса."""
     from . import sverka_chestnosti
     try:
         return sverka_chestnosti.run(day or None, dry=bool(dry))
+    except ValueError:
+        raise HTTPException(400, "day: нужна дата ГГГГ-ММ-ДД")
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"sverka_chestnosti: {type(e).__name__}: {str(e)[:300]}")
 
@@ -4117,7 +4133,10 @@ def api_sverka_chestnosti_run(day: str = "", dry: int = 1):
 @app.get("/sverka-chestnosti", response_class=HTMLResponse, dependencies=AUTH)
 def sverka_chestnosti_page(day: str = ""):
     from . import sverka_chestnosti
-    return HTMLResponse(sverka_chestnosti.html(day or None))
+    try:
+        return HTMLResponse(sverka_chestnosti.html(day or None))
+    except ValueError:
+        raise HTTPException(404, "нет такого дня")
 
 
 @app.get("/sverka", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -4438,12 +4457,12 @@ def _wazzup_process(payload: dict) -> None:
     except Exception:
         logging.getLogger("kidsup.wazzup").exception("raw: не сохранилось")
     try:
+        from . import gruppy_chaty
+        gruppy_chaty.store(payload)
+    except Exception:
+        logging.getLogger("kidsup.gruppy").exception("групповой чат: не сохранилось")
+    try:
         _inbox_store(payload)
-        try:
-            from . import gruppy_chaty
-            gruppy_chaty.store(payload)
-        except Exception:
-            logging.getLogger("kidsup.gruppy").exception("групповой чат: не сохранилось")
     except Exception:
         logging.getLogger("kidsup.wazzup").exception("inbox: не сохранилось")
     if not wazzup_forward(payload):

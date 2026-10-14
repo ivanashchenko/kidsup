@@ -8,7 +8,7 @@
 
 1. ЖУРНАЛ ПРАВОК. Сервер хранит копию CRM и никогда не удаляет строки
    (db.upsert_rows — INSERT … ON CONFLICT DO UPDATE). Триггеры SQLite на UPDATE
-   платежей, абонементов, счетов, записей на занятия и баланса клиента пишут
+   платежей, абонементов, счетов и записей на занятия пишут
    старый и новый raw в таблицу izmeneniya при каждом синке (лёгкий — раз в
    5 минут). Так видно: сумма, дата, тип и автор платежа; цена, скидка,
    оплачено, статус абонемента; снятые отметки явки и списания за пропуск.
@@ -28,7 +28,8 @@ managerId никогда); refund — возврат, managerId всегда. П
 по своей природе — это не нарушение.
 
 Запуск: autopilot в 08:45 (после полного синка 07:00 и контроля оплат 08:30);
-руками — POST /api/sverka-chestnosti/run?day=&dry=1. Результат:
+руками — POST /api/sverka-chestnosti/run?day=&dry=1 (только владелец; dry ничего
+не запоминает). Результат:
 data/sverka_chestnosti/<день>.json, страница /sverka-chestnosti, флаги в ленте
 аномалий (kind «честность»), красные пункты — Борису в инбокс, CRM-правки — Лизе.
 Фамилии клиентов остаются на сервере; в репозиторий и в чаты — только сводка.
@@ -39,6 +40,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sqlite3
 import sys
 from collections import defaultdict
@@ -52,7 +54,21 @@ OKNO_DNEY = 45           # окно живой сверки на удалени�
 PODTVERZHDENIY_MAX = 60  # сколько кандидатов на удаление подтверждаем GET-ом за один прогон
 BALANS_POROG = 500.0     # расхождение тождества баланса, с которого разбираем клиента
 BALANS_MAX = 30          # сколько клиентов с расхождением проверяем живым API за прогон
+ZHURNAL_DNEY = 90        # сколько дней хранить журнал правок izmeneniya (14.10, ревью: рос без границы)
 T_ONLINE = 2
+_DAY_RX = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _den(day) -> str | None:
+    """Параметр day — только дата ГГГГ-ММ-ДД. 14.10, ревью: day шёл в путь файла
+    без проверки, и ?day=../lk_tokens отдавал токены личных страниц админов."""
+    if not day:
+        return None
+    s = str(day).strip()
+    if not _DAY_RX.fullmatch(s):
+        raise ValueError("day: нужна дата в виде ГГГГ-ММ-ДД")
+    date.fromisoformat(s)
+    return s
 TYPES = {1: "нал", 2: "онлайн", 64725: "терминал", 63934: "перевод на счёт",
          72508: "коррекция", 97845: "возврат"}
 
@@ -65,8 +81,9 @@ POLYA = {
                            "statusId", "beginDate", "endDate", "visitCount", "visitedCount",
                            "comment", "classIds", "freezeFrom", "freezeTo", "sellDate"],
     "invoices": ["price", "payed", "status", "payUntil", "userSubscriptionId"],
-    "lesson_records": ["visit", "free", "test", "paid", "skip", "userSubscriptionId", "bill", "billSumma"],
-    "users": ["balance"],
+    # 14.10, ревью: bill — объект {id, summa, userSubscriptionId…}, а не число;
+    # userSubscriptionId и billSumma на верхнем уровне записи не бывает.
+    "lesson_records": ["visit", "free", "test", "paid", "skip", "bill"],
 }
 
 TRIGGERS_SQL = """
@@ -101,12 +118,9 @@ WHEN old.raw IS NOT new.raw BEGIN
     INSERT INTO izmeneniya(ts, tbl, rid, user_id, old_raw, new_raw)
     VALUES (datetime('now'), 'lesson_records', new.id, new.user_id, old.raw, new.raw);
 END;
-CREATE TRIGGER IF NOT EXISTS trg_izm_users_balance AFTER UPDATE ON users
-WHEN old.balance IS NOT new.balance BEGIN
-    INSERT INTO izmeneniya(ts, tbl, rid, user_id, old_raw, new_raw)
-    VALUES (datetime('now'), 'users', new.id, new.id,
-            json_object('balance', old.balance), json_object('balance', new.balance));
-END;
+-- 14.10, ревью: движение баланса run() не читает (его объясняют платежи и
+-- тождество баланса), а строки по users раздували журнал — триггера нет.
+DROP TRIGGER IF EXISTS trg_izm_users_balance;
 """
 
 
@@ -123,6 +137,14 @@ def _num(x, default=0.0):
         return float(x)
     except (TypeError, ValueError):
         return default
+
+
+def _bill_summa(b) -> float:
+    """bill записи на занятие — объект {id, summa, userSubscriptionId…} или пусто
+    (14.10, ревью: _num(dict) давал 0, и снятое списание не ловилось)."""
+    if isinstance(b, dict):
+        return _num(b.get("summa"))
+    return _num(b)
 
 
 def msk(ts: str | None) -> str:
@@ -212,10 +234,14 @@ def ocenit_pravku(tbl: str, old: dict, new: dict) -> dict | None:
     elif tbl == "lesson_records":
         if "visit" in d:
             chto.append("отметка явки " + ("снята" if not d["visit"][1] else "поставлена"))
-        for f in ("bill", "billSumma"):
-            if f in d and _num(d[f][0]) > 0 and _num(d[f][1]) == 0:
-                lvl = "yellow"; chto.append(f"снято списание за пропуск {_num(d[f][0]):g} ₽")
-        for f in ("free", "test", "paid", "skip", "userSubscriptionId"):
+        if "bill" in d:
+            a, b = _bill_summa(d["bill"][0]), _bill_summa(d["bill"][1])
+            if a > 0 and b == 0:
+                lvl = "yellow"
+                chto.append(f"снято списание{' за пропуск' if not new.get('visit') else ''} {a:g} ₽")
+            elif a != b:
+                chto.append(f"списание {a:g} → {b:g} ₽")
+        for f in ("free", "test", "paid", "skip"):
             if f in d:
                 chto.append(f"{f} {d[f][0]} → {d[f][1]}")
     elif tbl == "users":
@@ -273,7 +299,7 @@ def _is_404(e: Exception) -> bool:
 # ── основной прогон ────────────────────────────────────────────────────────
 def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dict:
     from . import db
-    day = day or date.today().isoformat()
+    day = _den(day) or date.today().isoformat()
     d0 = date.fromisoformat(day)
     now_utc = datetime.utcnow()
     R: dict = {"day": day, "sostavleno": datetime.now().strftime("%d.%m.%Y %H:%M"),
@@ -324,6 +350,10 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
         a = (d0 - timedelta(days=days)).isoformat()
         b = (d0 + timedelta(days=7)).isoformat()
         udaleno = []
+        # 14.10, ревью: подтверждённое удаление запоминаем («таблица:id»), иначе
+        # оно каждое утро до 45 дней возвращалось бы в пульт Бориса, даже закрытое.
+        izvestno = set(_j(db.get_state("sverka_chestnosti_udaleno") or "[]") or [])
+        novye_udaleniya: set = set()
         try:
             from .moyklass_client import MoyklassClient
             from . import sync as _sync
@@ -355,6 +385,8 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
                 plan = ([("payments", i, loc_pay[i]) for i in kandidaty(loc_pay, live_pay_ids)]
                         + [("user_subscriptions", i, loc_sub[i]) for i in kandidaty(loc_sub, live_sub_ids)]
                         + [("lesson_records", i, loc_rec[i]) for i in kandidaty(loc_rec, live_rec_ids)])
+                R["cifry"]["uzhe_izvestnyh_udaleniy"] = sum(1 for p in plan if f"{p[0]}:{p[1]}" in izvestno)
+                plan = [p for p in plan if f"{p[0]}:{p[1]}" not in izvestno]
                 R["cifry"]["kandidatov_na_udalenie"] = len(plan)
                 if len(plan) > PODTVERZHDENIY_MAX:
                     nakhodka("info", "предел", f"Кандидатов на удаление {len(plan)}, проверено первых {PODTVERZHDENIY_MAX} — остальное завтра.")
@@ -385,8 +417,10 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
                                 f"{_num(raw.get('visitedCount')):g}/{_num(raw.get('visitCount')):g}, продан {raw.get('sellDate')}, автор {who}).")
                     else:
                         lvl = "info"
-                        text = f"{name(uid)}: удалена запись на занятие {row.get('ldate')} (visit={raw.get('visit')}, списание {raw.get('bill')})."
+                        text = (f"{name(uid)}: удалена запись на занятие {row.get('ldate')} "
+                                f"(visit={raw.get('visit')}, списание {_bill_summa(raw.get('bill')):g} ₽).")
                     udaleno.append(rid)
+                    novye_udaleniya.add(f"{tbl}:{rid}")
                     nakhodka(lvl, f"удаление: {tbl}", text, uid, who, rid, tbl, {"raw": raw})
 
                 # 3. Тождество баланса (только при свежих данных)
@@ -394,15 +428,27 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
                     sr = db.get_state("sync_range") or ""
                     okno_ot = (_j(sr) or ["2024-07-01"])[0] if sr.startswith("[") else "2024-07-01"
                     summy = {r["user_id"]: _num(r["s"]) for r in conn.execute("SELECT user_id, SUM(summa) s FROM payments GROUP BY user_id")}
+                    # 14.10, ревью: неоплаченный счёт уводит баланс в минус без всякого
+                    # платежа (баланс −12 040 при недоплате 12 040) — без поправки
+                    # 7 из 9 «минусовых» клиентов были ложной тревогой.
+                    dolg = {r["user_id"]: _num(r["d"]) for r in conn.execute(
+                        "SELECT user_id, SUM(CASE WHEN price > payed THEN price - payed ELSE 0 END) d "
+                        "FROM invoices GROUP BY user_id")}
+                    ozhid = {uid: s - dolg.get(uid, 0.0) for uid, s in summy.items()}
                     balansy = {uid: _num(u.get("balance")) for uid, u in users.items()
-                               if (u.get("created_at") or "") >= okno_ot and uid in summy}
-                    rash = tozhdestvo_balansa(balansy, summy)
+                               if (u.get("created_at") or "") >= okno_ot and uid in ozhid}
+                    rash = tozhdestvo_balansa(balansy, ozhid)
                     R["cifry"]["tozhdestvo"] = {"klientov": len(balansy), "rashozhdeniy": len(rash),
                                                "v_minus": sum(1 for x in rash if x["delta"] < 0)}
-                    provereno = set(_j(db.get_state("sverka_chestnosti_balans") or "[]") or [])
+                    # {клиент: расхождение при прошлой проверке} — перепроверяем, если оно изменилось
+                    _pv = _j(db.get_state("sverka_chestnosti_balans") or "{}")
+                    provereno = _pv if isinstance(_pv, dict) else {str(u): None for u in (_pv or [])}
                     n = 0
                     for x in rash:
-                        if x["delta"] >= 0 or x["userId"] in provereno or n >= BALANS_MAX:
+                        key = str(x["userId"])
+                        if x["delta"] >= 0 or n >= BALANS_MAX:
+                            continue
+                        if provereno.get(key) is not None and abs(_num(provereno[key]) - x["delta"]) < 1:
                             continue
                         n += 1
                         try:
@@ -412,16 +458,19 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
                             continue
                         live_ids = {p["id"] for p in live_u}
                         loc_u = [dict(r) | _j(r["raw"]) for r in conn.execute("SELECT id, raw FROM payments WHERE user_id = ?", (x["userId"],))]
-                        gone = [p for p in loc_u if p["id"] not in live_ids]
-                        provereno.add(x["userId"])
+                        gone_vse = [p for p in loc_u if p["id"] not in live_ids]
+                        gone = [p for p in gone_vse if f"payments:{p['id']}" not in izvestno]
+                        provereno[key] = x["delta"]
                         for p in gone:
                             s = _num(p.get("summa")); who = M.get(p.get("managerId"), "—")
                             lvl = "red" if p.get("optype") == "income" and s > 0 else "yellow"
-                            nakhodka(lvl, "удаление: payments", f"{name(x['userId'])}: удалён платёж {p.get('optype')} {s:g} ₽ от {p.get('date')} (автор {who}); баланс {x['balans']:g} против суммы платежей {x['summa_platezhey']:g}.",
+                            novye_udaleniya.add(f"payments:{p['id']}")
+                            nakhodka(lvl, "удаление: payments", f"{name(x['userId'])}: удалён платёж {p.get('optype')} {s:g} ₽ от {p.get('date')} (автор строки {who}); баланс {x['balans']:g} против ожидаемого по платежам и счетам {x['summa_platezhey']:g}.",
                                      x["userId"], who, p["id"], "payments", {"delta": x["delta"]})
-                        if not gone:
-                            nakhodka("yellow", "баланс", f"{name(x['userId'])}: баланс {x['balans']:g} меньше суммы платежей на {-x['delta']:g} ₽, а удалённых платежей не найдено — возможно, списание задним числом.", x["userId"])
-                    db.set_state("sverka_chestnosti_balans", json.dumps(sorted(provereno)[-2000:]))
+                        if not gone_vse:
+                            nakhodka("yellow", "баланс", f"{name(x['userId'])}: баланс {x['balans']:g} меньше ожидаемого по платежам и счетам на {-x['delta']:g} ₽, а удалённых платежей не найдено — возможно, списание задним числом.", x["userId"])
+                    if not dry:
+                        db.set_state("sverka_chestnosti_balans", json.dumps(dict(list(provereno.items())[-3000:])))
                     plus = [x for x in rash if x["delta"] > 0]
                     if plus:
                         nakhodka("info", "синк", f"У {len(plus)} клиентов баланс больше суммы платежей (всего {sum(x['delta'] for x in plus):,.0f} ₽) — платежи есть в МойКлассе, у нас нет: пропуск синка, не честность.".replace(",", " "))
@@ -443,6 +492,12 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
         R["summary"] = (f"Сверка честности {day[8:]}.{day[5:7]}: правок в журнале {len(rows)}, удалений подтверждено {len(udaleno)}, "
                         f"красных {cnt['red']}, жёлтых {cnt['yellow']}" + ("" if svezho else "; данные неполные (нет свежего синка)")
                         + ". Подробно: app.kidsup.ru/sverka-chestnosti")
+        R["dry"] = bool(dry)
+        if dry:
+            # 14.10, ревью: dry — только отчёт. Курсор журнала, отметки проверенных,
+            # память удалений, лента аномалий и файл дня не трогаются: раньше один
+            # прогон dry «съедал» сигналы следующего боевого (2 красных вместо 6).
+            return R
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         (OUT_DIR / f"{day}.json").write_text(json.dumps(R, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
 
@@ -456,31 +511,42 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
         except Exception:  # noqa: BLE001
             log.exception("сверка честности: лента не записалась")
 
-        if not dry:
-            from . import autopilot
-            try:
-                otkryto = "\n".join(r[0] or "" for r in conn.execute(
-                    "SELECT text FROM plan_inbox WHERE done=0 AND day>=?", ((d0 - timedelta(days=14)).isoformat(),)))
-            except Exception:  # noqa: BLE001
-                otkryto = ""
-            n_b = n_l = 0
-            for x in sorted(R["nakhodki"], key=lambda z: {"red": 0, "yellow": 1, "info": 2}[z["level"]]):
-                if x["text"][:100] in otkryto:
-                    continue
-                if x["level"] == "red" and n_b < 6:
-                    if autopilot.inbox_add("Сверка честности: " + x["text"], phone(x.get("userId")), "Борис", source=f"сверка честности {day[8:]}.{day[5:7]}"):
-                        n_b += 1
-                elif x["level"] == "yellow" and n_l < 6 and x["kind"].startswith(("правка", "баланс")):
-                    if autopilot.inbox_add("Проверить и объяснить в карточке: " + x["text"], phone(x.get("userId")), "Лиза", source=f"сверка честности {day[8:]}.{day[5:7]}"):
-                        n_l += 1
-            autopilot.inbox_add(R["summary"], "", "Борис", source="сверка честности")
-            R["inbox_posted"] = {"Борис": n_b, "Лиза": n_l}
+        from . import autopilot
+        try:
+            otkryto = "\n".join(r[0] or "" for r in conn.execute(
+                "SELECT text FROM plan_inbox WHERE done=0 AND day>=?", ((d0 - timedelta(days=14)).isoformat(),)))
+        except Exception:  # noqa: BLE001
+            otkryto = ""
+        n_b = n_l = 0
+        # 14.10, ревью: пункты без телефона — с телефоном наряд и возврат считали
+        # семью «занятой» и не давали по ней звонков, пока пункт открыт.
+        for x in sorted(R["nakhodki"], key=lambda z: {"red": 0, "yellow": 1, "info": 2}[z["level"]]):
+            if x["text"][:100] in otkryto:
+                continue
+            if x["level"] == "red" and n_b < 6:
+                if autopilot.inbox_add("Сверка честности: " + x["text"], "", "Борис", source=f"сверка честности {day[8:]}.{day[5:7]}"):
+                    n_b += 1
+            elif x["level"] == "yellow" and n_l < 6 and x["kind"].startswith(("правка", "баланс")):
+                if autopilot.inbox_add("Проверить и объяснить в карточке: " + x["text"], "", "Лиза", source=f"сверка честности {day[8:]}.{day[5:7]}"):
+                    n_l += 1
+        autopilot.inbox_add(R["summary"], "", "Борис", source="сверка честности")
+        R["inbox_posted"] = {"Борис": n_b, "Лиза": n_l}
+        db.set_state("sverka_chestnosti_udaleno", json.dumps(sorted(izvestno | novye_udaleniya)[-5000:]))
+        try:
+            conn.execute("DELETE FROM izmeneniya WHERE ts < datetime('now', ?)", (f"-{ZHURNAL_DNEY} days",))
+        except Exception:  # noqa: BLE001
+            log.exception("сверка честности: журнал не почистился")
         db.set_state("sverka_chestnosti_ts", now_utc.strftime("%Y-%m-%d %H:%M:%S"))
     return R
 
 
+def _fayly() -> list:
+    return sorted(p for p in OUT_DIR.glob("*.json") if _DAY_RX.fullmatch(p.stem)) if OUT_DIR.exists() else []
+
+
 def load(day: str | None = None) -> dict:
-    files = sorted(OUT_DIR.glob("*.json")) if OUT_DIR.exists() else []
+    day = _den(day)          # ValueError на всё, кроме ГГГГ-ММ-ДД
+    files = _fayly()
     if day:
         f = OUT_DIR / f"{day}.json"
         files = [f] if f.exists() else []
@@ -493,12 +559,16 @@ def html(day: str | None = None) -> str:
     import html as _h
     R = load(day)
     days = "".join(f'<a href="/sverka-chestnosti?day={p.stem}">{p.stem[8:]}.{p.stem[5:7]}</a> '
-                   for p in (sorted(OUT_DIR.glob("*.json"))[-14:] if OUT_DIR.exists() else []))
+                   for p in _fayly()[-14:])
     body = [f"<h1>Сверка честности {(R.get('day') or '')[8:]}.{(R.get('day') or '')[5:7]}</h1>",
             f"<p class=lead>{_h.escape(R.get('summary', ''))} · собрано {R.get('sostavleno', '')}</p><p>Дни: {days}</p>"]
     po = R.get("po_sotrudnikam") or {}
     if po:
-        body.append("<h2>По сотрудникам</h2><table><tr><th>Кто</th><th>красных</th><th>жёлтых</th><th>прочее</th></tr>"
+        # 14.10, ревью: API не говорит, кто правил или удалял, — только кто провёл
+        # исходную строку. Подпись честная, чтобы не обвинить не того человека.
+        body.append("<h2>По автору исходной строки</h2><p class=lead>Кто провёл платёж или продал абонемент. "
+                    "Кто потом правил или удалял, МойКласс через API не показывает — это видно только в Истории действий.</p>"
+                    "<table><tr><th>Автор строки</th><th>красных</th><th>жёлтых</th><th>прочее</th></tr>"
                     + "".join(f"<tr><td>{_h.escape(str(k))}</td><td>{v['red']}</td><td>{v['yellow']}</td><td>{v['info']}</td></tr>" for k, v in po.items())
                     + "</table>")
     for lvl, title in (("red", "Красное — объяснения нет в данных"), ("yellow", "Жёлтое — нужна причина в карточке"), ("info", "Справочно")):
@@ -535,7 +605,7 @@ def _selftest() -> int:
     conn.execute("INSERT INTO users(id,name,balance) VALUES(10,'Тест',0) ON CONFLICT(id) DO UPDATE SET balance=excluded.balance")
     conn.execute("INSERT INTO users(id,name,balance) VALUES(10,'Тест',3225) ON CONFLICT(id) DO UPDATE SET balance=excluded.balance")
     rows = [dict(r) for r in conn.execute("SELECT * FROM izmeneniya ORDER BY id")]
-    assert [r["tbl"] for r in rows] == ["payments", "users"], rows
+    assert [r["tbl"] for r in rows] == ["payments"], rows   # баланс в журнал больше не пишется
     oc = ocenit_pravku("payments", _j(rows[0]["old_raw"]), _j(rows[0]["new_raw"]))
     assert oc and oc["level"] == "red" and "уменьшена" in oc["chto"] and "дата" in oc["chto"] and "тип" in oc["chto"], oc
     assert ocenit_pravku("payments", {"summa": 1, "stats": 1}, {"summa": 1, "stats": 2}) is None
@@ -544,6 +614,19 @@ def _selftest() -> int:
     assert oc2 and oc2["level"] == "red", oc2
     oc3 = ocenit_pravku("lesson_records", {"visit": False, "bill": 975}, {"visit": False, "bill": 0})
     assert oc3 and oc3["level"] == "yellow", oc3
+    # настоящая форма записи МойКласса: bill — объект, при снятии списания — null
+    oc3b = ocenit_pravku("lesson_records",
+                         {"visit": False, "paid": True, "bill": {"id": 7, "summa": 975, "userSubscriptionId": 5}},
+                         {"visit": False, "paid": False, "bill": None})
+    assert oc3b and oc3b["level"] == "yellow" and "снято списание за пропуск 975" in oc3b["chto"], oc3b
+    for bad in ("../lk_tokens", "/etc/passwd", "2026-10-1", "2026-10-14.dry", "2026-13-40"):
+        try:
+            _den(bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"_den пропустил {bad!r}")
+    assert _den("2026-10-14") == "2026-10-14" and _den("") is None
     oc4 = ocenit_pravku("invoices", {"price": 5000, "payed": 5000}, {"price": 1250, "payed": 1250})
     assert oc4 and oc4["level"] == "red", oc4
     t = tozhdestvo_balansa({1: 0.0, 2: 3225.0, 3: 100.0}, {1: 5000.0, 2: 0.0, 3: 0.0})
