@@ -4108,13 +4108,21 @@ def kontrol_oplat_page(day: str = ""):
 # 14.10, ревью: day принимается только как ГГГГ-ММ-ДД (раньше ?day=../lk_tokens
 # отдавал чужой файл), а прогон руками — только владельцу: проверяемые не должны
 # запускать проверку себя.
+def _sverka_den(day: str, code: int) -> str | None:
+    """day проверяется ДО вызова: 14.10, повторное ревью — except ValueError вокруг
+    всего вызова превращал битый файл дня (JSONDecodeError) в 404 «нет такого
+    дня», а любую ValueError внутри прогона — в 400 «нужна дата»."""
+    from . import sverka_chestnosti
+    try:
+        return sverka_chestnosti._den(day)
+    except ValueError:
+        raise HTTPException(code, "нет такого дня" if code == 404 else "day: нужна дата ГГГГ-ММ-ДД")
+
+
 @app.get("/api/sverka-chestnosti", dependencies=AUTH)
 def api_sverka_chestnosti(day: str = ""):
     from . import sverka_chestnosti
-    try:
-        return sverka_chestnosti.load(day or None)
-    except ValueError:
-        raise HTTPException(404, "нет такого дня")
+    return sverka_chestnosti.load(_sverka_den(day, 404))
 
 
 @app.post("/api/sverka-chestnosti/run", dependencies=OWNER_AUTH)
@@ -4122,10 +4130,9 @@ def api_sverka_chestnosti_run(day: str = "", dry: int = 1):
     """Прогон руками: dry=1 — только отчёт (ничего не запоминает и не пишет),
     dry=0 — как утренний: файл дня, лента, пункты в инбокс. Только чтение МойКласса."""
     from . import sverka_chestnosti
+    den = _sverka_den(day, 400)
     try:
-        return sverka_chestnosti.run(day or None, dry=bool(dry))
-    except ValueError:
-        raise HTTPException(400, "day: нужна дата ГГГГ-ММ-ДД")
+        return sverka_chestnosti.run(den, dry=bool(dry))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"sverka_chestnosti: {type(e).__name__}: {str(e)[:300]}")
 
@@ -4133,10 +4140,7 @@ def api_sverka_chestnosti_run(day: str = "", dry: int = 1):
 @app.get("/sverka-chestnosti", response_class=HTMLResponse, dependencies=AUTH)
 def sverka_chestnosti_page(day: str = ""):
     from . import sverka_chestnosti
-    try:
-        return HTMLResponse(sverka_chestnosti.html(day or None))
-    except ValueError:
-        raise HTTPException(404, "нет такого дня")
+    return HTMLResponse(sverka_chestnosti.html(_sverka_den(day, 404)))
 
 
 @app.get("/sverka", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -4478,7 +4482,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-14.1"
+APP_VERSION = "2026-10-15.1"
 
 
 @app.get("/api/net")

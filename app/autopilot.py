@@ -5075,10 +5075,15 @@ def _loop() -> None:
                     log.exception("контроль оплат не запустился")
             # 14.10, Борис: сверка честности (правки, удаления, задним числом) — в 08:45,
             # после полного синка и контроля оплат; красное — Борису, CRM-правки — Лизе
-            if now.hour == 8 and 45 <= now.minute < 60 and _mark("sverka_chestnosti", str(_today())):
+            # 14.10, повторное ревью: упавший или пропущенный (сервер лежал) утренний
+            # прогон повторяется в 11:45, если за день нет отметки о завершении;
+            # падение в потоке пишется в журнал приложения (run_safe), а не в stderr
+            if now.hour in (8, 11) and 45 <= now.minute < 60:
                 try:
                     from . import sverka_chestnosti
-                    threading.Thread(target=sverka_chestnosti.run, kwargs={"dry": False}, daemon=True).start()
+                    if not sverka_chestnosti.proshla(str(_today())) and _mark(
+                            "sverka_chestnosti", str(_today()) if now.hour == 8 else f"{_today()}:11"):
+                        threading.Thread(target=sverka_chestnosti.run_safe, daemon=True).start()
                 except Exception:
                     log.exception("сверка честности не запустилась")
             for _h, _shift in ((21, 0), (8, 1)):

@@ -50,7 +50,9 @@ def _init(conn) -> None:
 
 
 def is_group(msg: dict) -> bool:
-    return (msg.get("chatType") or "").lower() in GROUP_TYPES
+    # 14.10, ревью: кривой соседний элемент события (не словарь, chatType числом)
+    # ронял store целиком, и терялись все групповые сообщения события
+    return isinstance(msg, dict) and str(msg.get("chatType") or "").lower() in GROUP_TYPES
 
 
 def _ts(msg: dict) -> str:
@@ -95,25 +97,29 @@ def store(payload: dict) -> int:
     for msg in payload.get("messages") or []:
         if not is_group(msg):
             continue
-        contact = msg.get("contact") or {}
-        mid = str(msg.get("messageId") or "")
-        text = (msg.get("text") or "").strip()
-        kind = str(msg.get("type") or "text")
-        if msg.get("isDeleted"):
-            deletes.append(mid)
-            continue
-        if msg.get("isEdited") and mid:
-            edits.append((text, mid))
-        echo = bool(msg.get("isEcho"))
-        chat_id = str(msg.get("chatId") or "")
-        chat_name = KNOWN.get(chat_id) or str(contact.get("name") or "")
-        username = str(contact.get("username") or "")
-        author = str(msg.get("authorName") or "") if echo else ""
-        if not author and username:
-            author = avtory().get(username, "")
-        rows.append((_ts(msg), chat_id, chat_name, (msg.get("chatType") or "").lower(),
-                     author, username, (text or f"[{kind}]")[:4000], kind, 1 if echo else 0, mid,
-                     str(msg.get("contentUri") or ""), json.dumps(msg, ensure_ascii=False)[:3000]))
+        try:
+            contact = msg.get("contact") if isinstance(msg.get("contact"), dict) else {}
+            mid = str(msg.get("messageId") or "")
+            text = str(msg.get("text") or "").strip()
+            kind = str(msg.get("type") or "text")
+            if msg.get("isDeleted"):
+                deletes.append(mid)
+                continue
+            if msg.get("isEdited") and mid:
+                edits.append((text, mid))
+            echo = bool(msg.get("isEcho"))
+            chat_id = str(msg.get("chatId") or "")
+            chat_name = KNOWN.get(chat_id) or str(contact.get("name") or "")
+            username = str(contact.get("username") or "")
+            author = str(msg.get("authorName") or "") if echo else ""
+            if not author and username:
+                author = avtory().get(username, "")
+            rows.append((_ts(msg), chat_id, chat_name, str(msg.get("chatType") or "").lower(),
+                         author, username, (text or f"[{kind}]")[:4000], kind, 1 if echo else 0, mid,
+                         str(msg.get("contentUri") or ""), json.dumps(msg, ensure_ascii=False, default=str)[:3000]))
+        except Exception:  # noqa: BLE001 — одно кривое сообщение не роняет остальные
+            import logging
+            logging.getLogger("kidsup.gruppy").warning("групповое сообщение не разобрано", exc_info=True)
     if not rows and not edits and not deletes:
         return 0
     with db.get_conn() as conn:
