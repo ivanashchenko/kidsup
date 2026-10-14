@@ -1561,15 +1561,26 @@ def _is_phone(x: str) -> bool:
     return _real_number(d)
 
 
+_KANAL = {"telegram": "Telegram", "tgapi": "Telegram", "max": "MAX",
+          "instagram": "Instagram", "vk": "ВКонтакте", "avito": "Авито"}
+
+
 def _who_label(phone: str, name: str, chat_type: str | None) -> str:
     """Как назвать собеседника в теле задачи."""
-    kind = {"telegram": "Telegram", "tgapi": "Telegram", "max": "MAX",
-            "instagram": "Instagram", "vk": "ВКонтакте"}.get(
-        (chat_type or "").lower(), "")
-    if _is_phone(phone):
-        return f"+7{''.join(c for c in phone if c.isdigit())[-10:]}" + \
-               (f", {name}" if name else "")
-    tail = ''.join(c for c in str(phone or '') if c.isdigit())[-6:]
+    kind = _KANAL.get((chat_type or "").lower(), "")
+    d = ''.join(c for c in str(phone or '') if c.isdigit())
+    # 14.10, ревью: у мессенджера телефон — только 11 цифр 7/8+9: номер из
+    # contact.phone (с 14.10) или MAX, приславший сам номер. Десять цифр там —
+    # id чата, даже похожий на номер (у новых Telegram-аккаунтов 8XXXXXXXXX,
+    # и _is_phone его пропускает). Канал пишем и при номере: по одному
+    # телефону не понять, в каком мессенджере искать чат.
+    if kind:
+        nomer = len(d) == 11 and d[0] in "78" and d[1] == "9"
+    else:
+        nomer = _is_phone(phone)
+    if nomer:
+        return f"+7{d[-10:]}" + (f", {name}" if name else "") + (f", {kind}" if kind else "")
+    tail = d[-6:]
     src = kind or "мессенджер"
     return (f"{name}, {src}" if name
             else f"{src}, чат …{tail} — телефона нет, искать чат в Wazzup")
@@ -1676,7 +1687,16 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
             owner = admins[0]["managerId"] if admins else chat_admin   # это звонок
         else:
             head = "🔥 КЛИЕНТ ЖДЁТ ОТВЕТА" if hot else "Клиент писал, ответа нет"
-            where = "в WhatsApp" if _is_phone(phone) else "в том же чате"
+            # 14.10, ревью: канал — по chat_type входящего, а не по виду номера.
+            # Telegram и MAX с номером из contact.phone лежат под настоящим
+            # телефоном, и «в WhatsApp» уводило дежурную не в тот мессенджер:
+            # её ответ в WhatsApp закрыл бы вопрос в базе, а в Telegram
+            # клиент так и ждал бы.
+            kanal = _KANAL.get((chat_type or "").lower(), "")
+            if kanal:
+                where = f"в {kanal} (в том же чате)"
+            else:
+                where = "в WhatsApp" if _is_phone(phone) else "в том же чате"
             # 22.09.2026, аудит. Догадка модели вклеивалась в пункт как
             # приказ, без пометки и без точки перед «Ответить». Живой пункт
             # 929: по картинке от Харьковских модель сочинила «Оформить
@@ -4548,14 +4568,23 @@ def team_chat_tick() -> None:
             "WHERE id > ? AND ts >= ? ORDER BY id", (last, cutoff)).fetchall()
     if not rows:
         return
+    from . import wazzup
+    tmap = {"telegram": "tgapi", "whatsapp": "whatsapp", "max": "max", "vk": "vk"}
     fresh: dict[str, tuple] = {}
     for _id, phone, ctype, _text in rows:
-        if phone[-10:] in team:
-            fresh[phone[-10:]] = (phone, ctype)
+        if phone[-10:] not in team:
+            continue
+        # 14.10, ревью: Telegram с номером из contact.phone теперь лежит в
+        # wazzup_inbox под номером сотрудника. Без uid chat_id_for для Telegram
+        # пуст, send_via ответ всё равно отменит — а модель к тому времени уже
+        # вызвана, и платно. Такое сообщение пропускаем до вызова.
+        t = tmap.get(ctype, "whatsapp")
+        if t in ("tgapi", "telegram", "max") and not wazzup.chat_id_for(t, phone):
+            continue
+        fresh[phone[-10:]] = (phone, ctype)
     if fresh:
-        from . import analytics, assistant, wazzup
+        from . import analytics, assistant
         groups = analytics.group_stats()
-        tmap = {"telegram": "tgapi", "whatsapp": "whatsapp", "max": "max", "vk": "vk"}
         for p10, (phone, ctype) in list(fresh.items())[:5]:
             hist = _team_history(p10)
             if not hist:
@@ -4592,21 +4621,28 @@ def chat_watchdog() -> dict:
     since = (now - timedelta(hours=14)).isoformat(timespec="seconds")
     last: dict[str, tuple] = {}
     with _db.get_conn() as conn:
-        for table, direction in (("wazzup_inbox", "in"), ("wazzup_outbox", "out")):
+        # 14.10, ревью: канал входящего — Telegram и MAX с номером из
+        # contact.phone лежат под тем же телефоном, что и WhatsApp, и без
+        # пометки напоминание ведёт не в тот мессенджер
+        for table, direction, ct_col in (("wazzup_inbox", "in", "chat_type"),
+                                         ("wazzup_outbox", "out", "''")):
             try:
                 rows = conn.execute(
-                    f"SELECT ts, phone, text FROM {table} WHERE ts >= ?", (since,)).fetchall()
+                    f"SELECT ts, phone, text, {ct_col} FROM {table} WHERE ts >= ?",
+                    (since,)).fetchall()
             except Exception:
                 rows = []
-            for ts, phone, text in rows:
+            for ts, phone, text, ct in rows:
                 p = "".join(ch for ch in str(phone or "") if ch.isdigit())
                 if not p:
                     continue
                 cur = last.get(p)
                 if not cur or str(ts) > cur[0]:
-                    last[p] = (str(ts), direction, (text or "")[:70])
+                    last[p] = (str(ts), direction, (text or "")[:70], str(ct or "").lower())
     waiting = []
-    for p, (ts, direction, text) in last.items():
+    kanal = {}
+    for p, (ts, direction, text, ct) in last.items():
+        kanal[p] = _KANAL.get(ct, "")
         if direction != "in":
             continue
         try:
@@ -4639,7 +4675,7 @@ def chat_watchdog() -> dict:
         pass
     lines = ["⏳ Ждут ответа в переписке:"]
     for money, mins, p, text, _ in fresh[:8]:
-        who = names.get(p) or f"+{p}"
+        who = (names.get(p) or f"+{p}") + (f" ({kanal[p]})" if kanal.get(p) else "")
         lines.append(f"{'💰 ' if money else ''}{who} — {mins} мин: «{text}»")
     lines.append("Ответьте и закройте задачу в CRM. — Клод")
     try:

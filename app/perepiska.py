@@ -363,7 +363,8 @@ def scan(day: str | None = None) -> list[dict]:
                 subj = next((n for n, rx in SUBJ_HINT if rx.search(last["text"])), None)
         out.append({"phone": phone, "name": d.get("name") or "", "text": text,
                     "last_text": last["text"], "negative": bool(NEG_RE.search(last["text"] or "")),
-                    "last_ts": last["ts"], "topic": topic, "subject": subj})
+                    "last_ts": last["ts"], "topic": topic, "subject": subj,
+                    "ct": str(last.get("ct") or "").lower()})
     return out
 
 
@@ -386,6 +387,18 @@ def run(day: str | None = None, dry: bool = True) -> dict:
         for it in items:
             u = idx.get(it["phone"])
             it["uid"] = u["id"] if u else None
+            # 14.10, ревью: с 14.10 вопрос из Telegram (и MAX) с номером из
+            # contact.phone лежит в переписке под настоящим телефоном. send_smart
+            # отвечает в мессенджер только тем, кто есть в указателе Wazzup,
+            # новому клиенту — одним WhatsApp-ом, а в Telegram ничего; эхо этого
+            # сообщения закрывает вопрос, и он пропадает из «ждут ответа»,
+            # пульта и сторожа. Отвечать в тот же мессенджер мы не умеем —
+            # такой диалог оставляем человеку: он ответит там, где спросили.
+            if it.get("ct") not in ("", "whatsapp", "manual"):
+                it["answer"] = ""
+                report["человеку"] += 1
+                report["строки"].append({**it, "action": f"человеку: ответить в том же чате ({it['ct']})"})
+                continue
             text = ""
             if it["topic"] and it["topic"] not in HUMAN_ONLY and not it.get("negative"):
                 text = compose(mk, it["topic"], it["subject"], it["name"])

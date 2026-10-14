@@ -260,9 +260,12 @@ def sobrat(day: str = "") -> list[dict]:
             if not (r.get("money") or "?" in t or len(t) > 25):
                 continue
             nm = r.get("name") or r.get("phone")
+            # 14.10, ревью: Telegram и MAX с номером стоят в списке под тем же
+            # телефоном, что и WhatsApp, — без названия канала чат ищут не там
+            gde = f"в {r['channel']} (в том же чате)" if r.get("channel") else "в мессенджере"
             _add("ответ", r["phone"], nm,
                  f"Клиент ждёт ответа {_zhdet(r.get('wait_min'))}: {_imya(nm)} — "
-                 f"«{t[:90]}». Ответить в мессенджере и поставить следующий шаг.")
+                 f"«{t[:90]}». Ответить {gde} и поставить следующий шаг.")
     except Exception as e:  # noqa: BLE001
         log.warning("наряд: ждущие ответа не собрались: %s", e)
 

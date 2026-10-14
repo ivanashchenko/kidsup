@@ -2948,6 +2948,10 @@ def _wazzup_tag(payload: dict) -> None:
 # в wazzup_inbox/outbox не пишем: там phone везде считается телефоном, и по нему
 # могут что-то отправить. Такие чаты лежат в wazzup_inbox_nophone и видны на
 # /waiting отдельным блоком «ответить в Wazzup».
+# 14.10, ревью: «как у WhatsApp» — кроме отправок. Отвечать в Telegram и MAX
+# по номеру мы не умеем, поэтому автоответ (perepiska) такие диалоги отдаёт
+# человеку, а пульт, наряд и сторож пишут, в каком мессенджере отвечать.
+# Номер стал известен позже — переписка чата переносится под него (_chat_to_phone).
 CHAT_LABEL = {"whatsapp": "WhatsApp", "telegram": "Telegram", "max": "MAX",
               "vk": "ВКонтакте", "instagram": "Instagram", "avito": "Авито"}
 
@@ -3097,63 +3101,85 @@ def _chat_to_phone(conn, ct: str, cid: str, phone: str) -> None:
 def _inbox_store(payload: dict) -> None:
     """Входящие — в wazzup_inbox (для /api/replies и защиты рассылок),
     наши исходящие (isEcho) — в wazzup_outbox: по ним видно, ответили ли мы.
-    Чаты мессенджеров, где телефона нет, — в wazzup_inbox_nophone (14.10)."""
+    Чаты мессенджеров, где телефона нет, — в wazzup_inbox_nophone (14.10);
+    когда номер становится известен, их переписка переносится под него."""
     from . import autopilot
     msgs = []
-    for msg in payload.get("messages", []):
+    for msg in payload.get("messages") or []:
+        if not isinstance(msg, dict):
+            continue
+        ct, cid = str(msg.get("chatType") or "").lower(), str(msg.get("chatId") or "")
         # 03.10: групповые чаты Telegram/WhatsApp (telegroup/whatsgroup) — это
         # рабочие группы админов, не клиенты; им своя таблица (gruppy_chaty).
-        if (msg.get("chatType") or "").lower() in ("telegroup", "whatsgroup"):
+        if ct in ("telegroup", "whatsgroup") or not cid:
             continue
-        if str(msg.get("chatId") or ""):
-            msgs.append(msg)
+        # 14.10, ревью: у WhatsApp (и у события без chatType) chatId короче
+        # десяти цифр — не переписка с семьёй, такое отбрасывали и до 14.10.
+        # Блок «без номера» — для мессенджеров, где номера нет по природе.
+        if ct in ("whatsapp", "") and sum(ch.isdigit() for ch in cid) < 10:
+            continue
+        msgs.append(msg)
     # 14.10: у WhatsApp chatId и есть номер — как было, база не нужна. У
     # мессенджеров номер — из события, затем запомненный по этому чату,
     # затем сам chatId (_chat_id_phone); нет нигде — чат идёт без телефона.
     known = _wz_contact_phones(payload)
-    chats = {((m.get("chatType") or "").lower(), str(m.get("chatId") or "")) for m in msgs}
-    chats = {c for c in chats if c[0] not in ("whatsapp", "") and c not in known}
+    chats = {(str(m.get("chatType") or "").lower(), str(m.get("chatId") or "")) for m in msgs}
+    chats = {c for c in chats if c[0] not in ("whatsapp", "")}
     if known or chats:
         with db.get_conn() as conn:
             _nophone_init(conn)
             now_ts = autopilot._now().isoformat(timespec="seconds")
             for (ct, cid), p in known.items():
+                was = conn.execute("SELECT phone FROM wazzup_chat_phone WHERE chat_type=? AND chat_id=?",
+                                   (ct, cid)).fetchone()
                 conn.execute(
                     "INSERT INTO wazzup_chat_phone (chat_type, chat_id, phone, ts) VALUES (?, ?, ?, ?) "
                     "ON CONFLICT(chat_type, chat_id) DO UPDATE SET phone=excluded.phone, ts=excluded.ts",
                     (ct, cid, p, now_ts))
+                if not was or was[0] != p:
+                    _chat_to_phone(conn, ct, cid, p)    # 14.10, ревью: переписку — под номер
             for ct, cid in chats:
-                r = conn.execute("SELECT phone FROM wazzup_chat_phone WHERE chat_type=? AND chat_id=?",
-                                 (ct, cid)).fetchone()
-                if r and r[0]:
-                    known[(ct, cid)] = r[0]
+                p = known.get((ct, cid))
+                if not p:
+                    r = conn.execute("SELECT phone FROM wazzup_chat_phone WHERE chat_type=? AND chat_id=?",
+                                     (ct, cid)).fetchone()
+                    if not (r and r[0]):
+                        continue
+                    p = known[(ct, cid)] = r[0]
+                # 14.10, ревью: строка «без номера» могла лечь уже после того,
+                # как связка записана, — вебхуки сообщения и createContact идут
+                # параллельными потоками. Дотягиваем её под номер сейчас.
+                if conn.execute("SELECT 1 FROM wazzup_inbox_nophone WHERE chat_type=? AND chat_id=? "
+                                "LIMIT 1", (ct, cid)).fetchone():
+                    _chat_to_phone(conn, ct, cid, p)
     rows, echoes, nophone = [], [], []
     for msg in msgs:
-        ct, cid = (msg.get("chatType") or "").lower(), str(msg.get("chatId") or "")
+        raw_ct, cid = str(msg.get("chatType") or ""), str(msg.get("chatId") or "")
+        ct = raw_ct.lower()
         phone = ("" if ct in ("whatsapp", "") else known.get((ct, cid), "")) \
             or _chat_id_phone(ct, "".join(ch for ch in cid if ch.isdigit()))
         ts = autopilot._now().isoformat(timespec="seconds")
+        # 14.10, ревью: текст — строкой, что бы Wazzup ни прислал: одно кривое
+        # сообщение не должно ронять запись всего события (и WhatsApp в нём).
+        text = str(msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
         if not phone:
             contact = msg.get("contact") if isinstance(msg.get("contact"), dict) else {}
-            ntext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
             nophone.append((ts, ct[:12], cid[:64], str(contact.get("name") or "")[:80],
-                            ntext[:500], str(msg.get("messageId") or "") or None,
+                            text[:500], str(msg.get("messageId") or "") or None,
                             1 if msg.get("isEcho") else 0,
                             str(msg.get("authorId") or ""), str(msg.get("authorName") or "")))
             continue
         if msg.get("isEcho"):
-            etext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
             # authorId — это managerId сотрудника в МойКлассе; у отправок
             # через API его нет, и там остаётся только authorName «Admin».
             # Без этого поля нельзя сказать, кто из админов писал клиенту:
             # журнал вебхука хранит лишь последние 300 событий, то есть
             # полдня, и считать по нему можно только задним числом.
-            echoes.append((ts, phone, str(msg.get("messageId") or ""), etext[:500],
+            echoes.append((ts, phone, str(msg.get("messageId") or ""), text[:500],
                            str(msg.get("authorId") or ""),
                            str(msg.get("authorName") or "")))
             continue
-        text = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
-        rows.append((ts, phone, (msg.get("chatType") or "")[:12], text[:500],
+        rows.append((ts, phone, raw_ct[:12], text[:500],
                      str(msg.get("messageId") or "")))
     if not rows and not echoes and not nophone:
         return
@@ -3164,24 +3190,7 @@ def _inbox_store(payload: dict) -> None:
                 "INSERT OR IGNORE INTO wazzup_inbox_nophone (ts, chat_type, chat_id, contact_name, "
                 "text, message_id, is_echo, author_id, author_name) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", nophone)
-        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_inbox (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
-            chat_type TEXT, text TEXT, message_id TEXT UNIQUE)""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_outbox (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
-            message_id TEXT UNIQUE, text TEXT)""")
-        for ddl in ("ALTER TABLE wazzup_outbox ADD COLUMN author_id TEXT",
-                    "ALTER TABLE wazzup_outbox ADD COLUMN author_name TEXT",
-                    "ALTER TABLE wazzup_outbox ADD COLUMN message_id TEXT",
-                    "ALTER TABLE wazzup_outbox ADD COLUMN text TEXT"):
-            try:
-                conn.execute(ddl)
-            except Exception:
-                pass
-        try:
-            conn.execute("ALTER TABLE wazzup_outbox ADD COLUMN text TEXT")
-        except Exception:
-            pass
+        _wz_tables(conn)
         if rows:
             conn.executemany(
                 "INSERT OR IGNORE INTO wazzup_inbox (ts, phone, chat_type, text, message_id) "
@@ -4450,7 +4459,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-09.1"
+APP_VERSION = "2026-10-14.1"
 
 
 @app.get("/api/net")
@@ -10428,8 +10437,9 @@ async def api_duty(day: str = ""):
 @app.get("/api/dialogs", dependencies=AUTH)
 async def api_dialogs(day: str = "", hours: int = 0):
     """Переписки за день целиком: {"phone": …, "name": …, "messages": [
-    {"ts", "dir": "in"|"out", "text"}]}. day=YYYY-MM-DD (по умолчанию сегодня),
-    либо hours=N — за последние N часов. Для разбора дня и рекомендаций."""
+    {"ts", "dir": "in"|"out", "text", "ct"}]}. day=YYYY-MM-DD (по умолчанию сегодня),
+    либо hours=N — за последние N часов. Для разбора дня и рекомендаций.
+    ct — канал входящего (whatsapp, telegram, max…; у наших ответов пусто)."""
     from . import autopilot
     if hours:
         since = (autopilot._now() - timedelta(hours=hours)).isoformat(timespec="seconds")
@@ -10439,16 +10449,21 @@ async def api_dialogs(day: str = "", hours: int = 0):
         since, until = f"{d}T00:00:00", f"{d}T23:59:59"
     msgs: dict[str, list] = {}
     with db.get_conn() as conn:
-        for table, direction in (("wazzup_inbox", "in"), ("wazzup_outbox", "out")):
+        # 14.10, ревью: Telegram с номером из contact.phone лежит под тем же
+        # телефоном, что и WhatsApp. Без канала автоответ (perepiska) отвечал
+        # на вопрос из Telegram в WhatsApp, и эхо закрывало его как отвеченный.
+        for table, direction, ct_col in (("wazzup_inbox", "in", "chat_type"),
+                                         ("wazzup_outbox", "out", "''")):
             try:
                 rows = conn.execute(
-                    f"SELECT ts, phone, text FROM {table} WHERE ts >= ? AND ts <= ?",
+                    f"SELECT ts, phone, text, {ct_col} FROM {table} WHERE ts >= ? AND ts <= ?",
                     (since, until)).fetchall()
             except Exception:
                 rows = []
-            for ts, phone, text in rows:
+            for ts, phone, text, ct in rows:
                 msgs.setdefault(phone[-10:], []).append(
-                    {"ts": ts, "dir": direction, "text": text or ""})
+                    {"ts": ts, "dir": direction, "text": text or "",
+                     "ct": str(ct or "").lower()})
         names = {}
         for phone in msgs:
             row = conn.execute(
@@ -10582,16 +10597,29 @@ def _waiting_nophone(since: str, now: datetime, min_minutes: int) -> list[dict]:
                 "FROM wazzup_inbox_nophone WHERE ts >= ? ORDER BY ts, id", (since,)).fetchall()
         except Exception:
             return []                    # таблицы ещё нет — таких чатов не было
-        try:
-            # номер стал известен — дальше чат живёт в основном списке
-            known = {(r[0], r[1]) for r in conn.execute(
-                "SELECT chat_type, chat_id FROM wazzup_chat_phone")}
-        except Exception:
-            known = set()
-    chats: dict[tuple, list] = {}
-    for ts, ct, cid, name, text, echo in rows:
-        if (ct, cid) not in known:
+        chats: dict[tuple, list] = {}
+        for ts, ct, cid, name, text, echo in rows:
             chats.setdefault((ct, cid), []).append((ts, name or "", text or "", echo))
+        try:
+            known = {(r[0], r[1]): str(r[2] or "")[-10:] for r in conn.execute(
+                "SELECT chat_type, chat_id, phone FROM wazzup_chat_phone")}
+        except Exception:
+            known = {}
+        # Номер стал известен — дальше чат живёт в основном списке: _chat_to_phone
+        # переносит туда его сообщения. 14.10, ревью: раньше чат со связкой
+        # прятался сразу, и вопрос, оставшийся здесь (строка легла уже после
+        # связки — вебхуки сообщения и createContact идут параллельно), не был
+        # виден нигде. Прячем, только если переписка продолжилась под номером.
+        for key in [k for k in chats if known.get(k)]:
+            try:
+                r = conn.execute(
+                    "SELECT MAX(ts) FROM (SELECT ts FROM wazzup_inbox WHERE substr(phone,-10)=? "
+                    "UNION ALL SELECT ts FROM wazzup_outbox WHERE substr(phone,-10)=?)",
+                    (known[key], known[key])).fetchone()
+            except Exception:
+                r = None
+            if r and r[0] and r[0] >= chats[key][-1][0]:
+                del chats[key]
     out = []
     for (ct, cid), m in chats.items():
         if m[-1][3]:
