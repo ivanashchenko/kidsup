@@ -11,6 +11,7 @@
 
 import argparse
 import json
+import logging
 import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -22,6 +23,7 @@ from . import db
 BASE = "https://cloud.roistat.com/api/v1"
 BATCH = 100
 MSK = ZoneInfo("Europe/Moscow")
+log = logging.getLogger("kidsup.roistat")
 
 
 def _params() -> str:
@@ -164,20 +166,40 @@ def _headers() -> dict:
     return {"Api-key": db.get_setting("roistat_key") or "", "Content-type": "application/json"}
 
 
+def _has_error(j) -> bool:
+    """Есть ли в разобранном ответе Roistat непустое поле error или errors —
+    на любой глубине: ошибка по отдельному заказу внутри общего success —
+    тоже отказ. "error": null и "errors": [] — не ошибка (14.10)."""
+    if isinstance(j, dict):
+        return any((k in ("error", "errors") and bool(v)) or _has_error(v)
+                   for k, v in j.items())
+    if isinstance(j, list):
+        return any(_has_error(x) for x in j)
+    return False
+
+
 def _accepted(r: httpx.Response) -> bool:
     """Принял ли Roistat батч заказов.
 
     14.10: раньше — HTTP 200 и нет подстроки "error" в первых 200 знаках
-    ответа. Подстроку теперь ищем во всём ответе, а сам ответ обязан быть
-    JSON: страница-заглушка с кодом 200 (прокси, техработы) — не приём.
-    Есть поле status — оно должно быть success."""
-    if r.status_code != 200 or '"error"' in r.text:
+    ответа; подстрока считала отказом и успешный ответ с "error": null.
+    Теперь решаем по разобранному ответу: HTTP 200; ответ — JSON-объект или
+    список (страница-заглушка с кодом 200 от прокси или техработ — не приём);
+    поле status, если есть, — success или ok; нигде нет непустого error /
+    errors. Настоящего успешного ответа add-orders мы ещё не видели: его
+    начало сохраняется в roistat_last_ok (response) — после переключения
+    коннектора на «Интеграцию по API» один раз сверить его с этим правилом."""
+    if r.status_code != 200:
         return False
     try:
         j = r.json()
     except ValueError:
         return False
-    return not (isinstance(j, dict) and j.get("status", "success") != "success")
+    if not isinstance(j, (dict, list)):
+        return False
+    if isinstance(j, dict) and str(j.get("status", "success")).lower() not in ("success", "ok"):
+        return False
+    return not _has_error(j)
 
 
 def push(since: str, dry_run: bool = True) -> dict:
@@ -186,29 +208,39 @@ def push(since: str, dry_run: bool = True) -> dict:
     при заведённой «Интеграции по API»), и тогда ночной прогон должен оставлять
     внятную причину в логе, а не падать молча каждые сутки.
 
-    14.10: итог явный. ok — Roistat принял все заказы; sent — сколько ушло
-    в Roistat (батчи, на которые он ответил); accepted — сколько из них
-    принято; error — почему нет: ответ Roistat или сбой сети, до 500 знаков;
-    response — последний ответ Roistat как есть, до 500 знаков. Раньше при
-    отказе был только список errors, автопилот его не читал и всё равно
-    отмечал день выгруженным: по данным 19.08 и 08.09 Roistat отклонял
-    add-orders (в проекте коннектор «Мой Класс», а не «Интеграция по API»),
-    а видно это было лишь в stdout сервера. Итог настоящей выгрузки теперь
-    пишется в настройки (record_result) и виден в /api/ads/status.
-    Что и как отправляется — без изменений."""
+    14.10: итог явный. ok — Roistat принял все заказы либо отправлять было
+    нечего: в окне нет оплат, тогда nothing_to_send=True и Roistat не
+    спрашивали — это не «принято», roistat_last_ok не пишется. accepted —
+    сколько заказов принято; sent — то же самое (так было до 14.10, ключ
+    оставлен для старых вызовов, новым читать ok и accepted); posted —
+    сколько ушло в Roistat (батчи, на которые он ответил); error — почему
+    нет: ответ Roistat или сбой сети, до 500 знаков; response — последний
+    ответ Roistat как есть, до 500 знаков. Раньше при отказе был только
+    список errors, автопилот его не читал и всё равно отмечал день
+    выгруженным: по данным 19.08 и 08.09 Roistat отклонял add-orders (в
+    проекте коннектор «Мой Класс», а не «Интеграция по API»), а видно это
+    было лишь в stdout сервера. Итог настоящей выгрузки теперь пишется в
+    настройки (record_result) и виден в /api/ads/status; сбой этой записи
+    итог не меняет — только лог. Что и как отправляется — без изменений."""
     orders = build_orders(since)
     total = sum(o["price"] for o in orders)
     res = {"since": since, "orders": len(orders), "sum": round(total, 2),
            "with_visit": sum(1 for o in orders if o.get("roistat"))}
     print(f"К выгрузке: {len(orders)} оплат на {total:,.0f} ₽ (с {since})")
+    no_exchange = {"ok": True, "sent": 0, "posted": 0, "accepted": 0,
+                   "error": "", "response": "", "errors": []}
     if dry_run:
         for o in orders[:5]:
             print("  пример:", json.dumps(o, ensure_ascii=False)[:160])
         print("[dry-run] ничего не отправлено")
-        return {**res, "dry_run": True, "ok": True, "sent": 0, "accepted": 0,
-                "error": "", "response": "", "errors": []}
+        return {**res, **no_exchange, "dry_run": True}
+    if not orders:
+        # 14.10: пустое окно (длинные праздники, встал синк оплат) — Roistat
+        # не спрашиваем, и свежим «успехом» в статусе это не становится
+        print("В окне нет оплат — в Roistat ничего не отправлено")
+        return {**res, **no_exchange, "nothing_to_send": True}
     project = db.get_setting("roistat_project")
-    sent, accepted, error, response = 0, 0, "", ""
+    posted, accepted, error, response = 0, 0, "", ""
     for i in range(0, len(orders), BATCH):
         chunk = orders[i:i + BATCH]
         try:
@@ -218,38 +250,51 @@ def push(since: str, dry_run: bool = True) -> dict:
             error = f"нет ответа Roistat: {type(e).__name__}: {e}"[:500]
             print(f"  батч {i // BATCH + 1}: {error}")
             break
-        sent += len(chunk)
+        posted += len(chunk)
         response = r.text[:500]
         print(f"  батч {i // BATCH + 1}: HTTP {r.status_code} {r.text[:200]}")
         if not _accepted(r):
             error = f"HTTP {r.status_code}: {r.text}"[:500]
             break                       # смысла долбить остальными батчами нет
         accepted += len(chunk)
-    if accepted:
-        db.set_setting("roistat_last_push", since)
-    print(f"Итог: отправлено {sent}, принято {accepted} из {len(orders)}"
+    print(f"Итог: отправлено {posted}, принято {accepted} из {len(orders)}"
           + (f"; отказ: {error[:200]}" if error else ""))
-    out = {**res, "ok": not error, "sent": sent, "accepted": accepted,
-           "error": error, "response": response,
-           "errors": [error] if error else []}   # errors — как раньше, для старых вызовов
-    record_result(out)
+    out = {**res, "ok": not error, "sent": accepted, "posted": posted,
+           "accepted": accepted, "error": error, "response": response,
+           "errors": [error] if error else []}   # sent, errors — как раньше, для старых вызовов
+    # 14.10: Roistat уже ответил. Сбой записи в базу (database is locked)
+    # итог не меняет — только лог: иначе принятая выгрузка выглядела бы
+    # упавшей, а ручной вызов отдавал бы 500 без итога
+    try:
+        if accepted:
+            db.set_setting("roistat_last_push", since)
+    except Exception:
+        log.exception("roistat_last_push не записан — итог выгрузки не меняется")
+    try:
+        record_result(out)
+    except Exception:
+        log.exception("итог выгрузки в Roistat не записан в настройки")
     return out
 
 
 def record_result(res: dict) -> None:
     """Итог настоящей выгрузки — в настройки, чтобы его было видно без stdout.
 
-    14.10: roistat_last_ok — время МСК и сколько заказов принято;
-    roistat_last_error — время МСК и текст отказа (до 500 знаков). Пишется
-    одно из двух, второе остаётся от прошлого раза — верно то, что свежее.
-    Показывает /api/ads/status (поле roistat_push). Пробный прогон
-    (dry_run) ничего не пишет."""
-    if res.get("dry_run"):
+    14.10: roistat_last_ok — время МСК, сколько заказов принято и начало
+    ответа Roistat (response, до 200 знаков: по какому ответу признали
+    приём, см. _accepted); roistat_last_error — время МСК и текст отказа (до
+    500 знаков). Пишется одно из двух, второе остаётся от прошлого раза —
+    верно то, что свежее. Показывает /api/ads/status (поле roistat_push).
+    Пробный прогон (dry_run) и пустое окно (nothing_to_send) ничего не
+    пишут: Roistat не спрашивали, и свежий «успех» не должен заслонять
+    прошлый отказ."""
+    if res.get("dry_run") or res.get("nothing_to_send"):
         return
     ts = datetime.now(MSK).isoformat(timespec="seconds")
     if res.get("ok"):
         db.set_setting("roistat_last_ok", json.dumps(
-            {"ts": ts, "orders": res.get("accepted", 0), "since": res.get("since")},
+            {"ts": ts, "orders": res.get("accepted", 0), "since": res.get("since"),
+             "response": str(res.get("response") or "")[:200]},
             ensure_ascii=False))
     else:
         db.set_setting("roistat_last_error", json.dumps(

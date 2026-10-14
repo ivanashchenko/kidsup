@@ -10059,10 +10059,11 @@ async def api_roistat_push(since: str = "", dry_run: int = 1, collect: int = 1):
         result["sample"] = orders[:3]
         return result
     out = ro.push(since=since, dry_run=False)
-    # 14.10: день — только если Roistat принял всё. sent теперь значит
-    # «отправлено», а не «принято», и по нему отказ снимал бы ночную выгрузку.
+    # 14.10: день — только если Roistat принял всё (ok) и было что принимать
+    # (accepted). Пустое окно (nothing_to_send) Roistat не подтверждал, и
+    # ночную выгрузку оно не снимает — раньше так же решал sent («принято»).
     # Итог (roistat_last_ok / roistat_last_error) push() пишет сам.
-    if out.get("ok"):
+    if out.get("ok") and out.get("accepted"):
         db.set_setting("roistat_pushed_day", str(date.today()))
     return {**result, **out}
 
