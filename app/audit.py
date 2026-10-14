@@ -164,7 +164,13 @@ def unsigned_payments(day: str | None = None) -> list[dict]:
             FROM payments p LEFT JOIN users u ON u.id = p.user_id
             WHERE p.date = ? AND p.optype = 'income' AND p.summa > 0
               AND json_extract(p.raw, '$.managerId') IS NULL
+              AND COALESCE(json_extract(p.raw, '$.paymentTypeId'), 0) != 2
             ORDER BY p.summa DESC""", (d,)).fetchall()]
+    # 14.10.2026: онлайн-оплата по ссылке/виджету (тип 2) приходит без менеджера
+    # по своей природе — с 01.09 112 из 114 онлайн-платежей без подписи, а из 534
+    # терминальных и наличных без подписи ноль. 135 таких флагов в ленте были шумом,
+    # за которым терялись настоящие «деньги без хозяина». Онлайн исключаем здесь
+    # и в запросе к API ниже.
     if not seen:
         # синхронизация отстаёт на день-два, а деньги вчерашние нужны сегодня —
         # спрашиваем МойКласс напрямую, иначе проверка молча покажет ноль
@@ -198,7 +204,7 @@ def _unsigned_from_api(d: str) -> list[dict]:
             pass
     bad = [x for x in items
            if x.get("optype") == "income" and (x.get("summa") or 0) > 0
-           and not x.get("managerId")]
+           and not x.get("managerId") and x.get("paymentTypeId") != 2]
     names = {}
     if bad:
         with db.get_conn() as conn:
