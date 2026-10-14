@@ -2938,34 +2938,145 @@ def _wazzup_tag(payload: dict) -> None:
             logging.getLogger("kidsup.wazzup").exception("тег канала: не вышло для %s", phone)
 
 
+# --- чаты мессенджеров без телефона (14.10) ----------------------------------
+# 14.10.2026: у MAX и Telegram chatId — внутренний id аккаунта, обычно 8–9 цифр,
+# а _inbox_store молча выбрасывал всё, где в chatId меньше десяти цифр. Такой
+# переписки не было ни в «ждут ответа», ни в заявках, ни в наряде: 13.10 вопрос
+# «есть танцы?» из Telegram прождал ответа 19 часов, а кнопку MAX на сайте за
+# 30 дней нажали 174 раза. Теперь: прислал Wazzup номер контакта (contact.phone
+# у Telegram) — пишем под этим номером, и дальше всё как у WhatsApp. Номера нет —
+# в wazzup_inbox/outbox не пишем: там phone везде считается телефоном, и по нему
+# могут что-то отправить. Такие чаты лежат в wazzup_inbox_nophone и видны на
+# /waiting отдельным блоком «ответить в Wazzup».
+CHAT_LABEL = {"whatsapp": "WhatsApp", "telegram": "Telegram", "max": "MAX",
+              "vk": "ВКонтакте", "instagram": "Instagram", "avito": "Авито"}
+
+
+def _nophone_init(conn) -> None:
+    conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_inbox_nophone (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, chat_type TEXT,
+        chat_id TEXT, contact_name TEXT, text TEXT, message_id TEXT UNIQUE,
+        is_echo INTEGER DEFAULT 0, author_id TEXT, author_name TEXT)""")
+    conn.execute("CREATE INDEX IF NOT EXISTS wazzup_inbox_nophone_chat "
+                 "ON wazzup_inbox_nophone (chat_type, chat_id, ts)")
+    # Чат мессенджера → номер, который Wazzup однажды прислал. Наш ответ (isEcho)
+    # приходит без номера; без этой связки он лёг бы в таблицу без телефона,
+    # а вопрос клиента в wazzup_inbox так и висел бы «без ответа».
+    conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_chat_phone (
+        chat_type TEXT, chat_id TEXT, phone TEXT, ts TEXT,
+        PRIMARY KEY (chat_type, chat_id))""")
+
+
+def _wz_contact_phones(payload: dict) -> dict:
+    """{(chat_type, chat_id): телефон} — номера, которые Wazzup сам прислал в событии.
+
+    Это contact.phone входящего сообщения (у Telegram; его же читает tvoyklass)
+    и contactData[].phone в событиях о контактах. Наши ответы (isEcho) не берём:
+    чей там contact, по вебхуку не проверить. Номер — от десяти цифр, в виде
+    chatId WhatsApp (7XXXXXXXXXX), чтобы совпадал с остальной перепиской семьи."""
+    from .wazzup import _msisdn
+    out: dict = {}
+
+    def _take(ct, cid, raw) -> None:
+        ct, cid, p = str(ct or "").lower(), str(cid or ""), _msisdn(raw or "")
+        if ct and cid and len(p) >= 10 and ct not in ("whatsapp", "telegroup", "whatsgroup"):
+            out[(ct, cid)] = p
+
+    for msg in payload.get("messages") or []:
+        if isinstance(msg, dict) and not msg.get("isEcho") and isinstance(msg.get("contact"), dict):
+            _take(msg.get("chatType"), msg.get("chatId"), msg["contact"].get("phone"))
+    for key in ("contacts", "createContact"):
+        block = payload.get(key)
+        for c in (block if isinstance(block, list) else [block]):
+            for cd in ((c.get("contactData") or []) if isinstance(c, dict) else []):
+                if isinstance(cd, dict):
+                    _take(cd.get("chatType"), cd.get("chatId"), cd.get("phone"))
+    return out
+
+
+def _chat_id_phone(chat_type: str, digits: str) -> str:
+    """Сам chatId как телефон — или пустая строка, если телефоном он не является."""
+    if chat_type in ("whatsapp", ""):
+        return digits if len(digits) >= 10 else ""      # как было до 14.10
+    if chat_type == "max" and len(digits) == 11 and digits[0] in "78" and digits[1] == "9":
+        return digits          # MAX иногда присылает сам номер (см. wazzup.chat_id_for)
+    # Десятизначный id чата Telegram/MAX/VK с 12.08 лежит в wazzup_inbox как
+    # «телефон», и его видят otkaz, /api/dialogs и segodnya — оставляем как
+    # было. Кроме id на девятку: он неотличим от мобильного без кода страны
+    # (otkaz._is_phone и наряд принимают его за номер) и дальше по цепочке
+    # становится +79… — чужим номером, по которому наряд позовёт звонить,
+    # а автокарточка запишет в CRM.
+    if len(digits) == 10 and digits[0] != "9":
+        return digits
+    return ""
+
+
 def _inbox_store(payload: dict) -> None:
     """Входящие — в wazzup_inbox (для /api/replies и защиты рассылок),
-    наши исходящие (isEcho) — в wazzup_outbox: по ним видно, ответили ли мы."""
+    наши исходящие (isEcho) — в wazzup_outbox: по ним видно, ответили ли мы.
+    Чаты мессенджеров, где телефона нет, — в wazzup_inbox_nophone (14.10)."""
     from . import autopilot
-    rows, echoes = [], []
+    msgs = []
     for msg in payload.get("messages", []):
         # 03.10: групповые чаты Telegram/WhatsApp (telegroup/whatsgroup) — это
         # рабочие группы админов, не клиенты; им своя таблица (gruppy_chaty).
         if (msg.get("chatType") or "").lower() in ("telegroup", "whatsgroup"):
             continue
-        phone = "".join(ch for ch in str(msg.get("chatId") or "") if ch.isdigit())
-        if len(phone) < 10:
-            continue
-        ts = autopilot._now().isoformat(timespec="seconds")
-        if msg.get("isEcho"):
-            etext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
-            # authorId — это managerId сотрудника в МойКлассе; у отправок
-            # через API его нет, и там остаётся только authorName «Admin».
-            # Без этого поля нельзя сказать, кто из админов писал клиенту:
-            # журнал вебхука хранит лишь последние 300 событий, то есть
-            # полдня, и считать по нему можно только задним числом.
-            echoes.append((ts, phone, str(msg.get("messageId") or ""), etext[:500],
-                           str(msg.get("authorId") or ""),
-                           str(msg.get("authorName") or "")))
-            continue
-        text = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
-        rows.append((ts, phone, (msg.get("chatType") or "")[:12], text[:500],
-                     str(msg.get("messageId") or "")))
+        if str(msg.get("chatId") or ""):
+            msgs.append(msg)
+    pairs = _wz_contact_phones(payload)
+    if not msgs and not pairs:
+        return
+    rows, echoes, nophone = [], [], []
+    with db.get_conn() as conn:
+        _nophone_init(conn)
+        now_ts = autopilot._now().isoformat(timespec="seconds")
+        for (ct, cid), p in pairs.items():
+            conn.execute(
+                "INSERT INTO wazzup_chat_phone (chat_type, chat_id, phone, ts) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(chat_type, chat_id) DO UPDATE SET phone=excluded.phone, ts=excluded.ts",
+                (ct, cid, p, now_ts))
+        for msg in msgs:
+            ct, cid = (msg.get("chatType") or "").lower(), str(msg.get("chatId") or "")
+            digits = "".join(ch for ch in cid if ch.isdigit())
+            # 14.10: у WhatsApp chatId и есть номер — как было. У мессенджеров —
+            # номер из события, затем запомненный по этому чату, затем сам chatId.
+            phone = ""
+            if ct not in ("whatsapp", ""):
+                phone = pairs.get((ct, cid), "")
+                if not phone:
+                    known = conn.execute("SELECT phone FROM wazzup_chat_phone "
+                                         "WHERE chat_type=? AND chat_id=?", (ct, cid)).fetchone()
+                    phone = (known[0] if known else "") or ""
+            phone = phone or _chat_id_phone(ct, digits)
+            ts = autopilot._now().isoformat(timespec="seconds")
+            if not phone:
+                contact = msg.get("contact") if isinstance(msg.get("contact"), dict) else {}
+                ntext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
+                nophone.append((ts, ct[:12], cid[:64], str(contact.get("name") or "")[:80],
+                                ntext[:500], str(msg.get("messageId") or "") or None,
+                                1 if msg.get("isEcho") else 0,
+                                str(msg.get("authorId") or ""), str(msg.get("authorName") or "")))
+                continue
+            if msg.get("isEcho"):
+                etext = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
+                # authorId — это managerId сотрудника в МойКлассе; у отправок
+                # через API его нет, и там остаётся только authorName «Admin».
+                # Без этого поля нельзя сказать, кто из админов писал клиенту:
+                # журнал вебхука хранит лишь последние 300 событий, то есть
+                # полдня, и считать по нему можно только задним числом.
+                echoes.append((ts, phone, str(msg.get("messageId") or ""), etext[:500],
+                               str(msg.get("authorId") or ""),
+                               str(msg.get("authorName") or "")))
+                continue
+            text = (msg.get("text") or "").strip() or f"[{msg.get('type', 'вложение')}]"
+            rows.append((ts, phone, (msg.get("chatType") or "")[:12], text[:500],
+                         str(msg.get("messageId") or "")))
+        if nophone:
+            conn.executemany(
+                "INSERT OR IGNORE INTO wazzup_inbox_nophone (ts, chat_type, chat_id, contact_name, "
+                "text, message_id, is_echo, author_id, author_name) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", nophone)
     if not rows and not echoes:
         return
     with db.get_conn() as conn:
@@ -10376,25 +10487,76 @@ async def api_waiting_dismiss(payload: dict):
     return {"ok": True}
 
 
+def _waiting_nophone(since: str, now: datetime, min_minutes: int) -> list[dict]:
+    """Чаты мессенджеров без телефона (wazzup_inbox_nophone, 14.10), где последнее
+    слово за клиентом. Ответить можно только в самом Wazzup — номера нет, поэтому
+    в наряд и в автоматику такие чаты не идут, только сюда, на глаза дежурной."""
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                "SELECT ts, chat_type, chat_id, contact_name, text, is_echo "
+                "FROM wazzup_inbox_nophone WHERE ts >= ? ORDER BY ts, id", (since,)).fetchall()
+        except Exception:
+            return []                    # таблицы ещё нет — таких чатов не было
+        try:
+            # номер стал известен — дальше чат живёт в основном списке
+            known = {(r[0], r[1]) for r in conn.execute(
+                "SELECT chat_type, chat_id FROM wazzup_chat_phone")}
+        except Exception:
+            known = set()
+    chats: dict[tuple, list] = {}
+    for ts, ct, cid, name, text, echo in rows:
+        if (ct, cid) not in known:
+            chats.setdefault((ct, cid), []).append((ts, name or "", text or "", echo))
+    out = []
+    for (ct, cid), m in chats.items():
+        if m[-1][3]:
+            continue                     # последнее слово за нами
+        try:
+            wait_min = int((now - datetime.fromisoformat(m[-1][0])).total_seconds() // 60)
+        except Exception:
+            continue
+        if wait_min < min_minutes:
+            continue
+        tail = []                        # все входящие после нашего последнего ответа
+        for ts, name, text, echo in reversed(m):
+            if echo:
+                break
+            tail.append(text)
+        text = " · ".join(t for t in reversed(tail) if t)[:300]
+        out.append({"chat_type": ct, "channel": CHAT_LABEL.get(ct, ct or "мессенджер"),
+                    "chat_id": cid, "name": next((x[1] for x in reversed(m) if x[1]), ""),
+                    "last_text": text, "since": m[-1][0], "wait_min": wait_min,
+                    "money": bool(MONEY_RX.search(text)), "draft": _draft_for(text)})
+    out.sort(key=lambda w: (not w["money"], -w["wait_min"]))
+    return out
+
+
 @app.get("/api/waiting", dependencies=AUTH)
 async def api_waiting(min_minutes: int = 15):
     """Диалоги, где последнее слово за клиентом дольше min_minutes минут
-    (за последние 2 дня). Для бейджа в шапке и страницы /waiting."""
+    (за последние 2 дня). Для бейджа в шапке и страницы /waiting.
+    14.10: nophone — чаты Telegram/MAX без телефона, отдельным списком."""
     from . import autopilot
     now = autopilot._now()
     since = (now - timedelta(days=2)).isoformat(timespec="seconds")
     msgs: dict[str, list] = {}
     with db.get_conn() as conn:
-        for table, direction in (("wazzup_inbox", "in"), ("wazzup_outbox", "out")):
+        # 14.10: chat_type входящего — чтобы дежурная видела, в каком
+        # мессенджере отвечать: у Telegram с номером телефон тот же, что
+        # у WhatsApp, и без пометки чат ищут не там.
+        for table, direction, ct_col in (("wazzup_inbox", "in", "chat_type"),
+                                         ("wazzup_outbox", "out", "''")):
             try:
                 rows = conn.execute(
-                    f"SELECT ts, phone, text FROM {table} WHERE ts >= ?",
+                    f"SELECT ts, phone, text, {ct_col} FROM {table} WHERE ts >= ?",
                     (since,)).fetchall()
             except Exception:
                 rows = []
-            for ts, phone, text in rows:
+            for ts, phone, text, ct in rows:
                 msgs.setdefault(phone[-10:], []).append(
-                    {"ts": ts, "dir": direction, "text": text or ""})
+                    {"ts": ts, "dir": direction, "text": text or "",
+                     "ct": (ct or "").lower()})
         info = {}
         for phone in msgs:
             row = conn.execute(
@@ -10425,6 +10587,7 @@ async def api_waiting(min_minutes: int = 15):
         waiting.append({"phone": p, "name": name, "since": last["ts"],
                         "wait_min": wait_min, "text": text, "money": money,
                         "draft": _draft_for(text),
+                        "channel": CHAT_LABEL.get(last["ct"], "") if last["ct"] != "whatsapp" else "",
                         "brief": f"/brief?phone={p}",
                         "crm": f"https://app.moyklass.com/client/{uid}" if uid else ""})
     waiting.sort(key=lambda w: (not w["money"], -w["wait_min"]))
@@ -10433,12 +10596,19 @@ async def api_waiting(min_minutes: int = 15):
     except Exception as exc:
         logging.getLogger(__name__).warning("missed-calls: %s", exc)
         calls_waiting = []
+    try:
+        nophone = _waiting_nophone(since, now, min_minutes)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("nophone: %s", exc)
+        nophone = []
     return {"count": len(waiting),
             "money": sum(1 for w in waiting if w["money"]),
             "max_wait": max((w["wait_min"] for w in waiting), default=0),
             "items": waiting,
             "calls_count": len(calls_waiting),
-            "calls": calls_waiting}
+            "calls": calls_waiting,
+            "nophone_count": len(nophone),
+            "nophone": nophone}
 
 
 @app.get("/waiting", response_class=HTMLResponse, dependencies=AUTH)

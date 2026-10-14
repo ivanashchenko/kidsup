@@ -2,7 +2,7 @@
 {% block title %}Кто ждёт ответа — KidsUP{% endblock %}
 {% block content %}
 <h1>Ответы: кто ждёт и что ответить</h1>
-<p class="muted">Чаты, где последнее слово за клиентом (15+ минут), и звонки без перезвона.
+<p class="muted">Чаты, где последнее слово за клиентом (15+ минут), звонки без перезвона и чаты Telegram/MAX без номера.
 🔥 — деньги или запись. Черновик — подсказка по смыслу, проверьте и допишите под клиента.
 Обновляется само каждые 3 минуты · <span id="w-upd">открыто только что</span>.</p>
 
@@ -37,10 +37,33 @@
   <tr class="{{ 'warn-row' if it.money }}">
     <td>{{ '🔥' if it.money else '💬' }}</td>
     <td><b>{{ it.wait_min }} мин</b><br><span class="muted small">{{ it.since[11:16] }}</span></td>
-    <td>{{ it.name or '—' }}<br><span class="muted small">{{ it.phone }}</span><br>
+    <td>{{ it.name or '—' }}<br><span class="muted small">{{ it.phone }}{% if it.channel %} · {{ it.channel }}{% endif %}</span><br>
       <a class="small" href="{{ it.brief }}">досье</a>
       {% if it.crm %}· <a class="small" href="{{ it.crm }}" target="_blank">CRM ↗</a>{% endif %}</td>
     <td class="small">{{ it.text }}</td>
+    <td class="small muted">{{ it.draft }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{# 14.10: Telegram/MAX без номера — раньше вебхук их выбрасывал, и вопрос из
+   Telegram 13.10 прождал 19 часов. Номера нет: ответ только в самом Wazzup. #}
+<h2>📨 Telegram и MAX без номера — ответить в Wazzup</h2>
+{% if not w['nophone'] %}
+<div class="notice">✅ В чатах без номера никто не ждёт.</div>
+{% else %}
+<p class="muted small">Номер телефона мессенджер не передал: в наряд и автоматику эти чаты не попадают.
+Найдите чат в Wazzup по каналу и имени и ответьте там же.</p>
+<table>
+  <tr><th></th><th>Ждёт</th><th>Где и кто</th><th>Что написал</th><th>Что ответить</th></tr>
+  {% for it in w['nophone'] %}
+  <tr class="{{ 'warn-row' if it.money or it.wait_min > 120 }}">
+    <td>{{ '🔥' if it.money else '📨' }}</td>
+    <td><b>{% if it.wait_min >= 60 %}{{ it.wait_min // 60 }} ч {{ it.wait_min % 60 }} м{% else %}{{ it.wait_min }} мин{% endif %}</b><br>
+      <span class="muted small">{{ it.since[8:10] }}.{{ it.since[5:7] }} {{ it.since[11:16] }}</span></td>
+    <td><b>{{ it.channel }}</b>: {{ it.name or 'без имени' }}<br><span class="muted small">чат {{ it.chat_id }}</span></td>
+    <td class="small">{{ it.last_text }}</td>
     <td class="small muted">{{ it.draft }}</td>
   </tr>
   {% endfor %}
