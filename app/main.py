@@ -7759,6 +7759,7 @@ def api_ads_status(plan: str = "30377205"):
     08.09.2026: токены Директа и VK живут здесь, в настройках сервера, а
     рабочий контейнер после отката остаётся без них. Эндпоинт только читает —
     ни ставок, ни запусков, ни модерации отсюда не делается.
+    14.10: плюс roistat_push — итог выгрузки оплат в Roistat {last_ok, last_error}.
     """
     import httpx
     out = {"direct": {}, "vk": {}}
@@ -7837,6 +7838,14 @@ def api_ads_status(plan: str = "30377205"):
                     else {"http": bg.status_code, "body": bg.text[:200]}
         except Exception as e:
             out["vk"]["error"] = str(e)[:200]
+    # 14.10: отказ Roistat при ночной выгрузке оплат был виден только в
+    # stdout сервера — никто не знал, работает ли она. Здесь последний успех
+    # и последняя ошибка (время МСК); верно то, что свежее. Только чтение.
+    try:
+        from . import roistat as _roistat
+        out["roistat_push"] = _roistat.push_status()
+    except Exception as e:  # noqa: BLE001
+        out["roistat_push"] = {"error": str(e)[:200]}
     return out
 
 
@@ -10050,7 +10059,10 @@ async def api_roistat_push(since: str = "", dry_run: int = 1, collect: int = 1):
         result["sample"] = orders[:3]
         return result
     out = ro.push(since=since, dry_run=False)
-    if out.get("sent"):
+    # 14.10: день — только если Roistat принял всё. sent теперь значит
+    # «отправлено», а не «принято», и по нему отказ снимал бы ночную выгрузку.
+    # Итог (roistat_last_ok / roistat_last_error) push() пишет сам.
+    if out.get("ok"):
         db.set_setting("roistat_pushed_day", str(date.today()))
     return {**result, **out}
 

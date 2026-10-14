@@ -12,6 +12,8 @@
 import argparse
 import json
 import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -19,6 +21,7 @@ from . import db
 
 BASE = "https://cloud.roistat.com/api/v1"
 BATCH = 100
+MSK = ZoneInfo("Europe/Moscow")
 
 
 def _params() -> str:
@@ -161,11 +164,38 @@ def _headers() -> dict:
     return {"Api-key": db.get_setting("roistat_key") or "", "Content-type": "application/json"}
 
 
+def _accepted(r: httpx.Response) -> bool:
+    """Принял ли Roistat батч заказов.
+
+    14.10: раньше — HTTP 200 и нет подстроки "error" в первых 200 знаках
+    ответа. Подстроку теперь ищем во всём ответе, а сам ответ обязан быть
+    JSON: страница-заглушка с кодом 200 (прокси, техработы) — не приём.
+    Есть поле status — оно должно быть success."""
+    if r.status_code != 200 or '"error"' in r.text:
+        return False
+    try:
+        j = r.json()
+    except ValueError:
+        return False
+    return not (isinstance(j, dict) and j.get("status", "success") != "success")
+
+
 def push(since: str, dry_run: bool = True) -> dict:
     """Отдаёт итог словарём, а не бросает исключение: приём сделок в Roistat
     может быть выключен на стороне проекта (метод add-orders доступен только
     при заведённой «Интеграции по API»), и тогда ночной прогон должен оставлять
-    внятную причину в логе, а не падать молча каждые сутки."""
+    внятную причину в логе, а не падать молча каждые сутки.
+
+    14.10: итог явный. ok — Roistat принял все заказы; sent — сколько ушло
+    в Roistat (батчи, на которые он ответил); accepted — сколько из них
+    принято; error — почему нет: ответ Roistat или сбой сети, до 500 знаков;
+    response — последний ответ Roistat как есть, до 500 знаков. Раньше при
+    отказе был только список errors, автопилот его не читал и всё равно
+    отмечал день выгруженным: по данным 19.08 и 08.09 Roistat отклонял
+    add-orders (в проекте коннектор «Мой Класс», а не «Интеграция по API»),
+    а видно это было лишь в stdout сервера. Итог настоящей выгрузки теперь
+    пишется в настройки (record_result) и виден в /api/ads/status.
+    Что и как отправляется — без изменений."""
     orders = build_orders(since)
     total = sum(o["price"] for o in orders)
     res = {"since": since, "orders": len(orders), "sum": round(total, 2),
@@ -175,25 +205,70 @@ def push(since: str, dry_run: bool = True) -> dict:
         for o in orders[:5]:
             print("  пример:", json.dumps(o, ensure_ascii=False)[:160])
         print("[dry-run] ничего не отправлено")
-        return {**res, "dry_run": True}
+        return {**res, "dry_run": True, "ok": True, "sent": 0, "accepted": 0,
+                "error": "", "response": "", "errors": []}
     project = db.get_setting("roistat_project")
-    sent, errors = 0, []
+    sent, accepted, error, response = 0, 0, "", ""
     for i in range(0, len(orders), BATCH):
         chunk = orders[i:i + BATCH]
-        r = httpx.post(f"{BASE}/project/add-orders?project={project}",
-                       headers=_headers(), json=chunk, timeout=60)
-        body = r.text[:200]
-        ok = r.status_code == 200 and '"error"' not in body
-        print(f"  батч {i // BATCH + 1}: HTTP {r.status_code} {body}")
-        if ok:
-            sent += len(chunk)
-        else:
-            errors.append(body)
+        try:
+            r = httpx.post(f"{BASE}/project/add-orders?project={project}",
+                           headers=_headers(), json=chunk, timeout=60)
+        except Exception as e:          # сеть, таймаут: ответа Roistat нет
+            error = f"нет ответа Roistat: {type(e).__name__}: {e}"[:500]
+            print(f"  батч {i // BATCH + 1}: {error}")
+            break
+        sent += len(chunk)
+        response = r.text[:500]
+        print(f"  батч {i // BATCH + 1}: HTTP {r.status_code} {r.text[:200]}")
+        if not _accepted(r):
+            error = f"HTTP {r.status_code}: {r.text}"[:500]
             break                       # смысла долбить остальными батчами нет
-    if sent:
+        accepted += len(chunk)
+    if accepted:
         db.set_setting("roistat_last_push", since)
-    print(f"Итог: принято {sent} заказов" + (f", отклонено: {errors[0]}" if errors else ""))
-    return {**res, "sent": sent, "errors": errors}
+    print(f"Итог: отправлено {sent}, принято {accepted} из {len(orders)}"
+          + (f"; отказ: {error[:200]}" if error else ""))
+    out = {**res, "ok": not error, "sent": sent, "accepted": accepted,
+           "error": error, "response": response,
+           "errors": [error] if error else []}   # errors — как раньше, для старых вызовов
+    record_result(out)
+    return out
+
+
+def record_result(res: dict) -> None:
+    """Итог настоящей выгрузки — в настройки, чтобы его было видно без stdout.
+
+    14.10: roistat_last_ok — время МСК и сколько заказов принято;
+    roistat_last_error — время МСК и текст отказа (до 500 знаков). Пишется
+    одно из двух, второе остаётся от прошлого раза — верно то, что свежее.
+    Показывает /api/ads/status (поле roistat_push). Пробный прогон
+    (dry_run) ничего не пишет."""
+    if res.get("dry_run"):
+        return
+    ts = datetime.now(MSK).isoformat(timespec="seconds")
+    if res.get("ok"):
+        db.set_setting("roistat_last_ok", json.dumps(
+            {"ts": ts, "orders": res.get("accepted", 0), "since": res.get("since")},
+            ensure_ascii=False))
+    else:
+        db.set_setting("roistat_last_error", json.dumps(
+            {"ts": ts, "error": str(res.get("error") or "причина неизвестна")[:500],
+             "accepted": res.get("accepted", 0), "orders": res.get("orders"),
+             "since": res.get("since")}, ensure_ascii=False))
+
+
+def push_status() -> dict:
+    """{last_ok, last_error} для /api/ads/status (14.10): что лежит в
+    настройках. None — такого итога ещё не было."""
+    out = {}
+    for k in ("last_ok", "last_error"):
+        raw = db.get_setting(f"roistat_{k}")
+        try:
+            out[k] = json.loads(raw) if raw else None
+        except ValueError:
+            out[k] = raw                # не JSON (руками) — как есть
+    return out
 
 
 def main():

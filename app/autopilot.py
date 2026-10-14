@@ -4776,6 +4776,52 @@ def poll_calls() -> dict:
     return {"added": added, "seen": len(rows)}
 
 
+def roistat_night() -> dict | None:
+    """Ночная выгрузка оплат в Roistat: с 21:00 МСК, не больше попытки в день.
+
+    14.10. push() при отказе Roistat исключения не бросает, а здесь после
+    него безусловно ставилась отметка «день выгружен». По данным 19.08 и
+    08.09 Roistat отклонял add-orders, сервер считал ночи успешными, и
+    увидеть отказ можно было только в stdout. Теперь отметок две:
+      roistat_try_day    — сегодня уже пробовали. Ставится ДО отправки:
+                           отказ, сбой сети или падение не повторяются на
+                           каждом круге цикла до полуночи, следующая попытка —
+                           завтра в 21:00;
+      roistat_pushed_day — сегодня выгружено. Только при ok.
+    Окно оплат — как раньше: с roistat_last_push (меняется только при
+    приёме), а без него — за три дня.
+    Итог (roistat_last_ok / roistat_last_error) пишет сам push(), здесь —
+    только если push упал целиком (сборка заказов, база). Ручная выгрузка
+    /api/roistat/push попытку не тратит. None — сегодня делать нечего."""
+    now = _now()
+    day = now.date()
+    if now.hour < 21 or str(day) in (db.get_setting("roistat_pushed_day"),
+                                     db.get_setting("roistat_try_day")):
+        return None
+    db.set_setting("roistat_try_day", str(day))
+    from . import roistat as _ro
+    last = db.get_setting("roistat_last_push") or ""
+    d3 = (day - timedelta(days=3)).isoformat()
+    since = min(last, d3) if last else d3
+    try:
+        res = _ro.push(since=since, dry_run=False)
+    except Exception as e:
+        log.exception("выгрузка в Roistat упала — следующая попытка завтра")
+        res = {"ok": False, "since": since, "accepted": 0,
+               "error": f"выгрузка упала: {type(e).__name__}: {e}"[:500]}
+        try:
+            _ro.record_result(res)
+        except Exception:
+            log.exception("итог выгрузки в Roistat не записан")
+    if res.get("ok"):
+        db.set_setting("roistat_pushed_day", str(day))
+        log.info("Roistat принял %s заказов (с %s)", res.get("accepted"), since)
+    else:
+        log.warning("выгрузка в Roistat не прошла (с %s): %s — следующая попытка завтра",
+                    since, res.get("error"))
+    return res
+
+
 def _loop() -> None:
     last3 = 0.0
     while True:
@@ -5253,18 +5299,14 @@ def _loop() -> None:
                       "чистка задач по архивным клиентам")
             if now.hour >= 20:
                 _shag("digest", str(_today()), daily_digest, "вечерняя сводка")
-            if now.hour >= 21 and db.get_setting("roistat_pushed_day") != str(_today()):
+            # выгрузка оплат в Roistat: с 21:00, одна попытка в день, день
+            # отмечается выгруженным, только если Roistat принял (14.10,
+            # подробности в roistat_night)
+            if now.hour >= 21:
                 try:
-                    from . import roistat as _ro
-                    from datetime import timedelta as _td
-                    last = db.get_setting("roistat_last_push") or ""
-                    since = min(last, (_today() - _td(days=3)).isoformat()) if last \
-                        else (_today() - _td(days=3)).isoformat()
-                    _ro.push(since=since, dry_run=False)
-                    # отметку ставим ТОЛЬКО после успеха, иначе сбой съедал бы весь день
-                    db.set_setting("roistat_pushed_day", str(_today()))
+                    roistat_night()
                 except Exception:
-                    log.exception("roistat push не удался — повторим на следующем круге")
+                    log.exception("выгрузка в Roistat упала — продолжаем")
         except Exception:
             log.exception("autopilot: ошибка цикла")
         time.sleep(60)
