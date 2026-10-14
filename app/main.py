@@ -3891,6 +3891,31 @@ def kontrol_oplat_page(day: str = ""):
     return HTMLResponse(kontrol_oplat.html(day or None))
 
 
+# 14.10.2026, Борис: ежедневная сверка честности — правки, удаления и проводки
+# задним числом в МойКлассе (app/sverka_chestnosti.py). Чтение — админу: его же
+# читает вечерняя рутина 21:00 вместо пометки «история действий: нет пароля».
+@app.get("/api/sverka-chestnosti", dependencies=AUTH)
+def api_sverka_chestnosti(day: str = ""):
+    from . import sverka_chestnosti
+    return sverka_chestnosti.load(day or None)
+
+
+@app.post("/api/sverka-chestnosti/run", dependencies=AUTH)
+def api_sverka_chestnosti_run(day: str = "", dry: int = 1):
+    """Прогон руками: dry=1 — только отчёт, dry=0 — ещё пункты в инбокс. Только чтение МойКласса."""
+    from . import sverka_chestnosti
+    try:
+        return sverka_chestnosti.run(day or None, dry=bool(dry))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"sverka_chestnosti: {type(e).__name__}: {str(e)[:300]}")
+
+
+@app.get("/sverka-chestnosti", response_class=HTMLResponse, dependencies=AUTH)
+def sverka_chestnosti_page(day: str = ""):
+    from . import sverka_chestnosti
+    return HTMLResponse(sverka_chestnosti.html(day or None))
+
+
 @app.get("/sverka", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def sverka_page():
     """Сверка денег (тетрадь ↔ МойКласс ↔ КОМТЕТ ↔ банк + долги) — только владелец.

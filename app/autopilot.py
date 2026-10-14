@@ -4318,6 +4318,14 @@ def _migrations() -> None:
     if _mark("migration", "roistat_project_v1"):
         if not db.get_setting("roistat_project"):
             db.set_setting("roistat_project", "228571")  # Kids UP в Roistat
+    if _mark("migration", "sverka_chestnosti_triggers_v1"):
+        # 14.10: журнал правок для сверки честности — триггеры на UPDATE платежей,
+        # абонементов, счетов, записей и баланса; дальше их поддерживает сам модуль
+        try:
+            from . import sverka_chestnosti
+            sverka_chestnosti.ensure()
+        except Exception:
+            log.exception("триггеры сверки честности не создались")
     if _mark("migration", "no1_resume_tg_v1"):
         # WhatsApp 0077 заблокирован за массовость: остаток рассылки — только
         # Telegram (настройка broadcast_transports); заморозку вернуть в очередь
@@ -4975,6 +4983,14 @@ def _loop() -> None:
                     threading.Thread(target=kontrol_oplat.run, kwargs={"dry": False}, daemon=True).start()
                 except Exception:
                     log.exception("контроль оплат не запустился")
+            # 14.10, Борис: сверка честности (правки, удаления, задним числом) — в 08:45,
+            # после полного синка и контроля оплат; красное — Борису, CRM-правки — Лизе
+            if now.hour == 8 and 45 <= now.minute < 60 and _mark("sverka_chestnosti", str(_today())):
+                try:
+                    from . import sverka_chestnosti
+                    threading.Thread(target=sverka_chestnosti.run, kwargs={"dry": False}, daemon=True).start()
+                except Exception:
+                    log.exception("сверка честности не запустилась")
             for _h, _shift in ((21, 0), (8, 1)):
                 if now.hour == _h and 30 <= now.minute < 40 \
                         and _mark("yavka", f"{_today()}:{_h}"):
