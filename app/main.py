@@ -4833,7 +4833,12 @@ def _build_schedule():
     # У сада и нулевого класса вместимость 10 (решение владельца).
     def _pub(g):
         cap = g["capacity"]
-        if "Мини-сад" in g["name"] or "Нулевой" in g["name"]:
+        if "Мини-сад" in g["name"]:
+            # 15.10: сад считаем по дням (минимум 8 детей в день), список — до лимита
+            # из app/mesta.py; прежние 10 при 11 в списке давали «Группа набрана»
+            from . import mesta as _mesta
+            cap = _mesta.CAP_OVERRIDE.get("Мини-сад", 10)
+        elif "Нулевой" in g["name"]:
             cap = min(cap, 10)
         real = max(0, cap - g["enrolled"])
         # Витрина (26.08): группа близка к заполнению или полна (<=3 свободных) —
