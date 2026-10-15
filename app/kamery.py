@@ -7,6 +7,14 @@
 cam_embeds — JSON-список [{"name": "Английский, кабинет 2", "src": "<ссылка
 на плеер Ivideon>"}]. Ссылку даёт кабинет Ivideon: камера → «Поделиться» →
 «Встроить на сайт», оттуда нужен адрес из атрибута src.
+
+cam_okna (16.10.2026, план «Камеры: трансляция по правилам») — какие кабинеты
+и в какие часы показывать родителям: «К4 пн-пт 09:00-13:00; К2 пн-пт
+10:00-14:00», окна через «;» или с новой строки, у кабинета их может быть
+несколько. Пусто — как раньше: все камеры круглые сутки. Задано — кабинеты без
+окна не показываются вовсе, а вне окна вместо плеера стоит расписание: ссылки
+на плеер в странице тогда нет, скопировать её нечем. cam_embeds не трогаем —
+по нему же фото-явка снимает все кабинеты (app/kadry.py).
 """
 
 from __future__ import annotations
@@ -15,10 +23,13 @@ import html as _html
 import hmac
 import json
 import re
+from datetime import datetime, timedelta, timezone
 
 from . import db
 
 COOKIE = "kam"
+MSK = timezone(timedelta(hours=3))
+DNI = ("пн", "вт", "ср", "чт", "пт", "сб", "вс")
 
 
 def _password() -> str:
@@ -36,6 +47,50 @@ def _cameras() -> list[dict]:
         if src.startswith("https://"):
             out.append({"name": str(x.get("name") or "Камера"), "src": src})
     return out
+
+
+def _komnata(name: str) -> str:
+    """«Комната 4» → «К4» — как в kadry.cam_rooms() и справочнике rooms."""
+    m = re.search(r"(\d+)", name or "")
+    return "К" + m.group(1) if m else ""
+
+
+def _dni(s: str) -> set[int] | None:
+    """«пн-пт» → {0..4}, «вт,чт,пт» → {1, 3, 4}; непонятное → None."""
+    out: set[int] = set()
+    for part in s.split(","):
+        a, _, b = part.strip().partition("-")
+        if a not in DNI or (b and b not in DNI):
+            return None
+        i, j = DNI.index(a), DNI.index(b or a)
+        out.update(range(i, j + 1) if i <= j else [*range(i, 7), *range(0, j + 1)])
+    return out
+
+
+def okna(raw: str | None = None) -> dict[str, list[tuple[set[int], int, int, str]]]:
+    """cam_okna → {"К4": [(дни, с минуты, до минуты, «пн-пт 09:00-13:00»)]}.
+
+    Строку, которую не разобрали, пропускаем: лучше не показать кабинет, чем
+    показать его круглые сутки из-за опечатки.
+    """
+    raw = db.get_setting("cam_okna") if raw is None else raw
+    out: dict[str, list] = {}
+    for line in re.split(r"[;\n]", (raw or "").lower().replace("–", "-").replace("—", "-")):
+        m = re.fullmatch(r"\s*[кk]\s*(\d+)\s+([а-я,\-\s]+?)\s+(\d{1,2})[:.](\d\d)\s*-\s*(\d{1,2})[:.](\d\d)\s*", line)
+        if not m:
+            continue
+        dni = _dni(m.group(2).replace(" ", ""))
+        ot, do = int(m.group(3)) * 60 + int(m.group(4)), int(m.group(5)) * 60 + int(m.group(6))
+        if not dni or ot >= do or do > 24 * 60:
+            continue
+        tekst = f"{m.group(2).replace(' ', '')} {m.group(3)}:{m.group(4)}–{m.group(5)}:{m.group(6)}"
+        out.setdefault("К" + m.group(1), []).append((dni, ot, do, tekst))
+    return out
+
+
+def _seychas_vidno(windows: list, now: datetime) -> bool:
+    minute = now.hour * 60 + now.minute
+    return any(now.weekday() in dni and ot <= minute < do for dni, ot, do, _ in windows)
 
 
 def ok_token(token: str) -> bool:
@@ -72,6 +127,8 @@ figcaption{padding:10px 14px;font-weight:600;font-size:15px;display:flex;align-i
     border-radius:10px;padding:7px 12px;cursor:pointer;text-decoration:none}
 .fs:hover{border-color:var(--blue)}
 .frame:fullscreen,.frame:-webkit-full-screen{aspect-ratio:auto;width:100vw;height:100vh;background:#000}
+.frame.off{display:flex;align-items:center;justify-content:center;background:var(--soft)}
+.frame.off p{margin:0;padding:0 18px;text-align:center;color:var(--muted);font-size:15px}
 .how{margin-top:18px;padding:14px 18px;background:#fff;border:1px solid var(--line);border-radius:var(--r);font-size:15px}
 .how b{color:var(--indigo)}
 .how ul{margin:8px 0 0;padding-left:20px}
@@ -142,17 +199,36 @@ def login_page(error: str = "") -> str:
 </div>{FOOT}"""
 
 
-def page() -> str:
-    cams = _cameras()
-    if cams:
-        body = '<div class=cams>' + "".join(
-            f'<figure><div class=frame><iframe src="{_html.escape(c["src"])}" '
+def _plitka(c: dict) -> str:
+    return (f'<figure><div class=frame><iframe src="{_html.escape(c["src"])}" '
             f'allow="autoplay; fullscreen; encrypted-media" allowfullscreen '
             f'loading=lazy title="{_html.escape(c["name"])}"></iframe></div>'
             f'<figcaption><span>{_html.escape(c["name"])}</span>'
             f'<button class=fs type=button data-src="{_html.escape(c["src"])}">⛶ На весь экран</button>'
-            f'</figcaption></figure>'
-            for c in cams) + '</div>' + FS_HOW
+            f'</figcaption></figure>')
+
+
+def _zaglushka(c: dict, windows: list) -> str:
+    kogda = ", ".join(t for *_, t in windows)
+    return (f'<figure><div class="frame off"><p>Трансляция идёт в часы занятий группы: '
+            f'{_html.escape(kogda)}</p></div>'
+            f'<figcaption><span>{_html.escape(c["name"])}</span></figcaption></figure>')
+
+
+def page(now: datetime | None = None) -> str:
+    cams = _cameras()
+    ok = okna()
+    if ok:
+        # Окна заданы: только кабинеты с окном, плеер — только внутри окна.
+        now = now or datetime.now(MSK)
+        cams = [(c, ok[_komnata(c["name"])]) for c in cams if _komnata(c["name"]) in ok]
+        plitki = [_plitka(c) if _seychas_vidno(w, now) else _zaglushka(c, w) for c, w in cams]
+        live = any(_seychas_vidno(w, now) for _, w in cams)
+    else:
+        plitki = [_plitka(c) for c in cams]
+        live = bool(cams)
+    if plitki:
+        body = '<div class=cams>' + "".join(plitki) + '</div>' + (FS_HOW if live else "")
     else:
         body = ('<div class=empty>Камеры ещё не подключены. Если вы видите это '
                 'сообщение — напишите нам в WhatsApp, поможем.</div>')

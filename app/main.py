@@ -1452,6 +1452,7 @@ OWNER_FIELDS = [
     ("tbank_inn", "ИНН компании для Т-Банка", False),
     ("komtet_login", "Комтет Касса — логин пользователя «только просмотр»", False),
     ("komtet_password", "Комтет Касса — пароль", True),
+    ("cam_okna", "Камеры для родителей — кабинеты и часы показа: «К4 пн-пт 09:00-13:00; К2 пн-пт 10:00-14:00». «-» — без ограничений, как раньше", False),
     ("ivideon_login", "Ivideon — логин пользователя с доступом к камерам", False),
     ("ivideon_password", "Ivideon — пароль", True),
     ("pochta_password", "Почта kidsup.claude@yandex.ru — пароль (вход через браузер, читать коды)", True),
@@ -4614,7 +4615,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-15.5"
+APP_VERSION = "2026-10-16.1"
 
 
 @app.get("/api/net")
@@ -4672,7 +4673,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
             "roistat_project", "roistat_key",
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
-            "cam_password", "cam_embeds", "tbank_token", "tbank_inn", "ivideon_login", "ivideon_password", "komtet_login", "komtet_password", "komtet_imap_password", "pochta_password", "komtet_code", "ivideon_code", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
+            "cam_password", "cam_embeds", "cam_okna", "tbank_token", "tbank_inn", "ivideon_login", "ivideon_password", "komtet_login", "komtet_password", "komtet_imap_password", "pochta_password", "komtet_code", "ivideon_code", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
             "hooppy_token", "tbank_terminal", "tbank_terminal_password", "zenmoney_token", "green_api_instance", "green_api_token",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую

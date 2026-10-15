@@ -207,6 +207,11 @@ def run(day: str | None = None, dry: bool = False) -> dict:
                 od = (datetime.fromisoformat(o["operationDate"].replace("Z", "+00:00")) + timedelta(hours=3)).date().isoformat()
                 pp = o.get("payPurpose") or ""
                 m = re.search(r"ФИО обуч\.?\s*([А-ЯЁ][а-яё-]+)\s+([А-ЯЁ][а-яё]+)", pp)
+                if not m:
+                    # 16.10: у части платежей СФР нет «ФИО обуч.» — ребёнок стоит последним
+                    # перед «}»: «…дог 4 от 01.09.2026 Фамилия Имя Отчество}». Без
+                    # этого контроль писал «за ? ?» и просил внести маткапитал ребёнка клуба.
+                    m = re.search(r"([А-ЯЁ][а-яё-]+)\s+([А-ЯЁ][а-яё]+)\s+[А-ЯЁ][а-яё]+\s*\}", pp)
                 fam, im = (m[1], m[2]) if m else ("?", "?")
                 amt = o["operationAmount"]
                 if m and not any(fam.lower().replace("ё", "е") in n and im.lower().replace("ё", "е") in n for n in nashi):
