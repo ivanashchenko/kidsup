@@ -90,7 +90,41 @@ async def _public_hosts(request, call_next):
     if host == "kidsupweek.ru" and not path.startswith(("/api", "/static", "/go", "/wazzup", "/hook")):
         from fastapi.responses import RedirectResponse
         return RedirectResponse("https://kidsup.ru/#schedule", status_code=301)
+    # 15.10.2026, Борис открыл из чата «app.kidsup.ru/sverka-chestnosti.» и получил
+    # {"detail":"Not Found"}: мессенджер прихватил в ссылку точку после адреса.
+    # Знак препинания в конце адреса (или в конце ?day=…) срезаем и уводим на
+    # чистый адрес — в наших путях и датах такие знаки не встречаются.
+    # API и статику не трогаем: их зовёт код, а не человек из чата.
+    if request.method in ("GET", "HEAD") and not path.startswith(("/api/", "/static/", "/wazzup", "/hook")):
+        chisto = _bez_hvosta_ssylki(request.scope.get("path") or path, request.url.query)
+        if chisto:
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(chisto, status_code=307)
     return await call_next(request)
+
+
+_HVOST_SSYLKI = ".,;:!?)»”\"'"
+_HVOST_SSYLKI_KOD = ("%2E", "%2C", "%3B", "%3A", "%21", "%3F", "%29", "%C2%BB", "%E2%80%9D", "%22", "%27")
+
+
+def _bez_hvosta_ssylki(path: str, query: str = "") -> str:
+    """Адрес без прихваченной мессенджером пунктуации в конце или "" — если чистить нечего."""
+    def _srezat(s: str) -> str:
+        while True:
+            t = s.rstrip(_HVOST_SSYLKI)
+            for kod in _HVOST_SSYLKI_KOD:
+                if t.upper().endswith(kod):
+                    t = t[:-len(kod)]
+            if t == s:
+                return s
+            s = t
+    if query:
+        q = _srezat(query)
+        return (path + ("?" + q if q else "")) if q != query else ""
+    if len(path) > 1:
+        p = _srezat(path)
+        return (p or "/") if p != path else ""
+    return ""
 
 
 # 17.09: сайт отдаётся uvicorn напрямую, без сжатия на прокси — главная уходила в телефон
