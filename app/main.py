@@ -2545,6 +2545,51 @@ def boris_page():
     return HTMLResponse(boris.page())
 
 
+_DOC_HEADERS = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"}
+
+
+@app.get("/boris/docs", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+def boris_docs_page():
+    """Документы владельца — только под логином boris (15.10.2026, app/boris_docs.py)."""
+    from . import boris_docs
+    return HTMLResponse(boris_docs.page(), headers=_DOC_HEADERS)
+
+
+@app.get("/boris/docs/{slug}", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+def boris_doc(slug: str):
+    from . import boris_docs
+    html = boris_docs.get(slug)
+    if html is None:
+        raise HTTPException(404, "нет такого документа")
+    return HTMLResponse(html, headers=_DOC_HEADERS)
+
+
+@app.get("/api/boris-docs", dependencies=OWNER_AUTH)
+def api_boris_docs():
+    from . import boris_docs
+    return {"items": boris_docs.spisok()}
+
+
+@app.post("/api/boris-docs", dependencies=OWNER_AUTH)
+def api_boris_docs_save(payload: dict = Body(...)):
+    """{"slug", "title", "html", "note"?, "order"?} — записать или заменить документ владельца."""
+    from . import boris_docs
+    try:
+        r = boris_docs.save(str(payload.get("slug") or ""), str(payload.get("title") or ""),
+                            str(payload.get("html") or ""), str(payload.get("note") or ""),
+                            payload.get("order"))
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, **r}
+
+
+@app.post("/api/boris-docs/remove", dependencies=OWNER_AUTH)
+def api_boris_docs_remove(payload: dict = Body(...)):
+    """{"slug"} — убрать документ из списка (файл уходит в архив)."""
+    from . import boris_docs
+    return {"ok": boris_docs.remove(str(payload.get("slug") or ""))}
+
+
 @app.get("/api/boris/tasks", dependencies=AUTH)
 def api_boris_tasks():
     from . import boris
@@ -4569,7 +4614,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-15.4"
+APP_VERSION = "2026-10-15.5"
 
 
 @app.get("/api/net")
