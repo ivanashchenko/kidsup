@@ -100,8 +100,11 @@ def store(payload: dict) -> int:
         try:
             contact = msg.get("contact") if isinstance(msg.get("contact"), dict) else {}
             mid = str(msg.get("messageId") or "")
-            # 15.10, ревью: текст не строкой (словарь, список) — как вложение, а не repr
-            text = msg.get("text").strip() if isinstance(msg.get("text"), str) else ""
+            # 15.10, ревью: текст не строкой (словарь, список) — как вложение, а не repr;
+            # число («5») сохраняем числом-текстом, как было до правки
+            t = msg.get("text")
+            text = (t if isinstance(t, str)
+                    else str(t) if isinstance(t, (int, float)) and not isinstance(t, bool) else "").strip()
             kind = str(msg.get("type") or "text")
             if msg.get("isDeleted"):
                 deletes.append(mid)

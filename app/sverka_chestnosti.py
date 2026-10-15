@@ -175,6 +175,24 @@ def msk(ts: str | None) -> str:
         return str(ts)
 
 
+def den_msk(ts: str | None) -> str | None:
+    """День по Москве для ts журнала (триггер пишет datetime('now') в UTC).
+    15.10, ревью: правку, записанную в 00:07 МСК, день по UTC относил к
+    вчерашнему — и честное окончание «по сроку» становилось жёлтым."""
+    if not ts:
+        return None
+    s = str(ts).replace("T", " ").replace("Z", "")[:19]
+    try:
+        return (datetime.fromisoformat(s) + timedelta(hours=3)).date().isoformat()
+    except ValueError:
+        return s[:10] or None
+
+
+def _rub(x: float) -> str:
+    """Число с пробелом между тысячами: 1 025. Только число — запятые в тексте не трогаем."""
+    return f"{x:,.0f}".replace(",", " ")
+
+
 def raznica(tbl: str, old: dict, new: dict) -> dict:
     """Какие значимые поля изменились: {поле: (было, стало)}."""
     out = {}
@@ -246,11 +264,13 @@ def ocenit_pravku(tbl: str, old: dict, new: dict, den: str | None = None) -> dic
         if "visitCount" in d:
             a, b = _num(d["visitCount"][0]), _num(d["visitCount"][1])
             pa, pb = _num(old.get("price", new.get("price"))), _num(new.get("price"))
-            # 15.10, ревью: сравниваем цену ЗА ЗАНЯТИЕ — «+3 занятия и +1 ₽» тоже уступка
-            if b > a > 0 and pa > 0 and _num(new.get("payed")) > 0 and pb / b < pa / a * 0.9:
+            # 15.10, ревью: сравниваем цену ЗА ЗАНЯТИЕ — «+3 занятия и +1 ₽» тоже уступка.
+            # Допуск только на округление (0,5 %): с порогом 10 % «+1 занятие
+            # без доплаты» в абонементах от 9 занятий проходило справкой.
+            if b > a > 0 and pa > 0 and _num(new.get("payed")) > 0 and pb / b < pa / a * 0.995:
                 lvl = "yellow" if lvl != "red" else lvl
                 chto.append(f"в оплаченный абонемент добавлены занятия {a:g} → {b:g}, "
-                            f"цена за занятие {pa / a:,.0f} → {pb / b:,.0f} ₽".replace(",", " "))
+                            f"цена за занятие {_rub(pa / a)} → {_rub(pb / b)} ₽")
             else:
                 chto.append(f"занятий в абонементе {a:g} → {b:g}")
         for f in ("beginDate", "endDate", "sellDate", "freezeFrom", "freezeTo", "classIds"):
@@ -442,6 +462,18 @@ def _is_404(e: Exception) -> bool:
 _RUN_LOCK = threading.Lock()
 
 
+class UzheIdet(RuntimeError):
+    """Боевой прогон уже идёт. 15.10, ревью: отказ второго прогона писался
+    в журнал как ERROR с трассой, API отвечал 500, а автопилот тратил отметку
+    повтора 11:45 — и если утренний прогон потом падал, повтора в этот день
+    не было. Теперь это отдельный случай: INFO, 409, отметку не тратим."""
+
+
+def zanyato() -> bool:
+    """Идёт ли сейчас боевой прогон (для автопилота: не тратить отметку)."""
+    return _RUN_LOCK.locked()
+
+
 def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dict:
     """Один прогон сверки. Боевой (dry=False) — не больше одного за раз:
     15.10, ревью — повтор в 11:45 мог стартовать поверх идущего утреннего, и
@@ -449,7 +481,7 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
     if dry:
         return _run(day, dry=True, days=days)
     if not _RUN_LOCK.acquire(blocking=False):
-        raise RuntimeError("сверка честности уже идёт — второй боевой прогон не запускаю")
+        raise UzheIdet("сверка честности уже идёт — второй боевой прогон не запускаю")
     try:
         return _run(day, dry=False, days=days)
     finally:
@@ -504,7 +536,7 @@ def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> di
                 f"SELECT id, ts, tbl, rid, user_id, old_raw, new_raw FROM izmeneniya WHERE {usl} ORDER BY id", args):
             n_pravok += 1
             old, new = _j(r["old_raw"]), _j(r["new_raw"])
-            oc = ocenit_pravku(r["tbl"], old, new, den=(r["ts"] or "")[:10] or None)
+            oc = ocenit_pravku(r["tbl"], old, new, den=den_msk(r["ts"]))
             if not oc:
                 continue
             if r["tbl"] == "users":
@@ -651,7 +683,7 @@ def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> di
                         db.set_state("sverka_chestnosti_balans", json.dumps(dict(list(provereno.items())[-3000:])))
                     plus = [x for x in rash if x["delta"] > 0]
                     if plus:
-                        nakhodka("info", "синк", f"У {len(plus)} клиентов баланс больше суммы платежей (всего {sum(x['delta'] for x in plus):,.0f} ₽) — платежи есть в МойКлассе, у нас нет: пропуск синка, не честность.".replace(",", " "))
+                        nakhodka("info", "синк", f"У {len(plus)} клиентов баланс больше суммы платежей (всего {_rub(sum(x['delta'] for x in plus))} ₽) — платежи есть в МойКлассе, у нас нет: пропуск синка, не честность.")
                 else:
                     nakhodka("info", "предохранитель", f"Полный синк старше 26 часов ({last_sync or 'нет'}): тождество баланса не считали, данные неполные.")
             finally:
@@ -709,9 +741,10 @@ def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> di
                     n_l += 1
         autopilot.inbox_add(R["summary"], "", "Борис", source="сверка честности")
         R["inbox_posted"] = {"Борис": n_b, "Лиза": n_l}
-        # 14.10, повторное ревью: файл дня пишется после пунктов пульта (раньше
-        # inbox_posted в него не попадал) и атомарно — страница не прочтёт половину.
-        _zapisat_den(day, R)
+        # 15.10, ревью: память удалений и закладки журнала пишем ДО файла дня.
+        # Раньше сбой между файлом и закладками не повторялся в 11:45 (proshla()
+        # видела файл), а назавтра прогон заново находил те же удаления — и
+        # Борис получал повторно пункты, которые уже закрыл.
         izvestno.update({k: day for k in novye_udaleniya})
         db.set_state("sverka_chestnosti_udaleno", json.dumps(pochistit_izvestno(izvestno, d0), ensure_ascii=False))
         try:
@@ -730,6 +763,12 @@ def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> di
         db.set_state("sverka_chestnosti_id", str(max_id))
         db.set_state("sverka_chestnosti_ts", now_utc.strftime("%Y-%m-%d %H:%M:%S"))
         db.set_state("sverka_chestnosti_den", day)
+        # 14.10, повторное ревью: файл дня — после пунктов пульта (в нём inbox_posted)
+        # и атомарно, страница не прочтёт половину
+        try:
+            _zapisat_den(day, R)
+        except Exception:  # noqa: BLE001
+            log.exception("сверка честности: файл дня не записался (пункты и закладки уже сохранены)")
     return R
 
 
@@ -756,6 +795,8 @@ def run_safe(day: str | None = None) -> None:
     журнал приложения, а автопилот повторяет прогон в 11:45, если proshla() ложно."""
     try:
         run(day, dry=False)
+    except UzheIdet:
+        log.info("сверка честности: прогон уже идёт — пропуск")
     except Exception:  # noqa: BLE001
         log.exception("сверка честности: прогон упал")
 
@@ -911,6 +952,19 @@ def _selftest() -> int:
     assert ov and ov["level"] == "yellow", ov
     ow = ocenit_pravku("user_subscriptions", {"visitCount": 8, "price": 9000, "payed": 9000}, {"visitCount": 12, "price": 13500, "payed": 13500})
     assert ow and ow["level"] == "info", ow
+    # 15.10, ревью: «+1 занятие без доплаты» в абонементе на 9 — тоже уступка (порог 0,5 %)
+    o910 = ocenit_pravku("user_subscriptions", {"visitCount": 9, "price": 8300, "payed": 8300},
+                         {"visitCount": 10, "price": 8300, "payed": 8300})
+    assert o910 and o910["level"] == "yellow" and "1 025" not in o910["chto"], o910
+    assert "добавлены занятия 9 → 10, цена за занятие" in o910["chto"], o910   # запятая на месте
+    # 15.10, ревью: день правки — по Москве; 21:07 UTC 11.10 — это уже 12.10
+    assert den_msk("2026-10-11 21:07:00") == "2026-10-12" and den_msk("2026-10-11 20:59:00") == "2026-10-11"
+    assert den_msk(None) is None and den_msk("") is None
+    oms = ocenit_pravku("user_subscriptions", dict(sub, endDate="2026-10-11"), dict(sub, statusId=4, endDate="2026-10-11"),
+                        den=den_msk("2026-10-11 21:07:00"))
+    assert oms and oms["level"] == "info" and "по сроку" in oms["chto"], oms
+    # 15.10, ревью: занятый прогон — отдельный класс, не общий RuntimeError
+    assert issubclass(UzheIdet, RuntimeError) and not zanyato()
     # 15.10: красное — только пропавший приход денег; пересчёт абонемента — не тревога
     assert uroven_udaleniya("payments", {"optype": "income", "summa": 5000}) == "red"
     assert uroven_udaleniya("payments", {"optype": "income", "summa": 0}) == "yellow"
@@ -1030,9 +1084,10 @@ def _selftest_run() -> None:
             # второй боевой прогон поверх идущего не запускается
             assert _RUN_LOCK.acquire(blocking=False)
             try:
+                assert zanyato(), "занятый замок должен быть виден автопилоту"
                 run(day2, dry=False)
-            except RuntimeError:
-                pass
+            except UzheIdet:
+                run_safe(day2)          # не падает и не пишет ERROR — только INFO
             else:
                 raise AssertionError("второй боевой прогон должен отказаться")
             finally:

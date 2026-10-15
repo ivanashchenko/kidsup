@@ -2914,10 +2914,12 @@ def wazzup_forward(payload: dict) -> bool:
 
 
 def _wazzup_tag(payload: dict) -> None:
-    for msg in payload.get("messages", []):
-        if msg.get("isEcho"):
+    # 15.10, ревью: кривой элемент (не словарь, chatType не строка) ронял поток
+    # вебхука до разбора входящих — пропускаем его
+    for msg in payload.get("messages") or []:
+        if not isinstance(msg, dict) or msg.get("isEcho"):
             continue
-        tag_id = CHANNEL_TAG.get((msg.get("chatType") or "").lower())
+        tag_id = CHANNEL_TAG.get(str(msg.get("chatType") or "").lower())
         phone = "".join(ch for ch in str(msg.get("chatId") or "") if ch.isdigit())
         if not tag_id or len(phone) < 10:
             continue
@@ -4133,6 +4135,9 @@ def api_sverka_chestnosti_run(day: str = "", dry: int = 1):
     den = _sverka_den(day, 400)
     try:
         return sverka_chestnosti.run(den, dry=bool(dry))
+    except sverka_chestnosti.UzheIdet as e:
+        # 15.10, ревью: занятый прогон — не ошибка сервера, а понятное «уже идёт»
+        raise HTTPException(409, str(e))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, f"sverka_chestnosti: {type(e).__name__}: {str(e)[:300]}")
 
@@ -4416,15 +4421,17 @@ def _wazzup_status(payload: dict) -> None:
     rows = []
     ts = autopilot._now().isoformat(timespec="seconds")
     # 15.10, ревью: элемент не словарь не должен ронять статусы всего события
+    # 15.10, повторное ревью: статус не строкой (словарь) пропускаем, а не пишем repr
     for st in payload.get("statuses", []) or []:
-        if not isinstance(st, dict):
+        if not isinstance(st, dict) or not isinstance(st.get("status"), str):
             continue
-        mid, status = str(st.get("messageId") or ""), str(st.get("status") or "")
+        mid, status = str(st.get("messageId") or ""), st["status"]
         if mid and status:
             rows.append((mid, status, ts))
     for m in payload.get("messages", []) or []:
-        if isinstance(m, dict) and m.get("isEcho") and m.get("messageId") and m.get("status"):
-            rows.append((str(m["messageId"]), str(m["status"]), ts))
+        if isinstance(m, dict) and m.get("isEcho") and m.get("messageId") and isinstance(m.get("status"), str) \
+                and m["status"]:
+            rows.append((str(m["messageId"]), m["status"], ts))
     if not rows:
         return
     rank = {"sent": 1, "delivered": 2, "read": 3, "error": 0}
@@ -4475,7 +4482,10 @@ def _wazzup_process(payload: dict) -> None:
     if not wazzup_forward(payload):
         _fwd_store(payload)  # автопилот дошлёт позже
         logging.getLogger("kidsup.wazzup").warning("пересылка в МойКласс не удалась — в очередь")
-    _wazzup_tag(payload)
+    try:
+        _wazzup_tag(payload)
+    except Exception:
+        logging.getLogger("kidsup.wazzup").exception("тег канала: событие не разобрано")
     try:
         # 17.09: семья, у которой спросили почту для «Твой Класс», прислала адрес —
         # вписать в карточку и ответить инструкцией входа

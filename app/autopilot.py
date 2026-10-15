@@ -5081,7 +5081,9 @@ def _loop() -> None:
             if now.hour in (8, 11) and 45 <= now.minute < 60:
                 try:
                     from . import sverka_chestnosti
-                    if not sverka_chestnosti.proshla(str(_today())) and _mark(
+                    # 15.10, ревью: пока идёт утренний прогон, отметку повтора не тратим —
+                    # иначе, упади он позже, повтора в этот день уже не будет
+                    if not sverka_chestnosti.proshla(str(_today())) and not sverka_chestnosti.zanyato() and _mark(
                             "sverka_chestnosti", str(_today()) if now.hour == 8 else f"{_today()}:11"):
                         threading.Thread(target=sverka_chestnosti.run_safe, daemon=True).start()
                 except Exception:
