@@ -40,6 +40,17 @@ OTRABOTANO = {125955,      # Клиент
 
 PUSTYSHKA = re.compile(r"действий не требуется|не требует действий|\[непонятно\]", re.I)
 
+# 15.10.2026, жалоба Лены «в пульте одна мусорка»: порции обзвона базы
+# (vozvrat.razdat, источник «возврат…») утро за утром переносились без
+# срока — 24 новых в день сверху, и к 15.10 у Лены и Ани висело 300+
+# невзятых звонков. Порция обзвона — не обещание семье: невзятую за два дня
+# закрываем с пометкой, номер вернётся в общую очередь (razdat раздаёт тех,
+# у кого нет открытого пункта). Если админ уже звонил — даём четыре дня.
+VOZVRAT_DNEY = 2
+VOZVRAT_DNEY_S_POPYTKAMI = 4
+# Предел текста пункта — тот же, что у нового пункта и у правки (main.py).
+PREDEL_TEKSTA = 700
+
 # Обязательство перед семьёй или перед законом не гаснет от того, что семья
 # заплатила или сменила статус: деньги вернуть, документ выдать, на жалобу
 # ответить. Такие пункты автоматически не закрываем никогда — только человек.
@@ -403,8 +414,10 @@ def utro(dry: bool = False) -> dict:
          смене, иначе — дежурной, у которой меньше дел. Уровень важности
          (prio) сохраняется, пометка «⏳ с ДД.ММ» — чтобы было видно возраст.
     Задачи смены (pult_tasks) не переносим: они собраны под свой день.
+    Порции обзвона базы («возврат…») не переносим бесконечно — см. VOZVRAT_DNEY.
     """
     from . import pult
+    from .autopilot import obrezat
     segodnya = pult.today()
     smena = [w for w in pult.duty(segodnya) if w in set(pult.SHORT.values())]
     itog = {"день": segodnya, "смена": smena, "закрыто": [], "перенесено": 0,
@@ -412,8 +425,9 @@ def utro(dry: bool = False) -> dict:
     with db.get_conn() as conn:
         pult._inbox_tries(conn)
         rows = conn.execute(
-            "SELECT id, day, who, text, phone, prio FROM plan_inbox "
-            "WHERE done=0 AND day<? ORDER BY day, COALESCE(prio, 250), id", (segodnya,)).fetchall()
+            "SELECT id, day, who, text, phone, prio, source, ts, COALESCE(tries, 0) AS tries "
+            "FROM plan_inbox WHERE done=0 AND day<? ORDER BY day, COALESCE(prio, 250), id",
+            (segodnya,)).fetchall()
         if not rows:
             return itog
         s_daty = min(r["day"] for r in rows)
@@ -458,6 +472,19 @@ def utro(dry: bool = False) -> dict:
                     sled.append("ребёнок был на занятии после этой даты")
                 if p and razgovory.get(p, "")[:10] > den:
                     sled.append(f"разговор от 30 с {razgovory[p][:10]}")
+            # обещание, дописанное к порции («договорились на пятницу»), не гасим
+            if (not sled and kto != "Борис" and not OBYAZATELSTVO.search(tekst)
+                    and str(r["source"] or "").startswith("возврат")):
+                sozdan = str(r["ts"] or "")[:10]
+                try:
+                    vozrast = (_d.fromisoformat(segodnya) - _d.fromisoformat(sozdan)).days
+                except ValueError:
+                    vozrast = (_d.fromisoformat(segodnya) - _d.fromisoformat(den)).days
+                popytok = int(r["tries"] or 0)
+                if vozrast >= (VOZVRAT_DNEY_S_POPYTKAMI if popytok else VOZVRAT_DNEY):
+                    sled.append((f"не дозвонились за {vozrast} дн. ({popytok} попыт.)" if popytok
+                                 else f"порция обзвона не взята за {vozrast} дн.")
+                                + " — номер вернётся в общую очередь обзвона")
             if sled:
                 itog["закрыто"].append({"id": r["id"], "кто": kto, "почему": "; ".join(sled)})
                 if not dry:
@@ -473,13 +500,16 @@ def utro(dry: bool = False) -> dict:
             if novyj in nagruzka and den_novyj == segodnya:
                 nagruzka[novyj] += 1
             metka = "" if tekst.startswith("⏳") else f"⏳ с {den[8:10]}.{den[5:7]}: "
-            if len(metka) + len(tekst) > 400:
+            if len(metka) + len(tekst) > PREDEL_TEKSTA:
                 metka = ""          # обрезанный на полуслове текст хуже, чем без пометки
             itog["перенесено"] += 1
             itog["по_людям"][novyj] = itog["по_людям"].get(novyj, 0) + 1
             if not dry:
+                # 15.10.2026: здесь стоял срез [:400], а пункт с 08.10 бывает до
+                # 700 символов — каждый перенос отрезал хвост посреди слова
+                # («…ближайшие: вт 13»), в хвосте Ани таких было больше сотни.
                 conn.execute("UPDATE plan_inbox SET day=?, who=?, text=? WHERE id=?",
-                             (den_novyj, novyj, (metka + tekst)[:400], r["id"]))
+                             (den_novyj, novyj, obrezat(metka + tekst, PREDEL_TEKSTA), r["id"]))
     # Задачи смены вчерашнего дня, которые остались у того, кого сегодня нет
     # (решение Бориса 25.09: недоделанное Аней в пятницу — Ире на выходные).
     # Переносим только вчерашние: старше — уже устарели, их собирает наряд.

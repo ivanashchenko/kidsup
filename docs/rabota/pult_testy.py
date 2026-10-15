@@ -249,10 +249,58 @@ def test_zayavki_odin_punkt():
         config.DB_PATH = staryj
 
 
+# ── 9. Утро пульта: порции обзвона не копятся, текст не режется ──────────
+# 15.10: у Лены и Ани висело 300+ невзятых «возвратов» — утро переносило их
+# без срока, а сам перенос резал текст на 400 символах посреди слова.
+def test_utro():
+    print("Утро пульта (hvost.utro): срок «возвратам», текст целиком")
+    from app import config, hvost, pult
+    staryj, st_today, st_duty = config.DB_PATH, pult.today, pult.duty
+    config.DB_PATH = os.path.join(tempfile.mkdtemp(), "t.db")
+    try:
+        pult.today = lambda: "2026-10-16"          # пятница, в смене одна Ира
+        pult.duty = lambda day: ["Ира"]
+        conn = sqlite3.connect(config.DB_PATH)
+        conn.execute("""CREATE TABLE plan_inbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT, who TEXT,
+            text TEXT, phone TEXT, source TEXT, done INTEGER DEFAULT 0,
+            tries INTEGER DEFAULT 0, prio INTEGER)""")
+        dlinnyj = "ЗАЯВКА: " + "очень длинный текст пункта " * 22 + "КОНЕЦ"
+        for r in (
+            ("2026-10-15", "2026-10-13T08:01+03:00", "Аня", "БАЗА 2024/25: Иванов", "79990000001", "возврат: база 2024/25", 0),
+            ("2026-10-15", "2026-10-15T08:01+03:00", "Лена", "ДУМАЕТ: Петров", "79990000002", "возврат: думает", 0),
+            ("2026-10-15", "2026-10-13T08:01+03:00", "Лена", "НЕДОЗВОН: Сидоров", "79990000003", "возврат: недозвон", 2),
+            ("2026-10-15", "2026-10-11T08:01+03:00", "Лена", "НЕДОЗВОН: Козлов", "79990000004", "возврат: недозвон", 1),
+            ("2026-10-15", "2026-10-12T08:01+03:00", "Лена", "БАЗА: Орлов — договорились на пт", "79990000005", "возврат: база 2024/25", 0),
+            ("2026-10-15", "2026-10-15T09:00+03:00", "Лена", dlinnyj, "79990000006", "план 15.10", 0),
+            ("2026-10-15", "2026-10-10T09:00+03:00", "Лиза", "Маткапитал: вернуть 1 000", "79990000007", "звонок", 0),
+        ):
+            conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source, tries) "
+                         "VALUES (?,?,?,?,?,?,?)", r)
+        conn.commit()
+        conn.close()
+        itog = hvost.utro()
+        conn = sqlite3.connect(config.DB_PATH)
+        got = {r[0]: r[1:] for r in conn.execute("SELECT phone, done, day, who, text FROM plan_inbox")}
+        conn.close()
+        proverka("три дня без попыток — закрыт", got["79990000001"][0], 1)
+        proverka("в пометке — куда делся номер", "общую очередь обзвона" in got["79990000001"][3], True)
+        proverka("вчерашний — перенесён Ире", got["79990000002"][:3], (0, "2026-10-16", "Ира"))
+        proverka("с попытками держим четыре дня", got["79990000003"][0], 0)
+        proverka("пять дней с попытками — закрыт", got["79990000004"][0], 1)
+        proverka("«договорились» — не закрываем", got["79990000005"][0], 0)
+        proverka("длинный текст перенесён целиком", got["79990000006"][3].endswith("КОНЕЦ"), True)
+        proverka("пометка возраста на длинном", got["79990000006"][3].startswith("⏳ с 15.10: "), True)
+        proverka("обязательство Лизы остаётся у Лизы", got["79990000007"][:3], (0, "2026-10-16", "Лиза"))
+        proverka("закрыто ровно два", len(itog["закрыто"]), 2)
+    finally:
+        pult.today, pult.duty, config.DB_PATH = st_today, st_duty, staryj
+
+
 def main():
     for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_audit,
               test_data_gruppy, test_povtor,
-              test_zayavki_odin_punkt):
+              test_zayavki_odin_punkt, test_utro):
         t()
         print()
     if oshibok:
