@@ -325,6 +325,16 @@ def _tel(phone: str | None) -> str:
     return ""
 
 
+def _liniya(phone) -> str:
+    """Неприметная ссылка «Линия» рядом с номером: справка о семье и готовые
+    ответы на время разговора (/liniya). Нет номера — пусто."""
+    d = "".join(c for c in str(phone or "") if c.isdigit())
+    if len(d) < 10:
+        return ""
+    return (f" <a href='/liniya?phone={d[-10:]}' style='font-size:12px;color:#6c6a86;white-space:nowrap' "
+            f"title='Кто это, что было, свободные группы и готовые ответы — на время разговора'>Линия</a>")
+
+
 def _sklon(n: int, one: str, few: str, many: str) -> str:
     """«1 пункт», «2 пункта», «32 пункта», «5 пунктов» — админ читает это
     каждый день, и «32 пунктов» бьёт по глазам."""
@@ -711,6 +721,15 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
                             f"оплата {d_[8:10]}.{d_[5:7]} · {summa:,} ₽</span>".replace(",", " "))
         import re as _re2
         nums = set(_re2.findall(r"\b[78]?9\d{9}\b", (it.get("text") or "") + " " + (it.get("phone") or "")))
+        # «Линия» — у дела с телефоном в поле или ровно с одним номером в тексте
+        # (у задач смены номер всегда внутри текста, бывает и «7 999 000-10-01»)
+        if it["kind"] != "task" and len("".join(c for c in str(it.get("phone") or "") if c.isdigit())) >= 10:
+            tel += _liniya(it.get("phone"))
+        else:
+            from .svidetelstva import _telefony
+            v_tekste = _telefony(_re2.sub(r"<[^>]+>", " ", it.get("text") or ""))
+            if len(v_tekste) == 1:
+                tel += _liniya(v_tekste[0])
         if not it["done"] and len(nums) == 1:
             ctrl = (f" <a href='#' style='font-size:12px;color:#8a5a00;white-space:nowrap' "
                     f"title='Набрала, никто не взял — дело останется, попытка запишется' onclick=\""
@@ -1041,7 +1060,8 @@ def promises_page(day: str, who: str) -> str:
         if len(ph) >= 10:
             _t = _tel(ph)
             links = ((f" <a href='tel:+{_t}' style='color:{c};font-weight:700;white-space:nowrap'>📞 +{_t}</a>"
-                      f" <a href='https://wa.me/{_t}' style='color:#25D366;font-weight:700'>WA</a>")
+                      f" <a href='https://wa.me/{_t}' style='color:#25D366;font-weight:700'>WA</a>"
+                      f" <a href='/liniya?phone={_t}' style='color:#6c6a86;font-weight:700'>Линия</a>")
                      if _t else "")
         txt = html.escape(r["text"] or "")
         head, sep, tail = txt.partition(" — ")

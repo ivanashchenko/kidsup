@@ -126,7 +126,7 @@ function render(){
   const kids=x.kids.length?x.kids.map(k=>`${esc(k.n)}${k.age?` <small>${esc(k.age)} г.</small>`:''}`).join(', '):esc(x.name);
   const offers=x.offer.map(o=>`<span class="offer">${esc(o.t)}${o.free===null?'':` · <i class="${o.free?'':'z'}">${o.free?'мест '+o.free:'мест нет'}</i>`}</span>`).join('');
   el.innerHTML=`<div class="who">${tab==='plan'?`<span class="num">${n}.</span>`:''}<span class="kind k-${x.kind}">${esc(lbl(x.kind))}</span>${kids}${tab==='plan'&&x.prio!=null&&x.prio<900?'<span class="star">★ начать с этого</span>':''}${x.chej&&x.chej!==D.who?` <small>(из Пульта: ${esc(x.chej)})</small>`:''}<div class="meta">${esc(x.meta)}</div></div>
-   <div class="phone">${x.phone?`<a href="tel:+${esc(x.phone)}">${fmt(x.phone)}</a>`:'<span class="meta">нет телефона</span>'}</div>
+   <div class="phone">${x.phone?`<a href="tel:+${esc(x.phone)}">${fmt(x.phone)}</a><a class="btn" href="/liniya?phone=${esc(x.phone)}" target="_blank" rel="noopener" title="Кто это, что было, свободные группы и готовые ответы">Линия</a>`:'<span class="meta">нет телефона</span>'}</div>
    ${offers?`<div class="offers">${offers}</div>`:''}
    <div class="res">${RES.map(([k,t])=>`<button class="btn ${k}" type="button" data-k="${k}" aria-pressed="${m===k}">${t}</button>`).join('')}
     <input type="text" id="note-${x.id}" placeholder="коротко: группа и дата / почему" value="${esc(x.itog&&!x.itog_staryi?x.itog.note:'')}">

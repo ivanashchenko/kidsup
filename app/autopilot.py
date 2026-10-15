@@ -4703,6 +4703,17 @@ def store_calls(rows: list[dict]) -> int:
             conn.execute("ALTER TABLE mango_calls ADD COLUMN secs INTEGER DEFAULT 0")
         except Exception:
             pass                      # колонка уже есть
+        # 15.10.2026, «Линия» (/liniya?ext=12): чей аппарат вёл разговор. mango.calls()
+        # знает добавочный (по SIP-логину или from_ext), а в журнал он не попадал.
+        # Только добавляем колонку: ts, phone, direction и state не меняются —
+        # на них стоят SLA, хвост, аудит, обзвон и воронка.
+        try:
+            conn.execute("ALTER TABLE mango_calls ADD COLUMN ext TEXT")
+        except Exception:
+            pass                      # колонка уже есть
+        # не добавилась (база занята) — пишем как раньше, без добавочного:
+        # журнал важнее подписи аппарата
+        est_ext = "ext" in {c[1] for c in conn.execute("PRAGMA table_info(mango_calls)")}
         for r in rows:
             start = r.get("start")
             if not start:
@@ -4721,10 +4732,26 @@ def store_calls(rows: list[dict]) -> int:
             # разговором от 30 секунд. Проверить это было нечем — в журнале
             # лежал лишь признак talked (порог Манго — 20 с). Пишем секунды.
             secs = max(0, fin - ans) if ans and fin else 0
+            # добавочный админа: у исходящего — свой (SIP-логин или from_ext), у
+            # входящего mango.calls() его часто не знает — тогда to_ext
+            dob = str(r.get("ext") or r.get("to_ext") or "")
+            napr = "out" if ext else "in"
+            if not est_ext:
+                cur = conn.execute(
+                    "INSERT OR IGNORE INTO mango_calls (ts, phone, direction, state, rec_id, secs) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (ts, phone, napr, state, str(r.get("rec") or ""), secs))
+                added += cur.rowcount
+                continue
             cur = conn.execute(
-                "INSERT OR IGNORE INTO mango_calls (ts, phone, direction, state, rec_id, secs) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (ts, phone, "out" if ext else "in", state, str(r.get("rec") or ""), secs))
+                "INSERT OR IGNORE INTO mango_calls (ts, phone, direction, state, rec_id, secs, ext) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (ts, phone, napr, state, str(r.get("rec") or ""), secs, dob))
+            if not cur.rowcount and dob:
+                # строка уже была (опрос перечитывает 15 минут, до этой версии
+                # добавочный не писался) — дописываем только пустой добавочный
+                conn.execute("UPDATE mango_calls SET ext=? WHERE ts=? AND phone=? AND direction=? "
+                             "AND COALESCE(ext,'')=''", (dob, ts, phone, napr))
             added += cur.rowcount
     return added
 

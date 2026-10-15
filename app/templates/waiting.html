@@ -10,12 +10,14 @@
 {% if not w['calls'] %}
 <div class="notice">✅ Все пропущенные звонки отработаны (перезвонили или написали).</div>
 {% else %}
+<div style="overflow-x:auto">{# узкий экран: таблица прокручивается, страница — нет #}
 <table>
   <tr><th>Ждёт</th><th>Клиент</th><th>Пропущено</th><th>Что происходит</th><th>Когда звонил</th><th></th></tr>
   {% for it in w['calls'] %}
   <tr class="{{ 'warn-row' if it.wait_min > 120 and not it.mutual }}">
     <td><b>{{ it.wait_min // 60 }} ч {{ it.wait_min % 60 }} м</b></td>
-    <td>{{ it.name or '—' }}<br><span class="muted small">{{ it.phone }}</span></td>
+    <td>{{ it.name or '—' }}<br><span class="muted small">{{ it.phone }}</span>
+      · <a class="small" href="/liniya?phone={{ it.phone }}">Линия</a></td>
     <td>{{ it.attempts }} раз</td>
     <td>{% if it.mutual %}⇄ взаимный недозвон — мы набирали {{ it.ours }} раз, продолжайте
       {% else %}мы ещё не перезванивали{% endif %}</td>
@@ -25,12 +27,14 @@
   </tr>
   {% endfor %}
 </table>
+</div>
 {% endif %}
 
 <h2>💬 Чаты без ответа</h2>
 {% if not w['items'] %}
 <div class="notice">✅ Никто не ждёт — все чаты отвечены.</div>
 {% else %}
+<div style="overflow-x:auto">{# узкий экран: таблица прокручивается, страница — нет #}
 <table>
   <tr><th></th><th>Ждёт</th><th>Клиент</th><th>Что написал</th><th>Что ответить</th></tr>
   {% for it in w['items'] %}
@@ -39,12 +43,14 @@
     <td><b>{{ it.wait_min }} мин</b><br><span class="muted small">{{ it.since[11:16] }}</span></td>
     <td>{{ it.name or '—' }}<br><span class="muted small">{{ it.phone }}{% if it.channel %} · {{ it.channel }}{% endif %}</span><br>
       <a class="small" href="{{ it.brief }}">досье</a>
+      · <a class="small" href="/liniya?phone={{ it.phone }}">Линия</a>
       {% if it.crm %}· <a class="small" href="{{ it.crm }}" target="_blank">CRM ↗</a>{% endif %}</td>
     <td class="small">{{ it.text }}</td>
     <td class="small muted">{{ it.draft }}</td>
   </tr>
   {% endfor %}
 </table>
+</div>
 {% endif %}
 
 {# 14.10: Telegram/MAX без номера — раньше вебхук их выбрасывал, и вопрос из
@@ -57,6 +63,7 @@
 {% else %}
 <p class="muted small">Номер телефона мессенджер не передал: в наряд и автоматику эти чаты не попадают.
 Найдите чат в Wazzup по каналу и имени и ответьте там же.</p>
+<div style="overflow-x:auto">{# узкий экран: таблица прокручивается, страница — нет #}
 <table>
   <tr><th></th><th>Ждёт</th><th>Где и кто</th><th>Что написал</th><th>Что ответить</th></tr>
   {% for it in w['nophone'] %}
@@ -70,6 +77,7 @@
   </tr>
   {% endfor %}
 </table>
+</div>
 {% endif %}
 <script>
 /* «✓ отработано»: скрыть строку пропущенного (связались иначе / вопрос закрыт) */

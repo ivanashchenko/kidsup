@@ -14,12 +14,13 @@
 
 {% if phone and not client %}
 <div class="card"><p class="muted">Карточки с таким номером в CRM нет — это новый контакт.
-Спросите имя ребёнка и возраст, заведите карточку, затем вернитесь сюда.</p></div>
+Спросите имя ребёнка и возраст, заведите карточку, затем вернитесь сюда.</p>
+<p class="small">Скрипт нового контакта и группы по возрасту — <a href="/liniya?phone={{ phone|urlencode }}">Линия</a>.</p></div>
 {% endif %}
 
 {% if client %}
 <div class="card">
-  <h2 style="margin-top:0">{{ client.name }} <span class="muted">{{ client.phone }}</span></h2>
+  <h2 style="margin-top:0">{{ client.name }} <span class="muted">{{ client.phone }}</span> <a class="small" href="/liniya?phone={{ client.phone|urlencode }}">Линия</a></h2>
   <p>
     Возраст ребёнка: <b>{{ client.age if client.age else "не указан" }}</b> ·
     Статус: <b>{{ client.status }}</b> ·

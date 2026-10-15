@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}Линия — KidsUP{% endblock %}
+{% macro gruppa_stroka(g, checked) -%}
+<label class="ln-g">
+  <input type="radio" name="ln-gr" value="{{ g.id }}" data-opisanie="{{ g.opisanie }}" {% if checked %}checked{% endif %}>
+  <span class="ln-g-body">
+    <b>{{ g.predmet }}</b>{% if g.programma %} · {{ g.programma }}{% endif %}{% if g.uroven %} · {{ g.uroven }}{% endif %}{% if g.vozrast %} · {{ g.vozrast }}{% endif %}<br>
+    <span class="ln-g-when">{{ g.kogda or '—' }}</span>
+    · <span class="chip {{ 'warn' if (not g.sad and g.free <= 2) else 'free' }}">{{ g.free_text }}</span>
+    {% if g.cena %}· <span class="ln-nowrap">{{ g.cena }}</span>{% endif %}
+    {% if g.cena_menshe %}<br><span class="small muted">поменьше: {{ g.cena_menshe }}</span>{% endif %}
+    {% if g.zametka %}<br><span class="small ln-warn">{{ g.zametka }}</span>{% endif %}
+  </span>
+</label>
+{%- endmacro %}
+{% block content %}
+<style>
+  .ln-wrap{max-width:1180px}
+  .ln-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-bottom:10px}
+  .ln-head h1{margin:0}
+  .ln-find{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+  .ln-find label{font-size:14px;color:var(--text)}
+  .ln-find input[name=q]{font-size:22px;letter-spacing:.14em;width:8.5ch;text-align:center;font-weight:700}
+  .ln-ext-links{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
+  .ln-ext-links a{border:1px solid var(--border-strong);border-radius:999px;padding:5px 11px;font-weight:650;white-space:nowrap}
+  .ln-ext-links a.on{background:var(--indigo);border-color:var(--indigo);color:#fff}
+  .ln-hint{flex-basis:100%;margin:0}
+  .ln-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0 18px;align-items:start}
+  @media (min-width:980px){.ln-grid.ln-dve{grid-template-columns:minmax(0,1fr) minmax(0,1.08fr)}}
+  .ln-col{min-width:0}
+  .ln-row{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px}
+  .ln-row h2{margin:0 0 8px}
+  .ln-tel{font:700 18px ui-monospace,Menlo,Consolas,monospace;white-space:nowrap}
+  .ln-child{border-top:1px solid var(--border);padding:10px 0 8px;overflow-wrap:anywhere}
+  .ln-child:first-of-type{border-top:none}
+  .ln-child.ln-fokus{box-shadow:inset 3px 0 0 var(--primary);padding-left:10px}
+  .ln-child-head{font-size:16px;margin-bottom:3px}
+  .ln-child > div{margin:3px 0}
+  .ln-stop{background:var(--red-soft);color:var(--red);border-radius:10px;padding:8px 12px;font-weight:700;margin:6px 0}
+  .ln-facts,.ln-prom,.ln-list,.ln-calls{list-style:none;padding:0;margin:0}
+  .ln-facts li,.ln-prom li,.ln-calls li{padding:7px 0;border-top:1px solid var(--border);overflow-wrap:anywhere}
+  .ln-facts li:first-child,.ln-prom li:first-child,.ln-calls li:first-child{border-top:none}
+  .ln-k{display:inline-block;min-width:7.5em;font-size:12px;font-weight:750;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
+  .ln-prom li.ln-obyaz{background:var(--amber-soft);border-radius:10px;padding:7px 10px;border-top-color:transparent}
+  .ln-list li{padding:9px 0;border-top:1px solid var(--border);overflow-wrap:anywhere}
+  .ln-list li:first-child{border-top:none}
+  .ln-list a{font-size:16px}
+  .ln-draft{font-size:11.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+  .ln-btns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:6px 0 12px}
+  @media (min-width:600px){.ln-btns{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  .ln-btn{min-height:54px;border-radius:14px;border:1.5px solid var(--border-strong);background:var(--card);
+    color:var(--indigo);font:inherit;font-weight:750;font-size:15.5px;line-height:1.2;padding:8px 10px;cursor:pointer;
+    transition:background .12s,border-color .12s,color .12s}
+  .ln-btn:hover{border-color:var(--primary)}
+  .ln-btn.ln-novyj{border-color:var(--green);color:var(--green)}
+  .ln-btn[aria-pressed="true"],.ln-btn.ln-novyj[aria-pressed="true"]{background:var(--indigo);border-color:var(--indigo);color:#fff}
+  .ln-ans-text{font-size:17px;line-height:1.55;margin:0 0 10px;color:var(--text)}
+  .ln-step{background:var(--green-soft);border-left:4px solid var(--green);border-radius:10px;padding:8px 12px;margin:0 0 8px}
+  .ln-pomni{color:var(--amber);margin:0 0 8px}
+  .ln-g{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:start;padding:9px 0;
+    border-top:1px solid var(--border);cursor:pointer;font-weight:400;color:var(--text);font-size:14.5px}
+  .ln-g:first-of-type{border-top:none}
+  .ln-g input{margin-top:4px;width:18px;height:18px;accent-color:var(--primary)}
+  .ln-g-body{overflow-wrap:anywhere}
+  .ln-g-when{font-weight:650}
+  .ln-nowrap{white-space:nowrap}
+  .ln-warn{color:var(--amber);font-weight:600}
+  .ln-age{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 8px}
+  .ln-age input{width:6ch}
+  .ln-big{font-size:17px;font-weight:650}
+  .ln-wrap details > summary{cursor:pointer;color:var(--primary-dark);font-weight:650;margin:6px 0}
+</style>
+<div class="ln-wrap">
+<div class="ln-head">
+  <h1>Линия</h1>
+  <span class="muted">кто на телефоне, что с семьёй было и что ответить</span>
+</div>
+
+<form class="card ln-find" method="get" action="/liniya" id="ln-find">
+  <label for="ln-q">Последние 4 цифры номера</label>
+  <input id="ln-q" name="q" type="text" inputmode="numeric" autocomplete="off" maxlength="20"
+         placeholder="1234" value="{{ d.vvod.q }}" {% if d.rezhim == 'pusto' %}autofocus{% endif %}>
+  <button class="btn btn-primary" type="submit">Найти</button>
+  <span class="ln-ext-links">последний звонок:
+    {% for e in d.dobavochnye %}<a href="/liniya?ext={{ e.ext }}" class="{{ 'on' if d.vvod.ext == e.ext }}">доб. {{ e.ext }}{% if e.kto %} · {{ e.kto }}{% endif %}</a>{% endfor %}
+  </span>
+  <p class="muted small ln-hint">Номер можно вставить и целиком. Пока идёт разговор, набирайте 4 цифры: в журнал Манго звонок попадает, только когда положили трубку.</p>
+</form>
+
+{% if d.oshibka %}<div class="notice">{{ d.oshibka }}</div>{% endif %}
+
+{% if d.ext %}{% set e = d.ext %}
+<div class="card">
+  <div class="ln-row"><h2>Доб. {{ e.ext }}{% if e.kto %} · {{ e.kto }}{% endif %}</h2>
+    {% if e.zhurnal_do %}<span class="muted small">последняя запись журнала: {{ e.zhurnal_do }}</span>{% endif %}</div>
+  {% if not e.est_kolonka %}
+  <p>Журнал звонков пока не знает добавочных: они пишутся с этой версии, при каждом опросе Манго. Пока наберите последние 4 цифры номера.</p>
+  {% elif not e.glavnyj %}
+  <p>Сегодня законченных звонков на доб. {{ e.ext }} в журнале нет.</p>
+  {% else %}{% set g = e.glavnyj %}
+  <p class="ln-big">{{ g.kogda }} · {{ g.napr }} · {{ g.itog }} — <a href="/liniya?phone={{ g.p10 }}">{{ g.pokaz }}</a></p>
+  {% if e.zvonki|length > 1 %}
+  <details><summary class="small">другие звонки на доб. {{ e.ext }} сегодня ({{ e.zvonki|length - 1 }})</summary>
+    <ul class="ln-calls small">{% for z in e.zvonki %}{% if z.ts != g.ts %}<li>{{ z.kogda }} · {{ z.napr }} · {{ z.itog }} — <a href="/liniya?phone={{ z.p10 }}">{{ z.pokaz }}</a></li>{% endif %}{% endfor %}</ul>
+    <p class="muted small">Входящий звонок обходит добавочные по очереди, поэтому «пропущенный» здесь часто значит, что трубку взяли на другом аппарате.</p>
+  </details>
+  {% endif %}
+  {% endif %}
+  <p class="muted small">Здесь — последний закончившийся звонок на доб. {{ e.ext }}. Журнал Манго мы опрашиваем раз в минуту (с 8:00 до 21:00), поэтому разговор появляется здесь примерно через минуту после того, как положили трубку, в загруженные часы — позже. Пока идёт разговор — наберите последние 4 цифры номера в поле выше.</p>
+  <div id="ln-novyj-zvonok" class="notice" hidden>На доб. {{ e.ext }} закончился ещё один звонок: <b></b> — <a href="/liniya?ext={{ e.ext }}">показать</a></div>
+</div>
+{% endif %}
+
+{% if d.rezhim == 'spisok' %}
+<div class="card">
+  {% if d.spisok %}
+  <h2>Номер на …{{ d.vvod.q }}: {{ d.spisok|length }}{% if d.spisok_eshche %} и ещё {{ d.spisok_eshche }}{% endif %}</h2>
+  <ul class="ln-list">
+    {% for s in d.spisok %}
+    <li><a href="/liniya?phone={{ s.p10 }}"><b>{{ s.imena|join(', ') if s.imena else 'нет в CRM' }}</b> · {{ s.pokaz }}</a>
+      {% if s.statusy %}<span class="muted small">· {{ s.statusy|join(', ') }}</span>{% endif %}
+      {% if s.kontakt %}<span class="chip">{{ s.kontakt }}</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% if d.spisok_eshche %}<p class="muted small">Совпадений больше — уточните номер целиком.</p>{% endif %}
+  {% else %}
+  <h2>На …{{ d.vvod.q }} никого нет</h2>
+  <p>Ни в CRM, ни среди звонков и сообщений за два дня такого номера нет — похоже, новый контакт. Скрипт и группы по возрасту — ниже.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% set levo = d.telefon or (d.v_crm is defined) %}
+<div class="ln-grid {{ 'ln-dve' if levo }}">
+{% if levo %}
+<div class="ln-col">
+  {% if d.telefon %}{% set t = d.telefon %}
+  <div class="card">
+    <div class="ln-row"><h2>Кто на линии</h2><a class="ln-tel" href="tel:+{{ t.tel }}">{{ t.pokaz }}</a></div>
+    {% if d.nashli_po %}<p class="muted small">Нашли по последним цифрам …{{ d.nashli_po }}.</p>{% endif %}
+    {% if not d.v_crm %}
+    <p><span class="chip warn">нет в CRM</span> Номера нет в нашей копии CRM — новый контакт.
+      <span class="muted small">Копия обновляется раз в 5 минут{% if d.sinhro %} (последний раз {{ d.sinhro }}){% endif %}: если карточку завели только что, она появится чуть позже.</span></p>
+    {% else %}
+    {% if d.vtoroj_nomer %}<p class="small ln-warn">Номер записан в карточке как дополнительный — уточните, кто звонит.</p>{% endif %}
+    {% if d.stop %}<div class="ln-stop">⛔ Статус в CRM «{{ d.stop }}»: по правилам центра таким семьям сами не звоним и не пишем.</div>{% endif %}
+    {% if d.roditel %}<p class="small" style="margin:0 0 4px">Родитель: {{ d.roditel }}</p>{% endif %}
+    {% for c in d.deti %}
+    <div class="ln-child {{ 'ln-fokus' if c.id == d.fokus and d.deti|length > 1 }}">
+      <div class="ln-child-head"><b>{{ c.imya }}</b>
+        · {% if c.vozrast_text %}{{ c.vozrast_text }}{% else %}<span class="muted">возраст не указан</span>{% endif %}
+        · <span class="chip {{ 'full' if c.stop else ('free' if c.klient else '') }}">{{ c.status }}</span>
+        · <a class="small" href="{{ c.crm }}" target="_blank" rel="noopener">карточка в МойКласс ↗</a></div>
+      <div>На 2026/27:
+        {% if c.zapisan %}<span class="chip free">записан</span>
+          {% for z in c.gruppy %}{{ z.gruppa }} <span class="muted small">({{ z.status }})</span>{% if not loop.last %}; {% endif %}{% endfor %}
+        {% else %}<span class="chip warn">не записан</span>{% if c.bufer %} <span class="small">· в листе заявок: {{ c.bufer|join(', ') }}</span>{% endif %}{% endif %}
+        {% if c.ne_prishel %}<span class="small ln-warn">· не пришёл на пробное: {{ c.ne_prishel|join(', ') }}</span>{% endif %}
+      </div>
+      {% if c.sled %}<div class="small">Ближайшее занятие: <b>{{ c.sled.kogda }}</b> · {{ c.sled.gruppa }}{% if c.sled.probnoe %} · пробное{% endif %}</div>{% endif %}
+      {% if c.istoriya %}<div class="small muted">Посещал: {% for h in c.istoriya %}{{ h.kurs }} — {{ h.raz }} раз, последнее {{ h.poslednee }}{% if not loop.last %}; {% endif %}{% endfor %}</div>
+      {% else %}<div class="small muted">Занятий в истории нет — вероятно, только заявка.</div>{% endif %}
+      {% if d.deti|length > 1 and c.id != d.fokus %}<div class="small"><a href="/liniya?phone={{ t.p10 }}&child={{ c.id }}">подобрать группы для этого ребёнка</a></div>{% endif %}
+    </div>
+    {% endfor %}
+    {% if d.oplata %}<p class="small" style="margin:6px 0 0">Последняя оплата: {{ d.oplata.kogda }} · {{ d.oplata.summa }}</p>{% endif %}
+    {% if d.skidka_podskazka %}<p class="small muted" style="margin:4px 0 0">{{ d.skidka_podskazka }}</p>{% endif %}
+    {% endif %}
+  </div>
+
+  {% set k = d.kontakt %}
+  <div class="card">
+    <h2>Последний контакт</h2>
+    {% if k and k.est %}
+    <ul class="ln-facts">
+      {% if k.zvonki %}{% set z = k.zvonki[0] %}<li><span class="ln-k">Звонок</span> {{ z.kogda }} · {{ z.napr }} · {{ z.itog }}{% if z.ext %} · доб. {{ z.ext }}{% if z.kto %} ({{ z.kto }}){% endif %}{% endif %}{% if k.za_7_dnej > 1 %} <span class="muted small">· за 7 дней звонков: {{ k.za_7_dnej }}</span>{% endif %}</li>{% endif %}
+      {% if k.obzvon %}<li><span class="ln-k">Итог обзвона</span> {{ k.obzvon.kogda }} · {{ k.obzvon.otkuda }}: {{ k.obzvon.tekst }}</li>{% endif %}
+      {% if k.razbor %}<li><span class="ln-k">О чём говорили</span> {{ k.razbor.tekst }} <span class="muted small">(в карточке с {{ k.razbor.kogda }}; разбор звонков пишет через 1–2 часа после разговора)</span></li>{% endif %}
+      {% if k.otmetka %}<li><span class="ln-k">Прозвон</span> {{ k.otmetka.kogda }}: {{ k.otmetka.tekst }}</li>{% endif %}
+      {% if k.chelovek %}<li><span class="ln-k">Комментарий</span> {{ k.chelovek.kto }}, {{ k.chelovek.kogda }}: {{ k.chelovek.tekst }}</li>{% endif %}
+      {% if k.soobshchenie %}<li><span class="ln-k">Переписка</span> {{ k.soobshchenie.kto }}, {{ k.soobshchenie.kogda }}: {{ k.soobshchenie.tekst }}</li>{% endif %}
+    </ul>
+    {% if k.zvonki|length > 1 %}
+    <details><summary class="small">ещё звонки ({{ k.zvonki|length - 1 }})</summary>
+      <ul class="ln-calls small">{% for z in k.zvonki[1:] %}<li>{{ z.kogda }} · {{ z.napr }} · {{ z.itog }}{% if z.ext %} · доб. {{ z.ext }}{% endif %}</li>{% endfor %}</ul>
+    </details>
+    {% endif %}
+    {% else %}<p class="muted">Ни звонков в журнале, ни комментариев, ни переписки по этому номеру.</p>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Обещания и открытые дела{% if d.obeshchaniya or d.zadachi %} ({{ (d.obeshchaniya|length) + (d.zadachi|length) }}){% endif %}</h2>
+    {% if d.obeshchaniya or d.zadachi %}
+    <ul class="ln-prom">
+      {% for o in d.obeshchaniya %}
+      <li class="{{ 'ln-obyaz' if o.obyazatelstvo }}"><span class="muted small">{{ o.kto }} · {% if o.s %}с {{ o.s }}{% else %}{{ o.den }}{% endif %} · {{ o.vid }}{% if o.popytok %} · не дозвонились {{ o.popytok }}{% endif %}</span>
+        {% if o.obyazatelstvo %}<span class="chip full">обязательство — само не закроется</span>{% endif %}<br>{{ o.tekst[:320] }}{% if o.tekst|length > 320 %}…{% endif %}</li>
+      {% endfor %}
+      {% for z in d.zadachi %}<li><span class="muted small">задача смены · {{ z.kto }}{% if z.t %} · {{ z.t }}{% endif %}</span><br>{{ z.tekst }}</li>{% endfor %}
+    </ul>
+    <p class="muted small" style="margin:6px 0 0">Сделали — отметьте на <a href="/pult">пульте</a>.</p>
+    {% else %}<p class="muted">Открытых обещаний этой семье нет.</p>{% endif %}
+  </div>
+  {% elif d.v_crm is defined and not d.v_crm %}
+  <div class="card">
+    <h2>Новый контакт</h2>
+    <p>Спросите, как обращаться к родителю, имя и возраст ребёнка, — и введите возраст справа: появятся свободные группы. Скрипт — в «Что ответить».</p>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="ln-col">
+  <div class="card" id="ln-otvety">
+    <div class="ln-row"><h2>Что ответить</h2><span class="ln-draft">{{ d.chernovik }}</span></div>
+    <p class="small muted" id="ln-tek-wrap" {% if not (d.gruppy and d.gruppy.top) %}hidden{% endif %}>Ответы — про группу: <b id="ln-tek">{{ d.gruppy.top[0].opisanie if d.gruppy and d.gruppy.top else '' }}</b>. Другая группа — отметьте её ниже.</p>
+    <div class="ln-btns" role="group" aria-label="Вопросы и возражения родителя">
+      {% if d.knopki_novyj %}<button type="button" class="ln-btn ln-novyj" data-k="novyj_kontakt" aria-pressed="false">Новый контакт</button>{% endif %}
+      {% for b in d.knopki %}<button type="button" class="ln-btn" data-k="{{ b.key }}" aria-pressed="false">{{ b.label }}</button>{% endfor %}
+    </div>
+    <div id="ln-ans" aria-live="polite">
+      <p class="muted small" id="ln-ans-pusto">Нажмите кнопку — здесь появится готовый ответ и следующий шаг. Работают и клавиши 1–{{ d.knopki|length + (1 if d.knopki_novyj else 0) }}.</p>
+      <div id="ln-ans-body" hidden>
+        <p class="ln-ans-text" id="ln-ans-text"></p>
+        <p class="ln-step"><b>Дальше:</b> <span id="ln-ans-step"></span></p>
+        <p class="small ln-pomni" id="ln-ans-pomni" hidden></p>
+        <button type="button" class="copy" id="ln-copy">скопировать ответ</button>
+      </div>
+    </div>
+  </div>
+
+  {% if d.gruppy %}{% set gr = d.gruppy %}
+  <div class="card">
+    <h2>Свободные группы{% if d.vozrast_text %} · {{ d.vozrast_text }}{% endif %}</h2>
+    <form method="get" action="/liniya" class="ln-age">
+      {% if d.telefon %}<input type="hidden" name="phone" value="{{ d.telefon.p10 }}">{% elif d.vvod.q %}<input type="hidden" name="q" value="{{ d.vvod.q }}">{% endif %}
+      {% if d.fokus %}<input type="hidden" name="child" value="{{ d.fokus }}">{% endif %}
+      <label for="ln-age">Возраст ребёнка</label>
+      <input id="ln-age" type="text" name="age" inputmode="decimal" autocomplete="off" placeholder="5,5" value="{{ d.vvod.age }}">
+      <button class="btn" type="submit">подобрать</button>
+      {% if d.vozrast_otkuda == 'карточка' %}<span class="muted small">возраст из карточки{% if d.deti|length > 1 %}: {{ d.fokus_imya }}{% endif %}</span>{% endif %}
+    </form>
+    {% if gr.pochemu_pusto %}<p class="muted">{{ gr.pochemu_pusto }}</p>{% endif %}
+    {% if gr.top %}
+    <p class="small muted" style="margin:0">Предложить первыми — по одной на направление, где мест больше:</p>
+    {% for g in gr.top %}{{ gruppa_stroka(g, loop.first) }}{% endfor %}
+    {% endif %}
+    {% if gr.eshche %}
+    <details><summary>ещё по возрасту: {{ gr.eshche|length }}</summary>
+      {% for g in gr.eshche %}{{ gruppa_stroka(g, false) }}{% endfor %}
+    </details>
+    {% endif %}
+    <p class="muted small" style="margin:8px 0 0">Места — как на странице <a href="/mesta">«Места»</a>: живые записи CRM, обновление раз в 5 минут. Группы «не записывать» и «пауза» здесь не показываем. «Осталось N мест» говорим только по этим числам.</p>
+  </div>
+  {% endif %}
+</div>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var D = {{ d.js|safe }};  {# app/liniya.py js_json: экранирован, как tojson #}
+  var btns = Array.prototype.slice.call(document.querySelectorAll('.ln-btn'));
+  var pusto = document.getElementById('ln-ans-pusto'), body = document.getElementById('ln-ans-body');
+  var tText = document.getElementById('ln-ans-text'), tStep = document.getElementById('ln-ans-step');
+  var tPomni = document.getElementById('ln-ans-pomni'), tTek = document.getElementById('ln-tek');
+  var tek = D.tek || '_bez', key = D.nachalo || '';
+  var otvety = D.otvety || {};
+  function otvet(k) { return (otvety[tek] || {})[k] || (otvety._bez || {})[k]; }
+  function show() {
+    btns.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.k === key)); });
+    var o = key ? otvet(key) : null;
+    if (!o) { body.hidden = true; pusto.hidden = false; return; }
+    pusto.hidden = true; body.hidden = false;
+    tText.textContent = o.otvet; tStep.textContent = o.shag || '';
+    tPomni.textContent = o.pomni || ''; tPomni.hidden = !o.pomni;
+  }
+  btns.forEach(function (b) { b.addEventListener('click', function () { key = b.dataset.k; show(); }); });
+  document.querySelectorAll('input[name="ln-gr"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      if (!r.checked) return;
+      tek = r.value; if (tTek) tTek.textContent = r.dataset.opisanie || ''; show();
+    });
+  });
+  // клавиши 1–9 = кнопки по порядку (кроме случаев, когда печатают в поле)
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var a = document.activeElement || {}, tag = a.tagName || '';
+    if (tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && !/radio|checkbox|button|submit/.test(a.type))) return;
+    var n = parseInt(e.key, 10);
+    if (n >= 1 && n <= btns.length) { e.preventDefault(); btns[n - 1].click(); btns[n - 1].focus(); }
+  });
+  var copy = document.getElementById('ln-copy');
+  if (copy) copy.addEventListener('click', function () {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(tText.textContent).then(function () {
+      var old = copy.textContent; copy.textContent = 'скопировано ✓'; copy.classList.add('done');
+      setTimeout(function () { copy.textContent = old; copy.classList.remove('done'); }, 1500);
+    });
+  });
+  // 4 цифры набрали и замолчали — ищем сами; номер целиком вставляют — тоже ок
+  var q = document.getElementById('ln-q'), tm = null;
+  if (q) q.addEventListener('input', function () {
+    clearTimeout(tm);
+    var v = q.value.replace(/\D/g, '');
+    if ((v.length === 4 && q.value.trim().length <= 5) || v.length >= 10)
+      tm = setTimeout(function () { q.form.submit(); }, 600);
+  });
+  // ?ext=: раз в 30 секунд спрашиваем, не закончился ли новый звонок на этом добавочном
+  if (D.ext) {
+    var ban = document.getElementById('ln-novyj-zvonok');
+    setInterval(function () {
+      fetch('/api/liniya?kratko=1&ext=' + encodeURIComponent(D.ext), {cache: 'no-store'})
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (j && j.ts && j.ts !== D.ext_ts && ban) { ban.hidden = false; ban.querySelector('b').textContent = j.kogda || ''; }
+        }).catch(function () {});
+    }, 30000);
+  }
+  show();
+})();
+</script>
+{% endblock %}

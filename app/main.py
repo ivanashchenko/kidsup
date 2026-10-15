@@ -2293,6 +2293,18 @@ async def mango_events(request: Request, rest: str = ""):
     return {"ok": True}
 
 
+def _brief_history(conn, uid: int) -> list[dict]:
+    """Что ребёнок посещал: предмет, последнее занятие, сколько раз (до шести
+    предметов, свежие сверху). Общее для /brief и «Линии» (app/liniya.py)."""
+    return [{"course": r[0], "last": r[1], "visits": r[2]} for r in conn.execute(
+        """SELECT co.name, MAX(l.date), COUNT(*) FROM lesson_records lr
+           JOIN lessons l ON l.id = lr.lesson_id
+           LEFT JOIN classes cl ON cl.id = l.class_id
+           LEFT JOIN courses co ON co.id = cl.course_id
+           WHERE lr.user_id = ? AND lr.visit = 1
+           GROUP BY co.name ORDER BY MAX(l.date) DESC LIMIT 6""", (uid,))]
+
+
 @app.get("/brief", response_class=HTMLResponse, dependencies=AUTH)
 def brief_page(request: Request, phone: str = ""):
     """Всё о клиенте на одном экране: кто это, что было, что предложить,
@@ -2308,13 +2320,7 @@ def brief_page(request: Request, phone: str = ""):
             if row:
                 uid, name, ph, state, raw = row
                 age = _age_from_raw(raw)
-                history = [{"course": r[0], "last": r[1], "visits": r[2]} for r in conn.execute(
-                    """SELECT co.name, MAX(l.date), COUNT(*) FROM lesson_records lr
-                       JOIN lessons l ON l.id = lr.lesson_id
-                       LEFT JOIN classes cl ON cl.id = l.class_id
-                       LEFT JOIN courses co ON co.id = cl.course_id
-                       WHERE lr.user_id = ? AND lr.visit = 1
-                       GROUP BY co.name ORDER BY MAX(l.date) DESC LIMIT 6""", (uid,))]
+                history = _brief_history(conn, uid)
                 enrolled = conn.execute(
                     "SELECT COUNT(*) FROM joins j JOIN classes cl ON cl.id=j.class_id "
                     "WHERE j.user_id=? AND cl.name LIKE '2627%'", (uid,)).fetchone()[0]
@@ -2362,6 +2368,31 @@ def brief_page(request: Request, phone: str = ""):
     return render(request, "brief.html", active="brief", phone=phone,
                   client=client, history=history, groups=groups[:12],
                   pitch=pitch, dialog=dialog)
+
+
+@app.get("/liniya", response_class=HTMLResponse, dependencies=AUTH)
+def liniya_page(request: Request, phone: str = "", q: str = "", ext: str = "",
+                age: str = "", child: str = ""):
+    """«Линия»: кто на телефоне, что с семьёй было, свободные группы по возрасту
+    и готовые ответы на возражения — одним экраном на время разговора.
+    Номер — из ссылки (?phone=), по последним 4 цифрам (?q=1234) или последний
+    законченный звонок на добавочном (?ext=12). Только чтение."""
+    from . import liniya
+    return render(request, "liniya.html", active="liniya",
+                  d=liniya.sobrat(phone=phone, q=q, ext=ext, age=age, child=child))
+
+
+@app.get("/api/liniya", dependencies=AUTH)
+def api_liniya(phone: str = "", last4: str = "", q: str = "", ext: str = "",
+               age: str = "", child: str = "", kratko: str = ""):
+    """То же, что страница «Линия», в JSON. ?ext=12&kratko=1 — только какой звонок
+    на добавочном сейчас последний (страница опрашивает, не пришёл ли новый)."""
+    from . import liniya
+    if ext and kratko not in ("", "0"):
+        return liniya.dobavochnyj_kratko(ext)
+    d = liniya.sobrat(phone=phone, q=last4 or q, ext=ext, age=age, child=child)
+    d.pop("js", None)
+    return d
 
 
 @app.post("/api/callplan/done", dependencies=AUTH)
@@ -7058,7 +7089,9 @@ def _inbox_block(day: str) -> str:
             f"<span style='display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:800;color:#fff;background:{c}'>{html.escape(r['who'])}</span> "
             f"<span style='color:#6c6a86;font-size:12px'>{html.escape(r['ts'][11:16])}</span> "
             + (lambda tx: (f"{html.escape(tx[:140])}<details style='display:inline'><summary style='display:inline;cursor:pointer;color:#6c6a86'> …</summary> {html.escape(tx[140:])}</details>" if len(tx) > 160 else html.escape(tx)))(r['text'] or "")
-            + (lambda t: (f" <a href='tel:+{t}' style='white-space:nowrap;color:#6c6a86'>+{t}</a>" if t else ""))(
+            + (lambda t: (f" <a href='tel:+{t}' style='white-space:nowrap;color:#6c6a86'>+{t}</a>"
+                          f" <a href='/liniya?phone={t}' style='font-size:12px;color:#6c6a86'>Линия</a>"
+                          if t else ""))(
                 html.escape(_pult_tel(r['phone']))) + "</li>")
     body = "".join(items) or "<li style='color:#6c6a86'>пока пусто — сюда падает всё, что мы пообещали клиентам в звонках и переписке за день</li>"
     by_who = {}
