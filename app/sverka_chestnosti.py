@@ -307,6 +307,23 @@ def ocenit_pravku(tbl: str, old: dict, new: dict, den: str | None = None) -> dic
     return {"level": lvl, "chto": "; ".join(chto), "polya": {k: list(v) for k, v in d.items()}}
 
 
+def uroven_udaleniya(tbl: str, raw: dict) -> str:
+    """Насколько тревожно удаление строки.
+
+    15.10, первый боевой прогон: 20 красных из 53 удалений, и почти все — пересчёт
+    абонемента (удалили абонемент и его списание с баланса, завели заново).
+    Деньги видны по приходам и возвратам, поэтому красное — только когда исчез
+    сам приход денег. Удалённый абонемент — жёлтое (нужна причина в карточке),
+    удалённое списание с баланса и запись на занятие — справочно."""
+    if tbl == "payments":
+        if raw.get("optype") == "income" and _num(raw.get("summa")) > 0:
+            return "red"
+        return "info" if raw.get("optype") == "debit" else "yellow"
+    if tbl == "user_subscriptions":
+        return "yellow"
+    return "info"
+
+
 def tozhdestvo_balansa(balansy: dict, summy: dict, porog: float = BALANS_POROG, dolg: dict | None = None) -> list[dict]:
     """balans клиента против Σ его платежей. Минус — у нас есть платёж, которого
     в МойКлассе больше нет (удалён); плюс — платёж есть в МойКлассе, а у нас нет
@@ -552,8 +569,9 @@ def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> di
                     raw = _j(row.get("raw")) if isinstance(row, dict) and "raw" in row else row
                     try:
                         mk.get(path[tbl] + str(rid))
-                        # жива, но вышла из окна: сменили дату или клиента
-                        nakhodka("yellow", f"правка: {tbl}", f"{name(raw.get('userId') or row.get('user_id'))}: строка {tbl} #{rid} жива в МойКлассе, но ушла из окна — изменена дата или клиент.",
+                        # жива, но вышла из окна: сменили дату или клиента.
+                        # 15.10: справочно — денег не убыло, а Лизе в пульт шёл шум
+                        nakhodka("info", f"правка: {tbl}", f"{name(raw.get('userId') or row.get('user_id'))}: строка {tbl} #{rid} жива в МойКлассе, но ушла из окна — изменена дата или клиент.",
                                  raw.get("userId") or row.get("user_id"), M.get(raw.get("managerId"), "—"), rid, tbl)
                         continue
                     except Exception as e:  # noqa: BLE001
@@ -562,17 +580,16 @@ def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> di
                             continue
                     uid = raw.get("userId") or row.get("user_id")
                     who = M.get(raw.get("managerId"), "—")
+                    lvl = uroven_udaleniya(tbl, raw)
                     if tbl == "payments":
                         s = _num(raw.get("summa")); ot = raw.get("optype")
-                        lvl = "red" if ot == "income" and s > 0 else "yellow"
                         text = (f"{name(uid)}: удалён платёж {ot} {s:g} ₽ ({TYPES.get(raw.get('paymentTypeId'), raw.get('paymentTypeId'))}, "
                                 f"дата {raw.get('date')}, создан {msk(raw.get('createdAt'))}, автор строки {who}; кто удалил — видно только в Истории действий).")
                     elif tbl == "user_subscriptions":
-                        payed = _num(raw.get("payed")); lvl = "red" if payed > 0 else "yellow"
+                        payed = _num(raw.get("payed"))
                         text = (f"{name(uid)}: удалён абонемент {_num(raw.get('price')):g} ₽ (оплачено {payed:g}, "
                                 f"{_num(raw.get('visitedCount')):g}/{_num(raw.get('visitCount')):g}, продан {raw.get('sellDate')}, автор строки {who}; кто удалил — видно только в Истории действий).")
                     else:
-                        lvl = "info"
                         text = (f"{name(uid)}: удалена запись на занятие {row.get('ldate')} "
                                 f"(visit={raw.get('visit')}, списание {_bill_summa(raw.get('bill')):g} ₽).")
                     udaleno.append(rid)
@@ -620,7 +637,7 @@ def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> di
                         provereno[key] = x["delta"]
                         for p in gone:
                             s = _num(p.get("summa")); who = M.get(p.get("managerId"), "—")
-                            lvl = "red" if p.get("optype") == "income" and s > 0 else "yellow"
+                            lvl = uroven_udaleniya("payments", p)
                             novye_udaleniya.add(f"payments:{p['id']}")
                             nakhodka(lvl, "удаление: payments", f"{name(x['userId'])}: удалён платёж {p.get('optype')} {s:g} ₽ от {p.get('date')} (автор строки {who}); баланс {x['balans']:g} против суммы платежей {x['summa_platezhey']:g}.",
                                      x["userId"], who, p["id"], "payments", {"delta": x["delta"]})
@@ -894,6 +911,13 @@ def _selftest() -> int:
     assert ov and ov["level"] == "yellow", ov
     ow = ocenit_pravku("user_subscriptions", {"visitCount": 8, "price": 9000, "payed": 9000}, {"visitCount": 12, "price": 13500, "payed": 13500})
     assert ow and ow["level"] == "info", ow
+    # 15.10: красное — только пропавший приход денег; пересчёт абонемента — не тревога
+    assert uroven_udaleniya("payments", {"optype": "income", "summa": 5000}) == "red"
+    assert uroven_udaleniya("payments", {"optype": "income", "summa": 0}) == "yellow"
+    assert uroven_udaleniya("payments", {"optype": "refund", "summa": 3000}) == "yellow"
+    assert uroven_udaleniya("payments", {"optype": "debit", "summa": -8400}) == "info"
+    assert uroven_udaleniya("user_subscriptions", {"payed": 9450}) == "yellow"
+    assert uroven_udaleniya("lesson_records", {"visit": True}) == "info"
     _selftest_run()
     print("selftest ok: журнал правок, оценка правок, шум, тождество баланса, кандидаты, время, "
           "память удалений, триггеры, боевой прогон на файловой базе")
