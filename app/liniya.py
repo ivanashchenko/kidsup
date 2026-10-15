@@ -16,7 +16,9 @@
 и в «Ответах»), поле «последние 4 цифры» (q=1234) или /liniya?ext=12 —
 последний закончившийся звонок на добавочном из журнала Манго. Журнал мы
 опрашиваем раз в минуту, и в нём только законченные звонки, — поэтому для
-идущего разговора есть 4 цифры.
+идущего разговора есть 4 цифры. Набрали 4 цифры и замолчали — страница лишь
+подсказывает под полем, чьи это номера (/api/liniya?q=1234&kratko=1): «8999»
+бывает и началом номера, который ещё диктуют, поэтому семью открывает админ.
 
 Только чтение: никаких отправок, записей в CRM и запросов наружу.
 """
@@ -60,6 +62,12 @@ TOP = 3              # сколько групп предлагать первы
 GRUPP_MAX = 10       # и сколько всего показывать по возрасту
 OBESHCHANIJ_MAX = 15
 SPISOK_MAX = 12      # семей по 4 цифрам
+# Возраст центра — от 1,3 до 12 лет (бренд-правила; main._suggest_by_age: «13+ — не
+# наш возраст»). Снизу 1,2: возраст из дня рождения округлён до десятых, и 1 год
+# 3 месяца — это 1,2. Вне этих рамок групп не предлагаем вовсе.
+VOZRAST_CENTRA = (1.2, 13.0)
+# Пометка WAITLIST вида «добирать 10–12 лет» — набор с условием, а не «полная».
+_DOBOR = re.compile(r"\s*добира", re.I)
 
 _VVOD_OK = re.compile(r"^[\d\s()+\-.]*$")
 _PARA = re.compile(r"(пн|вт|ср|чт|пт|сб|вс)\s+(\d{1,2}:\d{2})")
@@ -86,20 +94,41 @@ def pokaz(p: str) -> str:
     return f"+7 {p[:3]} {p[3:6]}-{p[6:8]}-{p[8:]}" if len(p) == 10 else p
 
 
-def razobrat_vvod(s) -> tuple[str, str]:
-    """Что ввели в поле: ("4", "1234"), ("tel", "9990001234"), ("", "") — пусто,
-    ("", "oshibka") — не цифры или цифр не 4 и не 10+."""
+def razobrat_vvod(s, ssylka: bool = False) -> tuple[str, str]:
+    """Что ввели: ("4", "1234") — последние 4 цифры; ("tel", "9990001234") — номер
+    целиком: 10 цифр или 11 с 7/8 в начале; ("", "") — пусто; ("oshibka", текст
+    для админа) — всё остальное.
+
+    Лишние цифры не отрезаем: 12 цифр или два номера подряд, обрезанные до
+    последних десяти, — это чужой номер на экране под видом звонящего.
+    ssylka — номер пришёл ссылкой с другой страницы (?phone=), там 10 цифр
+    уже последние десять настоящего номера. В поле же 10 цифр с 7 или 8
+    в начале — почти всегда номер, в котором не хватает цифры."""
     s = str(s or "").strip()
     if not s:
         return "", ""
-    d = "".join(c for c in s if c.isdigit())
     if not _VVOD_OK.match(s):
-        return "", "oshibka"
-    if len(d) == 4:
+        return "oshibka", "Нужны последние 4 цифры номера или номер целиком — только цифры."
+    d = "".join(c for c in s if c.isdigit())
+    n = len(d)
+    if n == 4:
+        if not ssylka and (s.startswith("+") or re.match(r"[78][\s(\-.]", s)):
+            return "oshibka", "Похоже на начало номера: наберите его целиком или только последние 4 цифры."
         return "4", d
-    if len(d) >= 10:
-        return "tel", d[-10:]
-    return "", "oshibka"
+    if n == 11 and d[0] in "78":
+        return "tel", d[1:]
+    if n == 10 and (ssylka or d[0] not in "78"):
+        return "tel", d
+    if n == 10:
+        return "oshibka", "Похоже, в номере не хватает цифры: наберите все 11 (+7…) или последние 4."
+    if n < 10:
+        return "oshibka", (f"В номере {_sklon(n, 'цифра', 'цифры', 'цифр')}: нужны последние 4 цифры "
+                           f"или номер целиком.")
+    if n == 11:
+        return "oshibka", ("Проверьте номер: из 11 цифр он начинается с 7 или 8 — "
+                           "или наберите последние 4.")
+    return "oshibka", (f"Проверьте номер: в нём {_sklon(n, 'цифра', 'цифры', 'цифр')}, а нужно 11 (+7…) — "
+                       f"или наберите последние 4.")
 
 
 def vozrast(x) -> float | None:
@@ -282,9 +311,15 @@ def _probnoe_platnoe(pr: dict | None) -> str:
 def vse_gruppy() -> list[dict]:
     """Группы сезона со свободными местами — тот же счёт, что на /mesta
     (mesta.rows: живые записи, нормы CAP_OVERRIDE, пометки MERGE/WAITLIST/HOLD),
-    плюс направление, возраст, когда идёт и цена по прайсу."""
+    плюс направление, возраст, когда идёт и цена по прайсу.
+
+    mesto — что можно сказать родителю о месте: «est» — место есть по живым
+    записям; «po_dnyam» — мини-сад, места по дням (сверить в CRM); «list» —
+    группа в WAITLIST: «полная», не дописываем, место не обещаем. Пометка
+    WAITLIST вида «добирать 10–12 лет» — не «полная», а набор с условием:
+    такая группа «est», условие — в пометке (dobor)."""
     from . import mesta
-    from .main import COURSE_ALIAS, PRICES, _group_ages, _group_klass, _price_line
+    from .main import COURSE_ALIAS, PRICES, _group_ages, _group_klass, _name_days, _price_line
     rows = mesta.rows()
     with db.get_conn() as conn:
         info = {r[0]: (r[1] or "", r[2] or "") for r in conn.execute(
@@ -313,15 +348,22 @@ def vse_gruppy() -> list[dict]:
             vozr = ""
         programma = uroven = ""
         cena = cena_menshe = raz_v_nedelyu = ""
+        # Группа раз в неделю (один день в имени: «…_сб_16:30_…»): абонемент
+        # «8 занятий (2 р/нед)» в ней не купить — цена её строкой «1 р/нед»,
+        # а «поменьше» и «один день из двух» к ней не относятся.
+        odin_den = not sad and len(_name_days(short)) == 1
         if pr:
+            stroki = _stroki_programmy(pr, polnoe, predmet)
             glav = _price_line(pr, polnoe)
+            if odin_den:
+                glav = next((l for l in stroki if "1 р/нед" in l[0]), glav)
             cena = _cena_tekst(glav[0], glav[2])
             if " · " in glav[0]:
                 programma = glav[0].split(" · ")[0].strip()
-            drugie = [l for l in _stroki_programmy(pr, polnoe, predmet)
+            drugie = [l for l in stroki
                       if l is not glav and l[2] < glav[2]
                       and not re.search(r"разов|робн", l[0], re.I)]
-            if drugie:
+            if drugie and not odin_den:
                 m = min(drugie, key=lambda l: l[2])
                 cena_menshe = _cena_tekst(m[0], m[2])
                 if "1 р/нед" in m[0]:
@@ -331,9 +373,15 @@ def vse_gruppy() -> list[dict]:
             programma = ""
         ekran, rech = _kogda(short, sad)
         free = max(0, int(r["free"] or 0))
-        zametki = []
-        if r.get("wait"):
-            zametki.append("полная / лист: " + r["wait"])
+        wait = r.get("wait") or ""
+        dobor = wait if _DOBOR.match(wait) else ""
+        if wait and not dobor:
+            mesto, free_text = "list", "полная"
+        elif predmet == "Мини-сад":
+            mesto, free_text = "po_dnyam", "по дням — сверить в CRM"
+        else:
+            mesto, free_text = "est", _sklon(free, "место", "места", "мест")
+        zametki = [wait] if wait else []
         probnoe = _probnoe_platnoe(pr) if predmet in PLATNOE_PROBNOE else ""
         if probnoe:
             zametki.append(f"пробное платное — {probnoe}, в зачёт абонемента")
@@ -341,12 +389,11 @@ def vse_gruppy() -> list[dict]:
         out.append({
             "id": r["id"], "name": short, "predmet": predmet, "programma": programma,
             "uroven": uroven, "vozrast": vozr, "lo": lo, "hi": hi, "sad": sad,
-            "kogda": ekran, "kogda_rech": rech, "free": free,
-            "free_text": ("по дням — сверить в CRM" if predmet == "Мини-сад"
-                          else _sklon(free, "место", "места", "мест")),
+            "kogda": ekran, "kogda_rech": rech, "free": free, "free_text": free_text,
+            "mesto": mesto, "dobor": dobor,
             "cap": r["cap"], "live": r["live"],
             "cena": cena, "cena_menshe": cena_menshe, "raz_v_nedelyu": raz_v_nedelyu,
-            "probnoe": probnoe, "wait": r.get("wait") or "", "merge": r.get("merge") or "",
+            "probnoe": probnoe, "wait": wait, "merge": r.get("merge") or "",
             "hold": r.get("hold") or "", "zametka": "; ".join(zametki),
             "opisanie": opisanie,
             "vid_pervogo": "sad" if sad else ("platnoe" if probnoe else "obychnoe"),
@@ -369,8 +416,9 @@ def _rangi(age: float) -> list[str]:
 def podobrat(age: float | None, vse: list[dict]) -> tuple[list[dict], list[dict]]:
     """2–3 группы «предложить первыми» (по одной на направление, в порядке
     методички, где мест больше) и остальные подходящие по возрасту.
-    «Не записывать» и «пауза» не показываем вовсе, «полная / лист» — только
-    во втором списке, со своей пометкой."""
+    «Не записывать» и «пауза» не показываем вовсе, «полная» — только во втором
+    списке, со своей пометкой; набор с условием («добирать 10–12») — после
+    групп без условий."""
     if age is None:
         return [], []
     rangi = _rangi(age)
@@ -382,10 +430,10 @@ def podobrat(age: float | None, vse: list[dict]) -> tuple[list[dict], list[dict]
     fit = [g for g in vse
            if g["lo"] is not None and g["lo"] - 0.5 <= age <= g["hi"] + 0.5
            and g["free"] > 0 and not g["merge"] and not g["hold"]]
-    fit.sort(key=lambda g: (rang(g), bool(g["wait"]), -g["free"], g["kogda"]))
+    fit.sort(key=lambda g: (rang(g), g["mesto"] == "list", bool(g["dobor"]), -g["free"], g["kogda"]))
     top, bylo = [], set()
     for g in fit:
-        if g["wait"] or g["predmet"] in bylo:
+        if g["mesto"] == "list" or g["predmet"] in bylo:
             continue
         top.append(g)
         bylo.add(g["predmet"])
@@ -422,16 +470,41 @@ def _roditel(raw) -> str:
     return ""
 
 
+def _nomera_v_raw(raw) -> set:
+    """Номера из карточки (raw МойКласса): все строки-значения, похожие на номер,
+    — по последним десяти цифрам."""
+    try:
+        j = json.loads(raw or "{}")
+    except (ValueError, TypeError):
+        return set()
+    out, stek = set(), [j]
+    while stek:
+        x = stek.pop()
+        if isinstance(x, dict):
+            stek.extend(x.values())
+        elif isinstance(x, list):
+            stek.extend(x)
+        elif isinstance(x, str):
+            s = x.strip()
+            d = "".join(c for c in s if c.isdigit())
+            if _VVOD_OK.match(s) and (len(d) == 10 or (len(d) == 11 and d[0] in "78")):
+                out.add(d[-10:])
+    return out
+
+
 def _karty(conn, p: str) -> tuple[list, bool]:
     """Все карточки на номере (братья и сёстры — на одном телефоне). Нет ни одной —
-    ищем номер в карточке как второй (у части семей он только в raw)."""
+    ищем номер в карточке как второй (у части семей он только в raw). Совпадение
+    куска строки — ещё не номер: «7999000100» входит в «79990001001», поэтому
+    второй номер проверяем целиком."""
     rows = conn.execute(
         f"SELECT id, name, phone, client_state_id, raw FROM users "
         f"WHERE substr({_CHISTYJ},-10)=? ORDER BY id", (p,)).fetchall()
     if rows:
         return rows, False
-    rows = conn.execute("SELECT id, name, phone, client_state_id, raw FROM users "
-                        "WHERE raw LIKE ? ORDER BY id LIMIT 5", (f"%{p}%",)).fetchall()
+    rows = [r for r in conn.execute("SELECT id, name, phone, client_state_id, raw FROM users "
+                                    "WHERE raw LIKE ? ORDER BY id LIMIT 20", (f"%{p}%",)).fetchall()
+            if p in _nomera_v_raw(r["raw"])][:5]
     return rows, bool(rows)
 
 
@@ -657,18 +730,40 @@ def _obshchij_kontekst(imya: str, novaya: bool) -> dict:
         # без группы: общий вид меньшего шага; у конкретной группы — строка прайса или пусто
         "cena_menshe": "раз в неделю, а в мини-саду — два дня в неделю",
         "cena_probnogo": "", "vid_pervogo": "obychnoe",
+        "mesto_vid": "", "predmet": "", "drugaya_gruppa": "", "drugoe_vremya": "",
     }
 
 
-def _kontekst_gruppy(obshchij: dict, g: dict, novaya: bool) -> dict:
+def _drugaya(g: dict, gruppy: list[dict]) -> dict | None:
+    """Для «Время не подходит»: та же программа и уровень в другое время, где место
+    есть по живым записям, — из групп на экране; сначала с тем же возрастом в имени,
+    дальше — где мест больше (порядок экрана). Полные, с условием набора и мини-сад
+    (места по дням) не предлагаем."""
+    if g["sad"]:
+        return None
+    klyuch = (g["predmet"], g["programma"].lower(), g["uroven"].lower())
+    vse = [h for h in gruppy
+           if h["id"] != g["id"] and h["kogda"] and h["kogda"] != g["kogda"]
+           and (h["predmet"], h["programma"].lower(), h["uroven"].lower()) == klyuch
+           and h["mesto"] == "est" and not h["dobor"] and h["free"] > 0]
+    vse.sort(key=lambda h: h["vozrast"] != g["vozrast"])     # sort устойчивая: порядок экрана внутри
+    return vse[0] if vse else None
+
+
+def _kontekst_gruppy(obshchij: dict, g: dict, novaya: bool, drugaya: dict | None = None) -> dict:
     from . import autopilot
     ctx = dict(obshchij)
     ctx.update({
         "gruppa": g["opisanie"], "vremya": g["kogda_rech"], "cena": g["cena"],
-        "cena_menshe": g["cena_menshe"], "raz_v_nedelyu": g["raz_v_nedelyu"],
+        "cena_menshe": g["cena_menshe"],
+        # «ходить раз в неделю» — это запись в группу; в полную не дописываем
+        "raz_v_nedelyu": g["raz_v_nedelyu"] if g["mesto"] != "list" else "",
         "cena_probnogo": g["probnoe"] or "по прайсу", "vid_pervogo": g["vid_pervogo"],
         "skidka": (f"{autopilot.SKIDKA_SAD if g['sad'] else autopilot.SKIDKA_PERVYJ}%"
                    if novaya else ""),
+        "mesto_vid": g["mesto"], "predmet": g["predmet"],
+        "drugaya_gruppa": drugaya["opisanie"] if drugaya else "",
+        "drugoe_vremya": drugaya["kogda_rech"] if drugaya else "",
     })
     return ctx
 
@@ -681,7 +776,8 @@ def sobrat_otvety(imya: str, novaya: bool, gruppy: list[dict], novyj: bool = Fal
     baza = teksty.otvety(obshchij, klyuchi)
     out = {"_bez": baza}
     for g in gruppy:
-        svoi = teksty.otvety(_kontekst_gruppy(obshchij, g, novaya), klyuchi)
+        ctx = _kontekst_gruppy(obshchij, g, novaya, _drugaya(g, gruppy))
+        svoi = teksty.otvety(ctx, klyuchi)
         out[str(g["id"])] = {k: v for k, v in svoi.items() if v != baza[k]}
     return out
 
@@ -754,6 +850,19 @@ def po_dobavochnomu(conn, ext: str, segodnya: date) -> dict:
     return res
 
 
+def po_4_kratko(chetyre: str) -> dict:
+    """Для подсказки под полем: чьи номера кончаются на эти 4 цифры — списком,
+    ничего не открывая. Страница спрашивает, когда в поле ровно 4 цифры и
+    печатать перестали: это могут быть и первые цифры номера, который ещё
+    диктуют, — поэтому семью открывает только сам админ."""
+    vid, znach = razobrat_vvod(chetyre)
+    if vid != "4":
+        return {"q": "", "spisok": [], "eshche": 0}
+    with db.get_conn() as conn:
+        spisok = po_4_cifram(conn, znach, _segodnya())
+    return {"q": znach, "spisok": spisok[:SPISOK_MAX], "eshche": max(0, len(spisok) - SPISOK_MAX)}
+
+
 def dobavochnyj_kratko(ext: str) -> dict:
     """Для опроса со страницы: какой звонок на добавочном сейчас последний."""
     ext = ext if re.fullmatch(r"\d{1,4}", str(ext or "")) else ""
@@ -797,18 +906,22 @@ def sobrat(phone: str = "", q: str = "", ext: str = "", age: str = "", child=0) 
          "knopki": [{"key": k, "label": teksty.OTVETY[k]["knopka"]} for k in teksty.KNOPKI]}
     p = ""
     vid, znach = razobrat_vvod(q)
-    if znach == "oshibka":
-        d["oshibka"] = "Нужны последние 4 цифры номера или номер целиком — только цифры."
+    # Одну семью по 4 цифрам открываем сразу, только если в поле ровно 4 цифры
+    # («1001»). «10-01» тоже ищем, но показываем списком — проверить номер глазами.
+    tochno4 = bool(re.fullmatch(r"\d{4}", str(q or "").strip()))
+    if vid == "oshibka":
+        d["oshibka"] = znach
     elif vid == "tel":
         p = znach
     if phone:
-        vid_t, znach_t = razobrat_vvod(phone)
+        vid_t, znach_t = razobrat_vvod(phone, ssylka=True)
         if vid_t == "tel":
             p, vid = znach_t, ""
         elif vid_t == "4":
             vid, znach = vid_t, znach_t
-        else:
-            d["oshibka"] = "В номере меньше 10 цифр — проверьте номер или введите последние 4 цифры."
+            tochno4 = bool(re.fullmatch(r"\d{4}", str(phone).strip()))
+        elif vid_t == "oshibka":
+            d["oshibka"] = znach_t
     ext = str(ext or "").strip()
     with db.get_conn() as conn:
         if ext and not p:
@@ -824,7 +937,7 @@ def sobrat(phone: str = "", q: str = "", ext: str = "", age: str = "", child=0) 
         if vid == "4" and not p:
             spisok = po_4_cifram(conn, znach, segodnya)
             d["vvod"]["q"] = znach
-            if len(spisok) == 1:
+            if len(spisok) == 1 and tochno4:
                 p = spisok[0]["p10"]
                 d["nashli_po"] = znach
             else:
@@ -848,6 +961,10 @@ def sobrat(phone: str = "", q: str = "", ext: str = "", age: str = "", child=0) 
 
 
 def _gruppy_dlya(age_v: float | None) -> dict:
+    if age_v is not None and not VOZRAST_CENTRA[0] <= age_v < VOZRAST_CENTRA[1]:
+        return {"top": [], "eshche": [],
+                "pochemu_pusto": "Не наш возраст: занятия в центре — от 1,3 до 12 лет, "
+                                 "групп под этот возраст нет."}
     vse = vse_gruppy() if age_v is not None else []
     top, eshche = podobrat(age_v, vse)
     pochemu = ""
@@ -885,7 +1002,11 @@ def _semya(conn, p: str, segodnya: date, age, child) -> dict:
     uids = [r["id"] for r in rows]
     oplata = _oplata(conn, uids)
     novaya = not oplata and not any(x["klient"] for x in deti)
+    # под кого подбирать группы: выбранный ребёнок, иначе первый в возрасте центра
+    # (старший брат 14 лет не должен прятать группы младшей сестры)
     fokus = next((x for x in deti if x["id"] == child), None) \
+        or next((x for x in deti if x["vozrast"] is not None
+                 and VOZRAST_CENTRA[0] <= x["vozrast"] < VOZRAST_CENTRA[1]), None) \
         or next((x for x in deti if x["vozrast"] is not None), None) or deti[0]
     age_v = vozrast(age)
     otkuda = "введён" if age_v is not None else ("карточка" if fokus["vozrast"] is not None else "")

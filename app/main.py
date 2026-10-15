@@ -2386,10 +2386,13 @@ def liniya_page(request: Request, phone: str = "", q: str = "", ext: str = "",
 def api_liniya(phone: str = "", last4: str = "", q: str = "", ext: str = "",
                age: str = "", child: str = "", kratko: str = ""):
     """То же, что страница «Линия», в JSON. ?ext=12&kratko=1 — только какой звонок
-    на добавочном сейчас последний (страница опрашивает, не пришёл ли новый)."""
+    на добавочном сейчас последний (страница опрашивает, не пришёл ли новый);
+    ?q=1234&kratko=1 — только список номеров на эти 4 цифры (подсказка под полем)."""
     from . import liniya
     if ext and kratko not in ("", "0"):
         return liniya.dobavochnyj_kratko(ext)
+    if (last4 or q) and kratko not in ("", "0"):
+        return liniya.po_4_kratko(last4 or q)
     d = liniya.sobrat(phone=phone, q=last4 or q, ext=ext, age=age, child=child)
     d.pop("js", None)
     return d

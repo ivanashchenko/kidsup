@@ -146,6 +146,9 @@ GRUPPY = [
     (113, "2526_АЯ_пн-ср_16:00_6-7 лет", 2, 8),
     (114, "2627_Робототехника_пт 16:00 + вс 14:30_4-7 лет", 8, 8),
     (115, "2627_МА_вс_12:00_4-6 лет", 7, 8),
+    (116, "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)", 1, 8),     # тот же уровень, что Гр9, другое время
+    (117, "2627_РР.Музыка и речь_Группа 7_сб_16:30_1.8 - 2.2 года", 4, 7),  # раз в неделю
+    (118, "2627_АЯ_вт-чт_16:00_12-13 лет_A1 Starter (Гр5)", 2, 8),         # WAITLIST «добирать 10–12»
 ]
 SEMYA = "79990001001"      # двое детей на одном номере, у младшего нет дня рождения
 KLIENT = "79990002001"     # уже платили
@@ -154,6 +157,7 @@ NOMER_B = "79990011234"
 STOP = "79990004001"       # статус «не писать / не звонить»
 VTOROJ = "79990006001"     # номер только в карточке как второй
 NEZNAKOMYJ = "79990009999"  # нет в CRM
+STARSHIJ = "79990008001"   # старший брат 14 лет (не наш возраст) и сестра 6 лет
 
 
 def zasejat(baza: str):
@@ -170,6 +174,8 @@ def zasejat(baza: str):
         (9006, "Стопова Вера", STOP, 146328, _raw("Стопова Вера", STOP, "2019-06-01")),
         (9007, "Второв Ян", "79990005001", 125951, _raw("Второв Ян", "79990005001", "2020-09-09",
                                                         eshche_nomer=VTOROJ)),
+        (9008, "Старшев Глеб", STARSHIJ, 125951, _raw("Старшев Глеб", STARSHIJ, "2012-01-01")),
+        (9009, "Старшева Ника", STARSHIJ, 125951, _raw("Старшева Ника", STARSHIJ, "2020-05-05")),
     ]
     c.executemany("INSERT OR REPLACE INTO users (id, name, phone, client_state_id, raw) VALUES (?,?,?,?,?)",
                   lyudi)
@@ -182,6 +188,8 @@ def zasejat(baza: str):
     zapisi += [(9700 + i, 104, 2) for i in range(6)]            # ПШ2 (лист)
     zapisi += [(9800 + i, 105, 2) for i in range(2)]            # АЯ 5–7: 2 из 8
     zapisi += [(9900, 109, 2), (9901, 114, 2)]
+    zapisi += [(9910 + i, 116, 2) for i in range(6)]            # ПШ Гр15: 2 места (меньше, чем в Гр9)
+    zapisi += [(9920 + i, 118, 2) for i in range(5)]            # АЯ Гр5: 3 места
     c.executemany("INSERT OR REPLACE INTO joins (id, user_id, class_id, status_id, raw) VALUES (?,?,?,?,'{}')",
                   [(i + 1, u, k, s) for i, (u, k, s) in enumerate(zapisi)])
     c.executemany("INSERT OR REPLACE INTO lessons (id, date, begin_time, class_id) VALUES (?,?,?,?)",
@@ -245,7 +253,12 @@ def test_teksty(m):
     vse = []
     for k, o in t.OTVETY.items():
         vse += [o["knopka"], o["otvet"], o.get("shag", ""), o.get("pomni", "")]
-    vse += list(t.PERVOE_ZANYATIE.values())
+        vse += list((o.get("otvet_po_vidu") or {}).values())
+    vse += list(t.PERVOE_ZANYATIE.values()) + list(t.MESTO.values()) + list(t.VOPROS_UROVEN.values())
+    proverka("место «придержу» не обещаем — его держит только запись в CRM",
+             not any("придерж" in x for x in vse), [x[:60] for x in vse if "придерж" in x])
+    proverka("у каждого вида первого занятия — свой ответ «Пробное бесплатное?»",
+             set(t.OTVETY["probnoe"]["otvet_po_vidu"]) == set(t.PERVOE_ZANYATIE))
     proverka("ни одного «бесплатного пробного занятия»",
              not any(ZAPRESHCHENO.search(x) for x in vse),
              [x[:60] for x in vse if ZAPRESHCHENO.search(x)])
@@ -277,6 +290,10 @@ def test_teksty(m):
              t.zapolnit("Первое. В группе «{gruppa}» есть место. Последнее.", {"gruppa": ""})
              == "Первое. Последнее.")
     proverka("опечатка в подстановке остаётся на виду", "{grupa}" in t.zapolnit("Есть {grupa}.", {}))
+    proverka("пустая подстановка-предложение не тянет за собой соседние",
+             t.zapolnit("Вопрос? {vopros_uroven} {pervoe_zanyatie} {mesto}",
+                        {"vopros_uroven": "", "pervoe_zanyatie": "Первое.", "mesto": "Место."})
+             == "Вопрос? Первое. Место.")
     staraya = liniya.sobrat_otvety("Ева", False, [])["_bez"]
     proverka("семья уже платила — без скидки дня первого занятия",
              "скидка" not in staraya["skolko_stoit"]["otvet"] and "скидка" not in staraya["dorogo"]["otvet"])
@@ -289,6 +306,11 @@ def test_teksty(m):
              [s[:60] for s in zapolnennye if "{" in s][:2])
     proverka("в заполненных ответах нет «осталось N мест»",
              not any(re.search(r"осталось\s+\d", s) for s in zapolnennye))
+
+
+def _html(t):
+    """Страница без <script>: в JS-подсказке под полем есть и «нет в CRM», и «никого нет»."""
+    return re.sub(r"<script.*?</script>", "", t, flags=re.S)
 
 
 def _D(html):
@@ -358,9 +380,10 @@ def test_stranicy(c, m):
     vse_imena = [g["name"] for g in top + eshche]
     proverka("API: «не записывать» и «пауза» не предлагаем",
              not any("(Гр8)" in n or "(Гр13)" in n for n in vse_imena), vse_imena)
-    proverka("API: «полная / лист» — не первыми, но с пометкой",
-             not any("(Гр7)" in n for n in imena) and any("(Гр7)" in g["name"] and "полная" in g["zametka"]
-                                                           for g in eshche), vse_imena)
+    proverka("API: «полная» — не первыми, без числа мест, с пометкой листа",
+             not any("(Гр7)" in n for n in imena)
+             and any("(Гр7)" in g["name"] and g["mesto"] == "list" and g["free_text"] == "полная"
+                     and "лист ПШ2" in g["zametka"] for g in eshche), vse_imena)
     proverka("API: полные группы не предлагаем", not any("ШАХ" in n for n in vse_imena), vse_imena)
     proverka("API: места не отрицательные", all(g["free"] >= 0 for g in top + eshche))
     psh = next((g for g in top if g["name"].startswith("ПШ_вт-пт_17:00")), None)
@@ -381,12 +404,45 @@ def test_stranicy(c, m):
     proverka("API: в ответе про нулевой класс — бесплатный пробный день и скидка 8%",
              "бесплатный пробный день" in otv[str(nk["id"])]["skolko_stoit"]["otvet"]
              and "скидка 8%" in otv[str(nk["id"])]["skolko_stoit"]["otvet"])
-    proverka("API: в ответе про ПШ — группа, время и цена",
-             "«Подготовка к школе, ПШ1 нечитающие, 5–7 лет», по вторникам и пятницам в 17:00"
-             in otv[str(psh["id"])]["podumayu"]["otvet"]
-             and "8 400 ₽ за 8 занятий" in otv[str(psh["id"])]["skolko_stoit"]["otvet"])
+    proverka("API: в ответе про ПШ — группа и цена",
+             "В группе «Подготовка к школе, ПШ1 нечитающие, 5–7 лет» абонемент — 8 400 ₽ за 8 занятий"
+             in otv[str(psh["id"])]["skolko_stoit"]["otvet"])
     proverka("API: новая семья — скидка 15% в ответе про ПШ", "скидка 15%" in otv[str(psh["id"])]["skolko_stoit"]["otvet"])
     proverka("API: имя ребёнка в ответах", "как Ева занимается" in otv["_bez"]["dorogo"]["otvet"])
+
+    def otvet(gid, k, pole="otvet"):
+        return (otv.get(str(gid), {}).get(k) or otv["_bez"][k])[pole]
+
+    vnp = otvet(psh["id"], "vremya_ne_podhodit")
+    proverka("«Время не подходит» — другое время того же уровня, а не та же группа",
+             "Есть ещё группа «Подготовка к школе, ПШ1 нечитающие, 5–7 лет» по средам и пятницам в 19:00" in vnp
+             and "по вторникам и пятницам в 17:00" not in vnp, vnp)
+    proverka("«Время не подходит»: нет другого времени — предложения про место нет",
+             "Есть ещё группа" not in otvet(nk["id"], "vremya_ne_podhodit"), otvet(nk["id"], "vremya_ne_podhodit"))
+    gr7 = next(g for g in eshche if "(Гр7)" in g["name"])
+    vse_gr7 = " ".join(otvet(gr7["id"], k) for k in otv["_bez"])
+    proverka("полная группа: ни «есть место в группе», ни «придержу», ни «ходить раз в неделю»",
+             f"место в группе «{gr7['opisanie']}»" not in vse_gr7 and "придерж" not in vse_gr7
+             and "один день из двух" not in vse_gr7, vse_gr7[:200])
+    proverka("«Подумаю» не обещает придержать место",
+             not any("придерж" in o["otvet"] for gr in otv.values() for o in gr.values()))
+    proverka("«Подумаю»: как закрепить место — записью на первое занятие",
+             "запишите на первое занятие" in otv["_bez"]["podumayu"]["shag"])
+    proverka("«Дорого», шаг: абонемент поменьше — из прайса группы",
+             "Назвать абонемент поменьше — 5 000 ₽ за 4 занятия (1 р/нед)." in otvet(psh["id"], "dorogo", "shag"))
+    ma = next((g for g in top + eshche if g["name"].startswith("МА_")), None)
+    proverka("«Дорого», шаг: у группы нет абонемента поменьше — не просим его назвать",
+             ma and "поменьше" not in otvet(ma["id"], "dorogo", "shag")
+             and otvet(ma["id"], "dorogo", "shag").startswith("Предложить записаться"),
+             ma and otvet(ma["id"], "dorogo", "shag"))
+    proverka("«Пробное бесплатное?» про нулевой класс — сразу про пробный день",
+             otvet(nk["id"], "probnoe").startswith("В мини-саду и нулевом классе — бесплатный пробный день"),
+             otvet(nk["id"], "probnoe")[:80])
+    proverka("«Пробное бесплатное?» про ПШ — условно-бесплатное и без чужих направлений",
+             otvet(psh["id"], "probnoe").startswith("Первое занятие условно-бесплатное")
+             and "ИЗО" not in otvet(psh["id"], "probnoe"), otvet(psh["id"], "probnoe")[:80])
+    proverka("«Пробное бесплатное?» без группы — про все направления",
+             "мини-саду" in otv["_bez"]["probnoe"]["otvet"] and "ИЗО" in otv["_bez"]["probnoe"]["otvet"])
 
     print("Мини-сад: места по дням, без числа")
     j = c.get(f"/api/liniya?phone={SEMYA}&age=3").json()
@@ -396,6 +452,42 @@ def test_stranicy(c, m):
     proverka("вместо числа мест — «по дням — сверить в CRM»", sad and sad["free_text"] == "по дням — сверить в CRM")
     proverka("мини-сад: будни 9:00–13:00", sad and sad["kogda"] == "будни, 9:00–13:00")
     proverka("введённый возраст важнее карточки", j["vozrast"] == 3 and j["vozrast_otkuda"] == "введён")
+    otv_sad = " ".join(o["otvet"] for o in j["otvety"].get(str(sad["id"]), {}).values()) if sad else ""
+    proverka("мини-сад: в ответах ни «есть место», ни «придержу» — места по дням",
+             sad and "есть место" not in otv_sad and "придерж" not in otv_sad, otv_sad[:200])
+    proverka("мини-сад: «Пробное бесплатное?» — про пробный день",
+             sad and j["otvety"][str(sad["id"])]["probnoe"]["otvet"].startswith(
+                 "В мини-саду и нулевом классе — бесплатный пробный день"))
+
+    print("Группа раз в неделю, набор с условием, возраст центра")
+    from app import liniya as L
+    vse_g = {g["id"]: g for g in L.vse_gruppy()}
+    sb = vse_g.get(117, {})
+    proverka("раз в неделю (сб): цена строкой «1 р/нед», без «поменьше» и «один день из двух»",
+             sb.get("cena") == "5 200 ₽ за 4 занятия (1 р/нед)" and sb.get("cena_menshe") == ""
+             and sb.get("raz_v_nedelyu") == "", {k: sb.get(k) for k in ("cena", "cena_menshe", "raz_v_nedelyu")})
+    j = c.get(f"/api/liniya?phone={NEZNAKOMYJ}&age=2").json()
+    o117 = j["otvety"].get("117", {})
+    vnp117 = (o117.get("vremya_ne_podhodit") or j["otvety"]["_bez"]["vremya_ne_podhodit"])["otvet"]
+    proverka("раз в неделю: «Сколько стоит» — 5 200 ₽, «Время не подходит» — без «один день из двух»",
+             "5 200 ₽ за 4 занятия (1 р/нед)" in o117.get("skolko_stoit", {}).get("otvet", "")
+             and "8 600" not in json.dumps(o117, ensure_ascii=False) and "один день из двух" not in vnp117,
+             o117.get("skolko_stoit"))
+    a18 = vse_g.get(118, {})
+    proverka("«добирать 10–12» — не «полная»: места есть, условие в пометке",
+             a18.get("mesto") == "est" and a18.get("dobor", "").startswith("добирать 10–12")
+             and a18.get("free_text") == "3 места" and "полная" not in a18.get("zametka", ""), a18)
+    for vozr in ("14", "0,8"):
+        j = c.get(f"/api/liniya?phone={NEZNAKOMYJ}&age={vozr}").json()
+        proverka(f"возраст {vozr}: групп нет — «не наш возраст», а не лист ожидания",
+                 not j["gruppy"]["top"] and not j["gruppy"]["eshche"]
+                 and "Не наш возраст" in j["gruppy"]["pochemu_pusto"], j["gruppy"]["pochemu_pusto"])
+    j = c.get(f"/api/liniya?phone={STARSHIJ}").json()
+    proverka("двое детей, старшему 14: группы — под младшую, а не «не наш возраст»",
+             j.get("fokus") == 9009 and j["gruppy"]["top"], (j.get("fokus"), j["gruppy"].get("pochemu_pusto")))
+    j = c.get(f"/api/liniya?phone={NEZNAKOMYJ}&age=12").json()
+    proverka("12 лет — ещё наш возраст", any(g["id"] == 118 for g in j["gruppy"]["top"]),
+             [g["name"] for g in j["gruppy"]["top"]])
 
     print("Ребёнок без возраста")
     r = c.get(f"/liniya?phone={SEMYA}&child=9002")
@@ -409,7 +501,7 @@ def test_stranicy(c, m):
     print("Незнакомый номер")
     r = c.get(f"/liniya?phone={NEZNAKOMYJ}")
     proverka("200", r.status_code == 200)
-    proverka("«нет в CRM»", "нет в CRM" in r.text)
+    proverka("«нет в CRM»", "нет в CRM</span>" in _html(r.text))
     D = _D(r.text)
     proverka("скрипт нового контакта открыт сразу", ">Новый контакт</button>" in r.text
              and D.get("nachalo") == "novyj_kontakt"
@@ -419,6 +511,22 @@ def test_stranicy(c, m):
     proverka("ответ «новый контакт» заполнен группой",
              any("По возрасту есть место в группе «" in v.get("novyj_kontakt", {}).get("otvet", "")
                  for v in j["otvety"].values()))
+    nov = {gid: (v.get("novyj_kontakt") or j["otvety"]["_bez"]["novyj_kontakt"])["otvet"]
+           for gid, v in j["otvety"].items()}
+    proverka("новый контакт, полная группа: «сейчас полная» и лист, а не «есть место»",
+             "сейчас полная" in nov.get("104", "") and "лист ожидания" in nov.get("104", "")
+             and "есть место" not in nov.get("104", "").replace("где место есть", ""), nov.get("104"))
+    psh_n = nov.get("101", "")
+    proverka("новый контакт, ПШ: сначала «читает?», потом группа и время",
+             "Ребёнок уже читает?" in psh_n
+             and psh_n.find("Ребёнок уже читает?") < psh_n.find("По возрасту есть место"), psh_n)
+    proverka("новый контакт, нулевой класс: про чтение не спрашиваем", "читает" not in nov.get("107", "x читает"))
+    proverka("новый контакт без группы: без «есть место» и без вопроса про уровень",
+             "есть место" not in nov["_bez"] and "читает" not in nov["_bez"], nov["_bez"])
+    j = c.get(f"/api/liniya?phone={NEZNAKOMYJ}&age=4").json()
+    izo = j["otvety"].get("109", {}).get("probnoe", {}).get("otvet", "")
+    proverka("ИЗО: «Пробное бесплатное?» начинается с платного пробного, без «условно-бесплатного»",
+             izo.startswith("Первое занятие — знакомство") and "850 ₽" in izo and "условно" not in izo, izo[:90])
     proverka("звонок с незнакомого номера виден как контакт",
              c.get("/api/liniya?phone=79990077001").json()["kontakt"]["zvonki"][0]["itog"] == "пропущенный")
 
@@ -446,16 +554,49 @@ def test_stranicy(c, m):
     proverka("одна семья — открыта сразу", "Пробная Алиса" in r.text and "Кто на линии" in r.text
              and "Нашли по последним цифрам …2001" in r.text)
     r = c.get("/liniya?q=8888")
-    proverka("никого — новый контакт", "никого нет" in r.text and _D(r.text).get("nachalo") == "novyj_kontakt")
+    proverka("никого — новый контакт", "никого нет" in _html(r.text) and _D(r.text).get("nachalo") == "novyj_kontakt")
     r = c.get("/liniya?q=7001")
     proverka("номер не из CRM, но звонил сегодня — найден и открыт",
-             "нет в CRM" in r.text and "Нашли по последним цифрам …7001" in r.text and "пропущенный" in r.text)
+             "нет в CRM</span>" in _html(r.text) and "Нашли по последним цифрам …7001" in r.text and "пропущенный" in r.text)
     r = c.get("/liniya?q=12a4")
     proverka("не цифры — понятная ошибка", "только цифры" in r.text)
     r = c.get("/liniya?q=123")
-    proverka("три цифры — понятная ошибка", "Нужны последние 4 цифры" in r.text)
+    proverka("три цифры — понятная ошибка", "В номере 3 цифры" in r.text)
     proverka("API: last4", len(c.get("/api/liniya?last4=1234").json()["spisok"]) == 2)
     proverka("номер целиком в поле — как ?phone=", "Тестова Ева" in c.get(f"/liniya?q=+7 (999) 000-10-01").text)
+    r = c.get("/liniya?q=10-01")
+    proverka("«10-01» ищем, но одну семью не открываем — список, проверить номер",
+             "Номер на …1001" in r.text and "Тестова Ева" in r.text and "Кто на линии" not in r.text)
+    for vvod in ("8 999", "+7 999"):
+        r = c.get("/liniya", params={"q": vvod})
+        proverka(f"«{vvod}» — начало номера, а не последние цифры",
+                 "Похоже на начало номера" in r.text and "Кто на линии" not in r.text
+                 and "никого нет" not in _html(r.text))
+    r = c.get("/liniya?q=8999000100")
+    proverka("10 цифр с 8 в начале — не хватает цифры, «нет в CRM» не показываем",
+             "не хватает цифры" in r.text and "нет в CRM" not in _html(r.text))
+    j = c.get("/api/liniya?q=1001&kratko=1").json()
+    proverka("подсказка под полем: список без открытия семьи",
+             j.get("q") == "1001" and [s["p10"] for s in j.get("spisok", [])] == ["9990001001"]
+             and "deti" not in j and "otvety" not in j, j)
+    proverka("подсказка под полем: на 8999 никого — пустой список",
+             c.get("/api/liniya?q=8999&kratko=1").json() == {"q": "8999", "spisok": [], "eshche": 0})
+    stranica = c.get("/liniya").text
+    proverka("страница сама не открывает семью по 4 цифрам — только подсказка",
+             "/api/liniya?kratko=1&q=" in stranica and 'id="ln-pod"' in stranica)
+
+    print("Номер с лишними цифрами")
+    for vvod, cifr in (("799900010011", "12 цифр"), ("799900010011234", "15 цифр"),
+                       ("79990001001 79990002001", "22 цифры")):
+        for param in ("phone", "q"):
+            j = c.get("/api/liniya", params={param: vvod}).json()
+            proverka(f"{param}={vvod}: ошибка «{cifr}», чужой номер не показан",
+                     cifr in j.get("oshibka", "") and "telefon" not in j and j["rezhim"] == "pusto",
+                     (j.get("oshibka"), (j.get("telefon") or {}).get("pokaz")))
+    j = c.get("/api/liniya?phone=8120000001").json()
+    proverka("ссылка с 10 цифрами (городской, 812…) — как есть", (j.get("telefon") or {}).get("p10") == "8120000001")
+    j = c.get("/api/liniya?phone=7999000600").json()
+    proverka("кусок чужого номера в карточке — не «второй номер»", j.get("v_crm") is False, j.get("deti"))
 
     print("Добавочный")
     r = c.get("/liniya?ext=12")

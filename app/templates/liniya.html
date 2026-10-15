@@ -6,7 +6,7 @@
   <span class="ln-g-body">
     <b>{{ g.predmet }}</b>{% if g.programma %} · {{ g.programma }}{% endif %}{% if g.uroven %} · {{ g.uroven }}{% endif %}{% if g.vozrast %} · {{ g.vozrast }}{% endif %}<br>
     <span class="ln-g-when">{{ g.kogda or '—' }}</span>
-    · <span class="chip {{ 'warn' if (not g.sad and g.free <= 2) else 'free' }}">{{ g.free_text }}</span>
+    · <span class="chip {{ 'full' if g.mesto == 'list' else ('warn' if (not g.sad and g.free <= 2) else 'free') }}">{{ g.free_text }}</span>
     {% if g.cena %}· <span class="ln-nowrap">{{ g.cena }}</span>{% endif %}
     {% if g.cena_menshe %}<br><span class="small muted">поменьше: {{ g.cena_menshe }}</span>{% endif %}
     {% if g.zametka %}<br><span class="small ln-warn">{{ g.zametka }}</span>{% endif %}
@@ -25,6 +25,8 @@
   .ln-ext-links a{border:1px solid var(--border-strong);border-radius:999px;padding:5px 11px;font-weight:650;white-space:nowrap}
   .ln-ext-links a.on{background:var(--indigo);border-color:var(--indigo);color:#fff}
   .ln-hint{flex-basis:100%;margin:0}
+  .ln-pod{flex-basis:100%;min-width:0;border-top:1px solid var(--border);padding-top:4px}
+  .ln-pod > p{margin:4px 0}
   .ln-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:0 18px;align-items:start}
   @media (min-width:980px){.ln-grid.ln-dve{grid-template-columns:minmax(0,1fr) minmax(0,1.08fr)}}
   .ln-col{min-width:0}
@@ -84,7 +86,8 @@
   <span class="ln-ext-links">последний звонок:
     {% for e in d.dobavochnye %}<a href="/liniya?ext={{ e.ext }}" class="{{ 'on' if d.vvod.ext == e.ext }}">доб. {{ e.ext }}{% if e.kto %} · {{ e.kto }}{% endif %}</a>{% endfor %}
   </span>
-  <p class="muted small ln-hint">Номер можно вставить и целиком. Пока идёт разговор, набирайте 4 цифры: в журнал Манго звонок попадает, только когда положили трубку.</p>
+  <div id="ln-pod" class="ln-pod" hidden aria-live="polite"></div>
+  <p class="muted small ln-hint">Наберите 4 цифры — ниже появится, чей это номер. Номер целиком можно вставить или набрать — откроется сам. Пока идёт разговор, ищите здесь: в журнал Манго звонок попадает, только когда положили трубку.</p>
 </form>
 
 {% if d.oshibka %}<div class="notice">{{ d.oshibka }}</div>{% endif %}
@@ -117,7 +120,7 @@
   <h2>Номер на …{{ d.vvod.q }}: {{ d.spisok|length }}{% if d.spisok_eshche %} и ещё {{ d.spisok_eshche }}{% endif %}</h2>
   <ul class="ln-list">
     {% for s in d.spisok %}
-    <li><a href="/liniya?phone={{ s.p10 }}"><b>{{ s.imena|join(', ') if s.imena else 'нет в CRM' }}</b> · {{ s.pokaz }}</a>
+    <li><a href="/liniya?phone={{ s.p10 }}"><b>{{ s.imena|join(', ') if s.imena else 'нет в CRM' }}</b> · <span class="ln-nowrap">{{ s.pokaz }}</span></a>
       {% if s.statusy %}<span class="muted small">· {{ s.statusy|join(', ') }}</span>{% endif %}
       {% if s.kontakt %}<span class="chip">{{ s.kontakt }}</span>{% endif %}</li>
     {% endfor %}
@@ -250,7 +253,7 @@
       {% for g in gr.eshche %}{{ gruppa_stroka(g, false) }}{% endfor %}
     </details>
     {% endif %}
-    <p class="muted small" style="margin:8px 0 0">Места — как на странице <a href="/mesta">«Места»</a>: живые записи CRM, обновление раз в 5 минут. Группы «не записывать» и «пауза» здесь не показываем. «Осталось N мест» говорим только по этим числам.</p>
+    <p class="muted small" style="margin:8px 0 0">Места — как на странице <a href="/mesta">«Места»</a>: живые записи CRM, обновление раз в 5 минут. Группы «не записывать» и «пауза» здесь не показываем; в «полную» не дописываем — только лист ожидания. «Осталось N мест» говорим только по этим числам.</p>
   </div>
   {% endif %}
 </div>
@@ -299,13 +302,51 @@
       setTimeout(function () { copy.textContent = old; copy.classList.remove('done'); }, 1500);
     });
   });
-  // 4 цифры набрали и замолчали — ищем сами; номер целиком вставляют — тоже ок
-  var q = document.getElementById('ln-q'), tm = null;
+  // Поле номера. Ровно 4 цифры и пауза — подсказка под полем: чьи номера кончаются
+  // на эти цифры. Сами ничего не открываем: «8999» бывает и началом номера, который
+  // ещё диктуют. Номер целиком — 11 цифр с 7 или 8 в начале, 10 цифр с 3, 4 или 9 —
+  // открываем сами. Enter и «Найти» — как обычно.
+  var q = document.getElementById('ln-q'), pod = document.getElementById('ln-pod'), tm = null;
+  function celyj(v) { return v.length === 11 ? /^[78]/.test(v) : (v.length === 10 && /^[349]/.test(v)); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e;
+  }
+  function podskazka(chetyre) {
+    fetch('/api/liniya?kratko=1&q=' + chetyre, {cache: 'no-store'})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !pod || q.value.trim() !== chetyre) return;   // печатают дальше — подсказка не нужна
+        var s = j.spisok || [];
+        pod.textContent = '';
+        pod.appendChild(el('p', 'small muted', s.length
+          ? 'Кончается на …' + chetyre + ' — сверьте номер и откройте:'
+          : 'На …' + chetyre + ' никого нет ни в CRM, ни в звонках и сообщениях за два дня. '
+            + 'Если это начало номера — наберите его до конца. Новый контакт — нажмите «Найти».'));
+        if (s.length) {
+          var ul = el('ul', 'ln-list');
+          s.forEach(function (x) {
+            var li = el('li'), a = el('a');
+            a.href = '/liniya?phone=' + encodeURIComponent(x.p10);
+            a.appendChild(el('b', '', x.imena && x.imena.length ? x.imena.join(', ') : 'нет в CRM'));
+            a.appendChild(document.createTextNode(' · '));
+            a.appendChild(el('span', 'ln-nowrap', x.pokaz));
+            li.appendChild(a);
+            if (x.statusy && x.statusy.length) li.appendChild(el('span', 'muted small', ' · ' + x.statusy.join(', ')));
+            if (x.kontakt) { li.appendChild(document.createTextNode(' ')); li.appendChild(el('span', 'chip', x.kontakt)); }
+            ul.appendChild(li);
+          });
+          pod.appendChild(ul);
+          if (j.eshche) pod.appendChild(el('p', 'muted small', 'И ещё ' + j.eshche + ' — наберите номер целиком.'));
+        }
+        pod.hidden = false;
+      }).catch(function () {});
+  }
   if (q) q.addEventListener('input', function () {
     clearTimeout(tm);
-    var v = q.value.replace(/\D/g, '');
-    if ((v.length === 4 && q.value.trim().length <= 5) || v.length >= 10)
-      tm = setTimeout(function () { q.form.submit(); }, 600);
+    if (pod) pod.hidden = true;
+    var raw = q.value.trim(), v = raw.replace(/\D/g, '');
+    if (celyj(v)) tm = setTimeout(function () { q.form.submit(); }, 600);
+    else if (/^\d{4}$/.test(raw)) tm = setTimeout(function () { podskazka(raw); }, 600);
   });
   // ?ext=: раз в 30 секунд спрашиваем, не закончился ли новый звонок на этом добавочном
   if (D.ext) {
