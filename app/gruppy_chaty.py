@@ -100,12 +100,13 @@ def store(payload: dict) -> int:
         try:
             contact = msg.get("contact") if isinstance(msg.get("contact"), dict) else {}
             mid = str(msg.get("messageId") or "")
-            text = str(msg.get("text") or "").strip()
+            # 15.10, ревью: текст не строкой (словарь, список) — как вложение, а не repr
+            text = msg.get("text").strip() if isinstance(msg.get("text"), str) else ""
             kind = str(msg.get("type") or "text")
             if msg.get("isDeleted"):
                 deletes.append(mid)
                 continue
-            if msg.get("isEdited") and mid:
+            if msg.get("isEdited") and mid and text:
                 edits.append((text, mid))
             echo = bool(msg.get("isEcho"))
             chat_id = str(msg.get("chatId") or "")
@@ -118,8 +119,7 @@ def store(payload: dict) -> int:
                          author, username, (text or f"[{kind}]")[:4000], kind, 1 if echo else 0, mid,
                          str(msg.get("contentUri") or ""), json.dumps(msg, ensure_ascii=False, default=str)[:3000]))
         except Exception:  # noqa: BLE001 — одно кривое сообщение не роняет остальные
-            import logging
-            logging.getLogger("kidsup.gruppy").warning("групповое сообщение не разобрано", exc_info=True)
+            log.exception("групповое сообщение не разобрано")
     if not rows and not edits and not deletes:
         return 0
     with db.get_conn() as conn:

@@ -4415,13 +4415,16 @@ def _wazzup_status(payload: dict) -> None:
     from . import autopilot
     rows = []
     ts = autopilot._now().isoformat(timespec="seconds")
+    # 15.10, ревью: элемент не словарь не должен ронять статусы всего события
     for st in payload.get("statuses", []) or []:
-        mid, status = str(st.get("messageId") or ""), (st.get("status") or "")
+        if not isinstance(st, dict):
+            continue
+        mid, status = str(st.get("messageId") or ""), str(st.get("status") or "")
         if mid and status:
             rows.append((mid, status, ts))
     for m in payload.get("messages", []) or []:
-        if m.get("isEcho") and m.get("messageId") and m.get("status"):
-            rows.append((str(m["messageId"]), m["status"], ts))
+        if isinstance(m, dict) and m.get("isEcho") and m.get("messageId") and m.get("status"):
+            rows.append((str(m["messageId"]), str(m["status"]), ts))
     if not rows:
         return
     rank = {"sent": 1, "delivered": 2, "read": 3, "error": 0}
@@ -4482,7 +4485,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-15.1"
+APP_VERSION = "2026-10-15.2"
 
 
 @app.get("/api/net")

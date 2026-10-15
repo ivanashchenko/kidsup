@@ -41,9 +41,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import sqlite3
 import sys
+import threading
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -183,8 +185,9 @@ def raznica(tbl: str, old: dict, new: dict) -> dict:
     return out
 
 
-def ocenit_pravku(tbl: str, old: dict, new: dict) -> dict | None:
-    """Правка строки → находка с уровнем: red / yellow / info; None — не событие."""
+def ocenit_pravku(tbl: str, old: dict, new: dict, den: str | None = None) -> dict | None:
+    """Правка строки → находка с уровнем: red / yellow / info; None — не событие.
+    den — день правки (ГГГГ-ММ-ДД, из журнала); по умолчанию сегодня."""
     d = raznica(tbl, old, new)
     if not d:
         return None
@@ -223,21 +226,31 @@ def ocenit_pravku(tbl: str, old: dict, new: dict) -> dict | None:
         if "statusId" in d:
             st = int(_num(new.get("statusId")))
             ne_doshli = _num(new.get("visitedCount")) < _num(new.get("visitCount"))
-            po_sroku = bool(new.get("endDate")) and str(new.get("endDate"))[:10] < date.today().isoformat()
-            if st == 4 and _num(new.get("payed")) > 0 and ne_doshli and not po_sroku:
-                lvl = "yellow" if lvl != "red" else lvl
-                chto.append(f"оплаченный абонемент закрыт до конца ({_num(new.get('visitedCount')):g}/{_num(new.get('visitCount')):g})")
-            elif st == 4 and ne_doshli:
+            # 15.10, ревью: «по сроку» — только если дата окончания не менялась в этой же
+            # правке и уже прошла на ДЕНЬ ПРАВКИ (а не на день разбора журнала)
+            end_old, end_new = str(old.get("endDate") or "")[:10], str(new.get("endDate") or "")[:10]
+            po_sroku = bool(end_new) and end_old == end_new and end_new < (den or date.today().isoformat())[:10]
+            vis = f"{_num(new.get('visitedCount')):g}/{_num(new.get('visitCount')):g}"
+            if st == 4 and ne_doshli and po_sroku:
                 chto.append(f"абонемент окончен по сроку, не использовано "
                             f"{_num(new.get('visitCount')) - _num(new.get('visitedCount')):g} зан.")
+            elif st == 4 and ne_doshli and _num(new.get("payed")) > 0:
+                lvl = "yellow" if lvl != "red" else lvl
+                chto.append(f"оплаченный абонемент закрыт до конца ({vis})"
+                            + (f", дата окончания сдвинута {end_old} → {end_new}" if end_old != end_new else ""))
+            elif st == 4 and ne_doshli:
+                chto.append(f"неоплаченный абонемент закрыт до конца ({vis})")
             elif st != 4:
                 chto.append(f"статус {d['statusId'][0]} → {d['statusId'][1]}")
             # 14.10, ревью: обычное окончание (все занятия пройдены) — не событие
         if "visitCount" in d:
             a, b = _num(d["visitCount"][0]), _num(d["visitCount"][1])
-            if b > a and "price" not in d and _num(new.get("payed")) > 0:
+            pa, pb = _num(old.get("price", new.get("price"))), _num(new.get("price"))
+            # 15.10, ревью: сравниваем цену ЗА ЗАНЯТИЕ — «+3 занятия и +1 ₽» тоже уступка
+            if b > a > 0 and pa > 0 and _num(new.get("payed")) > 0 and pb / b < pa / a * 0.9:
                 lvl = "yellow" if lvl != "red" else lvl
-                chto.append(f"в оплаченный абонемент добавлены занятия {a:g} → {b:g} без изменения цены")
+                chto.append(f"в оплаченный абонемент добавлены занятия {a:g} → {b:g}, "
+                            f"цена за занятие {pa / a:,.0f} → {pb / b:,.0f} ₽".replace(",", " "))
             else:
                 chto.append(f"занятий в абонементе {a:g} → {b:g}")
         for f in ("beginDate", "endDate", "sellDate", "freezeFrom", "freezeTo", "classIds"):
@@ -268,6 +281,9 @@ def ocenit_pravku(tbl: str, old: dict, new: dict) -> dict | None:
             if a > 0 and b == 0:
                 lvl = "yellow"
                 chto.append(f"снято списание{' за пропуск' if not new.get('visit') else ''} {a:g} ₽")
+            elif a > 0 and b < a and new.get("goodReason") and abs(b - a / 2) < 0.01:
+                # 15.10, ревью: уважительная причина — штатные 50 % МойКласса, не уступка
+                chto.append(f"пропуск по уважительной причине: списание 50 % ({a:g} → {b:g} ₽)")
             elif a > 0 and b < a:
                 # 14.10, ревью: частичное снятие (975 → 487,5) — тоже уступка
                 lvl = "yellow"
@@ -277,7 +293,8 @@ def ocenit_pravku(tbl: str, old: dict, new: dict) -> dict | None:
             chto.append("снята отметка «оплачено»")
         if "free" in d and d["free"][1] and not d["free"][0]:
             chto.append("занятие отмечено бесплатным")
-        if "goodReason" in d and d["goodReason"][1] and not d["goodReason"][0]:
+        if "goodReason" in d and d["goodReason"][1] and not d["goodReason"][0] \
+                and not any(x.startswith("пропуск по уважительной") for x in chto):
             chto.append("пропуск отмечен уважительным")
         for f in ("test", "skip"):
             if f in d:
@@ -310,8 +327,21 @@ def tozhdestvo_balansa(balansy: dict, summy: dict, porog: float = BALANS_POROG, 
         delta = min(d1, d2)
         if abs(delta) >= porog:
             out.append({"userId": uid, "balans": bal, "summa_platezhey": round(s, 2), "delta": delta,
+                        "d1": d1, "d2": d2,
                         "smysl": "платёж удалён в МойКлассе" if delta < 0 else "пропуск синка или снятое списание"})
     return sorted(out, key=lambda x: x["delta"])
+
+
+def ostatok_balansa(x: dict, summa_udalennyh: float, porog: float = BALANS_POROG) -> float | None:
+    """Расхождение, которое НЕ объясняют удалённые платежи, или None.
+    15.10, ревью: остаток считался только по формуле без долга, и у клиента, чей
+    баланс уже уменьшил неоплаченный счёт, удалённый приход давал ложное жёлтое
+    «баланс» ровно на сумму долга. Жёлтое — только если не сходится ни одна формула."""
+    o1 = round(_num(x.get("d1", x.get("delta"))) + summa_udalennyh, 2)
+    o2 = round(_num(x.get("d2", x.get("delta"))) + summa_udalennyh, 2)
+    if o1 <= -porog and o2 <= -porog:
+        return max(o1, o2)
+    return None
 
 
 def kandidaty(local_ids, live_ids) -> list:
@@ -340,27 +370,41 @@ def _norm_sql(s) -> str:
     return " ".join(str(s or "").replace(";", " ").split())
 
 
-def ensure(conn=None) -> None:
-    """Таблица журнала и триггеры. Повторный вызов безвреден.
+def ensure(conn=None, peresozdat: bool = True) -> list:
+    """Таблица журнала и триггеры. Повторный вызов безвреден. Возвращает имена
+    устаревших триггеров.
 
     14.10, ревью: триггеры создаются «IF NOT EXISTS», и изменённое тело на
     рабочей базе не применилось бы никогда. Теперь триггер, чей текст в базе
-    отличается от TRIGGERS_SQL, удаляется и создаётся заново."""
+    отличается от TRIGGERS_SQL, пересоздаётся. 15.10, ревью: DROP и CREATE —
+    одной транзакцией (иначе под замком синка триггер мог пропасть совсем), а при
+    peresozdat=False (прогон dry) только сообщается, база не трогается."""
     from . import db
 
     def _apply(c):
-        for name, body in _TRG_RX.findall(TRIGGERS_SQL):
-            row = c.execute("SELECT sql FROM sqlite_master WHERE type='trigger' AND name=?", (name,)).fetchone()
-            if row and _norm_sql(row[0]) != _norm_sql(f"CREATE TRIGGER {name} {body}"):
-                log.warning("сверка честности: триггер %s устарел — пересоздаю", name)
-                c.execute(f"DROP TRIGGER IF EXISTS {name}")
+        stale = [(name, body) for name, body in _TRG_RX.findall(TRIGGERS_SQL)
+                 if (row := c.execute("SELECT sql FROM sqlite_master WHERE type='trigger' AND name=?", (name,)).fetchone())
+                 and _norm_sql(row[0]) != _norm_sql(f"CREATE TRIGGER {name} {body}")]
+        if stale and peresozdat:
+            if c.in_transaction:
+                c.commit()
+            c.execute("BEGIN IMMEDIATE")
+            try:
+                for name, body in stale:
+                    log.warning("сверка честности: триггер %s устарел — пересоздаю", name)
+                    c.execute(f"DROP TRIGGER IF EXISTS {name}")
+                    c.execute(f"CREATE TRIGGER {name} {body}")
+                c.execute("COMMIT")
+            except Exception:
+                c.execute("ROLLBACK")
+                raise
         c.executescript(TRIGGERS_SQL)
+        return [name for name, _ in stale]
 
     if conn is not None:
-        _apply(conn)
-        return
+        return _apply(conn)
     with db.get_conn() as c:
-        _apply(c)
+        return _apply(c)
 
 
 def _manager_names(conn) -> dict:
@@ -378,7 +422,24 @@ def _is_404(e: Exception) -> bool:
 
 
 # ── основной прогон ────────────────────────────────────────────────────────
+_RUN_LOCK = threading.Lock()
+
+
 def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dict:
+    """Один прогон сверки. Боевой (dry=False) — не больше одного за раз:
+    15.10, ревью — повтор в 11:45 мог стартовать поверх идущего утреннего, и
+    закладка журнала откатывалась."""
+    if dry:
+        return _run(day, dry=True, days=days)
+    if not _RUN_LOCK.acquire(blocking=False):
+        raise RuntimeError("сверка честности уже идёт — второй боевой прогон не запускаю")
+    try:
+        return _run(day, dry=False, days=days)
+    finally:
+        _RUN_LOCK.release()
+
+
+def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dict:
     from . import db
     day = _den(day) or date.today().isoformat()
     d0 = date.fromisoformat(day)
@@ -391,7 +452,9 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
                               "who": who, "rid": rid, "tbl": tbl, "extra": extra or {}})
 
     with db.get_conn() as conn:
-        ensure(conn)
+        zastarelo = ensure(conn, peresozdat=not dry)
+        if zastarelo and dry:
+            nakhodka("info", "предохранитель", f"Триггеры журнала устарели ({', '.join(zastarelo)}) — пересоздадутся при боевом прогоне.")
         M = _manager_names(conn)
         users = {r["id"]: dict(r) for r in conn.execute("SELECT id, name, phone, balance, created_at FROM users")}
         name = lambda uid: (users.get(uid) or {}).get("name") or f"#{uid}"
@@ -424,7 +487,7 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
                 f"SELECT id, ts, tbl, rid, user_id, old_raw, new_raw FROM izmeneniya WHERE {usl} ORDER BY id", args):
             n_pravok += 1
             old, new = _j(r["old_raw"]), _j(r["new_raw"])
-            oc = ocenit_pravku(r["tbl"], old, new)
+            oc = ocenit_pravku(r["tbl"], old, new, den=(r["ts"] or "")[:10] or None)
             if not oc:
                 continue
             if r["tbl"] == "users":
@@ -564,8 +627,8 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
                         # Остаток, который не объясняют удалённые платежи (известные и новые):
                         # 14.10, ревью — раньше любое новое расхождение у клиента с уже
                         # известным удалением молчало.
-                        ostatok = round(x["delta"] + sum(_num(p.get("summa")) for p in gone_vse), 2)
-                        if ostatok <= -BALANS_POROG:
+                        ostatok = ostatok_balansa(x, sum(_num(p.get("summa")) for p in gone_vse))
+                        if ostatok is not None:
                             nakhodka("yellow", "баланс", f"{name(x['userId'])}: баланс {x['balans']:g} меньше суммы платежей на {-ostatok:g} ₽ сверх удалённых платежей — возможно, списание задним числом.", x["userId"])
                     if not dry:
                         db.set_state("sverka_chestnosti_balans", json.dumps(dict(list(provereno.items())[-3000:])))
@@ -656,15 +719,18 @@ def run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> dic
 def _zapisat_den(day: str, R: dict) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     f = OUT_DIR / f"{day}.json"
-    tmp = OUT_DIR / f".{day}.json.tmp"
+    # 15.10, ревью: временный файл свой у каждого потока — два прогона не мешают друг другу
+    tmp = OUT_DIR / f".{day}.{os.getpid()}.{threading.get_ident()}.tmp"
     tmp.write_text(json.dumps(R, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
     tmp.replace(f)
 
 
 def proshla(day: str) -> bool:
-    """Боевой прогон за этот день дошёл до конца (для повтора в автопилоте)."""
+    """Боевой прогон за этот день дошёл до файла дня (для повтора в автопилоте).
+    15.10, ревью: файл дня пишется после пунктов пульта — если он есть, повтор
+    в 11:45 не нужен и не должен перезаписать полный отчёт почти пустым."""
     from . import db
-    return (db.get_state("sverka_chestnosti_den") or "") == str(day)
+    return (db.get_state("sverka_chestnosti_den") or "") == str(day) or (OUT_DIR / f"{day}.json").exists()
 
 
 def run_safe(day: str | None = None) -> None:
@@ -690,7 +756,10 @@ def load(day: str | None = None) -> dict:
     if not files:
         return {"day": day, "nakhodki": [], "summary": "Сверка ещё не запускалась."}
     try:
-        return json.loads(files[-1].read_text(encoding="utf-8"))
+        R = json.loads(files[-1].read_text(encoding="utf-8"))
+        if not isinstance(R, dict):
+            raise ValueError("файл дня — не объект")
+        return R
     except (OSError, ValueError):
         # 14.10, ревью: битый файл не должен выглядеть как «нет такого дня» (404)
         log.exception("сверка честности: файл %s не читается", files[-1].name)
@@ -796,12 +865,35 @@ def _selftest() -> int:
     d0 = date(2026, 10, 15)
     iz = pochistit_izvestno({"lesson_records:9": "2026-10-14", "payments:1": "2025-01-01", "user_subscriptions:3": "2026-09-01"}, d0)
     assert iz == {"lesson_records:9": "2026-10-14", "user_subscriptions:3": "2026-09-01"}, iz
-    # устаревший триггер пересоздаётся
+    # устаревший триггер: в dry только сообщается, в боевом — пересоздаётся одной транзакцией
     conn.execute("DROP TRIGGER trg_izm_payments")
     conn.execute("CREATE TRIGGER trg_izm_payments AFTER UPDATE ON payments BEGIN SELECT 1; END")
-    ensure(conn)
+    assert ensure(conn, peresozdat=False) == ["trg_izm_payments"]
+    assert "SELECT 1" in conn.execute("SELECT sql FROM sqlite_master WHERE name='trg_izm_payments'").fetchone()[0]
+    assert ensure(conn) == ["trg_izm_payments"]
     sql_t = conn.execute("SELECT sql FROM sqlite_master WHERE name='trg_izm_payments'").fetchone()[0]
     assert "INSERT INTO izmeneniya" in sql_t, sql_t
+    assert ensure(conn) == [], "повторный ensure не должен ничего пересоздавать"
+    # 15.10: остаток сверх удалённых — по обеим формулам (с долгом и без)
+    assert ostatok_balansa({"d1": -11200.0, "d2": -3000.0}, 3000.0) is None      # долг 8200, удалён приход 3000
+    assert ostatok_balansa({"d1": -35750.0, "d2": -35750.0}, 32750.0) == -3000.0  # сверх известного удаления
+    # 15.10: «по сроку» — по дню правки и только если дата окончания не сдвинута в этой же правке
+    sub = {"statusId": 2, "visitCount": 9, "visitedCount": 4, "payed": 8775}
+    oa = ocenit_pravku("user_subscriptions", dict(sub, endDate="2026-10-31"), dict(sub, statusId=4, endDate="2026-10-01"), den="2026-10-15")
+    assert oa and oa["level"] == "yellow" and "сдвинута" in oa["chto"], oa
+    ob = ocenit_pravku("user_subscriptions", dict(sub, endDate="2026-10-12"), dict(sub, statusId=4, endDate="2026-10-12"), den="2026-10-10")
+    assert ob and ob["level"] == "yellow" and "закрыт до конца" in ob["chto"], ob
+    oc8 = ocenit_pravku("user_subscriptions", dict(sub, payed=0, endDate="2026-11-30"), dict(sub, payed=0, statusId=4, endDate="2026-11-30"), den="2026-10-15")
+    assert oc8 and oc8["level"] == "info" and "неоплаченный" in oc8["chto"], oc8
+    # 15.10: уважительная причина — штатные 50 %, не уступка; без дубля строки
+    og = ocenit_pravku("lesson_records", {"visit": False, "goodReason": False, "bill": {"summa": 975}},
+                       {"visit": False, "goodReason": True, "bill": {"summa": 487.5}})
+    assert og and og["level"] == "info" and "уважительной" in og["chto"] and "отмечен" not in og["chto"], og
+    # 15.10: цена за занятие — «+3 занятия и +1 ₽» тоже уступка; честное увеличение — нет
+    ov = ocenit_pravku("user_subscriptions", {"visitCount": 8, "price": 9000, "payed": 9000}, {"visitCount": 11, "price": 9001, "payed": 9000})
+    assert ov and ov["level"] == "yellow", ov
+    ow = ocenit_pravku("user_subscriptions", {"visitCount": 8, "price": 9000, "payed": 9000}, {"visitCount": 12, "price": 13500, "payed": 13500})
+    assert ow and ow["level"] == "info", ow
     _selftest_run()
     print("selftest ok: журнал правок, оценка правок, шум, тождество баланса, кандидаты, время, "
           "память удалений, триггеры, боевой прогон на файловой базе")
@@ -907,6 +999,20 @@ def _selftest_run() -> None:
             assert R2["cifry"].get("uzhe_izvestnyh_udaleniy") == 1, R2["cifry"]
             assert not [t for _, _, t in inbox[n_inbox:] if "удалён платёж" in t], inbox[n_inbox:]
             assert load(day1)["day"] == day1 and "<h1>" in html(day2)
+            assert proshla(day1) and not proshla("2026-10-20")
+            # файл дня — не объект: страница и API не падают
+            (OUT_DIR / "2026-10-17.json").write_text("[]", encoding="utf-8")
+            assert "не читается" in load("2026-10-17")["summary"] and "<h1>" in html("2026-10-17")
+            # второй боевой прогон поверх идущего не запускается
+            assert _RUN_LOCK.acquire(blocking=False)
+            try:
+                run(day2, dry=False)
+            except RuntimeError:
+                pass
+            else:
+                raise AssertionError("второй боевой прогон должен отказаться")
+            finally:
+                _RUN_LOCK.release()
         finally:
             config.DB_PATH, OUT_DIR = saved_db, saved_out
             for k in fakes:

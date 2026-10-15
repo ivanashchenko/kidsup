@@ -380,11 +380,12 @@ def _inbound_texts(payload: dict) -> list[tuple[str, str]]:
     """(телефон, текст) по всем входящим сообщениям события Wazzup."""
     out = []
     for m in payload.get("messages") or []:
-        if m.get("isEcho") or m.get("status") == "outbound":
-            continue
+        if not isinstance(m, dict) or m.get("isEcho") or m.get("status") == "outbound":
+            continue   # 15.10, ревью: кривой элемент события пропускаем, а не падаем
         chat = m.get("chatId") or ""
-        phone = _p10(chat if str(chat).isdigit() else (m.get("contact") or {}).get("phone", ""))
-        text = m.get("text") or ""
+        contact = m.get("contact") if isinstance(m.get("contact"), dict) else {}
+        phone = _p10(chat if str(chat).isdigit() else contact.get("phone", ""))
+        text = m.get("text") if isinstance(m.get("text"), str) else ""
         if phone and text:
             out.append((phone, text))
     return out
