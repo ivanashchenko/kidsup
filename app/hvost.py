@@ -480,7 +480,10 @@ def utro(dry: bool = False) -> dict:
                     vozrast = (_d.fromisoformat(segodnya) - _d.fromisoformat(sozdan)).days
                 except ValueError:
                     vozrast = (_d.fromisoformat(segodnya) - _d.fromisoformat(den)).days
-                popytok = int(r["tries"] or 0)
+                # попытки с «Обзвона дня» пишутся не в tries, а пометкой в текст
+                # («итог …: не дозвонились») — считаем и их, иначе живую порцию
+                # закрыли бы через 2 дня как «не взятую»
+                popytok = max(int(r["tries"] or 0), tekst.lower().count("не дозвонил"))
                 if vozrast >= (VOZVRAT_DNEY_S_POPYTKAMI if popytok else VOZVRAT_DNEY):
                     sled.append((f"не дозвонились за {vozrast} дн. ({popytok} попыт.)" if popytok
                                  else f"порция обзвона не взята за {vozrast} дн.")

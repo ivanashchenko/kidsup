@@ -94,10 +94,13 @@ async def _public_hosts(request, call_next):
     # {"detail":"Not Found"}: мессенджер прихватил в ссылку точку после адреса.
     # Знак препинания в конце адреса (или в конце ?day=…) срезаем и уводим на
     # чистый адрес — в наших путях и датах такие знаки не встречаются.
-    # API и статику не трогаем: их зовёт код, а не человек из чата.
-    if request.method in ("GET", "HEAD") and not path.startswith(("/api/", "/static/", "/wazzup", "/hook")):
+    # API и статику не трогаем: их зовёт код, а не человек из чата. /go/ — тоже:
+    # там приветствие мессенджеру, и его знак препинания в конце — часть текста.
+    # Адрес, начинающийся с «//» или «/\», браузер читает как чужой сайт — такой
+    # не возвращаем, иначе ссылка вида app.kidsup.ru//чужой.сайт. уводила бы туда.
+    if request.method in ("GET", "HEAD") and not path.startswith(("/api/", "/static/", "/go/", "/wazzup", "/hook")):
         chisto = _bez_hvosta_ssylki(request.scope.get("path") or path, request.url.query)
-        if chisto:
+        if chisto and not chisto.startswith(("//", "/\\")):
             from fastapi.responses import RedirectResponse
             return RedirectResponse(chisto, status_code=307)
     return await call_next(request)
@@ -110,7 +113,9 @@ _HVOST_SSYLKI_KOD = ("%2E", "%2C", "%3B", "%3A", "%21", "%3F", "%29", "%C2%BB", 
 def _bez_hvosta_ssylki(path: str, query: str = "") -> str:
     """Адрес без прихваченной мессенджером пунктуации в конце или "" — если чистить нечего."""
     def _srezat(s: str) -> str:
-        while True:
+        # хвост из чата — 1–3 знака; без предела цикла адрес в 60 КБ из %2E
+        # держал бы сервер секунды (каждый круг срезает по одному коду)
+        for _ in range(5):
             t = s.rstrip(_HVOST_SSYLKI)
             for kod in _HVOST_SSYLKI_KOD:
                 if t.upper().endswith(kod):
@@ -118,6 +123,7 @@ def _bez_hvosta_ssylki(path: str, query: str = "") -> str:
             if t == s:
                 return s
             s = t
+        return s
     if query:
         q = _srezat(query)
         return (path + ("?" + q if q else "")) if q != query else ""
@@ -4529,7 +4535,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-15.2"
+APP_VERSION = "2026-10-15.3"
 
 
 @app.get("/api/net")
