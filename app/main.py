@@ -2591,6 +2591,48 @@ def api_boris_docs_remove(payload: dict = Body(...)):
     return {"ok": boris_docs.remove(str(payload.get("slug") or ""))}
 
 
+# Списки для администраторов (16.10.2026): та же папка на сервере, что у документов
+# владельца, но читают под логином admin, а выкладывает только владелец.
+@app.get("/admin/docs", response_class=HTMLResponse, dependencies=AUTH)
+def admin_docs_page():
+    from . import boris_docs
+    return HTMLResponse(boris_docs.ADMIN.page(), headers=_DOC_HEADERS)
+
+
+@app.get("/admin/docs/{slug}", response_class=HTMLResponse, dependencies=AUTH)
+def admin_doc(slug: str):
+    from . import boris_docs
+    html = boris_docs.ADMIN.get(slug)
+    if html is None:
+        raise HTTPException(404, "нет такого списка")
+    return HTMLResponse(html, headers=_DOC_HEADERS)
+
+
+@app.get("/api/admin-docs", dependencies=OWNER_AUTH)
+def api_admin_docs():
+    from . import boris_docs
+    return {"items": boris_docs.ADMIN.spisok()}
+
+
+@app.post("/api/admin-docs", dependencies=OWNER_AUTH)
+def api_admin_docs_save(payload: dict = Body(...)):
+    """{"slug", "title", "html", "note"?, "order"?} — выложить или заменить список для админов."""
+    from . import boris_docs
+    try:
+        r = boris_docs.ADMIN.save(str(payload.get("slug") or ""), str(payload.get("title") or ""),
+                                  str(payload.get("html") or ""), str(payload.get("note") or ""),
+                                  payload.get("order"))
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, **r}
+
+
+@app.post("/api/admin-docs/remove", dependencies=OWNER_AUTH)
+def api_admin_docs_remove(payload: dict = Body(...)):
+    from . import boris_docs
+    return {"ok": boris_docs.ADMIN.remove(str(payload.get("slug") or ""))}
+
+
 @app.get("/api/boris/tasks", dependencies=AUTH)
 def api_boris_tasks():
     from . import boris
@@ -4615,7 +4657,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-16.1"
+APP_VERSION = "2026-10-16.2"
 
 
 @app.get("/api/net")
