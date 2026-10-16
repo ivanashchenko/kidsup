@@ -3476,16 +3476,31 @@ def card_quality() -> None:
         bad_bd, bad_phone, bad_name = [], [], []
         MSG = _re.compile(r"\((телеграмм?|telegram|tg|max|макс|whats?app|ватсап|вайбер)\)", _re.I)
         AGE = _re.compile(r"\b\d{1,2}\s*(лет|год|года|мес)\b")
+        # 16.10.2026: «+7 (9xx) xxx-xx-xx» и «Заявка с сайта» тоже не имя ребёнка,
+        # а прежняя проверка ловила только телефон без пробелов и скобок.
+        PHONE_NAME = _re.compile(r"^[\d\s()+\-]{10,}$")
+        SLUZH = _re.compile(r"^(заявка|звонок от|лид|без имени|тест)\b", _re.I)
+        # 16.10.2026, Ира в чате: «пришли список, эта задача долго висит». В пункте
+        # были только числа, и найти сами карточки админ не мог. Теперь в пункте —
+        # что не заполнено и ссылка на каждую карточку.
+        nado: dict[int, dict] = {}
         for u in users:
             name = (u.get("name") or "").strip()
             attrs = {a.get("attributeAlias"): a.get("value") for a in (u.get("attributes") or [])}
+            chego = []
             if not attrs.get("birthday"):
                 bad_bd.append(name or str(u.get("id")))
+                chego.append("дата рождения")
             if not u.get("phone"):
                 bad_phone.append(name or str(u.get("id")))
+                chego.append("телефон")
             if MSG.search(name) or AGE.search(name) or (name[:1].islower() if name else False) \
-                    or _re.match(r"^7?9\d{9}$", name.replace(" ", "")):
+                    or _re.match(r"^7?9\d{9}$", name.replace(" ", "")) \
+                    or PHONE_NAME.match(name) or SLUZH.match(name):
                 bad_name.append(name)
+                chego.append("имя ребёнка")
+            if chego and u.get("id"):
+                nado[u["id"]] = {"name": name, "chego": chego}
         if not (bad_bd or bad_phone or bad_name):
             return
         admins = _admins_today() or _admins()
@@ -3502,7 +3517,16 @@ def card_quality() -> None:
         body = ("🤖 Клод: качество карточек за 3 дня — " + ", ".join(parts) +
                 ". Дозаполнить: дата рождения нужна для подбора группы, телефон — чтобы перезвонить. "
                 "В имени — только имя ребёнка (не мессенджер, не возраст, не телефон).")
-        _task(mk, who, None, obrezat(body, 250))
+        spisok = [f"«{v['name'] or 'без имени'}» — нет: {', '.join(v['chego'])} — "
+                  f"https://app.moyklass.com/client/{uid}" for uid, v in list(nado.items())[:15]]
+        if spisok:
+            body += " Карточки: " + "; ".join(f"{i}) {s}" for i, s in enumerate(spisok, 1))
+            if len(nado) > 15:
+                body += f"; и ещё {len(nado) - 15}"
+            body += "."
+        # Пункт плана дня (crm_tasks_off=1) длинный текст держит; задача МойКласса — нет.
+        predel = 2000 if db.get_setting("crm_tasks_off", "0") == "1" else 250
+        _task(mk, who, None, obrezat(body, predel))
         log.info("card_quality: %s", ", ".join(parts))
     finally:
         mk.close()
