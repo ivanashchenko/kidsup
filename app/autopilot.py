@@ -1500,7 +1500,8 @@ def speed_to_lead(mk: MoyklassClient) -> None:
         # 17.10.2026: мама сама позвонила, админ в разговоре завела заявку — и
         # через минуту получила «🔥 позвонить в течение 5 минут» про того же
         # человека, к тому же со статусом «не писать». С кем говорили за
-        # последний час, тому срочный звонок не ставим.
+        # последний час (итог «talked» в журнале, не ответ голосового меню),
+        # тому срочный звонок не ставим.
         _govorili = False
         if len(_tel_l) == 10:
             try:
@@ -1509,10 +1510,12 @@ def speed_to_lead(mk: MoyklassClient) -> None:
                 with db.get_conn() as _c:
                     _govorili = zvonok_filtr.nedavno_govorili(_c, _tel_l, _chas)
             except Exception:
+                log.exception("speed_to_lead: не проверили разговор по заявке %s", j["id"])
                 _govorili = False
         if _govorili:
             log.info("speed_to_lead: заявка %s — с семьёй говорили в последний час, 🔥 не ставим", j["id"])
         else:
+            log.info("speed_to_lead: задача по заявке %s → %s", j["id"], duty["name"])
             _task(mk, duty["managerId"], j.get("userId"),
                   ("Заявка от семьи со статусом «не писать / не звонить» — прочитай комментарий "
                    "в карточке и реши, звонить ли. " if _st_l == 146328 else
@@ -1526,7 +1529,6 @@ def speed_to_lead(mk: MoyklassClient) -> None:
             except Exception:
                 log.exception("speed_to_lead: подсказка не создана для %s", j["userId"])
         _mark("lead_task", str(j["id"]))  # метка только после успешного создания
-        log.info("speed_to_lead: задача по заявке %s → %s", j["id"], duty["name"])
 
 
 # клиент написал — а мы молчим -----------------------------------------
@@ -3811,6 +3813,19 @@ def _open_calls_today(mk: MoyklassClient, manager_id: int) -> int:
     return n
 
 
+def _ne_zvonit(uid, phone) -> str:
+    """17.10.2026, Ира: «по таким задачам мы выглядим надоедами». Причина не
+    ставить звонок семье (ответ в карточке, три звонка и сообщение) или ''."""
+    tel = "".join(c for c in str(phone or "") if c.isdigit())[-10:]
+    try:
+        from . import zvonok_filtr
+        with db.get_conn() as conn:
+            return zvonok_filtr.ne_zvonit(conn, [uid], tel)
+    except Exception:
+        log.exception("morning_tasks: не проверили карточку %s перед звонком", uid)
+        return ""
+
+
 def morning_tasks(mk: MoyklassClient) -> None:
     admins = _admins_today()
     if not admins:
@@ -3889,6 +3904,15 @@ def morning_tasks(mk: MoyklassClient) -> None:
                 state = user.get("clientStateId")
                 if state in skip:
                     continue
+                # 17.10.2026, Ира: «по таким задачам мы выглядим надоедами».
+                # Проверяем до меток: номер повтора — наши метки, а не журнал
+                # звонков. Семье с ответом в карточке («свяжусь сама», «далеко»…)
+                # или с тремя звонками без ответа и нашим сообщением звонок не
+                # ставим; отсрочка («после каникул») истечёт — звонок вернётся.
+                _pochemu = _ne_zvonit(uid, user.get("phone"))
+                if _pochemu:
+                    log.info("morning_tasks: звонок %s не ставим — %s", uid, _pochemu)
+                    continue
                 if not _mark("call_task", str(uid)):
                     # повтор для недозвона: новая задача раз в 2 дня, до 3 раз
                     if state != ST_NEDOZVON:
@@ -3902,19 +3926,6 @@ def morning_tasks(mk: MoyklassClient) -> None:
                     # ни кому звонит, ни о чём говорить, и шла искать карточку.
                     _imya = (user.get("name") or "").strip()[:32] or "имя не заполнено"
                     _tel_ = "".join(c for c in str(user.get("phone") or "") if c.isdigit())[-10:]
-                    # 17.10.2026, Ира: «по таким задачам мы выглядим надоедами».
-                    # Номер повтора — наши метки, а не журнал звонков: семье с
-                    # ответом в карточке («свяжусь сама», «далеко»…) или с тремя
-                    # звонками без ответа и нашим сообщением повтор не ставим.
-                    try:
-                        from . import zvonok_filtr
-                        with db.get_conn() as _c:
-                            _pochemu = zvonok_filtr.ne_zvonit(_c, [uid], _tel_)
-                    except Exception:
-                        _pochemu = ""
-                    if _pochemu:
-                        log.info("morning_tasks: повтор недозвона %s не ставим — %s", uid, _pochemu)
-                        continue
                     _tema = {"contin": "продолжение занятий", "camp": "был в лагере",
                              "regular": "продление с сентября", "hot": "был у нас этим летом",
                              "warm": "занимался до весны", "rr": "раннее развитие"}.get(kind, "набор 2026/27")

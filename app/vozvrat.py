@@ -239,18 +239,20 @@ def _dannye(conn) -> dict:
         "SELECT id, name, phone, client_state_id, created_at, raw FROM users")}
     zhivoy: dict[str, str] = {}
     popytki: dict[str, list[str]] = defaultdict(list)
+    # 17.10.2026: итоговые строки журнала (без событий вебхука) — для правила
+    # «звонить ли семье» (zvonok_filtr); popytki ниже считаются как раньше
+    zvonki_t: dict[str, list[tuple]] = defaultdict(list)
     for ts, phone, direction, state in conn.execute(
             "SELECT ts, phone, direction, state FROM mango_calls WHERE ts >= ?", ("2025-06-01",)):
         p = _p10(phone)
         if not p:
             continue
+        if state in ("talked", "short", "missed") and str(ts) >= NABOR_S:
+            zvonki_t[p].append((str(ts), str(direction or ""), state))
         if state == "talked":
             if str(ts) > zhivoy.get(p, ""):
                 zhivoy[p] = str(ts)
-        # 17.10.2026: в журнал пишет и вебхук — appeared/connected/… на каждый
-        # звонок; попыткой считаем только итог звонка (missed/short), один раз
-        elif (state in ("missed", "short") and str(direction or "").startswith(("out", "исх"))
-              and str(ts) >= NABOR_S and str(ts)[:16] not in {t[:16] for t in popytki[p]}):
+        elif direction == "out" and str(ts) >= NABOR_S:
             popytki[p].append(str(ts))
     pisali_nam: dict[str, str] = {}
     my_pisali: dict[str, str] = {}
@@ -277,7 +279,7 @@ def _dannye(conn) -> dict:
         "SELECT DISTINCT j.user_id FROM joins j JOIN classes c ON c.id = j.class_id "
         "WHERE c.name LIKE ? AND (c.name LIKE ? OR j.status_id = 50509)", ("2627_%", "%Заявк%"))}
     return {"today": today, "st": st_names, "mertvye": mertvye, "users": users, "zhivoy": zhivoy,
-            "popytki": popytki, "pisali_nam": pisali_nam, "my_pisali": my_pisali,
+            "popytki": popytki, "zvonki_t": zvonki_t, "pisali_nam": pisali_nam, "my_pisali": my_pisali,
             "seychas": seychas, "uchitsya": uchitsya, "platil": platil, "zhdut": zhdut,
             "kom": zvonok_filtr.kommentarii(conn)}
 
@@ -360,13 +362,13 @@ def spiski() -> dict:
             """17.10, Ира: «мы выглядим надоедами». В карточке уже ответ «не звонить»
             (свяжусь сама, далеко, после каникул…) или три звонка без ответа после
             последнего разговора и наше сообщение — звонок не ставим."""
-            pr = zvonok_filtr.otvet_v_kartochke(conn, [x[0] for x in na_nomere.get(p, [])], D["kom"])
+            zv = D["zvonki_t"].get(p, [])
+            pr = zvonok_filtr.otvet(D["kom"], [x[0] for x in na_nomere.get(p, [])], zv, today)
             if pr or not i_popytki:
                 return pr
-            k = kontakt(p)
-            pop = sorted(t for t in D["popytki"].get(p, []) if t[:10] > k)
-            if len(pop) >= 3 and D["my_pisali"].get(p, "")[:16] >= pop[0][:16]:
-                return f"{len(pop)} звонка без ответа и наше сообщение"
+            n, pisali = zvonok_filtr.popytki(zv, D["pisali_nam"].get(p, ""), D["my_pisali"].get(p, ""))
+            if n >= 3 and pisali:
+                return f"{n} звонка без ответа и наше сообщение"
             return ""
 
         zhdut_semey = Counter()
