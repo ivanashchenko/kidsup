@@ -161,5 +161,22 @@ otvety[:] = [Otvet(403, {"message": "Tariff expired."})]
 r = pub.publish(b"PNG", "x", ["hooppy"])
 proverka("отказ Hooppy — в ответе кнопки", not r["hooppy"]["ok"] and "Tariff expired." in r["hooppy"]["msg"])
 
+print("Истории (Борис 17.10: ВК, Instagram, ТГ-канал, ТГ-аккаунт, WhatsApp)")
+zaprosy.clear()
+otvety[:] = []
+r = pub.publish(b"PNG", "", ["hooppy_story"])
+proverka("без набора историй — понятная ошибка, ничего не отправлено",
+         not r["hooppy_story"]["ok"] and "hooppy_nabor_istorii" in r["hooppy_story"]["msg"] and not zaprosy)
+nastr["hooppy_nabor_istorii"] = "92400"
+otvety[:] = [Otvet(200, {"photo": foto}), Otvet(200, {"id": 533301})]
+r = pub.publish(b"PNG", "", ["hooppy_story"])
+telo = zaprosy[1][2]["json"]
+proverka("история уходит в свой набор с флагом историй во всех сетях",
+         r["hooppy_story"]["ok"] and telo["project_id"] == 92400 and telo["texts"] == []
+         and {"type": "settings", "data": {"publish_as_story": 1,
+                                           "publish_as_story_source_ids": "1,2,7,9,10,22"}} in telo["attachments"])
+proverka("в ленту история не дублируется",
+         "share_stories_to_feed" not in hp.nastrojki_istorii())
+
 print("\nошибок:", oshibok)
 sys.exit(1 if oshibok else 0)

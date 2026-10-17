@@ -11,6 +11,7 @@ Max добавим, когда появится токен их Bot API.
 
 Настройки (страница /settings): vk_token, vk_group_id (число без минуса),
 tg_bot_token, tg_channel (@имя_канала или -100…id), hooppy_nabor (id набора);
+hooppy_nabor_istorii (id набора для историй);
 ключ Hooppy — hooppy_token на странице /owner.
 """
 
@@ -78,7 +79,20 @@ def publish_hooppy(image: bytes, caption: str) -> str:
     return f"пост №{pid} принят, Hooppy публикует его в страницы набора; ошибки соцсетей — в его журнале"
 
 
-CHANNELS = {"vk": publish_vk, "tg": publish_tg, "hooppy": publish_hooppy}
+def publish_hooppy_story(image: bytes, caption: str) -> str:
+    """17.10.2026, Борис: истории в ВК, Instagram, ТГ-канал, ТГ-аккаунт и WhatsApp.
+    Свой набор hooppy_nabor_istorii: в нём могут быть личный аккаунт Telegram и
+    WhatsApp, куда посты для ленты не идут. Подпись к истории соцсети не показывают."""
+    from . import hooppy
+    nabor = (db.get_setting("hooppy_nabor_istorii") or "").strip()
+    if not nabor.isdigit():
+        raise RuntimeError("не настроено: hooppy_nabor_istorii (id набора для историй) в /settings")
+    foto = hooppy.zagruzit_foto(image, "istoriya.png")
+    pid = hooppy.post(caption, foto=[foto], nabor_id=int(nabor), nastrojki=hooppy.nastrojki_istorii())
+    return f"история №{pid} принята, Hooppy публикует её в страницы набора; ошибки соцсетей — в его журнале"
+
+
+CHANNELS = {"vk": publish_vk, "tg": publish_tg, "hooppy": publish_hooppy, "hooppy_story": publish_hooppy_story}
 
 
 def publish(image: bytes, caption: str, channels: list[str]) -> dict:

@@ -900,7 +900,8 @@ async def api_publish(request: Request):
 def api_publish_health():
     return {"vk": bool(db.get_setting("vk_token") and db.get_setting("vk_group_id")),
             "tg": bool(db.get_setting("tg_bot_token") and db.get_setting("tg_channel")),
-            "hooppy": bool(db.get_setting("hooppy_token") and db.get_setting("hooppy_nabor"))}
+            "hooppy": bool(db.get_setting("hooppy_token") and db.get_setting("hooppy_nabor")),
+            "hooppy_story": bool(db.get_setting("hooppy_token") and db.get_setting("hooppy_nabor_istorii"))}
 
 
 # 17.10.2026, Борис: «давай hooppy.ru настроим» — автопостинг в ВК, Telegram, Max и
@@ -919,7 +920,8 @@ def api_hooppy():
 @app.post("/api/hooppy/post", dependencies=OWNER_AUTH)
 def api_hooppy_post(payload: dict = Body(...)):
     """{"text", "foto_url"? | "foto_b64"?: [{"name", "data"}], "stranicy_ids"? | "nabor_id"? |
-    "raspisanie_ids"?, "kogda"?: "ДД.ММ.ГГГГ ЧЧ:ММ", "ssylka"?, "nastrojki"?: флаги Hooppy} → id поста.
+    "raspisanie_ids"?, "kogda"?: "ДД.ММ.ГГГГ ЧЧ:ММ", "ssylka"?, "nastrojki"?: флаги Hooppy,
+    "istoriya"?: true — историей (картинка 1080×1920)} → id поста.
     foto_b64 — картинки байтами (макет рендерится не на сервере): Hooppy нужна
     картинка, без неё Instagram пост не примет."""
     import base64
@@ -945,6 +947,8 @@ def api_hooppy_post(payload: dict = Body(...)):
     nastrojki = payload.get("nastrojki")
     if nastrojki is not None and not isinstance(nastrojki, dict):
         raise HTTPException(400, "nastrojki: нужен объект флагов, например {\"publish_as_story\": 1}")
+    if payload.get("istoriya"):  # историей во всех сетях, где Hooppy это умеет
+        nastrojki = {**(nastrojki or {}), **hooppy.nastrojki_istorii()}
     try:
         foto = [hooppy.zagruzit_po_ssylke(payload["foto_url"])] if payload.get("foto_url") else []
         foto += [hooppy.zagruzit_foto(data, name) for data, name in kartinki]
@@ -4775,7 +4779,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-17.3"
+APP_VERSION = "2026-10-17.4"
 
 
 @app.get("/api/net")
@@ -4837,6 +4841,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             "hooppy_token", "tbank_terminal", "tbank_terminal_password", "zenmoney_token", "green_api_instance", "green_api_token",
             # набор страниц Hooppy для кнопки «Опубликовать» на /makety (app/publish.py)
             "hooppy_nabor",
+            "hooppy_nabor_istorii",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
             "waba_template_id", "waba_templates",

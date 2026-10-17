@@ -22,8 +22,9 @@
 Instagram, Max — что подключено в кабинете Hooppy и входит в набор hooppy_nabor) или
 напрямую в <b>ВК</b> и <b>Телеграм-канал</b> (токены задаются в
 <a href="/settings">Настройках</a>: vk_token, vk_group_id, tg_bot_token, tg_channel).
-Статусы WhatsApp отсюда не публикуются — для них скачивайте PNG и
-выкладывайте с телефона. Устареть макет не может: он собирается заново из живых
+Сторис 1080×1920 — галочкой «Историей во все сети»: ВК, Instagram, Телеграм и
+WhatsApp из набора hooppy_nabor_istorii (истории в Телеграме — только от аккаунта с
+Premium, статусы WhatsApp — только через Wappi.pro). Устареть макет не может: он собирается заново из живых
 остатков мест при каждом открытии.</div>
 
 <div id="pub-modal" style="position:fixed;inset:0;background:rgba(15,20,28,.55);z-index:200;
@@ -34,6 +35,7 @@ Instagram, Max — что подключено в кабинете Hooppy и в�
     <a href="/content" target="_blank">фабрики</a>):</p>
     <textarea id="pub-caption" rows="5" style="width:100%"></textarea>
     <div style="display:flex;gap:14px;margin:10px 0;flex-wrap:wrap">
+      <label><input type="checkbox" id="pub-hs"> Историей во все сети</label>
       <label><input type="checkbox" id="pub-hp"> Все сети через Hooppy</label>
       <label><input type="checkbox" id="pub-vk" checked> ВКонтакте</label>
       <label><input type="checkbox" id="pub-tg" checked> Телеграм-канал</label>
@@ -62,7 +64,7 @@ Instagram, Max — что подключено в кабинете Hooppy и в�
       <button class="btn btn-primary" onclick="dlPng('mk-{{ m.key }}','kidsup_{{ m.key }}')">⬇ PNG {{ m.w }}×{{ m.h }}</button>
       <button class="btn" onclick="dlSvg('mk-{{ m.key }}','kidsup_{{ m.key }}')">SVG</button>
       {% if m.group != 'Печать' %}
-      <button class="btn" onclick="pubOpen('mk-{{ m.key }}','{{ m.title }}')">📤 Опубликовать</button>
+      <button class="btn" onclick="pubOpen('mk-{{ m.key }}','{{ m.title }}',{{ 'true' if m.h > m.w * 1.5 else 'false' }})">📤 Опубликовать</button>
       {% endif %}
     </div>
   </div>
@@ -95,17 +97,19 @@ function dlPng(id,name){
 
 /* --- публикация в соцсети ------------------------------------------------ */
 let pubTarget = null;
-function pubOpen(id, title) {
+function pubOpen(id, title, story) {
   pubTarget = id;
   document.getElementById('pub-title').textContent = '📤 ' + title;
   document.getElementById('pub-result').textContent = '';
   document.getElementById('pub-modal').style.display = 'flex';
   // Hooppy уже публикует и в ВК, и в канал: если он настроен, прямые галочки
   // снимаем, иначе один и тот же пост выйдет в ВК и в канале дважды
+  // сторис 9:16 по умолчанию уходит историей, а не постом в ленту
   fetch('/api/publish/health').then(function (r) { return r.json(); }).then(function (h) {
-    document.getElementById('pub-hp').checked = !!h.hooppy;
-    document.getElementById('pub-vk').checked = !!h.vk && !h.hooppy;
-    document.getElementById('pub-tg').checked = !!h.tg && !h.hooppy;
+    document.getElementById('pub-hs').checked = !!story && !!h.hooppy_story;
+    document.getElementById('pub-hp').checked = !story && !!h.hooppy;
+    document.getElementById('pub-vk').checked = !story && !!h.vk && !h.hooppy;
+    document.getElementById('pub-tg').checked = !story && !!h.tg && !h.hooppy;
   }).catch(function () {});
 }
 document.getElementById('pub-hp').addEventListener('change', function () {
@@ -133,6 +137,7 @@ function _pngBlob(id) {
 document.getElementById('pub-go').addEventListener('click', async function () {
   const out = document.getElementById('pub-result');
   const chans = [];
+  if (document.getElementById('pub-hs').checked) chans.push('hooppy_story');
   if (document.getElementById('pub-hp').checked) chans.push('hooppy');
   if (document.getElementById('pub-vk').checked) chans.push('vk');
   if (document.getElementById('pub-tg').checked) chans.push('tg');

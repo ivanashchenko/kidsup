@@ -22,7 +22,10 @@ from . import db
 
 BASE = "https://api.hooppy.ru/api"
 # Номера соцсетей в Hooppy (source_id); остальные приходят в ответе /accounts/pages.
-VK, TG = 1, 9
+VK, OK, IG_COOKIE, TG, IG, WA = 1, 2, 7, 9, 10, 22
+# Где Hooppy умеет истории (из его кабинета, 17.10.2026). Telegram — только от
+# аккаунта с Telegram Premium (в канал — ещё и бусты), WhatsApp — только через Wappi.pro.
+ISTORII_SETI = (VK, OK, IG_COOKIE, TG, IG, WA)
 
 
 class HooppyError(RuntimeError):
@@ -211,6 +214,12 @@ def telo_posta(text: str, *, foto: list[dict] | None = None, stranicy_ids: list[
     else:
         body["publication_when_type"] = 1
     return body
+
+
+def nastrojki_istorii() -> dict:
+    """Флаги «опубликовать историей» во всех сетях, где Hooppy это умеет. В ленту
+    историю не дублируем: пост для ленты — отдельный, в формате 4:5."""
+    return {"publish_as_story": 1, "publish_as_story_source_ids": ",".join(map(str, ISTORII_SETI))}
 
 
 def post(text: str, **kw) -> int:
