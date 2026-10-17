@@ -391,12 +391,24 @@ def save_lessons(items: list[dict]):
                 r.get("id"), l.get("id"), r.get("userId"),
                 1 if r.get("visit") else 0, json.dumps(r, ensure_ascii=False),
             ))
+    # 17.10.2026: перенос записи в МойКлассе — это удаление записи на старую дату
+    # и новая на другую. Синк только дописывал, удалённая запись жила в базе, и
+    # /api/day/firsts звал админа встречать первое занятие, перенесённое накануне.
+    # Занятие пришло со списком записей — это весь список, чего в нём нет, удалено.
+    # Если записи не пришли ни у одного занятия (API их не отдал), ничего не удаляем.
+    polnye = ([l for l in items if isinstance(l.get("records"), list)]
+              if any(l.get("records") for l in items) else [])
     with _lock, get_conn() as conn:
         upsert_rows(conn, "lessons",
                     ["id", "date", "begin_time", "end_time", "class_id", "filial_id",
                      "status", "topic", "raw"], lesson_rows)
         upsert_rows(conn, "lesson_records",
                     ["id", "lesson_id", "user_id", "visit", "raw"], record_rows)
+        for l in polnye:
+            ids = [r.get("id") for r in l["records"] if r.get("id") is not None]
+            conn.execute("DELETE FROM lesson_records WHERE lesson_id=?"
+                         + (" AND id NOT IN (%s)" % ",".join("?" * len(ids)) if ids else ""),
+                         (l.get("id"), *ids))
 
 
 def save_lesson_records(items: list[dict]):
