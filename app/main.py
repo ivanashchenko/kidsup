@@ -918,9 +918,24 @@ def api_hooppy():
 
 @app.post("/api/hooppy/post", dependencies=OWNER_AUTH)
 def api_hooppy_post(payload: dict = Body(...)):
-    """{"text", "foto_url"?, "stranicy_ids"? | "nabor_id"? | "raspisanie_ids"?,
-    "kogda"?: "ДД.ММ.ГГГГ ЧЧ:ММ", "ssylka"?, "nastrojki"?: флаги Hooppy} → id поста."""
+    """{"text", "foto_url"? | "foto_b64"?: [{"name", "data"}], "stranicy_ids"? | "nabor_id"? |
+    "raspisanie_ids"?, "kogda"?: "ДД.ММ.ГГГГ ЧЧ:ММ", "ssylka"?, "nastrojki"?: флаги Hooppy} → id поста.
+    foto_b64 — картинки байтами (макет рендерится не на сервере): Hooppy нужна
+    картинка, без неё Instagram пост не примет."""
+    import base64
+    import binascii
     from . import hooppy
+    kartinki = []
+    for i, f in enumerate(payload.get("foto_b64") or []):
+        try:
+            data = base64.b64decode(str((f or {}).get("data") or ""), validate=True)
+        except (binascii.Error, ValueError, AttributeError):
+            raise HTTPException(400, f"foto_b64[{i}]: не base64")
+        if not data or len(data) > 8_000_000:
+            raise HTTPException(413, f"foto_b64[{i}]: пусто или больше 8 МБ")
+        kartinki.append((data, str(f.get("name") or f"post{i}.png")[:80]))
+    if len(kartinki) > 10:
+        raise HTTPException(400, "не больше 10 картинок в посте")
     kogda = None
     if payload.get("kogda"):
         try:
@@ -931,7 +946,8 @@ def api_hooppy_post(payload: dict = Body(...)):
     if nastrojki is not None and not isinstance(nastrojki, dict):
         raise HTTPException(400, "nastrojki: нужен объект флагов, например {\"publish_as_story\": 1}")
     try:
-        foto = [hooppy.zagruzit_po_ssylke(payload["foto_url"])] if payload.get("foto_url") else None
+        foto = [hooppy.zagruzit_po_ssylke(payload["foto_url"])] if payload.get("foto_url") else []
+        foto += [hooppy.zagruzit_foto(data, name) for data, name in kartinki]
         pid = hooppy.post(str(payload.get("text") or ""), foto=foto,
                           stranicy_ids=payload.get("stranicy_ids"), nabor_id=payload.get("nabor_id"),
                           raspisanie_ids=payload.get("raspisanie_ids"), kogda=kogda,
