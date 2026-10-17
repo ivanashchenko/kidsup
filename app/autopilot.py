@@ -1488,19 +1488,38 @@ def speed_to_lead(mk: MoyklassClient) -> None:
         # локальной базы, а карточка туда ещё не доехала (синк раз в 5 минут).
         # Такой пункт бесполезен, а для заявки с сайта ещё и дублирует уже
         # поставленный подробный пункт. Имя и номер берём из самой CRM.
-        _imya_l, _tel_l = "", ""
+        _imya_l, _tel_l, _st_l = "", "", None
         if j.get("userId"):
             try:
                 _u = mk.get(f"/v1/company/users/{j['userId']}") or {}
                 _imya_l = (_u.get("name") or "").strip()[:40]
                 _tel_l = "".join(c for c in str(_u.get("phone") or "") if c.isdigit())[-10:]
+                _st_l = _u.get("clientStateId")
             except Exception:
                 pass
-        _task(mk, duty["managerId"], j.get("userId"),
-              "🔥 НОВАЯ ЗАЯВКА — позвонить в течение 5 минут! "
-              + (f"{_imya_l}" if _imya_l else "имя не указано")
-              + (f", тел. +7{_tel_l}" if len(_tel_l) == 10 else "")
-              + ". Свежий лид конвертируется в разы лучше.")
+        # 17.10.2026: мама сама позвонила, админ в разговоре завела заявку — и
+        # через минуту получила «🔥 позвонить в течение 5 минут» про того же
+        # человека, к тому же со статусом «не писать». С кем говорили за
+        # последний час, тому срочный звонок не ставим.
+        _govorili = False
+        if len(_tel_l) == 10:
+            try:
+                from . import zvonok_filtr
+                _chas = (_now() - timedelta(hours=1)).isoformat(timespec="seconds")[:19]
+                with db.get_conn() as _c:
+                    _govorili = zvonok_filtr.nedavno_govorili(_c, _tel_l, _chas)
+            except Exception:
+                _govorili = False
+        if _govorili:
+            log.info("speed_to_lead: заявка %s — с семьёй говорили в последний час, 🔥 не ставим", j["id"])
+        else:
+            _task(mk, duty["managerId"], j.get("userId"),
+                  ("Заявка от семьи со статусом «не писать / не звонить» — прочитай комментарий "
+                   "в карточке и реши, звонить ли. " if _st_l == 146328 else
+                   "🔥 НОВАЯ ЗАЯВКА — позвонить в течение 5 минут! ")
+                  + (f"{_imya_l}" if _imya_l else "имя не указано")
+                  + (f", тел. +7{_tel_l}" if len(_tel_l) == 10 else "")
+                  + ("." if _st_l == 146328 else ". Свежий лид конвертируется в разы лучше."))
         if j.get("userId") and _mark("lead_hint", str(j["userId"])):
             try:
                 _hint_for_lead(mk, j["userId"], j)
@@ -3883,6 +3902,19 @@ def morning_tasks(mk: MoyklassClient) -> None:
                     # ни кому звонит, ни о чём говорить, и шла искать карточку.
                     _imya = (user.get("name") or "").strip()[:32] or "имя не заполнено"
                     _tel_ = "".join(c for c in str(user.get("phone") or "") if c.isdigit())[-10:]
+                    # 17.10.2026, Ира: «по таким задачам мы выглядим надоедами».
+                    # Номер повтора — наши метки, а не журнал звонков: семье с
+                    # ответом в карточке («свяжусь сама», «далеко»…) или с тремя
+                    # звонками без ответа и нашим сообщением повтор не ставим.
+                    try:
+                        from . import zvonok_filtr
+                        with db.get_conn() as _c:
+                            _pochemu = zvonok_filtr.ne_zvonit(_c, [uid], _tel_)
+                    except Exception:
+                        _pochemu = ""
+                    if _pochemu:
+                        log.info("morning_tasks: повтор недозвона %s не ставим — %s", uid, _pochemu)
+                        continue
                     _tema = {"contin": "продолжение занятий", "camp": "был в лагере",
                              "regular": "продление с сентября", "hot": "был у нас этим летом",
                              "warm": "занимался до весны", "rr": "раннее развитие"}.get(kind, "набор 2026/27")

@@ -37,7 +37,7 @@ import re
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 
-from . import db, nabor
+from . import db, nabor, zvonok_filtr
 
 log = logging.getLogger("kidsup.vozvrat")
 
@@ -247,7 +247,10 @@ def _dannye(conn) -> dict:
         if state == "talked":
             if str(ts) > zhivoy.get(p, ""):
                 zhivoy[p] = str(ts)
-        elif direction == "out" and str(ts) >= NABOR_S:
+        # 17.10.2026: в журнал пишет и вебхук — appeared/connected/… на каждый
+        # звонок; попыткой считаем только итог звонка (missed/short), один раз
+        elif (state in ("missed", "short") and str(direction or "").startswith(("out", "исх"))
+              and str(ts) >= NABOR_S and str(ts)[:16] not in {t[:16] for t in popytki[p]}):
             popytki[p].append(str(ts))
     pisali_nam: dict[str, str] = {}
     my_pisali: dict[str, str] = {}
@@ -275,7 +278,8 @@ def _dannye(conn) -> dict:
         "WHERE c.name LIKE ? AND (c.name LIKE ? OR j.status_id = 50509)", ("2627_%", "%Заявк%"))}
     return {"today": today, "st": st_names, "mertvye": mertvye, "users": users, "zhivoy": zhivoy,
             "popytki": popytki, "pisali_nam": pisali_nam, "my_pisali": my_pisali,
-            "seychas": seychas, "uchitsya": uchitsya, "platil": platil, "zhdut": zhdut}
+            "seychas": seychas, "uchitsya": uchitsya, "platil": platil, "zhdut": zhdut,
+            "kom": zvonok_filtr.kommentarii(conn)}
 
 
 def _semi(D: dict, uids) -> dict[str, list]:
@@ -352,7 +356,21 @@ def spiski() -> dict:
             """Семья в листе ожидания — ждёт своё направление, чужое не предлагаем (06.10)."""
             return any(x[0] in D["zhdut"] for x in na_nomere.get(p, []))
 
+        def otvetili(p, i_popytki=True):
+            """17.10, Ира: «мы выглядим надоедами». В карточке уже ответ «не звонить»
+            (свяжусь сама, далеко, после каникул…) или три звонка без ответа после
+            последнего разговора и наше сообщение — звонок не ставим."""
+            pr = zvonok_filtr.otvet_v_kartochke(conn, [x[0] for x in na_nomere.get(p, [])], D["kom"])
+            if pr or not i_popytki:
+                return pr
+            k = kontakt(p)
+            pop = sorted(t for t in D["popytki"].get(p, []) if t[:10] > k)
+            if len(pop) >= 3 and D["my_pisali"].get(p, "")[:16] >= pop[0][:16]:
+                return f"{len(pop)} звонка без ответа и наше сообщение"
+            return ""
+
         zhdut_semey = Counter()
+        otvetili_semey = Counter()
 
         # ---- думает
         dumaet = []
@@ -364,6 +382,9 @@ def spiski() -> dict:
                 continue
             if all(x[0] in D["uchitsya"] for x in us):
                 continue                               # уже учится — статус просто не обновили
+            if otvetili(p):
+                otvetili_semey["думает"] += 1
+                continue
             k = kontakt(p)
             posl_pop = max(D["popytki"].get(p, [""]))[:10]
             dney = (today - date.fromisoformat(k)).days if k else 999
@@ -392,6 +413,10 @@ def spiski() -> dict:
                 continue
             if semya_zhdet(p):
                 zhdut_semey["недозвон"] += 1
+                continue
+            # три попытки здесь — своё правило (сообщение и «Архив набора»), не звонок
+            if otvetili(p, i_popytki=False):
+                otvetili_semey["недозвон"] += 1
                 continue
             k = kontakt(p)
             pop = sorted(D["popytki"].get(p, []))
@@ -462,6 +487,10 @@ def spiski() -> dict:
             if k and k >= NABOR_S:
                 itog25["семей_уже_говорили_в_этот_набор"] += 1
                 continue
+            if otvetili(p):
+                itog25["семей_ответ_в_карточке_или_3_звонка"] += 1
+                otvetili_semey["база2425"] += 1
+                continue
             us = [r[0] for r in rows]
             deti = [rebenok(u) for u in us]
             if vzroslye(deti):
@@ -494,7 +523,8 @@ def spiski() -> dict:
     itog25["отказ_раньше"] = sum(1 for r in baza if r["отказ_раньше"])
     return {"дата": today.isoformat(), "думает": dumaet, "недозвон": nedozvon, "база2425": baza,
             "итог2425": dict(itog25), "групп_с_местами": len(grp),
-            "лист_ожидания_исключено": dict(zhdut_semey)}
+            "лист_ожидания_исключено": dict(zhdut_semey),
+            "ответ_в_карточке_исключено": dict(otvetili_semey)}
 
 
 # ------------------------------------------------------------ раздача по сменам
