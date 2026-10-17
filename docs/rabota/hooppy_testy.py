@@ -93,6 +93,40 @@ o = hp.oshibki()
 proverka("журнал: только ошибки, с названием страницы", len(o) == 1 and o[0]["stranica"] == "KidsUP"
          and "Нет прав" in o[0]["chto"])
 
+print("Набор и расписание")
+shablon = {"id": 0, "name": "", "publication_where_type": 1, "watermark_id": 0, "posts_caption": "",
+           "tg_buttons": {"list": []}, "selected_pages_by_source_ids": {}, "social_pages_by_accounts": ["…"],
+           "watermarks": [], "projects": []}
+stranicy_otvet = Otvet(200, {"list": [{"id": 822454, "source_id": 1}, {"id": 22543, "source_id": 9}],
+                             "is_has_more": False})
+zaprosy.clear()
+otvety[:] = [Otvet(200, dict(shablon)), stranicy_otvet, Otvet(200, {"id": 412})]
+proverka("набор создаётся, id из ответа", hp.sozdat_nabor("KidsUP — все сети", [822454, 22543]) == 412)
+telo = zaprosy[-1][2]["json"]
+proverka("набор: страницы по сетям, поля шаблона на месте, справочники убраны",
+         telo["selected_pages_by_source_ids"] == {"1": [822454], "9": [22543]} and telo["name"] == "KidsUP — все сети"
+         and telo["tg_buttons"] == {"list": []} and "social_pages_by_accounts" not in telo and "id" not in telo)
+otvety[:] = [Otvet(200, dict(shablon)), stranicy_otvet]
+try:
+    hp.sozdat_nabor("x", [999])
+    proverka("чужая страница в наборе — ошибка", False)
+except hp.HooppyError as e:
+    proverka("чужая страница в наборе — ошибка", "999" in str(e))
+otvety[:] = [Otvet(200, dict(shablon)), Otvet(200, {"id": 2871})]
+nedelya = [["10:00"], [], ["10:00", "19:30"], [], [], ["9:05"], []]
+proverka("расписание создаётся", hp.sozdat_raspisanie("Посты KidsUP", nedelya, 412) == 2871)
+telo = zaprosy[-1][2]["json"]
+proverka("расписание — остановлено, через набор, время с ведущим нулём",
+         telo["state"] == 3 and telo["publication_how_type"] == 2 and telo["project_id"] == 412
+         and telo["times"][2] == [{"hours": "10", "minutes": "00"}, {"hours": "19", "minutes": "30"}]
+         and telo["times"][5] == [{"hours": "09", "minutes": "05"}] and len(telo["times"]) == 7)
+for nazv, vr in (("не 7 дней", [["10:00"]]), ("кривое время", [["25:00"], [], [], [], [], [], []])):
+    try:
+        hp.sozdat_raspisanie("x", vr, 1)
+        proverka(f"расписание: {nazv} — ошибка", False)
+    except hp.HooppyError:
+        proverka(f"расписание: {nazv} — ошибка", True)
+
 print("Кнопка «Опубликовать» на /makety (app/publish.py)")
 from app import publish as pub  # noqa: E402
 nastr = {}

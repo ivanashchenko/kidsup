@@ -919,7 +919,7 @@ def api_hooppy():
 @app.post("/api/hooppy/post", dependencies=OWNER_AUTH)
 def api_hooppy_post(payload: dict = Body(...)):
     """{"text", "foto_url"?, "stranicy_ids"? | "nabor_id"? | "raspisanie_ids"?,
-    "kogda"?: "ДД.ММ.ГГГГ ЧЧ:ММ", "ssylka"?} → id поста в Hooppy."""
+    "kogda"?: "ДД.ММ.ГГГГ ЧЧ:ММ", "ssylka"?, "nastrojki"?: флаги Hooppy} → id поста."""
     from . import hooppy
     kogda = None
     if payload.get("kogda"):
@@ -927,15 +927,47 @@ def api_hooppy_post(payload: dict = Body(...)):
             kogda = datetime.strptime(str(payload["kogda"]).strip(), "%d.%m.%Y %H:%M")
         except ValueError:
             raise HTTPException(400, "kogda: нужно «ДД.ММ.ГГГГ ЧЧ:ММ»")
+    nastrojki = payload.get("nastrojki")
+    if nastrojki is not None and not isinstance(nastrojki, dict):
+        raise HTTPException(400, "nastrojki: нужен объект флагов, например {\"publish_as_story\": 1}")
     try:
         foto = [hooppy.zagruzit_po_ssylke(payload["foto_url"])] if payload.get("foto_url") else None
         pid = hooppy.post(str(payload.get("text") or ""), foto=foto,
                           stranicy_ids=payload.get("stranicy_ids"), nabor_id=payload.get("nabor_id"),
                           raspisanie_ids=payload.get("raspisanie_ids"), kogda=kogda,
-                          ssylka=str(payload.get("ssylka") or ""))
+                          ssylka=str(payload.get("ssylka") or ""), nastrojki=nastrojki)
     except hooppy.HooppyError as e:
         raise HTTPException(502, str(e)[:300])
     return {"ok": True, "post_id": pid}
+
+
+@app.post("/api/hooppy/nabor", dependencies=OWNER_AUTH)
+def api_hooppy_nabor(payload: dict = Body(...)):
+    """{"name", "stranicy_ids"} → набор страниц в Hooppy (куда пост уходит одной кнопкой)."""
+    from . import hooppy
+    name = str(payload.get("name") or "").strip()
+    ids = payload.get("stranicy_ids") or []
+    if not name or not isinstance(ids, list):
+        raise HTTPException(400, "нужны name и список stranicy_ids")
+    try:
+        return {"ok": True, "nabor_id": hooppy.sozdat_nabor(name, ids)}
+    except hooppy.HooppyError as e:
+        raise HTTPException(502, str(e)[:300])
+
+
+@app.post("/api/hooppy/raspisanie", dependencies=OWNER_AUTH)
+def api_hooppy_raspisanie(payload: dict = Body(...)):
+    """{"name", "nabor_id", "vremena": 7 списков «ЧЧ:ММ» с понедельника} → расписание.
+    Создаётся остановленным: первые посты — только после «да» владельца."""
+    from . import hooppy
+    name = str(payload.get("name") or "").strip()
+    vremena = payload.get("vremena")
+    if not name or not payload.get("nabor_id") or not isinstance(vremena, list):
+        raise HTTPException(400, "нужны name, nabor_id и vremena (7 списков «ЧЧ:ММ»)")
+    try:
+        return {"ok": True, "raspisanie_id": hooppy.sozdat_raspisanie(name, vremena, int(payload["nabor_id"]))}
+    except (hooppy.HooppyError, TypeError, ValueError) as e:
+        raise HTTPException(502 if isinstance(e, hooppy.HooppyError) else 400, str(e)[:300])
 
 
 @app.get("/makety", response_class=HTMLResponse, dependencies=AUTH)

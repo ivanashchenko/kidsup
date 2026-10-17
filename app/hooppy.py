@@ -74,6 +74,58 @@ def raspisaniya() -> list[dict]:
     return _req("GET", "/posts/schedules/json").get("schedules") or []
 
 
+_SPRAVOCHNIKI = ("id", "social_pages_by_accounts", "social_albums_by_pages", "watermarks", "projects")
+
+
+def _shablon(path: str) -> dict:
+    """Шаблон нового набора или расписания (GET …/0/edit) без справочников. Поля
+    обработки контента (подпись, теги, рерайт…) Hooppy читает каждое напрямую,
+    поэтому передаём их все — со значениями по умолчанию из шаблона."""
+    b = _req("GET", f"{path}/0/edit")
+    return {k: v for k, v in b.items() if k not in _SPRAVOCHNIKI}
+
+
+def _po_setyam(stranicy_ids: list[int]) -> dict[str, list[int]]:
+    """{source_id: [id страниц]} — так Hooppy принимает выбор страниц в наборе."""
+    ids = [int(x) for x in stranicy_ids]
+    vse = {p["id"]: p["set"] for p in stranicy()}
+    chuzhie = [i for i in ids if i not in vse]
+    if not ids or chuzhie:
+        raise HooppyError(f"страницы не подключены в Hooppy: {chuzhie or 'список пуст'}")
+    out: dict[str, list[int]] = {}
+    for i in ids:
+        out.setdefault(str(vse[i]), []).append(i)
+    return out
+
+
+def sozdat_nabor(name: str, stranicy_ids: list[int]) -> int:
+    """Набор страниц — куда уходит пост одной кнопкой. Возвращает id набора."""
+    body = _shablon("/posts/projects")
+    body.update(name=name, publication_where_type=1, selected_pages_by_source_ids=_po_setyam(stranicy_ids))
+    return int(_req("POST", "/posts/projects", json=body).get("id") or 0)
+
+
+def sozdat_raspisanie(name: str, vremena: list[list[str]], nabor_id: int) -> int:
+    """Расписание — очередь постов по времени недели (vremena: 7 списков «ЧЧ:ММ»,
+    с понедельника). Создаём ВСЕГДА остановленным (state 3): запускает владелец
+    в кабинете Hooppy, когда посмотрит очередь."""
+    if len(vremena) != 7:
+        raise HooppyError("нужно 7 дней времени публикаций, с понедельника")
+    times = []
+    for den in vremena:
+        sloty = []
+        for t in den:
+            h, _, m = str(t).partition(":")
+            if not (h.isdigit() and m.isdigit() and int(h) < 24 and int(m) < 60):
+                raise HooppyError(f"время «{t}» — нужно ЧЧ:ММ")
+            sloty.append({"hours": f"{int(h):02d}", "minutes": f"{int(m):02d}"})
+        times.append(sloty)
+    body = _shablon("/posts/schedules")
+    body.update(name=name, times=times, state=3, publication_how_type=2, publication_where_type=1,
+                project_id=int(nabor_id))
+    return int(_req("POST", "/posts/schedules", json=body).get("id") or 0)
+
+
 def oshibki(limit: int = 30) -> list[dict]:
     """Журнал ошибок публикаций, новые сверху: [{kogda, set, stranica, chto}]."""
     b = _req("GET", "/notifications", params={"page": 1, "limit": limit})
