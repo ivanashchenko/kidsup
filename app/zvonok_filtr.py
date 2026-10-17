@@ -68,6 +68,9 @@ MYAGKO = re.compile(r"не\s?(?:актуальн|интересн|интерес
 INTERES = re.compile(r"(?<!не\s)\b(?:хотят|хочет|хотим|хотели\s+бы|интересует|интересна|интересно|"
                      r"интересны|интересен|нравится)\b", re.I)
 POKA = re.compile(r"\b(?:пока|сейчас|ещ[её]|на\s+данный\s+момент|в\s+этом\s+году)\b", re.I)
+# «не актуально до нового года», «не интересно до марта» — срок в мягком ответе.
+# Только там: «абонемент до мая» сам по себе не отсрочка.
+DO_SROKA = re.compile(r"\bдо\s+(?:(нового\s+года)|(январ|феврал|март|апрел|ма[йяе]|июн|июл|август|сентябр|октябр|ноябр|декабр)\w*)", re.I)
 
 # Отсрочка: звонить можно, но не сейчас — «через месяц», «позвонить в марте»,
 # «в конце месяца», «подрастут» (из карточек «думают» 17.10).
@@ -227,6 +230,13 @@ def _data_pauzy(t: str, kogda_msk: str) -> date:
         nachalo = date(d0.year if num > d0.month else d0.year + 1, num, 1)
         tekushchij = num <= d0.month < num + 3 or (num == 12 and d0.month <= 2)
         return d0 + timedelta(days=SROK_PAUZY) if tekushchij else nachalo
+    m = DO_SROKA.search(t)
+    if m:
+        if m.group(1):
+            return d0 if d0.month <= 2 else date(d0.year + 1, 1, 10)
+        num = _nomer_mes(m.group(2))
+        if num:
+            return date(d0.year if num > d0.month else d0.year + 1, num, 1)
     return d0 + timedelta(days=SROK_PAUZY)
 
 
@@ -263,8 +273,8 @@ def otvet(kom: dict, uids, zvonki: list[tuple] | None = None, segodnya: date | N
         if stop and MYAGKO.match(stop.group(0)):
             if INTERES.search(t0):
                 stop = None               # не актуально одно — хотят другое
-            elif pauza or POKA.search(t0):
-                stop, pauza = None, True  # «пока не актуально, позвонить в январе»
+            elif pauza or POKA.search(t0) or DO_SROKA.search(t0):
+                stop, pauza = None, True  # «пока не актуально, позвонить в январе», «…до нового года»
         if stop:
             if zhivoy and zhivoy > kogda:
                 return ""                 # после этого семья объявилась — запрет снят
