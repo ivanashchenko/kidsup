@@ -902,6 +902,41 @@ def api_publish_health():
             "tg": bool(db.get_setting("tg_bot_token") and db.get_setting("tg_channel"))}
 
 
+# 17.10.2026, Борис: «давай hooppy.ru настроим» — автопостинг в ВК, Telegram, Max и
+# ОК одним API (app/hooppy.py). Только владельцу: пост сразу уходит в соцсети.
+@app.get("/api/hooppy", dependencies=OWNER_AUTH)
+def api_hooppy():
+    """Что подключено в кабинете Hooppy: страницы, наборы, расписания, свежие ошибки."""
+    from . import hooppy
+    try:
+        return {"ok": True, "stranicy": hooppy.stranicy(), "nabory": hooppy.nabory(),
+                "raspisaniya": hooppy.raspisaniya(), "oshibki": hooppy.oshibki(10)}
+    except hooppy.HooppyError as e:
+        return {"ok": False, "oshibka": str(e)[:300]}
+
+
+@app.post("/api/hooppy/post", dependencies=OWNER_AUTH)
+def api_hooppy_post(payload: dict = Body(...)):
+    """{"text", "foto_url"?, "stranicy_ids"? | "nabor_id"? | "raspisanie_ids"?,
+    "kogda"?: "ДД.ММ.ГГГГ ЧЧ:ММ", "ssylka"?} → id поста в Hooppy."""
+    from . import hooppy
+    kogda = None
+    if payload.get("kogda"):
+        try:
+            kogda = datetime.strptime(str(payload["kogda"]).strip(), "%d.%m.%Y %H:%M")
+        except ValueError:
+            raise HTTPException(400, "kogda: нужно «ДД.ММ.ГГГГ ЧЧ:ММ»")
+    try:
+        foto = [hooppy.zagruzit_po_ssylke(payload["foto_url"])] if payload.get("foto_url") else None
+        pid = hooppy.post(str(payload.get("text") or ""), foto=foto,
+                          stranicy_ids=payload.get("stranicy_ids"), nabor_id=payload.get("nabor_id"),
+                          raspisanie_ids=payload.get("raspisanie_ids"), kogda=kogda,
+                          ssylka=str(payload.get("ssylka") or ""))
+    except hooppy.HooppyError as e:
+        raise HTTPException(502, str(e)[:300])
+    return {"ok": True, "post_id": pid}
+
+
 @app.get("/makety", response_class=HTMLResponse, dependencies=AUTH)
 def makety_page(request: Request):
     """Готовые визуалы (SVG→PNG) на живых данных: посты, сторис, плакат, листовка."""
