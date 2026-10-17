@@ -47,16 +47,37 @@ STOP = re.compile(
     r"\bвыбрали\s+друг(?:ой|ую|ие|ое)\s+(?:центр|кружок|секци\w*|студи\w*|школ\w*|сад\w*)|"
     r"\bопределились\s+с\s+(?:друг|детск)\w*\s+(?:центр|сад|школ)\w*|"
     r"\bне\s+актуальн\w*|\bне\s+интересн\w*|\bне\s+интересует\b|"
-    r"\bзаверш\w*\s+общени\w*",
+    r"\bзаверш\w*\s+общени\w*|"
+    r"\bесли\s+что\W{0,3}\s*(?:сами\s+)?(?:вернёмся|вернемся|позвоним|напишем|обратимся|свяжемся)\b",
     re.I)
 
-# Отсрочка: звонить можно, но не сейчас.
+# Отсрочка: звонить можно, но не сейчас — «через месяц», «позвонить в марте»,
+# «в конце месяца», «подрастут» (из карточек «думают» 17.10).
+_MES = r"январ|феврал|март|апрел|ма[йяе]|июн|июл|август|сентябр|октябр|ноябр|декабр"
+CHEREZ = re.compile(r"\bчерез\s+(?:(\d+|пару|два|две|три|четыре|полгода)\s+)?(недел\w*|месяц\w*|полгода)\b", re.I)
+V_MESYATS = re.compile(rf"\b(?:позвонить|перезвонить|звонить|набрать|вернуться|связаться|вернутся)\s+"
+                       rf"(в\s+конце\s+|в\s+начале\s+|в\s+|после\s+)({_MES})\w*", re.I)
+V_KONCE = re.compile(r"\bв\s+конце\s+(месяца|недели)\b", re.I)
 PAUZA = re.compile(
     r"\bпосле\s+(?:\w+\s+){0,2}каникул\b|\bна\s+будущее\b|"
     r"\b(?:сейчас|пока|ещ[её])\s+рано\b(?!\s+утр)|\bрано\s+ещ[её]\b|"
-    r"\bвернутся\s+(?:к\s+(?:вопросу|занятиям)\s+)?(?:после|позже|осенью|зимой|весной|летом)\b",
+    r"\bвернутся\s+(?:к\s+(?:вопросу|занятиям)\s+)?(?:после|позже|осенью|зимой|весной|летом)\b|"
+    rf"{CHEREZ.pattern}|{V_MESYATS.pattern}|{V_KONCE.pattern}|\bдораст\w*|\bподраст\w*",
     re.I)
 DATA_ZVONKA = re.compile(r"\b(?:перезвон\w*|позвон\w*|набрать|звонить)\s+(?:после\s+|с\s+)?(\d{1,2})\.(\d{2})\b", re.I)
+_CHISLO = {"пару": 2, "два": 2, "две": 2, "три": 3, "четыре": 4}
+_NOMER_MES = {"январ": 1, "феврал": 2, "март": 3, "апрел": 4, "май": 5, "мая": 5, "мае": 5, "июн": 6,
+              "июл": 7, "август": 8, "сентябр": 9, "октябр": 10, "ноябр": 11, "декабр": 12}
+
+
+def _plus_mes(d: date, n: int) -> date:
+    m = d.month - 1 + n
+    y, m = d.year + m // 12, m % 12 + 1
+    return date(y, m, min(d.day, 28))
+
+
+def _konec_mes(d: date) -> date:
+    return _plus_mes(date(d.year, d.month, 1), 1) - timedelta(days=1)
 
 # Отметка о недозвоне — не ответ семьи; решает комментарий до неё.
 PUSTO = re.compile(
@@ -89,7 +110,8 @@ def _msk(ts_utc: str) -> str:
 
 
 def _data_pauzy(t: str, kogda_msk: str) -> date:
-    """До какого дня пауза: названная дата «перезвонить ДД.ММ» или SROK_PAUZY дней."""
+    """До какого дня пауза: названная дата («перезвонить 02.11»), срок («через
+    месяц»), месяц («позвонить в марте», «в конце месяца») или SROK_PAUZY дней."""
     try:
         d0 = date.fromisoformat(kogda_msk[:10])
     except ValueError:
@@ -103,6 +125,29 @@ def _data_pauzy(t: str, kogda_msk: str) -> date:
             return d
         except ValueError:
             pass
+    m = CHEREZ.search(t)
+    if m:
+        n = m.group(1) or "1"
+        n = 6 if n == "полгода" else (int(n) if n.isdigit() else _CHISLO.get(n.lower(), 1))
+        ed = m.group(2).lower()
+        if ed.startswith("полгода"):
+            return _plus_mes(d0, 6)
+        return d0 + timedelta(weeks=n) if ed.startswith("недел") else _plus_mes(d0, n)
+    m = V_MESYATS.search(t)
+    if m:
+        kak, mes = m.group(1).strip().lower(), m.group(2).lower()
+        num = next((v for k, v in _NOMER_MES.items() if mes.startswith(k)), 0)
+        if num:
+            god = d0.year if num >= d0.month else d0.year + 1
+            nachalo = date(god, num, 1)
+            if kak.startswith("в конце"):
+                return _konec_mes(nachalo) - timedelta(days=7)
+            if kak.startswith("после"):
+                return _plus_mes(nachalo, 1)
+            return nachalo if nachalo > d0 else d0
+    m = V_KONCE.search(t)
+    if m:
+        return d0 + timedelta(days=6) if m.group(1).lower().startswith("недел") else _konec_mes(d0) - timedelta(days=5)
     return d0 + timedelta(days=SROK_PAUZY)
 
 
