@@ -361,12 +361,18 @@ def spiski() -> dict:
         def otvetili(p, i_popytki=True):
             """17.10, Ира: «мы выглядим надоедами». В карточке уже ответ «не звонить»
             (свяжусь сама, далеко, после каникул…) или три звонка без ответа после
-            последнего разговора и наше сообщение — звонок не ставим."""
-            zv = D["zvonki_t"].get(p, [])
-            pr = zvonok_filtr.otvet(D["kom"], [x[0] for x in na_nomere.get(p, [])], zv, today)
-            if pr or not i_popytki:
-                return pr
-            n, pisali = zvonok_filtr.popytki(zv, D["pisali_nam"].get(p, ""), D["my_pisali"].get(p, ""))
+            последнего разговора и наше сообщение — звонок не ставим.
+            Сбой разбора одной карточки не роняет списки и раздачу дня — семья
+            тогда остаётся в очереди, как было до фильтра."""
+            try:
+                zv = D["zvonki_t"].get(p, [])
+                pr = zvonok_filtr.otvet(D["kom"], [x[0] for x in na_nomere.get(p, [])], zv, today)
+                if pr or not i_popytki:
+                    return pr
+                n, pisali = zvonok_filtr.popytki(zv, D["pisali_nam"].get(p, ""), D["my_pisali"].get(p, ""))
+            except Exception:
+                log.exception("возврат: не разобрали карточки %s", p)
+                return ""
             if n >= 3 and pisali:
                 return f"{n} звонка без ответа и наше сообщение"
             return ""

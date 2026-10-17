@@ -3726,6 +3726,11 @@ def _plan_queues() -> tuple[dict[int, list[int]], dict[int, str]]:
                 if uid in taken:
                     continue
                 taken.add(uid)
+                # 17.10, ревью: семья с ответом в карточке иначе занимала бы
+                # место в норме, а утром её всё равно пропускали — звонков
+                # становилось меньше нормы. Отсеиваем до раздачи.
+                if _ne_zvonit(uid, users[uid][1]):
+                    continue
                 mine.append(uid)
             if len(mine) >= norm:
                 break
