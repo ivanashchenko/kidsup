@@ -126,6 +126,27 @@ def sozdat_raspisanie(name: str, vremena: list[list[str]], nabor_id: int) -> int
     return int(_req("POST", "/posts/schedules", json=body).get("id") or 0)
 
 
+def _ids(ids) -> str:
+    out = [str(int(x)) for x in ids or []]
+    if not out:
+        raise HooppyError("пустой список id")
+    return ",".join(out)
+
+
+def udalit_posty(ids: list[int]) -> None:
+    """Удалить посты из Hooppy (уже опубликованные в соцсетях записи остаются)."""
+    _req("POST", "/posts/batch/delete", json={"ids": _ids(ids)})
+
+
+def zapustit_raspisaniya(ids: list[int]) -> None:
+    """Запустить остановленные расписания — только после «да» владельца."""
+    _req("POST", "/posts/schedules/batch/start", json={"ids": _ids(ids)})
+
+
+def ostanovit_raspisaniya(ids: list[int]) -> None:
+    _req("POST", "/posts/schedules/batch/stop", json={"ids": _ids(ids)})
+
+
 def oshibki(limit: int = 30) -> list[dict]:
     """Журнал ошибок публикаций, новые сверху: [{kogda, set, stranica, chto}]."""
     b = _req("GET", "/notifications", params={"page": 1, "limit": limit})

@@ -957,6 +957,28 @@ def api_hooppy_post(payload: dict = Body(...)):
     return {"ok": True, "post_id": pid}
 
 
+@app.post("/api/hooppy/udalit", dependencies=OWNER_AUTH)
+def api_hooppy_udalit(payload: dict = Body(...)):
+    """{"post_ids": [...]} — удалить черновики из Hooppy (опубликованное в соцсетях остаётся)."""
+    from . import hooppy
+    try:
+        hooppy.udalit_posty(payload.get("post_ids") or [])
+    except (hooppy.HooppyError, TypeError, ValueError) as e:
+        raise HTTPException(502 if isinstance(e, hooppy.HooppyError) else 400, str(e)[:300])
+    return {"ok": True}
+
+
+@app.post("/api/hooppy/raspisanie/sostoyanie", dependencies=OWNER_AUTH)
+def api_hooppy_raspisanie_sostoyanie(payload: dict = Body(...)):
+    """{"ids": [...], "zapusk": true|false} — запустить (только после «да» владельца) или остановить."""
+    from . import hooppy
+    try:
+        (hooppy.zapustit_raspisaniya if payload.get("zapusk") else hooppy.ostanovit_raspisaniya)(payload.get("ids") or [])
+    except (hooppy.HooppyError, TypeError, ValueError) as e:
+        raise HTTPException(502 if isinstance(e, hooppy.HooppyError) else 400, str(e)[:300])
+    return {"ok": True, "zapushcheno": bool(payload.get("zapusk"))}
+
+
 @app.post("/api/hooppy/nabor", dependencies=OWNER_AUTH)
 def api_hooppy_nabor(payload: dict = Body(...)):
     """{"name", "stranicy_ids"} → набор страниц в Hooppy (куда пост уходит одной кнопкой)."""

@@ -127,6 +127,22 @@ for nazv, vr in (("не 7 дней", [["10:00"]]), ("кривое время", [
     except hp.HooppyError:
         proverka(f"расписание: {nazv} — ошибка", True)
 
+print("Удаление и запуск")
+zaprosy.clear()
+otvety[:] = [Otvet(200, {"success": True}), Otvet(200, {"success": True}), Otvet(200, {"success": True})]
+hp.udalit_posty([98891140, 98891141])
+hp.zapustit_raspisaniya([110331])
+hp.ostanovit_raspisaniya([110331])
+proverka("удаление — id строкой через запятую", zaprosy[0][1].endswith("/posts/batch/delete")
+         and zaprosy[0][2]["json"] == {"ids": "98891140,98891141"})
+proverka("запуск и остановка расписания", zaprosy[1][1].endswith("/posts/schedules/batch/start")
+         and zaprosy[2][1].endswith("/posts/schedules/batch/stop") and zaprosy[1][2]["json"] == {"ids": "110331"})
+try:
+    hp.udalit_posty([])
+    proverka("пустой список — ошибка, без запроса", False)
+except hp.HooppyError:
+    proverka("пустой список — ошибка, без запроса", len(zaprosy) == 3)
+
 print("Кнопка «Опубликовать» на /makety (app/publish.py)")
 from app import publish as pub  # noqa: E402
 nastr = {}
