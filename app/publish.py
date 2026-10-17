@@ -6,9 +6,12 @@
   • Телеграм-канал — Bot API, бот должен быть админом канала
 Instagram и статусы WhatsApp API не дают — для них кнопка «скачать» и руки.
 Max добавим, когда появится токен их Bot API.
+  • С 17.10.2026 — «все сети» через Hooppy: один пост во все страницы набора
+    (ВК, Телеграм-канал, Instagram, Max — что подключено в кабинете Hooppy)
 
 Настройки (страница /settings): vk_token, vk_group_id (число без минуса),
-tg_bot_token, tg_channel (@имя_канала или -100…id).
+tg_bot_token, tg_channel (@имя_канала или -100…id), hooppy_nabor (id набора);
+ключ Hooppy — hooppy_token на странице /owner.
 """
 
 from __future__ import annotations
@@ -62,7 +65,20 @@ def publish_tg(image: bytes, caption: str) -> str:
     return f"пост №{r['result']['message_id']} в {chat}"
 
 
-CHANNELS = {"vk": publish_vk, "tg": publish_tg}
+def publish_hooppy(image: bytes, caption: str) -> str:
+    """17.10.2026: все сети разом через Hooppy (app/hooppy.py). Публикуем только в
+    набор страниц hooppy_nabor, а не во всё подключённое: в кабинете могут быть
+    WhatsApp и личные аккаунты Telegram, куда пост с макетом уходить не должен."""
+    from . import hooppy
+    nabor = (db.get_setting("hooppy_nabor") or "").strip()
+    if not nabor.isdigit():
+        raise RuntimeError("не настроено: hooppy_nabor (id набора страниц в Hooppy) в /settings")
+    foto = hooppy.zagruzit_foto(image, "maket.png")
+    pid = hooppy.post(caption, foto=[foto], nabor_id=int(nabor))
+    return f"пост №{pid} принят, Hooppy публикует его в страницы набора; ошибки соцсетей — в его журнале"
+
+
+CHANNELS = {"vk": publish_vk, "tg": publish_tg, "hooppy": publish_hooppy}
 
 
 def publish(image: bytes, caption: str, channels: list[str]) -> dict:

@@ -106,19 +106,23 @@ def _abzacy(text: str) -> str:
 
 def telo_posta(text: str, *, foto: list[dict] | None = None, stranicy_ids: list[int] | None = None,
                nabor_id: int | None = None, kogda: datetime | None = None,
-               raspisanie_ids: list[int] | None = None, ssylka: str = "") -> dict:
+               raspisanie_ids: list[int] | None = None, ssylka: str = "",
+               nastrojki: dict | None = None) -> dict:
     """Тело POST /posts. Куда: страницы (stranicy_ids) или набор (nabor_id), либо в
     расписание (raspisanie_ids). Когда: сразу, в момент kogda (часовой пояс кабинета)
-    или по расписанию."""
+    или по расписанию. nastrojki — флаги публикации Hooppy как есть, например
+    {"publish_as_story": 1, "publish_as_story_source_ids": "1,9"} — ещё и в истории."""
     vlozheniya = []
     if foto:
         vlozheniya.append({"type": "photos", "data": foto})
     if ssylka:
         vlozheniya.append({"type": "link", "data": ssylka})
+    if not text and not vlozheniya:
+        raise HooppyError("пустой пост: нет ни текста, ни вложений")
+    if nastrojki:
+        vlozheniya.append({"type": "settings", "data": dict(nastrojki)})
     body = {"texts": [{"text": _abzacy(text), "source_id": 0}] if text else [],
             "attachments": vlozheniya}
-    if not body["texts"] and not vlozheniya:
-        raise HooppyError("пустой пост: нет ни текста, ни вложений")
     if raspisanie_ids:
         body.update(publication_when_type=3, publication_how_type=1, schedules_ids=list(raspisanie_ids))
         return body

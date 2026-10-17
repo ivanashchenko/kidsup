@@ -18,9 +18,11 @@
 
 <div class="notice"><b>Как пользоваться.</b> «PNG» — готовая картинка (посты и сторис
 в размере соцсетей, печатные — 150 dpi). «SVG» — исходник, если нужно докрутить.
-«📤 Опубликовать» — сразу в <b>ВК</b> и <b>Телеграм-канал</b> (токены задаются в
+«📤 Опубликовать» — сразу во <b>все сети через Hooppy</b> (ВК, Телеграм-канал,
+Instagram, Max — что подключено в кабинете Hooppy и входит в набор hooppy_nabor) или
+напрямую в <b>ВК</b> и <b>Телеграм-канал</b> (токены задаются в
 <a href="/settings">Настройках</a>: vk_token, vk_group_id, tg_bot_token, tg_channel).
-Instagram и статусы WhatsApp автопубликации не дают — для них скачивайте PNG и
+Статусы WhatsApp отсюда не публикуются — для них скачивайте PNG и
 выкладывайте с телефона. Устареть макет не может: он собирается заново из живых
 остатков мест при каждом открытии.</div>
 
@@ -32,6 +34,7 @@ Instagram и статусы WhatsApp автопубликации не дают 
     <a href="/content" target="_blank">фабрики</a>):</p>
     <textarea id="pub-caption" rows="5" style="width:100%"></textarea>
     <div style="display:flex;gap:14px;margin:10px 0;flex-wrap:wrap">
+      <label><input type="checkbox" id="pub-hp"> Все сети через Hooppy</label>
       <label><input type="checkbox" id="pub-vk" checked> ВКонтакте</label>
       <label><input type="checkbox" id="pub-tg" checked> Телеграм-канал</label>
     </div>
@@ -97,7 +100,20 @@ function pubOpen(id, title) {
   document.getElementById('pub-title').textContent = '📤 ' + title;
   document.getElementById('pub-result').textContent = '';
   document.getElementById('pub-modal').style.display = 'flex';
+  // Hooppy уже публикует и в ВК, и в канал: если он настроен, прямые галочки
+  // снимаем, иначе один и тот же пост выйдет в ВК и в канале дважды
+  fetch('/api/publish/health').then(function (r) { return r.json(); }).then(function (h) {
+    document.getElementById('pub-hp').checked = !!h.hooppy;
+    document.getElementById('pub-vk').checked = !!h.vk && !h.hooppy;
+    document.getElementById('pub-tg').checked = !!h.tg && !h.hooppy;
+  }).catch(function () {});
 }
+document.getElementById('pub-hp').addEventListener('change', function () {
+  if (this.checked) {
+    document.getElementById('pub-vk').checked = false;
+    document.getElementById('pub-tg').checked = false;
+  }
+});
 function _pngBlob(id) {
   return new Promise(function (resolve, reject) {
     const h = document.getElementById(id), s = _svgEl(id);
@@ -117,6 +133,7 @@ function _pngBlob(id) {
 document.getElementById('pub-go').addEventListener('click', async function () {
   const out = document.getElementById('pub-result');
   const chans = [];
+  if (document.getElementById('pub-hp').checked) chans.push('hooppy');
   if (document.getElementById('pub-vk').checked) chans.push('vk');
   if (document.getElementById('pub-tg').checked) chans.push('tg');
   if (!chans.length) { out.textContent = 'Выберите хотя бы один канал'; return; }

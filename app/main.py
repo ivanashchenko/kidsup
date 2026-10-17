@@ -882,7 +882,7 @@ def content_page(request: Request, g: str = ""):
 @app.post("/api/publish", dependencies=AUTH)
 async def api_publish(request: Request):
     """Публикация макета: PNG рендерится в браузере и приходит сюда,
-    сервер раздаёт по каналам (ВК, ТГ-канал)."""
+    сервер раздаёт по каналам (ВК, ТГ-канал, все сети через Hooppy)."""
     from . import publish as publish_mod
     form = await request.form()
     up = form.get("image")
@@ -899,7 +899,8 @@ async def api_publish(request: Request):
 @app.get("/api/publish/health", dependencies=AUTH)
 def api_publish_health():
     return {"vk": bool(db.get_setting("vk_token") and db.get_setting("vk_group_id")),
-            "tg": bool(db.get_setting("tg_bot_token") and db.get_setting("tg_channel"))}
+            "tg": bool(db.get_setting("tg_bot_token") and db.get_setting("tg_channel")),
+            "hooppy": bool(db.get_setting("hooppy_token") and db.get_setting("hooppy_nabor"))}
 
 
 # 17.10.2026, Борис: «давай hooppy.ru настроим» — автопостинг в ВК, Telegram, Max и
@@ -4762,6 +4763,8 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
             "cam_password", "cam_embeds", "cam_okna", "tbank_token", "tbank_inn", "ivideon_login", "ivideon_password", "komtet_login", "komtet_password", "komtet_imap_password", "pochta_password", "komtet_code", "ivideon_code", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
             "hooppy_token", "tbank_terminal", "tbank_terminal_password", "zenmoney_token", "green_api_instance", "green_api_token",
+            # набор страниц Hooppy для кнопки «Опубликовать» на /makety (app/publish.py)
+            "hooppy_nabor",
             # id утверждённого WABA-шаблона: без него массовая отправка через
             # 3507 отменяется, чтобы не плодить «отправленные» письма впустую
             "waba_template_id", "waba_templates",

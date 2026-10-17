@@ -58,9 +58,13 @@ foto = {"id": "abc", "type": "photo", "name": "abc.png"}
 b = hp.telo_posta("", foto=[foto], stranicy_ids=[1], ssylka="https://kidsup.ru")
 proverka("фото без текста и ссылка", b["texts"] == [] and b["attachments"] == [
     {"type": "photos", "data": [foto]}, {"type": "link", "data": "https://kidsup.ru"}])
-for nazv, kw in (("пустой пост", {"stranicy_ids": [1]}), ("без страниц и набора", {})):
+b = hp.telo_posta("Сторис", nabor_id=7, nastrojki={"publish_as_story": 1, "publish_as_story_source_ids": "1,9"})
+proverka("флаги публикации — вложением settings", b["attachments"] == [
+    {"type": "settings", "data": {"publish_as_story": 1, "publish_as_story_source_ids": "1,9"}}])
+for nazv, kw in (("пустой пост", {"stranicy_ids": [1]}), ("без страниц и набора", {}),
+                 ("одни флаги без текста и картинки", {"stranicy_ids": [1], "nastrojki": {"pin_post": 1}})):
     try:
-        hp.telo_posta("" if nazv == "пустой пост" else "текст", **kw)
+        hp.telo_posta("текст" if nazv == "без страниц и набора" else "", **kw)
         proverka(f"{nazv} — ошибка", False)
     except hp.HooppyError:
         proverka(f"{nazv} — ошибка", True)
@@ -88,6 +92,24 @@ otvety[:] = [Otvet(200, {"list": [{"is_error": 1, "operation_date": "05.10.2026,
 o = hp.oshibki()
 proverka("журнал: только ошибки, с названием страницы", len(o) == 1 and o[0]["stranica"] == "KidsUP"
          and "Нет прав" in o[0]["chto"])
+
+print("Кнопка «Опубликовать» на /makety (app/publish.py)")
+from app import publish as pub  # noqa: E402
+nastr = {}
+pub.db.get_setting = lambda k: nastr.get(k)
+r = pub.publish(b"PNG", "Подпись", ["hooppy"])
+proverka("без набора — понятная ошибка, ничего не отправлено",
+         not r["hooppy"]["ok"] and "hooppy_nabor" in r["hooppy"]["msg"] and not otvety)
+nastr["hooppy_nabor"] = "92384"
+zaprosy.clear()
+otvety[:] = [Otvet(200, {"photo": foto}), Otvet(200, {"id": 533300})]
+r = pub.publish(b"PNG", "Свободные места", ["hooppy"])
+proverka("картинка загружается, пост уходит в набор", r["hooppy"]["ok"] and "533300" in r["hooppy"]["msg"]
+         and zaprosy[0][1].endswith("/files/media/upload") and zaprosy[1][2]["json"]["project_id"] == 92384
+         and zaprosy[1][2]["json"]["attachments"] == [{"type": "photos", "data": [foto]}])
+otvety[:] = [Otvet(403, {"message": "Tariff expired."})]
+r = pub.publish(b"PNG", "x", ["hooppy"])
+proverka("отказ Hooppy — в ответе кнопки", not r["hooppy"]["ok"] and "Tariff expired." in r["hooppy"]["msg"])
 
 print("\nошибок:", oshibok)
 sys.exit(1 if oshibok else 0)
