@@ -1762,6 +1762,15 @@ def unanswered_inbound(mk: MoyklassClient) -> None:
 
 PAID_TRIAL = (("шах", "шахматы — 850 ₽"), ("изо", "ИЗО — 850 ₽"),
               ("робот", "робототехника — 1 600 ₽"))
+# 17.10.2026, Ира: «У логопеда нет условно-бесплатных занятий. Ты прислал
+# неправильно…» — логопед платный с первого занятия, абонемента нет, поэтому
+# и «в зачёт абонемента» не пишем. Мини-сад и нулевой класс по правилам бренда —
+# «бесплатный пробный день», а не «условно-бесплатное занятие».
+LOGOPED = re.compile(r"(?:^|[\s_·(])лг(?:[\s_·]|$)|логопед", re.I)
+SAD = re.compile(r"мини-сад|нулев\w*\s+класс", re.I)
+TRIAL_LOGOPED = "Занятия с логопедом платные, оплата — за каждое занятие."
+TRIAL_SAD = ("В мини-саду и нулевом классе первый день — бесплатный пробный, дальше "
+             "пробная неделя: её стоимость засчитаем, если в течение 3 дней оформите месяц.")
 
 
 def _trial_terms(names, default: str) -> str:
@@ -1771,17 +1780,23 @@ def _trial_terms(names, default: str) -> str:
     всё ещё пишет условно-бесплатное. Потеряли двух клиентов: заплатили, но
     разочарованы, что их не предупредили». Цены — как в прайсе и в «Частых
     вопросах» на сайте: 850 ₽ шахматы и ИЗО, 1 600 ₽ робототехника, при покупке
-    абонемента сумма идёт в зачёт. Остальным — прежний текст (default)."""
+    абонемента сумма идёт в зачёт. Логопед и мини-сад — свои условия (17.10).
+    Остальным — прежний текст (default)."""
     names = [str(n or "") for n in (names or [])]
-    paid, free = [], not names
+    paid, svoi, free = [], [], not names
     for n in names:
         low = n.lower()
+        if LOGOPED.search(low) or SAD.search(low):
+            txt = TRIAL_LOGOPED if LOGOPED.search(low) else TRIAL_SAD
+            if txt not in svoi:
+                svoi.append(txt)
+            continue
         hit = [txt for key, txt in PAID_TRIAL if key in low]
         if hit:
             paid += [h for h in hit if h not in paid]
         else:
             free = True
-    out = []
+    out = list(svoi)
     if paid:
         out.append("Пробное занятие платное: " + ", ".join(paid) +
                    "; при покупке абонемента эта сумма идёт в зачёт.")
