@@ -107,8 +107,9 @@ def test_proverka_pulta():
              bool(P.ZAPRESHCHENO.search("позвать на бесплатное пробное занятие")), True)
     proverka("«условно-бесплатное» не ловится",
              bool(P.ZAPRESHCHENO.search("условно-бесплатное первое занятие")), False)
-    proverka("Лизе можно закрытие занятий",
-             bool(P.LIZA_MOZHNO.search("Закрыть занятия за вчера, 40 штук")), True)
+    # 08.10 Борис: у Лизы только деньги и маткапиталы — закрытие занятий у неё сняли (7a022af)
+    proverka("Лизе нельзя закрытие занятий (с 08.10)",
+             bool(P.LIZA_MOZHNO.search("Закрыть занятия за вчера, 40 штук")), False)
     proverka("Лизе можно долги",
              bool(P.LIZA_MOZHNO.search("Долг 2 500 ₽ у семьи Гориных")), True)
     proverka("Лизе нельзя обзвон",
