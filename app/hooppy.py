@@ -22,10 +22,11 @@ from . import db
 
 BASE = "https://api.hooppy.ru/api"
 # Номера соцсетей в Hooppy (source_id); остальные приходят в ответе /accounts/pages.
-VK, OK, IG_COOKIE, TG, IG, WA = 1, 2, 7, 9, 10, 22
+VK, OK, IG_COOKIE, TG, IG, TG_AKK, WA, MAX = 1, 2, 7, 9, 10, 11, 22, 33
 # Где Hooppy умеет истории (из его кабинета, 17.10.2026). Telegram — только от
 # аккаунта с Telegram Premium (в канал — ещё и бусты), WhatsApp — только через Wappi.pro.
-ISTORII_SETI = (VK, OK, IG_COOKIE, TG, IG, WA)
+# Личный аккаунт Telegram и Max — отдельные соцсети (18.10, поддержка Hooppy).
+ISTORII_SETI = (VK, OK, IG_COOKIE, TG, IG, TG_AKK, WA, MAX)
 
 
 class HooppyError(RuntimeError):

@@ -174,7 +174,7 @@ telo = zaprosy[1][2]["json"]
 proverka("история уходит в свой набор с флагом историй во всех сетях",
          r["hooppy_story"]["ok"] and telo["project_id"] == 92400 and telo["texts"] == []
          and {"type": "settings", "data": {"publish_as_story": 1,
-                                           "publish_as_story_source_ids": "1,2,7,9,10,22"}} in telo["attachments"])
+                                           "publish_as_story_source_ids": "1,2,7,9,10,11,22,33"}} in telo["attachments"])
 proverka("в ленту история не дублируется",
          "share_stories_to_feed" not in hp.nastrojki_istorii())
 

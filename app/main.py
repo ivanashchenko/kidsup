@@ -907,10 +907,14 @@ def api_publish_health():
 # 17.10.2026, Борис: «давай hooppy.ru настроим» — автопостинг в ВК, Telegram, Max и
 # ОК одним API (app/hooppy.py). Только владельцу: пост сразу уходит в соцсети.
 @app.get("/api/hooppy", dependencies=OWNER_AUTH)
-def api_hooppy():
-    """Что подключено в кабинете Hooppy: страницы, наборы, расписания, свежие ошибки."""
+def api_hooppy(source_id: int = 0):
+    """Что подключено в кабинете Hooppy: страницы, наборы, расписания, свежие ошибки.
+    source_id — страницы одной соцсети: личные аккаунты Telegram (11) и Max (33)
+    в общий список не попадают, их Hooppy отдаёт только по номеру соцсети."""
     from . import hooppy
     try:
+        if source_id:
+            return {"ok": True, "stranicy": hooppy.stranicy(source_id)}
         return {"ok": True, "stranicy": hooppy.stranicy(), "nabory": hooppy.nabory(),
                 "raspisaniya": hooppy.raspisaniya(), "oshibki": hooppy.oshibki(10)}
     except hooppy.HooppyError as e:
@@ -4779,7 +4783,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-17.4"
+APP_VERSION = "2026-10-18.1"
 
 
 @app.get("/api/net")
