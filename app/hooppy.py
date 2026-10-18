@@ -92,7 +92,8 @@ def _shablon(path: str) -> dict:
 def _po_setyam(stranicy_ids: list[int]) -> dict[str, list[int]]:
     """{source_id: [id страниц]} — так Hooppy принимает выбор страниц в наборе."""
     ids = [int(x) for x in stranicy_ids]
-    vse = {p["id"]: p["set"] for p in stranicy()}
+    # личные аккаунты Telegram и Max в общий список не попадают — спрашиваем отдельно
+    vse = {p["id"]: p["set"] for p in stranicy() + stranicy(TG_AKK) + stranicy(MAX)}
     chuzhie = [i for i in ids if i not in vse]
     if not ids or chuzhie:
         raise HooppyError(f"страницы не подключены в Hooppy: {chuzhie or 'список пуст'}")

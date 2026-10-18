@@ -100,13 +100,14 @@ shablon = {"id": 0, "name": "", "publication_where_type": 1, "watermark_id": 0, 
 stranicy_otvet = Otvet(200, {"list": [{"id": 822454, "source_id": 1}, {"id": 22543, "source_id": 9}],
                              "is_has_more": False})
 zaprosy.clear()
-otvety[:] = [Otvet(200, dict(shablon)), stranicy_otvet, Otvet(200, {"id": 412})]
+pusto = Otvet(200, {"list": [], "is_has_more": False})  # аккаунты Telegram и Max — отдельные запросы
+otvety[:] = [Otvet(200, dict(shablon)), stranicy_otvet, pusto, pusto, Otvet(200, {"id": 412})]
 proverka("набор создаётся, id из ответа", hp.sozdat_nabor("KidsUP — все сети", [822454, 22543]) == 412)
 telo = zaprosy[-1][2]["json"]
 proverka("набор: страницы по сетям, поля шаблона на месте, справочники убраны",
          telo["selected_pages_by_source_ids"] == {"1": [822454], "9": [22543]} and telo["name"] == "KidsUP — все сети"
          and telo["tg_buttons"] == {"list": []} and "social_pages_by_accounts" not in telo and "id" not in telo)
-otvety[:] = [Otvet(200, dict(shablon)), stranicy_otvet]
+otvety[:] = [Otvet(200, dict(shablon)), stranicy_otvet, pusto, pusto]
 try:
     hp.sozdat_nabor("x", [999])
     proverka("чужая страница в наборе — ошибка", False)
