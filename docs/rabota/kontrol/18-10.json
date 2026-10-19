@@ -1,0 +1,62 @@
+{
+ "den": "2026-10-18",
+ "sostavleno": "2026-10-19 08:25 МСК (рутина 21:00 пропущена — сессия спала, контроль сделан утром)",
+ "smena": [
+  "Ира (звонки, CRM)",
+  "Лиза (деньги, переписка)"
+ ],
+ "istoriya": {
+  "Ира": {
+   "sobytiy": 322,
+   "udaleno_zapisej_na_zanyatiya": 92,
+   "iz_nih": "52 — уходящий ученик РР (возврат), 33 — ученик робототехники 7–12 (все будущие записи), 4 — перенос, 3 — разовые",
+   "platezhey": 8,
+   "provedeno_v_dolg": 3
+  },
+  "Борис": {
+   "sobytiy": 28,
+   "udaleno_kartochek": 3,
+   "primechanie": "дубли и личный номер; 11 записей переведены в «Не пришёл на пробное»"
+  },
+  "Лена": {
+   "sobytiy": 1,
+   "primechanie": "не в смене, один вход"
+  },
+  "bez_avtora": 93
+ },
+ "zvonki": {
+  "Ира_ishodyashchih": 26,
+  "razgovorov_30s": 4,
+  "posledniy_zvonok": "16:43",
+  "vechernie_perezvony_posle_18": 0
+ },
+ "perepiska": {
+  "Ира": {
+   "soobshcheniy": 55,
+   "chatov": 23
+  },
+  "Лиза": {
+   "soobshcheniy": 0,
+   "chatov": 0
+  },
+  "avtopilot": 15
+ },
+ "pult": {
+  "Ира_zakryto": 37,
+  "Лиза_zakryto": 0
+ },
+ "kamery": {
+  "snyato": 9,
+  "rashozhdeniya": [
+   "МА 4–6 вс 12:00 — детей 0, педагог в комнате",
+   "Робототехника 7–12 вс 15:30 — пусто (второй случай подряд)",
+   "Робототехника 4–7 вс 14:30 — 6 детей при 4 записанных"
+  ]
+ },
+ "cheki_nalichnyh": "не проверялись",
+ "dubli_22_00": {
+  "k_perenosu": 0,
+  "avtokartochki_bez_imeni": 13,
+  "punkt": "уже на пульте Иры (3799)"
+ }
+}
