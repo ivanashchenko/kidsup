@@ -923,7 +923,8 @@ def api_hooppy(source_id: int = 0):
 
 @app.post("/api/hooppy/post", dependencies=OWNER_AUTH)
 def api_hooppy_post(payload: dict = Body(...)):
-    """{"text", "foto_url"? | "foto_b64"?: [{"name", "data"}], "stranicy_ids"? | "nabor_id"? |
+    """{"text", "foto_url"? | "foto_b64"?: [{"name", "data"}], "video_url"?: [{"url", "name": "….mp4"}],
+    "stranicy_ids"? | "nabor_id"? |
     "raspisanie_ids"?, "kogda"?: "ДД.ММ.ГГГГ ЧЧ:ММ", "ssylka"?, "nastrojki"?: флаги Hooppy,
     "istoriya"?: true — историей (картинка 1080×1920)} → id поста.
     foto_b64 — картинки байтами (макет рендерится не на сервере): Hooppy нужна
@@ -940,8 +941,12 @@ def api_hooppy_post(payload: dict = Body(...)):
         if not data or len(data) > 8_000_000:
             raise HTTPException(413, f"foto_b64[{i}]: пусто или больше 8 МБ")
         kartinki.append((data, str(f.get("name") or f"post{i}.png")[:80]))
-    if len(kartinki) > 10:
-        raise HTTPException(400, "не больше 10 картинок в посте")
+    video = payload.get("video_url") or []
+    if not isinstance(video, list) or not all(isinstance(v, dict) and str(v.get("url") or "").startswith("https://")
+                                              for v in video):
+        raise HTTPException(400, "video_url: список {\"url\": \"https://…\", \"name\": \"….mp4|.mov\"}")
+    if len(kartinki) + len(video) > 10:
+        raise HTTPException(400, "не больше 10 картинок и видео в посте")
     kogda = None
     if payload.get("kogda"):
         try:
@@ -956,6 +961,8 @@ def api_hooppy_post(payload: dict = Body(...)):
     try:
         foto = [hooppy.zagruzit_po_ssylke(payload["foto_url"])] if payload.get("foto_url") else []
         foto += [hooppy.zagruzit_foto(data, name) for data, name in kartinki]
+        foto += [hooppy.zagruzit_video_po_ssylke(str(v.get("url") or ""), str(v.get("name") or "video.mp4")[:80])
+                 for v in video]
         pid = hooppy.post(str(payload.get("text") or ""), foto=foto,
                           stranicy_ids=payload.get("stranicy_ids"), nabor_id=payload.get("nabor_id"),
                           raspisanie_ids=payload.get("raspisanie_ids"), kogda=kogda,
@@ -4783,7 +4790,7 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-18.2"
+APP_VERSION = "2026-10-19.1"
 
 
 @app.get("/api/net")

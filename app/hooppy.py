@@ -161,12 +161,37 @@ def oshibki(limit: int = 30) -> list[dict]:
             for x in (b.get("list") or []) if x.get("is_error")]
 
 
+TIPY = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
+        ".mp4": "video/mp4", ".mov": "video/quicktime"}
+VIDEO_MAX = 100_000_000
+
+
 def zagruzit_foto(image: bytes, name: str = "post.png") -> dict:
-    """Картинка в хранилище Hooppy; объект из ответа вкладывается в пост."""
-    tip = "image/jpeg" if name.lower().endswith((".jpg", ".jpeg")) else "image/png"
-    b = _req("POST", "/files/media/upload", files={"file": (name, image, tip)},
-             data={"file_id": secrets.token_hex(10)}, timeout=120)
+    """Картинка или видео (mp4, mov) в хранилище Hooppy; объект из ответа вкладывается
+    в пост. Видео Hooppy принимает тем же запросом, что и фото, и кладёт в тот же
+    список вложений (так делает его кабинет)."""
+    ext = "." + name.lower().rsplit(".", 1)[-1] if "." in name else ""
+    b = _req("POST", "/files/media/upload", files={"file": (name, image, TIPY.get(ext, "image/png"))},
+             data={"file_id": secrets.token_hex(10)}, timeout=600 if ext in (".mp4", ".mov") else 120)
     return b["photo"]
+
+
+def zagruzit_video_po_ssylke(url: str, name: str = "video.mp4") -> dict:
+    """Видео по ссылке (например, из чата педагогов в Wazzup): скачиваем сервером и
+    загружаем в Hooppy — upload_from_url у Hooppy только для картинок."""
+    if not name.lower().endswith((".mp4", ".mov")):
+        raise HooppyError(f"видео: нужен .mp4 или .mov, а не {name}")
+    try:
+        with httpx.stream("GET", url, timeout=300, follow_redirects=True) as r:
+            r.raise_for_status()
+            buf = bytearray()
+            for chunk in r.iter_bytes():
+                buf += chunk
+                if len(buf) > VIDEO_MAX:
+                    raise HooppyError("видео больше 100 МБ")
+    except httpx.HTTPError as e:
+        raise HooppyError(f"видео не скачалось: {type(e).__name__}") from e
+    return zagruzit_foto(bytes(buf), name)
 
 
 def zagruzit_po_ssylke(url: str) -> dict:
