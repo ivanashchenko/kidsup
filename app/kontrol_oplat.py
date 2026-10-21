@@ -87,7 +87,8 @@ def _covered(subs_by: dict, uid: int, cls: str, d: str, classes: dict):
     f = _fam(cls)
     best = None
     for s in subs_by.get(uid, []):
-        if not ((s.get("beginDate") or "9") <= d <= (s.get("endDate") or "0")):
+        # абонемент «на N занятий» без даты окончания действует, пока не израсходован
+        if not ((s.get("beginDate") or "9") <= d <= (s.get("endDate") or "9999")):
             continue
         if any(_fam(classes.get(c, "")) == f for c in (s.get("classIds") or [])):
             if (s.get("payed") or 0) > 0:
