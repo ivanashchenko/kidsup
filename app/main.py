@@ -5035,6 +5035,33 @@ async def api_restart():
     return {"ok": True, "restarting": True}
 
 
+@app.get("/api/backup/db", dependencies=OWNER_AUTH)
+def api_backup_db():
+    """Полная копия базы сервера (пульт, звонки, кадры, настройки, зеркало МойКласса)
+    одним .db.gz — для хранения вне дата-центра.
+
+    21.10.2026, Борис: угроза дата-центру. Код лежит на GitHub, данные МойКласса
+    есть в /export/raw, а пульт, разборы и настройки жили только здесь. Копия
+    снимается штатным sqlite backup — работа сервера при этом не останавливается.
+    Внутри ключи и персональные данные: отдавать только владельцу."""
+    import gzip
+    import sqlite3
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        kopiya = Path(tmp) / "kidsup.db"
+        src = sqlite3.connect(config.DB_PATH, timeout=60)
+        dst = sqlite3.connect(kopiya)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+        data = gzip.compress(kopiya.read_bytes(), compresslevel=6)
+    imya = f"kidsup_db_{datetime.now().strftime('%Y-%m-%d_%H%M')}.db.gz"
+    return Response(content=data, media_type="application/gzip",
+                    headers={"Content-Disposition": f'attachment; filename="{imya}"'})
+
+
 @app.post("/api/broadcast", dependencies=AUTH)
 async def api_broadcast(payload: dict):
     """Кампания рассылки: {"campaign": "no1_digest", "segment": "warm|contin|camp|regular|y2425",
