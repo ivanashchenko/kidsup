@@ -574,6 +574,63 @@ def _ves(it: dict) -> int:
     return 2 if (it.get("phone") or _re_phone(txt)) else 4
 
 
+# 23.10.2026, Ира: «Отсортируйте задачи по блокам … ПРОБНЫЕ НА СЕГОДНЯ,
+# ВОПРОСЫ ПО ОПЛАТАМ, НОВЫЕ ЗАЯВКИ, ЧИСТКА БАЗЫ, ОБЗВОН БАЗЫ. И в самом
+# начале — ЧТО ГОРИТ… только не та ерунда, которая там написана, а например
+# отменить занятия заболевшего педагога или срочно решить вопрос по удержанию
+# ребёнка». Одна лента «сверху вниз» превратилась в смесь: дело про оплату
+# стояло между обзвоном и чисткой карточек, и искать своё приходилось глазами.
+# Порядок блоков — её; внутри блока порядок прежний (_ves, prio, время).
+BLOKI = (
+    ("gorit", "Горит"),
+    ("probnye", "Пробные на сегодня"),
+    ("oplaty", "Вопросы по оплатам"),
+    ("zayavki", "Новые заявки и ждут ответа"),
+    ("chistka", "Чистка базы"),
+    ("obzvon", "Обзвон базы"),
+    ("prochee", "Остальное"),
+)
+# «Горит» — только то, что нельзя отложить до завтра: уход семьи, деньги
+# сегодня, заболевший педагог, жалоба. «Клиент писал, ответа нет» сюда не
+# попадает — это обычная работа блока заявок, а не пожар.
+_GORIT = (r"^!!|СРОЧНО|не может (до нас )?дозвониться|жалоб|готов[аыо]? (сегодня )?оплат|"
+          r"вернуть деньги|прекратить ходить|перестан(ем|ут) ходить|хот(им|ят) уйти|"
+          r"расторг|удержани|отменить занятия|(педагог|преподават)\w*[^.]{0,40}(заболел|болеет)|"
+          r"(заболел|болеет)\w*[^.]{0,20}(педагог|преподават)|состоится ли|выздоровел")
+_BLOK_PAT = (
+    ("probnye", r"подтвердить (пробн|запис|занят|что придут)|пробн\w*[^.]{0,30}сегодня|"
+                r"сегодня[^.]{0,40}пробн|встретить пробн|первое занятие сегодня|пробный день сегодня"),
+    # сильные признаки раньше заявок и денег: «после пробного — абонемент» —
+    # это обзвон; «запись «Учится» в группе Заявки_… абонемент 7 380» и
+    # «занятие стоит «проведено», проверить списания» — чистка базы
+    ("obzvon", r"не пришёл на пробное|посетил пробное|после пробного|были на пробном|ЗАДАЧА БОРИСА [23]"),
+    ("chistka", r"«Учится»|статус записи|дубл|ЗАДАЧА БОРИСА 4|«проведено»|«не проведено»"),
+    ("zayavki", r"заявк|пропущенн\w* (звон|вход)|ПРОПУЩЕННЫЙ|новый контакт|ждёт ответа|"
+                r"ответа нет|Roistat|звонок от"),
+    ("oplaty", r"оплат|сч[её]т|ссылк[ау] на оплату|абонемент|возврат|долг|маткапитал|чек|касс|₽|списал"),
+    ("obzvon", r"перезвон|позвон|обзвон|дозвон|набрать|дожим|вернуть|бывш|второй предмет|напис"),
+    ("chistka", r"статус|закрыть запись|карточк|в crm|МойКласс|отмет|явк|проведено|"
+                r"запис\w* в групп|убрать из групп|завести"),
+)
+
+
+def _blok(it: dict) -> str:
+    """Блок колонки, в который встаёт дело (ключ из BLOKI)."""
+    import re as _re
+    txt = _re.sub(r"<[^>]+>", " ", it.get("text") or "")
+    txt = _re.sub(r"^⏳ с \d\d\.\d\d:\s*", "", txt)
+    if _re.search(_GORIT, txt, _re.I):
+        return "gorit"
+    if it.get("tag") == "наряд":
+        return "zayavki"
+    if it.get("tag") == "возврат":
+        return "obzvon"
+    for key, pat in _BLOK_PAT:
+        if _re.search(pat, txt, _re.I):
+            return key
+    return "prochee"
+
+
 def _inbox_tries(conn) -> None:
     """Колонка попыток дозвона у дел инбокса — появилась 21.09 вместе с
     исходом «не дозвонилась»."""
@@ -611,18 +668,23 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
         cur_key = (cur["kind"], cur["id"])
     cur_ft = next((_first_time(i["t"]) for i in items if (i["kind"], i["id"]) == cur_key), "")
     paid = _paid_recently() if day else {}
+    import re as _re0
+    for it in items:
+        # Хвост прошлых дней бывает двух видов: пункт со старой датой (staryj
+        # из _lenta) и пункт, утром перенесённый на сегодня с пометкой
+        # «⏳ с ДД.ММ» в тексте. Ира 23.10: «Сейчас 23.10, а у меня задачи
+        # 20.10 и 21.10» — вторые стояли в сегодняшней ленте как новые.
+        m = _re0.match(r"⏳ с (\d\d)\.(\d\d)", it.get("text") or "")
+        if m:
+            it["staryj"] = True
+            it["s_dnya"] = f"{m.group(2)}-{m.group(1)}"
+        elif it.get("staryj"):
+            it["s_dnya"] = (it.get("day") or "")[5:10]
+        it["blok"] = _blok(it)
     lis = []
-    # Заголовки уровней — только когда порядок в колонке разобран вручную
-    # (есть prio): тогда уровень значит «почему это выше», а не догадку по словам.
-    razobrano = any(i.get("prio") is not None for i in items)
-    prev_ves = None
     for it in items:
         st, badge, extra = "", "", ""
         head = ""
-        if razobrano and not it["done"] and not it.get("staryj") and it.get("ves") != prev_ves:
-            prev_ves = it.get("ves")
-            head = (f"<li style='margin:12px 0 2px;font-size:11.5px;font-weight:800;letter-spacing:.04em;"
-                    f"text-transform:uppercase;color:#6c6a86'>{UROVNI.get(prev_ves, '')}</li>")
         ft = _first_time(it["t"])
         # 10.09, просьба Иры: «пишите красным жизненно важное, без чего работа
         # встанет, а не СРОЧНО перенёс ли пробник свой день». Пункт, начатый
@@ -740,75 +802,50 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             f"onchange=\"{done_js}\">"
             f"<span>{badge}"
             + (f"<b>{html.escape(it['t'])}</b> — " if it["t"] and it["kind"] == "task" else "")
-            + f"{text_html}{tel}{extra}{ctrl}</span></label></li>"))
-    # 08.09: по 10–12 пунктов в колонке не читаются. Показываем ближайшие,
-    # остальные несделанные и все сделанные — свёрнуто. 21.09: лента стала
-    # общей (задачи + обещания), поэтому показываем семь, а не пять.
-    LIMIT = 7
-    done_html = "".join(h for d_, o_, st_, h in lis if d_)
+            + f"{text_html}{tel}{extra}{ctrl}</span></label></li>", it))
+    done_html = "".join(h for d_, o_, st_, h, _ in lis if d_)
     # 22.09.2026. Незакрытые дела прошлых дней раньше просто исчезали в
     # полночь — так пропало 261 обещание семьям. Теперь они видны, но не в
-    # сегодняшней ленте: 261 строка в колонку — это уже не план, а свалка.
-    # Отдельным блоком внизу, со счётчиком и самой старой датой.
-    open_html = [h for d_, o_, st_, h in lis if o_ and not st_]
-    staryj_html = [h for d_, o_, st_, h in lis if o_ and st_]
-    moved_html = "".join(h for d_, o_, st_, h in lis if not d_ and not o_)
-    # Черта смены. 21.09 у Ани к обеду висело 33 дела на четыре часа работы —
-    # это не план, а гора. Считаем по-честному: звонок с записью в CRM — шесть
-    # минут, дело без телефона — три. Всё, что за чертой, до конца смены не
-    # делается, и врать об этом не надо: пусть человек видит границу и решает,
-    # что перенести, а не тонет.
-    uspeem = None
-    if day == today() and now_hm and onduty:
-        # На дела уходит не всё время смены: входящие звонки, встреча детей,
-        # родители на ресепшене съедают около сорока процентов часа. 21.09 без
-        # этой поправки выходило, что 33 дела «успеваются», — а по факту за
-        # день закрывалось втрое меньше.
-        left = int(max(0, (20 * 60) - (int(now_hm[:2]) * 60 + int(now_hm[3:]))) * 0.6)
-        otkrytye = [i for i in items if not i["done"] and not i.get("staryj")]
-        cena = [6 if i.get("phone") or _re_phone(i.get("text")) else 3
-                for i in otkrytye]
-        s_, uspeem = 0, 0
-        for c_ in cena:
-            if s_ + c_ > left:
-                break
-            s_ += c_
-            uspeem += 1
-        # Задача смены под чертой не прячется никогда. 22.09.2026, аудит:
-        # «Подтвердить звонком ВСЕ вечерние пробные сегодня» и «Встретить
-        # пробные 16:00–17:00» лежали в свёрнутом блоке под надписью «до
-        # 20:00 не успеть» — страница сама разрешила их не делать, а это
-        # каркас дня, на котором стоят семь семей. Черта режет добавочные
-        # пункты, а не расписание смены.
-        posledn = max((n for n, i in enumerate(otkrytye, 1)
-                       if i.get("kind") == "task"), default=0)
-        uspeem = max(uspeem, posledn)
-    body = "".join(open_html[:LIMIT])
-    if len(open_html) > LIMIT:
-        hvost = open_html[LIMIT:]
-        if uspeem is not None and LIMIT <= uspeem < len(open_html):
-            n_do = uspeem - LIMIT
-            body += (f"<details open style='margin:6px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>"
-                     f"ещё {n_do} успеваешь до конца смены — по шесть минут на звонок</summary>"
-                     f"<ol style='list-style:none;padding:0;margin:0'>{''.join(hvost[:n_do])}</ol></details>")
-            hvost = hvost[n_do:]
-            if hvost:
-                body += (f"<div style='margin:10px 0 4px;border-top:2px dashed #E30613;padding-top:6px;"
-                         f"font-size:12.5px;color:#E30613;font-weight:700'>Ниже черты: {len(hvost)} — "
-                         f"до 20:00 при обычной скорости не успеть</div>"
-                         f"<details style='margin:2px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>"
-                         f"показать и решить, что перенести</summary>"
-                         f"<ol style='list-style:none;padding:0;margin:0'>{''.join(hvost)}</ol></details>")
-        else:
-            body += (f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>ещё {len(hvost)} на день — после этих семи</summary>"
-                     f"<ol style='list-style:none;padding:0;margin:0'>{''.join(hvost)}</ol></details>")
-    if staryj_html:
-        body += (f"<div style='margin:12px 0 4px;border-top:2px solid #F59C00;padding-top:6px;"
+    # сегодняшней ленте: отдельным блоком внизу, по датам.
+    segodnya = [(h, i) for d_, o_, st_, h, i in lis if o_ and not st_]
+    staryj = [(h, i) for d_, o_, st_, h, i in lis if o_ and st_]
+    moved_html = "".join(h for d_, o_, st_, h, _ in lis if not d_ and not o_)
+    # 23.10.2026, Ира: блоки вместо одной ленты. В каждом блоке видно первые
+    # пять дел, остальные — под «ещё N». Пустой блок не рисуем: заголовок
+    # «Горит» без пожара приучает не смотреть на него, когда пожар будет.
+    POKAZ = 5
+    body = ""
+    for key, nazv in BLOKI:
+        v_bloke = [h for h, i in segodnya if i.get("blok") == key]
+        if not v_bloke:
+            continue
+        gorit = key == "gorit"
+        body += (f"<li style='margin:14px 0 4px;font-size:12px;font-weight:800;letter-spacing:.05em;"
+                 f"text-transform:uppercase;color:{'#E30613' if gorit else '#312783'};"
+                 f"border-bottom:1px solid {'#E30613' if gorit else '#e4e2f0'};padding-bottom:2px'>"
+                 f"{html.escape(nazv)} · {len(v_bloke)}</li>")
+        body += "".join(v_bloke[:POKAZ])
+        if len(v_bloke) > POKAZ:
+            body += (f"<details style='margin:4px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>"
+                     f"ещё {len(v_bloke) - POKAZ} в этом блоке</summary>"
+                     f"<ol style='list-style:none;padding:0;margin:0'>{''.join(v_bloke[POKAZ:])}</ol></details>")
+    if staryj:
+        # Свежие хвосты выше старых: вчерашнее обещание ещё можно спасти,
+        # трёхнедельное — уже решение «звонить или закрыть».
+        po_dnyam: dict[str, list[str]] = {}
+        for h, i in staryj:
+            po_dnyam.setdefault(i.get("s_dnya") or "", []).append(h)
+        vnutri = ""
+        for dn in sorted(po_dnyam, reverse=True):
+            podp = f"с {dn[3:5]}.{dn[0:2]}" if len(dn) == 5 else "без даты"
+            vnutri += (f"<li style='margin:10px 0 2px;font-size:11.5px;font-weight:800;color:#a35f00'>"
+                       f"{podp} · {len(po_dnyam[dn])}</li>" + "".join(po_dnyam[dn]))
+        body += (f"<div style='margin:16px 0 4px;border-top:2px solid #F59C00;padding-top:6px;"
                  f"font-size:12.5px;color:#a35f00;font-weight:700'>"
-                 f"Не закрыто с прошлых дней: {len(staryj_html)}</div>"
+                 f"Хвосты прошлых дней: {len(staryj)}</div>"
                  f"<details style='margin:2px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>"
-                 f"показать — это обещания семьям, которые мы не выполнили</summary>"
-                 f"<ol style='list-style:none;padding:0;margin:0'>{''.join(staryj_html)}</ol></details>")
+                 f"показать по датам — сначала самые свежие</summary>"
+                 f"<ol style='list-style:none;padding:0;margin:0'>{vnutri}</ol></details>")
     if moved_html:
         body += f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#a35f00;font-size:13px'>перенесено на завтра</summary><ol style='list-style:none;padding:0;margin:0'>{moved_html}</ol></details>"
     if done_html:
@@ -833,9 +870,10 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
 
 
 HOWTO = ("<div class='card' style='border-left:4px solid #312783;margin:10px 0;font-size:15px'>"
-         "<b>Работай только в своей колонке, сверху вниз.</b> В ней уже всё: задачи смены, "
-         "обещания клиентам и заявки без ответа — одним списком по времени. Выбирать, "
-         "куда пойти дальше, не нужно: следующий пункт — тот, что ниже. "
+         "<b>Работай только в своей колонке, сверху вниз.</b> Дела на сегодня разложены по блокам: "
+         "<b>Горит</b> (только то, что нельзя отложить) · Пробные на сегодня · Вопросы по оплатам · "
+         "Новые заявки · Чистка базы · Обзвон базы. Новое за день само встаёт в свой блок. "
+         "Хвосты прошлых дней — отдельно внизу, по датам. "
          "<b>Сделала — галочка сразу</b>, не вечером. Не успеваешь — «перенести на завтра ↩». "
          "Списки ниже (заявки, места) — справочные, туда ходить не надо: всё, что оттуда "
          "нужно сегодня, уже стоит у тебя в колонке. "
