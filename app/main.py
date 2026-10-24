@@ -8079,6 +8079,42 @@ def api_crm_comment(payload: dict = Body(...)):
         mk.close()
 
 
+@app.post("/api/crm/tag", dependencies=OWNER_AUTH)
+def api_crm_tag(payload: dict = Body(...)):
+    """Тег клиента: {"name": "Промо: Серафима", "userIds": [..]?}. Тега с таким
+    именем нет — заводим (POST /userTags), затем добавляем его карточкам через
+    /users/{id}/tags, не трогая уже стоящие теги (24.10: теги промоутеров)."""
+    from .moyklass_client import MoyklassClient
+    name = str(payload.get("name") or "").strip()
+    uids = [int(x) for x in (payload.get("userIds") or []) if str(x).isdigit()]
+    if not name or len(name) > 100:
+        raise HTTPException(400, "нужно имя тега до 100 символов")
+    mk = MoyklassClient(sync.get_api_key())
+    try:
+        tags = mk.get("/v1/company/userTags")
+        tags = tags if isinstance(tags, list) else tags.get("tags", [])
+        tag = next((t for t in tags if (t.get("name") or "").strip().lower() == name.lower()), None)
+        created = False
+        if not tag:
+            tag = mk.post("/v1/company/userTags", {"name": name})
+            created = True
+        tag_id = int(tag["id"])
+        done, errors = [], []
+        for uid in uids[:200]:
+            try:
+                u = mk.get(f"/v1/company/users/{uid}")
+                cur = [t["id"] if isinstance(t, dict) else t for t in (u.get("tags") or [])]
+                if tag_id not in cur:
+                    mk.post(f"/v1/company/users/{uid}/tags", {"tags": sorted(set(cur) | {tag_id})})
+                done.append(uid)
+            except Exception as e:  # noqa: BLE001
+                errors.append({"userId": uid, "error": f"{type(e).__name__}: {str(e)[:200]}"})
+        return {"ok": True, "tagId": tag_id, "name": tag.get("name", name), "created": created,
+                "tagged": done, "errors": errors}
+    finally:
+        mk.close()
+
+
 @app.post("/api/crm/email", dependencies=AUTH)
 def api_crm_email(payload: dict = Body(...)):
     """Почта в карточку: {"userId": 123, "email": "a@b.ru"} — через safe_update_user
