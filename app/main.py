@@ -9078,7 +9078,10 @@ def api_crm_raw_user(user_id: int):
         c = mk.get("/v1/company/userComments", {"userId": user_id, "limit": 50})
     finally:
         mk.close()
-    return {"user": u, "comments": (c.get("comments") if isinstance(c, dict) else c)}
+    # МойКласс отдаёт комментарии под ключом userComments; по «comments»
+    # ответ всегда был пустым (24.10)
+    return {"user": u, "comments": ((c.get("userComments") or c.get("comments"))
+                                    if isinstance(c, dict) else c)}
 
 
 @app.get("/api/crm/names/audit", dependencies=OWNER_AUTH)
