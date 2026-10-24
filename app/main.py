@@ -1058,7 +1058,7 @@ def _enrollment_groups() -> list[dict]:
         course = COURSE_ALIAS.get(r["course"] or "", r["course"] or "?")
         pr = PRICES.get(course)
         out.append({
-            "name": name, "course": course, "buffer": buffer,
+            "id": r["id"], "name": name, "course": course, "buffer": buffer,
             "day": " · ".join(DAY_LABEL[d] for d in g_days) or "—",
             "time": " · ".join(times[:2]) or "—",
             "age_lo": age_lo, "age_hi": age_hi,
@@ -5112,10 +5112,38 @@ def public_schedule():
             _SCHED_LOCK.release()
 
 
+# 24.10 (Ира, Борис): расформированные группы на сайте не показываем, пока их
+# не закрыли в МойКлассе; ПШ Гр8 теперь только по пятницам; в робототехнике и
+# шахматах место «держат» дети, которые ходят раз в неделю, — там всегда
+# «есть места».
+_SCHED_HIDE = ("ПШ_пн-чт_16:00_5-7 лет_ПШ1 нечитающие (Гр5)", "(Гр15)", "ШАХ_Группа 1_",
+               "Робототехника_пт 17:00", "МА_вс_12:00")
+_SCHED_DAY_FIX = {"(Гр8)": "Пт"}
+_SCHED_ALWAYS_FREE = ("Робототехника", "ШАХ_")
+# занятое место — «учится» и записанные/подтвердившие пробное; «не пришёл»,
+# «посетил пробное» и новые заявки места не держат
+_BUSY_STATUSES = (2, 58132, 83760)
+
+
+def _busy_by_class() -> dict[int, int]:
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT class_id, COUNT(DISTINCT user_id) FROM joins WHERE status_id IN "
+            f"({','.join('?' * len(_BUSY_STATUSES))}) GROUP BY class_id", _BUSY_STATUSES).fetchall()
+    return {r[0]: r[1] for r in rows}
+
+
 def _build_schedule():
     import time as _t
     all_groups = _enrollment_groups()
-    groups = [g for g in all_groups if not g["buffer"]]
+    groups = [g for g in all_groups if not g["buffer"]
+              and not any(h in g["name"] for h in _SCHED_HIDE)]
+    busy = _busy_by_class()
+    for g in groups:
+        g["enrolled"] = busy.get(g["id"], 0)
+        for k, day in _SCHED_DAY_FIX.items():
+            if k in g["name"] and "_ПШ_" in "_" + g["name"]:
+                g["day"] = day
     # Витринное правило владельца (27.08, заменяет «минус два всем»):
     # где свободных мест мало — показываем честную цифру; где много —
     # прижимаем к 3-4, чтобы «свободно 8 мест» не читалось пустым залом.
@@ -5135,6 +5163,8 @@ def _build_schedule():
         # Витрина (26.08): группа близка к заполнению или полна (<=3 свободных) —
         # показываем как есть; свободных ещё много — показываем на 2 меньше.
         shown = real if real <= 3 else real - 2
+        if any(k in g["name"] for k in _SCHED_ALWAYS_FREE):
+            shown = max(shown, 3)
         return {**g, "capacity": cap, "free": shown}
     groups = [_pub(g) for g in groups]
     free_by_course: dict[str, int] = {}
