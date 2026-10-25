@@ -972,6 +972,17 @@ def api_hooppy_post(payload: dict = Body(...)):
     return {"ok": True, "post_id": pid}
 
 
+@app.get("/api/hooppy/posty", dependencies=OWNER_AUTH)
+def api_hooppy_posty(limit: int = 20):
+    """Последние посты в Hooppy — проверить после обрыва связи, создался ли пост
+    (повтор без проверки = дубль во всех подключённых сетях)."""
+    from . import hooppy
+    try:
+        return {"ok": True, "posty": hooppy.posty(max(1, min(int(limit), 100)))}
+    except hooppy.HooppyError as e:
+        raise HTTPException(502, str(e)[:300])
+
+
 @app.post("/api/hooppy/udalit", dependencies=OWNER_AUTH)
 def api_hooppy_udalit(payload: dict = Body(...)):
     """{"post_ids": [...]} — удалить черновики из Hooppy (опубликованное в соцсетях остаётся)."""

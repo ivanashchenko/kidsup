@@ -161,6 +161,30 @@ def oshibki(limit: int = 30) -> list[dict]:
             for x in (b.get("list") or []) if x.get("is_error")]
 
 
+def posty(limit: int = 20) -> list[dict]:
+    """Последние посты в Hooppy, новые сверху, в сжатом виде (id, даты, статус,
+    начало текста). 25.10.2026: на /api/hooppy/post оборвалась связь, и без этого
+    списка нельзя было понять, создался ли пост, — а повтор = дубль в четырёх сетях."""
+    b = _req("GET", "/posts", params={"page": 1, "limit": limit})
+    items = b
+    if isinstance(b, dict):
+        items = b.get("list") or b.get("data") or b.get("posts") or []
+    out = []
+    for x in items or []:
+        if not isinstance(x, dict):
+            continue
+        row = {"id": x.get("id")}
+        for k, v in x.items():
+            if k == "id":
+                continue
+            lk = k.lower()
+            if any(s in lk for s in ("date", "time", "status", "text", "message", "title",
+                                     "state", "set", "pages", "schedule", "publish")):
+                row[k] = v[:120] if isinstance(v, str) else v
+        out.append(row)
+    return out
+
+
 TIPY = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
         ".mp4": "video/mp4", ".mov": "video/quicktime"}
 VIDEO_MAX = 100_000_000
