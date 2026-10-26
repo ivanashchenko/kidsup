@@ -3047,6 +3047,39 @@ def promo_page(request: Request):
     return render(request, "promo.html", active="promo", s=promo.stats())
 
 
+@app.get("/promo/grafik", response_class=HTMLResponse, dependencies=AUTH)
+def promo_grafik_page():
+    """График выходов промоутеров: кто и когда готов (Борис 26.10.2026, app/promo_grafik.py)."""
+    from . import promo_grafik
+    return HTMLResponse(promo_grafik.page())
+
+
+@app.get("/api/promo/grafik", dependencies=AUTH)
+def api_promo_grafik():
+    from . import promo_grafik
+    return promo_grafik.dannye()
+
+
+@app.post("/api/promo/grafik/chelovek", dependencies=AUTH)
+def api_promo_grafik_chelovek(payload: dict = Body(...)):
+    """{"id"?, "name", "kanal", "kontakt", "phone", "note", "active"} — добавить или поправить промоутера."""
+    from . import promo_grafik
+    try:
+        return promo_grafik.save_chelovek(payload or {})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/promo/grafik/den", dependencies=AUTH)
+def api_promo_grafik_den(payload: dict = Body(...)):
+    """{"lid", "day", "status", "vremya"?, "note"?} — клетка дня; пустой status стирает."""
+    from . import promo_grafik
+    try:
+        return promo_grafik.set_den(payload or {})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/leads", response_class=HTMLResponse, dependencies=AUTH)
 def leads_page(request: Request):
     return render(request, "leads.html", active="leads",
