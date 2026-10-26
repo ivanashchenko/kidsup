@@ -4356,8 +4356,7 @@ def api_sync_diag_payment_ids(ids: str = "", since: str = "", till: str = ""):
         for pid in [int(x) for x in ids.split(",") if x.strip().isdigit()] + kand[:20]:
             try:
                 r = c.get(f"/v1/company/payments/{pid}")
-                otvety[pid] = {"kod": 200, "id": (r or {}).get("id"), "date": (r or {}).get("date"),
-                               "summa": (r or {}).get("summa")}
+                otvety[pid] = {"kod": 200, "polya": r}
             except httpx.HTTPStatusError as e:
                 otvety[pid] = {"kod": e.response.status_code if e.response is not None else None,
                                "tekst": (e.response.text if e.response is not None else "")[:200]}
