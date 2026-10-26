@@ -38,21 +38,30 @@ from . import db
 
 log = logging.getLogger("kidsup.oplata")
 
-CAMPAIGN = "oplata_oct26"
+# 26.10.2026: вторая волна — ноябрь. Окна сдвинуты на месяц: «текущий» абонемент
+# теперь октябрьский (куплен с 20.09), «следующий» — с 01.11. Борис 26.10:
+# приём оплат за ноябрь открыт с 25.10, 4 ноября центр работает.
+CAMPAIGN = "oplata_nov26"
 KIND = "oplata"                      # сервисный вид для wazzup.guard
 SEASON_PREFIX = "2627_"
 ST_UCHITSYA = 2
-CUR_FROM, CUR_TO = "2026-08-20", "2026-10-01"   # «абонемент за сентябрь»: начало в этом окне
-NEXT_FROM = "2026-10-01"                         # абонемент следующего месяца
-NEXT_TO = "2026-11-01"                           # первый день после следующего месяца
-SOLD_AFTER = "2026-09-21"                        # куплен в последнюю неделю — считаем за октябрь
-START_AT = "2026-09-28T10:00"                    # решение владельца: «завтра с утра»
-# 28.09 Борис: семьям — «до 1 октября», внутренний крайний срок остаётся 5 октября
-DEADLINE = "1 октября"
+CUR_FROM, CUR_TO = "2026-09-20", "2026-11-01"   # «абонемент за октябрь»: начало в этом окне
+NEXT_FROM = "2026-11-01"                         # абонемент следующего месяца
+NEXT_TO = "2026-12-01"                           # первый день после следующего месяца
+SOLD_AFTER = "2026-10-24"                        # куплен после открытия приёма — считаем за ноябрь
+START_AT = "2026-10-26T12:00"
+DEADLINE = "1 ноября"
 SKIP_STATES = (146328, 215202, 125954)          # «не писать» и прочие жёсткие
-MONTH = "октябрь"
-MONTH_P = "октября"
-MONTH_V = "октябре"
+MONTH = "ноябрь"
+MONTH_P = "ноября"
+MONTH_V = "ноябре"
+PREV_MONTH = "октябрь"
+# Правило Иры 25.10: кому администратор уже прислал ссылку на оплату, второй
+# раз не просим — ищем в исходящих с этой даты ссылку pay.tvoyklass.com
+# или текст «оплатите … ноября … ссылк».
+LINK_SINCE = "2026-10-20"
+# Борис 26.10: в каждом сообщении — что 4 ноября центр работает.
+LINE_0411 = "4 ноября (среда) центр работает — все занятия идут по расписанию."
 # Имена, которые в CRM записаны с явной опечаткой: в сообщении без имени,
 # чем с чужим («Сладислава» 27.09 — админам поправить карточку)
 NAME_SUSPECT = {"Сладислава"}
@@ -128,8 +137,9 @@ def text_for(kids: list[tuple[str, list[str]]], summa: float = 0) -> str:
                f"• или на ресепшене картой или по СБП — сумму скажут на месте.")
     return (
         f"Здравствуйте! Это KidsUP 🌿\n\n"
-        f"Спасибо, что сентябрь провели с нами! Открываем оплату занятий на {MONTH}:\n"
+        f"Спасибо, что {PREV_MONTH} провели с нами! Открываем оплату занятий на {MONTH}:\n"
         f"{spisok}\n\n"
+        f"{LINE_0411}\n\n"
         f"Просим оплатить до {DEADLINE} — так {mesto} закрепится за вами: сейчас идёт "
         f"набор, и новые семьи записываются на свободные места.\n\n"
         f"{kak}\n\n"
@@ -238,6 +248,23 @@ def _has_current(subs: list[dict], cid: int) -> bool:
                for s in subs)
 
 
+def _links_sent(conn) -> set[str]:
+    """Телефоны (10 цифр), которым с LINK_SINCE уже ушла ссылка на оплату."""
+    try:
+        rows = conn.execute("SELECT phone, text FROM wazzup_outbox WHERE ts >= ?",
+                            (LINK_SINCE,)).fetchall()
+    except Exception:  # noqa: BLE001 — таблицы может не быть на пустой базе
+        return set()
+    out: set[str] = set()
+    for ph, text in rows:
+        t = (text or "").lower()
+        if "pay.tvoyklass.com" in t or ("оплат" in t and "ноябр" in t and "ссылк" in t):
+            p = _p10(ph)
+            if len(p) == 10:
+                out.add(p)
+    return out
+
+
 def plan() -> dict:
     """Кому и что отправим. Ничего не отправляет."""
     _UROKI.clear()
@@ -248,6 +275,7 @@ def plan() -> dict:
     mimo: list[dict] = []
     with db.get_conn() as conn:
         subs = _subs(conn)
+        linked = _links_sent(conn)
         rows = conn.execute(
             "SELECT u.id, u.name, u.phone, c.id, c.name, COALESCE(u.client_state_id,0) FROM joins j "
             "JOIN users u ON u.id = j.user_id JOIN classes c ON c.id = j.class_id "
@@ -262,14 +290,17 @@ def plan() -> dict:
         elif not any((not x["cids"] or cid in x["cids"]) for x in s):
             why = "нет оплаченного абонемента на группу"
         elif _covered(s, cid):
-            skipped_paid.append({"uid": uid, "child": name, "group": cls})
+            skipped_paid.append({"uid": uid, "child": name, "group": cls,
+                                 "phone": ("7" + _p10(phone)) if len(_p10(phone)) == 10 else ""})
             continue
         elif not _has_current(s, cid):
-            why = "абонемент не сентябрьский (" + ", ".join(
+            why = f"абонемент не за {PREV_MONTH} (" + ", ".join(
                 sorted({x["begin"] for x in s if not x["cids"] or cid in x["cids"]})) + ")"
         p = _p10(phone)
         if not why and (len(p) != 10 or not p.startswith("9")):
             why = f"нет мобильного номера ({phone or 'пусто'})"
+        if not why and p in linked:
+            why = f"ссылка на оплату уже отправлена (после {LINK_SINCE[8:]}.{LINK_SINCE[5:7]})"
         if why:
             mimo.append({"uid": uid, "child": name, "group": cls.replace(SEASON_PREFIX, ""), "почему": why})
             continue
