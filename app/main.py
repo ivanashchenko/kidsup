@@ -4335,6 +4335,40 @@ def api_sync_diag_payments(since: str = "", till: str = ""):
     return out
 
 
+@app.get("/api/sync/diag-payment-ids", dependencies=OWNER_AUTH)
+def api_sync_diag_payment_ids(ids: str = "", since: str = "", till: str = ""):
+    """Только чтение: что МойКласс отвечает на платёж по id (ids через запятую)
+    и какие платежи базы за окно [since, till] не пришли в выгрузке — кандидаты
+    в удалённые (26.10: чистка удалённых платежей в sync._prune_payments)."""
+    import httpx
+    from . import sync as _s
+    from .moyklass_client import MoyklassClient
+    import datetime as _dt
+    d0 = since or (_dt.date.today() - _dt.timedelta(days=3)).isoformat(); d1 = till or _dt.date.today().isoformat()
+    c = MoyklassClient(_s.get_api_key())
+    out = {"okno": [d0, d1]}
+    try:
+        items = c.fetch_all("/v1/company/payments", ["payments"], params={"date": [d0, d1]})
+        out["vygruzka"] = len(items)
+        kand = db.payments_missing(d0, d1, items)
+        out["kandidaty"] = kand
+        otvety = {}
+        for pid in [int(x) for x in ids.split(",") if x.strip().isdigit()] + kand[:20]:
+            try:
+                r = c.get(f"/v1/company/payments/{pid}")
+                otvety[pid] = {"kod": 200, "id": (r or {}).get("id"), "date": (r or {}).get("date"),
+                               "summa": (r or {}).get("summa")}
+            except httpx.HTTPStatusError as e:
+                otvety[pid] = {"kod": e.response.status_code if e.response is not None else None,
+                               "tekst": (e.response.text if e.response is not None else "")[:200]}
+            except Exception as e:  # noqa: BLE001
+                otvety[pid] = {"oshibka": str(e)[:200]}
+        out["otvety"] = otvety
+    finally:
+        c.close()
+    return out
+
+
 @app.get("/api/kadry", dependencies=AUTH)
 def api_kadry(day: str = ""):
     """Кадры с камер по занятиям дня (фото-явка, пилот 06.10.2026): что снято, что подсчитано."""
