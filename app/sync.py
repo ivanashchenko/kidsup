@@ -73,33 +73,38 @@ def _prune_payments(client: MoyklassClient, date_from: str, date_to: str,
                     items: list[dict], limit: int = 50) -> int:
     """Убрать из базы платежи окна, удалённые в МойКлассе (см. db.payments_missing).
 
-    Кандидат удаляется, только если МойКласс по его id отвечает 404. Платёж,
-    который нашёлся, остаётся: значит, выгрузка за окно была неполной, и
-    стирать по ней нельзя. limit — не больше стольких проверок за проход
-    (троттлинг ~3 запроса в секунду); остаток доберёт следующий синк."""
-    import httpx
-    kandidaty = db.payments_missing(date_from, date_to, items)[:limit]
-    if not kandidaty:
+    По id МойКласс отдаёт и удалённый платёж (проверено 26.10: 200 и все поля,
+    признака удаления нет), поэтому подтверждаем иначе — вторым, независимым
+    списком: платежи этого же ученика. Кандидата нет и там — удаляем. Список
+    ученика проверяем на полноту: живые платежи ученика из выгрузки окна
+    обязаны в нём быть, иначе ученика пропускаем. Кандидатов подозрительно
+    много — выгрузка неполная, ничего не трогаем. limit — не больше стольких
+    учеников за проход (~3 запроса в секунду); остаток доберёт следующий синк."""
+    kandidaty = db.payments_missing(date_from, date_to, items)
+    if not kandidaty or not items:
         return 0
-    # контрольный запрос по заведомо живому платежу: если и он «404»,
-    # эндпоинту по id верить нельзя — ничего не удаляем
-    zhivoj = next((p["id"] for p in items if p.get("id") is not None), None)
-    if zhivoj is None:
+    if len(kandidaty) > max(10, len(items) // 5):
+        log.warning("чистка удалённых платежей пропущена: кандидатов %s при выгрузке %s",
+                    len(kandidaty), len(items))
         return 0
-    try:
-        client.get(f"/v1/company/payments/{zhivoj}")
-    except (httpx.HTTPError, MoyklassError):
-        log.warning("проверка удалённых платежей пропущена: платёж %s по id не читается", zhivoj)
-        return 0
+    zhivye = {}
+    for p in items:
+        if p.get("id") is not None and p.get("userId") is not None:
+            zhivye.setdefault(int(p["userId"]), set()).add(int(p["id"]))
+    po_ucheniku = {}
+    for k in kandidaty:
+        if k["user_id"] is not None:
+            po_ucheniku.setdefault(int(k["user_id"]), []).append(int(k["id"]))
     udalit = []
-    for pid in kandidaty:
+    for uid, pids in list(po_ucheniku.items())[:limit]:
         try:
-            client.get(f"/v1/company/payments/{pid}")
-        except httpx.HTTPStatusError as e:
-            if e.response is not None and e.response.status_code == 404:
-                udalit.append(pid)
-        except (httpx.HTTPError, MoyklassError):
-            pass
+            spisok = client.fetch_all("/v1/company/payments", ["payments"], params={"userId": uid})
+        except Exception:
+            continue
+        est = {int(p["id"]) for p in spisok if p.get("id") is not None}
+        if not est or not zhivye.get(uid, set()) <= est:
+            continue
+        udalit += [pid for pid in pids if pid not in est]
     db.delete_payments(udalit)
     if udalit:
         log.info("платежи, удалённые в МойКлассе, убраны из базы: %s", udalit)
