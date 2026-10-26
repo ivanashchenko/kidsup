@@ -1885,7 +1885,10 @@ def trial_reminder_2h(mk: MoyklassClient) -> None:
         uid = r.get("userId")
         lesson = r.get("lesson") or {}
         begin = (lesson.get("beginTime") or "")[:5]
-        if not uid or not begin or r.get("visit") is not None:
+        # 26.10.2026: МойКласс отдаёт visit=false у неотмеченной записи, а не
+        # null — проверка «is not None» отсекала все записи, и с 08.09 это
+        # напоминание не ушло ни разу. Пропускаем только уже отмеченную явку.
+        if not uid or not begin or r.get("visit"):
             continue
         try:
             hh, mm = (int(x) for x in begin.split(":"))

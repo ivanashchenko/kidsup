@@ -144,8 +144,8 @@ DAY_LIMIT = 2            # автосообщений одному челове�
 # Всё остальное — реклама, и её человеку положено не больше ОДНОЙ в день:
 # два разных конвейера (nabor и akciya) законно укладывались в общий
 # лимит 2 и вдвоём засыпали семью предложениями.
-SERVICE_KINDS = {"confirm", "trial_reminder", "reschedule", "missed",
-                 "booking", "sms", "welcome", "oplata"}
+SERVICE_KINDS = {"confirm", "trial_reminder", "trial_reminder_2h", "reschedule",
+                 "missed", "booking", "sms", "welcome", "oplata"}
 MARKETING_DAY_LIMIT = 1
 # Недельный потолок «необязательных» автосообщений семье — всё, кроме
 # подтверждения записи, напоминания о занятии и переноса. 24.09 админы:
@@ -155,7 +155,8 @@ MARKETING_DAY_LIMIT = 1
 # «oplata» — сбор оплаты следующего месяца у платящих семей (27.09): это
 # расчёт по уже купленным занятиям, а не реклама, и недельный потолок
 # необязательных сообщений его не касается.
-WEEK_KINDS_FREE = {"confirm", "trial_reminder", "reschedule", "booking", "sms", "oplata"}
+WEEK_KINDS_FREE = {"confirm", "trial_reminder", "trial_reminder_2h", "reschedule",
+                   "booking", "sms", "oplata"}
 WEEK_LIMIT = 2
 HOUR_FROM, HOUR_TO = 9, 20
 
@@ -321,7 +322,8 @@ def guard(phone: str, text: str, kind: str = "",
                     "SELECT COUNT(DISTINCT digest) FROM wazzup_guard "
                     "WHERE phone=? AND day=? AND kind NOT IN "
                     "('reply','digest','owner','apology','confirm',"
-                    "'trial_reminder','reschedule','missed','booking','sms')",
+                    "'trial_reminder','trial_reminder_2h','reschedule','missed',"
+                    "'booking','sms')",
                     (p, day)).fetchone()[0]
                 if m >= MARKETING_DAY_LIMIT:
                     return (f"рекламное сегодня уже уходило ({m}) — "
