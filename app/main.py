@@ -4336,7 +4336,7 @@ def api_sync_diag_payments(since: str = "", till: str = ""):
 
 
 @app.get("/api/sync/diag-payment-ids", dependencies=OWNER_AUTH)
-def api_sync_diag_payment_ids(ids: str = "", since: str = "", till: str = ""):
+def api_sync_diag_payment_ids(ids: str = "", since: str = "", till: str = "", user: int = 0):
     """Только чтение: что МойКласс отвечает на платёж по id (ids через запятую)
     и какие платежи базы за окно [since, till] не пришли в выгрузке — кандидаты
     в удалённые (26.10: чистка удалённых платежей в sync._prune_payments)."""
@@ -4363,6 +4363,11 @@ def api_sync_diag_payment_ids(ids: str = "", since: str = "", till: str = ""):
             except Exception as e:  # noqa: BLE001
                 otvety[pid] = {"oshibka": str(e)[:200]}
         out["otvety"] = otvety
+        if user:
+            r = c.get("/v1/company/payments", {"userId": int(user), "limit": 100})
+            out["po_ucheniku"] = [{"id": p.get("id"), "date": p.get("date"), "summa": p.get("summa"),
+                                   "paymentTypeId": p.get("paymentTypeId")}
+                                  for p in ((r or {}).get("payments") or [])]
     finally:
         c.close()
     return out
