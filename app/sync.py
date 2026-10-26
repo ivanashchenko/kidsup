@@ -69,6 +69,43 @@ def _progress_cb(entity: str):
     return cb
 
 
+def _prune_payments(client: MoyklassClient, date_from: str, date_to: str,
+                    items: list[dict], limit: int = 50) -> int:
+    """Убрать из базы платежи окна, удалённые в МойКлассе (см. db.payments_missing).
+
+    Кандидат удаляется, только если МойКласс по его id отвечает 404. Платёж,
+    который нашёлся, остаётся: значит, выгрузка за окно была неполной, и
+    стирать по ней нельзя. limit — не больше стольких проверок за проход
+    (троттлинг ~3 запроса в секунду); остаток доберёт следующий синк."""
+    import httpx
+    kandidaty = db.payments_missing(date_from, date_to, items)[:limit]
+    if not kandidaty:
+        return 0
+    # контрольный запрос по заведомо живому платежу: если и он «404»,
+    # эндпоинту по id верить нельзя — ничего не удаляем
+    zhivoj = next((p["id"] for p in items if p.get("id") is not None), None)
+    if zhivoj is None:
+        return 0
+    try:
+        client.get(f"/v1/company/payments/{zhivoj}")
+    except (httpx.HTTPError, MoyklassError):
+        log.warning("проверка удалённых платежей пропущена: платёж %s по id не читается", zhivoj)
+        return 0
+    udalit = []
+    for pid in kandidaty:
+        try:
+            client.get(f"/v1/company/payments/{pid}")
+        except httpx.HTTPStatusError as e:
+            if e.response is not None and e.response.status_code == 404:
+                udalit.append(pid)
+        except (httpx.HTTPError, MoyklassError):
+            pass
+    db.delete_payments(udalit)
+    if udalit:
+        log.info("платежи, удалённые в МойКлассе, убраны из базы: %s", udalit)
+    return len(udalit)
+
+
 def _run_sync(history_months: int | None):
     api_key = get_api_key()
     client = None
@@ -120,6 +157,7 @@ def _run_sync(history_months: int | None):
             progress=_progress_cb("Платежи"),
         )
         db.save_payments(payments)
+        _prune_payments(client, date_from, date_to, payments, limit=200)
 
         _stage("Счета")
         db.save_invoices(client.fetch_optional("/v1/company/invoices", ["invoices"]))
@@ -203,8 +241,12 @@ def light_sync() -> None:
         since3 = (_dt.date.today() - _dt.timedelta(days=3)).isoformat()
         today = _dt.date.today().isoformat()
         try:
-            db.save_payments(client.fetch_all("/v1/company/payments", ["payments"],
-                                              params={"date": [since3, today]}))
+            platezhi = client.fetch_all("/v1/company/payments", ["payments"],
+                                        params={"date": [since3, today]})
+            db.save_payments(platezhi)
+            # удалённый в МойКлассе платёж (исправили «нал» на «карту») уходит
+            # из базы за минуты, а не висит призраком в контроле оплат
+            _prune_payments(client, since3, today, platezhi)
             db.save_user_subscriptions(client.fetch_all("/v1/company/userSubscriptions", ["subscriptions"],
                                                         params={"sellDate": [since3, today]}))
         except Exception:

@@ -317,6 +317,31 @@ def save_payments(items: list[dict]):
                     ["id", "user_id", "date", "summa", "optype", "comment", "raw"], rows)
 
 
+def payments_missing(date_from: str, date_to: str, items: list[dict]) -> list[int]:
+    """Платежи локальной копии за окно [date_from, date_to], которых нет в
+    выгрузке items за то же окно, — кандидаты в удалённые в МойКлассе.
+
+    26.10.2026: save_payments только добавляет и обновляет, поэтому платёж,
+    удалённый в МойКлассе, оставался в базе навсегда. 25.10 наличную оплату
+    одной семьи удалили и внесли заново картой, а контроль оплат продолжал
+    считать её наличной без чека — и касса «не сходилась» на 1 600 ₽.
+    Удалять кандидата можно только после того, как МойКласс подтвердил 404
+    (sync._prune_payments): пустая или неполная выгрузка не должна стирать базу."""
+    keep = {int(p["id"]) for p in items if p.get("id") is not None}
+    with get_conn() as conn:
+        local = [int(r[0]) for r in conn.execute(
+            "SELECT id FROM payments WHERE substr(date, 1, 10) BETWEEN ? AND ?",
+            (date_from[:10], date_to[:10]))]
+    return [i for i in local if i not in keep]
+
+
+def delete_payments(ids: list[int]) -> None:
+    if not ids:
+        return
+    with _lock, get_conn() as conn:
+        conn.executemany("DELETE FROM payments WHERE id=?", [(int(i),) for i in ids])
+
+
 def save_invoices(items: list[dict]):
     rows = [
         (
