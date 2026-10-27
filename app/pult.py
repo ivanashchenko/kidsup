@@ -584,6 +584,10 @@ def _ves(it: dict) -> int:
 BLOKI = (
     ("gorit", "Горит"),
     ("probnye", "Пробные на сегодня"),
+    # 28.10.2026, Борис: «Счёт спринта стоит … Давай админам дадим». Списки C
+    # (вернуть после пробного) и D (второй предмет) — свой блок, а не хвост
+    # «Обзвона базы»: там их 27.10 никто не открыл.
+    ("sprint", "Спринт: вернуть после пробного и второй предмет"),
     ("oplaty", "Вопросы по оплатам"),
     ("zayavki", "Новые заявки и ждут ответа"),
     ("chistka", "Чистка базы"),
@@ -620,6 +624,10 @@ def _blok(it: dict) -> str:
     import re as _re
     txt = _re.sub(r"<[^>]+>", " ", it.get("text") or "")
     txt = _re.sub(r"^⏳ с \d\d\.\d\d:\s*", "", txt)
+    # раньше «Горит»: в причинах отказа бывают «болеют» и «хотим уйти»,
+    # а пожаром пункт спринта от этого не становится
+    if _re.match(r"(?:С\d{1,2} · )?Спринт [CDСД]\b", txt):
+        return "sprint"
     if _re.search(_GORIT, txt, _re.I):
         return "gorit"
     if it.get("tag") == "наряд":
@@ -682,6 +690,10 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
         elif it.get("staryj"):
             it["s_dnya"] = (it.get("day") or "")[5:10]
         it["blok"] = _blok(it)
+        if it["blok"] == "sprint":
+            # у спринта один срок на все дни — 31.10; вчерашний звонок не уходит
+            # в хвост вниз, а остаётся в блоке и в его счётчике
+            it["staryj"] = False
     lis = []
     for it in items:
         st, badge, extra = "", "", ""

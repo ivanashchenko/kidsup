@@ -1424,6 +1424,8 @@ DOC_GROUPS = [
          "Почему такие ставки, сколько выйдет по месяцам при графике 4/3 — с сентября по май"),
         ("promo_vvod", "🪧 Заведение промо-контакта",
          "Алгоритм Бориса: дубль → источник → тег → статус"),
+        ("promo_upravlenie", "🪧 Промоутеры: что делает админ каждый день",
+         "Утром подтвердить смену, бриф в две фразы, каждый номер — карточка и звонок за час, расчёт 400/600/200 ₽"),
     ]),
     ("Команде и родителям", [
         ("pravila_kidsup", "📋 Правила посещения KidsUP",
@@ -10423,6 +10425,17 @@ def await_page(which: str) -> HTMLResponse:
     name = {"site": "site.html", "day": "day.html", "week": "week.html"}[which]
     f = BASE / "static" / name
     return HTMLResponse(f.read_text(encoding="utf-8"))
+
+
+@app.get("/konkurs", response_class=HTMLResponse)
+def konkurs_page():
+    """Правила конкурса детских фраз 28.10–08.11.2026 — публично, без пароля.
+
+    28.10 Борис: «сделай … конкурсы с призами за подписку». Ссылка стоит в
+    конкурсных постах: закон о рекламе (ст. 9) требует сказать, где прочитать
+    об организаторе, правилах, призах и порядке их получения, а kidsup.ru
+    пока на Tilda."""
+    return HTMLResponse((BASE / "static" / "konkurs.html").read_text(encoding="utf-8"))
 
 
 @app.get("/site", response_class=HTMLResponse)
