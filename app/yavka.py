@@ -21,7 +21,7 @@ KidsUP Team, а в МойКлассе явка не отмечена три дн
     спорно; ни с одним — «нет в записи» (отработка, пробное без записи,
     опечатка) — это Лизе;
   • пишем в МойКласс ТОЛЬКО однозначное: visit=true тем, кто «был»,
-    goodReason=true тем, кто «не был» по болезни/предупредив. Провести
+    goodReason=true тем, кто «не был» и принёс справку. Провести
     занятие (status=1 — с этого момента списываются абонементы) — только
     если в отчёте учтён каждый записанный ребёнок и нет спорных имён.
     Режим yavka_auto: 0 — только сверка и пункт в Пульт (по умолчанию),
@@ -71,7 +71,16 @@ RE_NOTE = re.compile(r"\b(отработ\w*|пробн\w*|болеет|боле�
 # строка с такими словами — не имя, а разговор
 RE_NOISE = re.compile(r"\b(набираем|групп[аыу]|заняти\w*|урок\w*|сегодня|завтра|вчера|спасибо|пожалуйста|добрый|доброе|здравствуйте|"
                       r"коллеги|удалено|кликните|сообщение|списки|прислать|пришлите|всех|нас|каюсь|видела|должна|ресепшен\w*)\b", re.I)
-GOOD_REASON = re.compile(r"боле|заболе|справк|уваж|предупред|карантин|уехал|отпуск|перенос", re.I)
+# 27.10.2026, Лена: уважительную причину (болезнь) ставим ТОЛЬКО при справке —
+# у ряда групп за неё идёт возврат 50 % (оферта, п. 2.7). «Болеет»,
+# «предупредили», «уехал» в отчёте педагога — обычный пропуск, его не трогаем.
+GOOD_REASON = re.compile(r"справк", re.I)
+BEZ_SPRAVKI = re.compile(r"без\s+справк|нет\s+справк|справк\w*\s+(?:нет|не\s|будет|позже|потом)|"
+                         r"(?:принес[уёе]т|донес[уёе]т|занес[уёе]т|будет)\s+справк", re.I)
+
+
+def _so_spravkoy(note: str) -> bool:
+    return bool(GOOD_REASON.search(note)) and not BEZ_SPRAVKI.search(note)
 SERVICE_LINES = ("сообщение изменено", "сообщение удалено", "кликните, чтобы перейти к сообщению", "изменено", "удалено")
 
 DIM = {
@@ -575,7 +584,7 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
             elif rec["report"] == "не был":
                 if rec["crm_visit"]:
                     rec["action"] = "conflict_visit"  # в CRM «был», педагог пишет «не был»
-                elif GOOD_REASON.search(rec["note"] or "") and not rec["crm_good"]:
+                elif _so_spravkoy(rec["note"] or "") and not rec["crm_good"]:
                     rec["action"] = None if conducted else "good_reason"
         accounted = bool(Lr["records"]) and all(r["report"] is not None or (r["test"] and r["crm_visit"]) for r in Lr["records"])
         over = day < today or (_minutes(Lr["end"] or Lr["time"]) or 0) < now_m
@@ -638,7 +647,7 @@ def log_rows(day: str) -> list[dict]:
 def otmetit(day: str, lesson_ids: list[int] | None = None, provesti: bool = False, who: str = "Клод", dry: bool = False) -> dict:
     """Поставить в МойКлассе однозначные отметки по сверке дня.
 
-    visit=true — «был»; goodReason=true — «не был» по болезни/предупредив.
+    visit=true — «был»; goodReason=true — «не был» и есть справка.
     provesti=True — ещё и провести занятия, где учтён каждый записанный
     (с этого момента списываются абонементы). Конфликты, спорные и «нет в
     записи» не трогаем — они остаются Лизе."""
