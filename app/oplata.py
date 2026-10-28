@@ -232,7 +232,10 @@ def _covered(subs: list[dict], cid: int) -> bool:
             continue
         if s["begin"] >= NEXT_FROM:
             return True
-        if s["sold"] >= SOLD_AFTER and s["begin"] >= SOLD_AFTER:
+        # 28.10: разовое занятие (логопед, праздник, первое занятие), купленное после
+        # открытия приёма, ноябрь не оплачивает — 20 детей с такими покупками
+        # выпадали из напоминания как «оплатившие ноябрь»
+        if s["sold"] >= SOLD_AFTER and s["begin"] >= SOLD_AFTER and (s["total"] or 0) > 1:
             return True
         if s["end"] and s["end"] < NEXT_FROM:
             continue
