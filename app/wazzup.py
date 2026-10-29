@@ -279,8 +279,18 @@ def guard(phone: str, text: str, kind: str = "",
     # send_smart() — то есть рассылка набора и автоответы уходили в субботу
     # в 9:00 мимо правила (22.09.2026, аудит).
     s_hour = 10 if now.weekday() >= 5 else HOUR_FROM
-    if not (s_hour <= now.hour < HOUR_TO):
-        return (f"сейчас {now.hour}:00 — вне окна {s_hour}-{HOUR_TO}"
+    # 29.10.2026, Борис: рассылку оплат — «сегодня до 21:00». Её окно задаёт
+    # настройка oplata_do; без этого предохранитель после 20:00 возвращал бы
+    # отказ, и oplata ставила бы семьи в hold навсегда.
+    h_to = HOUR_TO
+    if kind == "oplata":
+        try:
+            hh, mm = (db.get_setting("oplata_do", "") or "").split(":")
+            h_to = max(HOUR_TO, int(hh) + (1 if int(mm) else 0))
+        except ValueError:
+            pass
+    if not (s_hour <= now.hour < h_to):
+        return (f"сейчас {now.hour}:00 — вне окна {s_hour}-{h_to}"
                 + (" (выходной: пишем с 10:00)" if now.weekday() >= 5 else ""))
     import hashlib
     dig = hashlib.sha1(text.strip().lower().encode()).hexdigest()[:16]

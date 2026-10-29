@@ -4920,8 +4920,8 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             "anthropic_proxy_secret", "work_hours", "ext_by_day",
             "vk_token", "vk_group_id", "vk_ads_client_id", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "tg_bot_token", "tg_channel", "mango_ext_admins", "pedagog_key", "mk_web_login", "mk_web_password",
             "calls_parsed", "sms_on", "sms_sender_name", "lead_hook_key",
-            # сбор оплат за следующий месяц (app/oplata.py): включение и время старта
-            "oplata_on", "oplata_start",
+            # сбор оплат за следующий месяц (app/oplata.py): включение, время старта и конец окна
+            "oplata_on", "oplata_start", "oplata_do",
             # возврат «думает»/«недозвон»/база 2024/25 (app/vozvrat.py): сколько звонков в день и кому
             "vozvrat_v_den", "vozvrat_kto", "vozvrat_on", "vozvrat_kvota", "ya_price_auto",
             "vozvrat_msg_on", "vozvrat_msg_start", "vozvrat_msg_v_den",

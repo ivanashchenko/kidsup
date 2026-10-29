@@ -459,8 +459,15 @@ def deliver_one(dry: bool = True) -> dict:
     from . import mango, wazzup
     from .autopilot import _now
     now = _now()
-    if not (10 <= now.hour < 19 or (now.hour == 19 and now.minute < 30)):
-        return {"ok": False, "error": "вне окна 10:00–19:30"}
+    # 29.10.2026, Борис: «давай все сегодня до 21:00» — конец окна задаёт
+    # настройка oplata_do (по умолчанию 19:30, как было)
+    do = (db.get_setting("oplata_do", "") or "19:30").strip()
+    try:
+        do_min = int(do.split(":")[0]) * 60 + int(do.split(":")[1])
+    except (ValueError, IndexError):
+        do, do_min = "19:30", 19 * 60 + 30
+    if not (10 * 60 <= now.hour * 60 + now.minute < do_min):
+        return {"ok": False, "error": f"вне окна 10:00–{do}"}
     with db.get_conn() as conn:
         _q(conn)
         # два отказа за день — в сторону, чтобы не занимать очередь
