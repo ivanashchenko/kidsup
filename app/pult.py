@@ -107,14 +107,13 @@ def set_tasks(day: str, who: str, items: list[dict], replace: bool = True) -> in
             text = str(it.get("text") or "").strip()
             if not text:
                 continue
-            # 22.09.2026, аудит. Решение владельца от 20.09: у Лизы только
-            # закрытие занятий (явка, «проведено») и долги. Помешать поставить
-            # ей что-то ещё было нечему — и на 22.09 у неё в колонке лежали
-            # две чужие задачи. Такие не записываем и называем вслух, чтобы
-            # тот, кто их ставил, переадресовал.
+            # 22.09.2026, аудит: Лизе ставили чужие задачи, и они висели.
+            # Такие не записываем и называем вслух, чтобы тот, кто их ставил,
+            # переадресовал. 29.10.2026, Борис: Лиза из дома делает всё, кроме
+            # звонков, — чужими теперь считаются только звонки и работа в клубе.
             if who == "Лиза":
-                from .pult_proverka import LIZA_MOZHNO
-                if not LIZA_MOZHNO.search(text):
+                from .pult_proverka import liza_mozhno
+                if not liza_mozhno(text):
                     chuzhie.append(text[:70])
                     continue
             conn.execute("INSERT INTO pult_tasks (day, who, t, text, done, ord, ts) VALUES (?,?,?,?,?,?,?)",
@@ -122,7 +121,7 @@ def set_tasks(day: str, who: str, items: list[dict], replace: bool = True) -> in
             n += 1
         if chuzhie:
             log.warning("set_tasks: Лизе не поставлено %d задач вне её роли "
-                        "(с 08.10 у неё только деньги и маткапиталы): %s", len(chuzhie), chuzhie)
+                        "(звонки и работа в клубе — дежурной): %s", len(chuzhie), chuzhie)
         return n
 
 
