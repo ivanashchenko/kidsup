@@ -23,6 +23,12 @@ NEXT_FROM или проданный после SOLD_AFTER с остатком з
 Темп: одна семья за раз и пауза 2–4 минуты. Номер 0918 — живой канал
 переписки, залп в сотню сообщений он не переживёт (22.08 так ушёл в бан 0077).
 
+29.10.2026, Борис: «по мессенджерам — кто в каком последний раз отвечал,
+а у кого нет переписок в мессенджерах — тем смс». С ноябрьской волны семья
+получает ОДНО сообщение: в WhatsApp, Telegram или MAX — туда, где она
+последней писала нам; переписки нет ни в одном — СМС. Схема «мессенджер +
+WhatsApp + СМС всем» ниже остаётся только в описании октябрьской волны.
+
 Отправка только из цикла сервера (autopilot) и серверных эндпоинтов;
 локально модуль ничего не шлёт.
 """
@@ -62,7 +68,7 @@ PREV_MONTH = "октябрь"
 # или текст «оплатите … ноября … ссылк».
 LINK_SINCE = "2026-10-20"
 # Борис 26.10: в каждом сообщении — что 4 ноября центр работает.
-LINE_0411 = "4 ноября (среда) центр работает — все занятия идут по расписанию."
+LINE_0411 = "4 ноября (среда) центр работает, все занятия по расписанию."
 # Имена, которые в CRM записаны с явной опечаткой: в сообщении без имени,
 # чем с чужим («Сладислава» 27.09 — админам поправить карточку)
 NAME_SUSPECT = {"Сладислава"}
@@ -122,43 +128,48 @@ def text_for(kids: list[tuple[str, list[str]]], summa: float = 0) -> str:
                         for n, ss in kids)
     lg = any("логопед" in x for _, ss in kids for x in ss)
     mesto = "место в группе" + (" и время у логопеда" if lg else "")
+    privyk = "к каким привыкли дети" if len(kids) > 1 else "к каким привык ребёнок"
     if summa > 0:
         kak = (f"К оплате за {MONTH}: {_rub(summa)} ₽ — счёт уже выставлен.\n\n"
                f"Как оплатить:\n"
                f"• в личном кабинете «Твой Класс» (kidsup.tvoyklass.com) — счёт на эту "
                f"сумму там, кнопка «Оплатить»;\n"
-               f"• на ресепшене картой или по СБП;\n"
+               f"• на ресепшене — картой или по СБП;\n"
                f"• или ответьте «ссылка» — пришлём ссылку на эту сумму для оплаты по СБП.")
     else:
-        kak = (f"Сумма зависит от числа занятий в {MONTH_V} по вашему расписанию, поэтому "
-               f"считаем её для каждой семьи.\n\n"
+        kak = (f"Сумму считаем для каждой семьи — по числу занятий в {MONTH_V} "
+               f"по вашему расписанию.\n\n"
                f"Как оплатить:\n"
                f"• ответьте на это сообщение «ссылка» — администратор посчитает сумму "
                f"и пришлёт ссылку для оплаты по СБП (с 10 до 20, обычно в течение часа);\n"
-               f"• или на ресепшене картой или по СБП — сумму скажут на месте.")
+               f"• или на ресепшене — картой или по СБП.")
+    # 29.10 Борис: «объясним, почему это для нас важно» — текст утверждён им
     return (
         f"Здравствуйте! Это KidsUP 🌿\n\n"
-        f"Спасибо, что {PREV_MONTH} провели с нами! Открываем оплату занятий на {MONTH}:\n"
+        f"Открыта оплата занятий на {MONTH}:\n"
         f"{spisok}\n\n"
-        f"{LINE_0411}\n\n"
-        f"Просим оплатить до {DEADLINE} — так {mesto} закрепится за вами: сейчас идёт "
-        f"набор, и новые семьи записываются на свободные места.\n\n"
+        f"Просим оплатить до {DEADLINE} — и вот почему это для нас важно. Из оплат за месяц "
+        f"мы платим педагогам, аренду и за материалы и по ним заранее планируем {MONTH}: "
+        f"составы групп, расписание, замены. Когда оплата приходит в начале месяца, мы "
+        f"сохраняем группу и педагога такими, {privyk}. А ещё сейчас идёт набор — оплата "
+        f"закрепляет {mesto} за вами.\n\n"
         f"{kak}\n\n"
-        f"Принимаем материнский капитал, для налогового вычета 13% подготовим справку. "
-        f"Если в {MONTH_V} что-то меняется — время, пауза, ещё один предмет — "
-        f"просто напишите, всё подберём 💛\n\n"
+        f"{LINE_0411} Принимаем материнский капитал, для налогового вычета подготовим справку. "
+        f"Если в {MONTH_V} что-то меняется — напишите, подберём 💛\n\n"
         f"Если вы уже оплатили {MONTH} — спасибо, это сообщение можно пропустить."
     )
 
 
 def sms_for(kids: list[tuple[str, list[str]]], summa: float = 0) -> str:
+    """СМС уходит только тем, у кого переписки нет ни в одном мессенджере, —
+    поэтому без «ответьте на наше сообщение»: отвечать им некуда."""
     names = ", ".join(n for n, _ in kids if n)
-    head = f"KidsUP: открыта оплата занятий на {MONTH}{f' ({names})' if names else ''}. "
+    head = f"KidsUP: открыта оплата занятий на {MONTH}{f' ({names})' if names else ''}"
     if summa > 0:
-        return (head + f"К оплате {_rub(summa)} руб., счёт в кабинете kidsup.tvoyklass.com. "
-                f"Оплатить до {DEADLINE}, тел. 84951209024")
-    return (head + f"Сумму и ссылку пришлём в WhatsApp — ответьте на наше сообщение "
-            f"или позвоните 84951209024")
+        return (head + f" — к оплате {_rub(summa)} руб., счёт в кабинете kidsup.tvoyklass.com. "
+                f"До {DEADLINE}, тел. +74951209024")
+    return (head + f" — до {DEADLINE}, так за вами сохранится место в группе. Оплата на "
+            f"ресепшене картой/СБП или по ссылке — позвоните +74951209024, посчитаем сумму.")
 
 
 def _open_invoices(conn, uids: list[int]) -> float:
@@ -397,8 +408,54 @@ def _still_due(uids: list[int]) -> bool:
                for u, c in rows)
 
 
+TRANSPORT = {"whatsapp": "whatsapp", "telegram": "tgapi", "max": "max"}
+LABEL = {"whatsapp": "WhatsApp", "tgapi": "Telegram", "max": "MAX"}
+
+
+def _kanal(phone: str, uids: list[int]) -> tuple[str, int | None] | None:
+    """Где семья последней писала нам: (транспорт, uid для chatId) или None.
+
+    Входящие из вебхука Wazzup: по номеру (WhatsApp, а также Telegram и MAX,
+    когда номер известен) и чаты без номера — через указатель контактов
+    Wazzup, где у чата лежит id карточки МойКласс."""
+    from . import wazzup
+    p = _p10(phone)
+    last: dict[str, tuple[str, int | None]] = {}   # тип → (время, uid)
+
+    def seen(kind: str, ts: str, uid: int | None) -> None:
+        ts = str(ts or "")[:19]
+        if kind in TRANSPORT and ts > last.get(kind, ("", None))[0]:
+            last[kind] = (ts, uid)
+
+    with db.get_conn() as conn:
+        if len(p) == 10:
+            for ts, kind in conn.execute(
+                    "SELECT ts, chat_type FROM wazzup_inbox WHERE phone LIKE ? "
+                    "AND chat_type IN ('whatsapp','telegram','max')", (f"%{p}",)):
+                seen(kind, ts, None)
+        chats: dict[str, tuple[str, int]] = {}
+        want = {str(u) for u in uids}
+        for cid, info in (wazzup.contacts() or {}).items():
+            if str(info.get("uid") or "") in want and info.get("type") in ("telegram", "max"):
+                chats[cid] = (info["type"], int(info["uid"]))
+        if chats:
+            for ts, cid in conn.execute(
+                    "SELECT ts, chat_id FROM wazzup_inbox_nophone WHERE chat_id IN (%s)"
+                    % ",".join("?" * len(chats)), list(chats)):
+                kind, uid = chats[str(cid)]
+                seen(kind, ts, uid)
+    if not last:
+        return None
+    kind, (_, uid) = max(last.items(), key=lambda kv: kv[1][0])
+    if uid is None and kind in ("telegram", "max"):
+        # чат знаем по номеру, chatId — по карточке: берём того ребёнка, у кого он есть
+        uid = next((u for u in uids if wazzup.chat_id_for(TRANSPORT[kind], phone, u)), uids[0] if uids else None)
+    return TRANSPORT[kind], uid
+
+
 def deliver_one(dry: bool = True) -> dict:
-    """Одна семья: мессенджеры + WhatsApp, затем СМС."""
+    """Одна семья — одно сообщение: в мессенджер, где она последней писала нам,
+    а если переписки нет нигде (или мессенджер не принял) — СМС."""
     from . import mango, wazzup
     from .autopilot import _now
     now = _now()
@@ -426,33 +483,50 @@ def deliver_one(dry: bool = True) -> dict:
             conn.execute("UPDATE oplata_queue SET status='cancelled', "
                          "tried=COALESCE(tried,'')||'оплатили_до_отправки;' WHERE id=?", (rid,))
         return {"ok": True, "phone": phone, "снят": "уже оплатили"}
+    route = _kanal(phone, uids)
     if dry:
         return {"ok": True, "dry_run": True, "phone": phone,
-                "каналы": wazzup.channels_for(phone, uids[0] if uids else None), "text": text, "sms": sms}
-    try:
-        log_ = wazzup.send_smart(phone, text, uid=uids[0] if uids else None,
-                                 dry_run=False, mass=False, kind=KIND)
-        ok = any(x.endswith(": ok") for x in log_)
-    except Exception as e:  # noqa: BLE001
-        ok, log_ = False, [str(e)[:150]]
+                "канал": LABEL[route[0]] if route else "СМС", "text": text, "sms": sms}
+    ok, kanal, msg_st = False, "", "-"
+    if route:
+        transport, uid_for = route
+        sender = (db.get_setting("chat_whatsapp", wazzup.CHAT_SENDER) or wazzup.CHAT_SENDER) \
+            if transport == "whatsapp" else None
+        try:
+            res = wazzup.send_via(transport, phone, text, dry_run=False, sender=sender,
+                                  uid=uid_for, kind=KIND)
+        except Exception as e:  # noqa: BLE001
+            res = False
+            log.warning("oplata: %s %s — %s", transport, phone[-4:], str(e)[:150])
+        if res is None:
+            # предохранитель остановил: такое сообщение этому номеру уже уходило —
+            # ни повтор, ни СМС вдогонку не нужны
+            with db.get_conn() as conn:
+                conn.execute("UPDATE oplata_queue SET status='hold', "
+                             "tried=COALESCE(tried,'')||'предохранитель;' WHERE id=?", (rid,))
+            return {"ok": False, "phone": phone, "канал": LABEL[transport], "стоп": "предохранитель"}
+        ok, kanal = bool(res), LABEL[transport]
+        msg_st = f"{transport}:{'ok' if ok else 'fail'}"
     sms_st = "нет"
-    if ok and sms and db.get_setting("sms_on", "0") == "1":
+    if not ok and sms and db.get_setting("sms_on", "0") == "1":
         try:
             sms_st = "ok" if mango.send_sms(phone, sms) else "fail"
         except Exception as e:  # noqa: BLE001
             sms_st = f"err {str(e)[:60]}"
+        if sms_st == "ok":
+            ok, kanal = True, "СМС"
     with db.get_conn() as conn:
         conn.execute(
             "UPDATE oplata_queue SET status=?, sent=?, tried=COALESCE(tried,'')||? WHERE id=?",
             ("sent" if ok else "pending", now.isoformat(timespec="seconds") if ok else None,
-             ("msg=ok" if ok else "msg=fail") + f",sms={sms_st};", rid))
+             f"msg={msg_st},sms={sms_st};", rid))
     if ok:
-        _comment(uids, sms_st)
-    log.info("oplata: %s → %s, смс %s", phone[-4:], "ok" if ok else "fail", sms_st)
-    return {"ok": ok, "phone": phone, "log": log_, "sms": sms_st}
+        _comment(uids, kanal)
+    log.info("oplata: %s → %s (%s)", phone[-4:], "ok" if ok else "fail", kanal or "нет канала")
+    return {"ok": ok, "phone": phone, "канал": kanal, "msg": msg_st, "sms": sms_st}
 
 
-def _comment(uids: list[int], sms_st: str) -> None:
+def _comment(uids: list[int], kanal: str) -> None:
     """След в карточке: админ видит, что напоминание об оплате ушло."""
     try:
         from .autopilot import _client, _now
@@ -462,8 +536,7 @@ def _comment(uids: list[int], sms_st: str) -> None:
                 mk.post("/v1/company/userComments", {
                     "userId": u, "showToUser": False,
                     "comment": f"{_now():%d.%m %H:%M} Клод: ушло сообщение «открыта оплата на "
-                               f"{MONTH}, до {DEADLINE}» (мессенджер/WhatsApp"
-                               f"{', СМС' if sms_st == 'ok' else ''})."})
+                               f"{MONTH}, до {DEADLINE}» ({kanal})."})
         finally:
             mk.close()
     except Exception:
@@ -485,7 +558,10 @@ def tick() -> dict | None:
     r = deliver_one(dry=False)
     if r.get("error") or r.get("пусто"):
         return None
-    db.set_setting("oplata_next", (now + timedelta(seconds=random.randint(120, 240)))
+    # Пауза бережёт WhatsApp 0918; СМС, Telegram и MAX залпа не боятся —
+    # 29.10: иначе 184 семьи не укладываются в один день
+    pause = (120, 240) if r.get("канал") == "WhatsApp" else (30, 60)
+    db.set_setting("oplata_next", (now + timedelta(seconds=random.randint(*pause)))
                    .isoformat(timespec="seconds"))
     return r
 
