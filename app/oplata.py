@@ -587,6 +587,29 @@ def rebuild_pending() -> dict:
     return {"ok": True, "снято_старых": n, **r}
 
 
+def retry(phones: list) -> dict:
+    """Вернуть в очередь семьи, отложенные предохранителем (hold).
+
+    29.10.2026: Романовы и Шиши попали в стоп-лист отказов по ошибке
+    распознавания («Уехали» на каникулы, «в понедельник не сможем — английский
+    смещается»), и напоминание об оплате ушло в hold. Борис: «Делай» —
+    снять их со стоп-листа и отправить. Только для hold и только по списку."""
+    want = {"".join(c for c in str(p) if c.isdigit())[-10:] for p in phones or []}
+    want.discard("")
+    n = 0
+    with db.get_conn() as conn:
+        _q(conn)
+        for rid, phone in conn.execute(
+                "SELECT id, phone FROM oplata_queue WHERE campaign=? AND status='hold'",
+                (CAMPAIGN,)).fetchall():
+            if str(phone)[-10:] in want:
+                conn.execute("UPDATE oplata_queue SET status='pending', "
+                             "tried=COALESCE(tried,'')||'повтор по решению владельца;' "
+                             "WHERE id=?", (rid,))
+                n += 1
+    return {"ok": True, "возвращено": n}
+
+
 def status() -> dict:
     with db.get_conn() as conn:
         _q(conn)

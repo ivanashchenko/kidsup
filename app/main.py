@@ -3862,6 +3862,14 @@ def api_oplata_rebuild():
     return oplata.rebuild_pending()
 
 
+@app.post("/api/oplata/retry", dependencies=OWNER_AUTH)
+def api_oplata_retry(payload: dict = Body(default={})):
+    """Вернуть в очередь семьи, отложенные предохранителем: {"phones": [...]}.
+    Только владелец: это отправка клиентам, которую автоматика сама остановила."""
+    from . import oplata
+    return oplata.retry(payload.get("phones") or [])
+
+
 @app.get("/api/oplata/status", dependencies=AUTH)
 def api_oplata_status():
     from . import oplata
