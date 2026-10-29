@@ -247,7 +247,7 @@ def callback(ext: str, phone: str) -> bool:
     return ok
 
 
-def send_sms(phone: str, text: str, from_ext: str = "12") -> bool:
+def send_sms(phone: str, text: str, from_ext: str = "12", kind: str = "sms") -> bool:
     """СМС через АТС — крайний канал для тех, у кого нет мессенджеров.
 
     Проверено 24.08 на номере владельца: доходит через МТС, отправителем
@@ -264,7 +264,9 @@ def send_sms(phone: str, text: str, from_ext: str = "12") -> bool:
     # набор групп» могла уйти клиенту, который письменно попросил снять
     # бронь. Один канал — одна дверь.
     from . import wazzup as _wz
-    stop = _wz.guard(num, text, kind="sms", transport="sms")
+    # kind — для окна времени: СМС сбора оплат живёт в окне рассылки оплат
+    # (oplata_do), а не в общем 9–20 (29.10: «давай все сегодня до 21:00»)
+    stop = _wz.guard(num, text, kind=kind, transport="sms")
     if stop:
         import logging
         logging.getLogger("kidsup.mango").info(

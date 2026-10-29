@@ -517,7 +517,7 @@ def deliver_one(dry: bool = True) -> dict:
     sms_st = "нет"
     if not ok and sms and db.get_setting("sms_on", "0") == "1":
         try:
-            sms_st = "ok" if mango.send_sms(phone, sms) else "fail"
+            sms_st = "ok" if mango.send_sms(phone, sms, kind=KIND) else "fail"
         except Exception as e:  # noqa: BLE001
             sms_st = f"err {str(e)[:60]}"
         if sms_st == "ok":
