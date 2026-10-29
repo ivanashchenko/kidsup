@@ -2357,6 +2357,11 @@ def missed_inbound(mk: MoyklassClient) -> None:
         return
     answered_back: set[str] = set()
     missed: dict[str, int] = {}
+    # 29.10.2026, Лена: «в журнале звонков нет пропущенного в 13:25, мы
+    # с Ирой вдвоём и звонков не пропускали». Звонок и правда не дошёл до
+    # стойки: без to_ext клиент положил трубку раньше, чем зазвонил телефон.
+    # Перезвонить всё равно стоит, но называть это пропуском админов нельзя.
+    rang: set[str] = set()
     for r in rows:
         num = (r.get("from_num") if not r.get("from_ext") else r.get("to_num")) or ""
         num = "".join(ch for ch in str(num) if ch.isdigit())[-10:]
@@ -2366,6 +2371,8 @@ def missed_inbound(mk: MoyklassClient) -> None:
             answered_back.add(num)          # поговорили (в любую сторону)
         elif not r.get("from_ext"):
             missed[num] = missed.get(num, 0) + 1
+            if r.get("to_ext"):
+                rang.add(num)
     admins = _admins_today() or _admins()
     if not admins:
         return
@@ -2381,8 +2388,13 @@ def missed_inbound(mk: MoyklassClient) -> None:
         uid = phone_uid.get(num)
         mobile = num.startswith("9")
         if mobile or uid:
+            # Начало «ПРОПУЩЕННЫЙ ЗВОНОК от +7…» не трогаем: по нему пункт
+            # попадает в блок «Заявки» пульта и в «Обзвон дня».
+            kak = "" if num in rang else (
+                " (до стойки не дошёл: положили трубку до соединения, "
+                "в журнале телефона его нет)")
             _task(mk, admins[0]["managerId"], uid,
-                  f"🔥 ПРОПУЩЕННЫЙ ЗВОНОК от +7{num} — перезвонить в течение "
+                  f"🔥 ПРОПУЩЕННЫЙ ЗВОНОК от +7{num}{kak} — перезвонить в течение "
                   "15 минут! Клиент звонил сам — самый горячий контакт дня.")
         else:
             # Городской номер, которого нет в базе, — чаще всего обзвонщик
