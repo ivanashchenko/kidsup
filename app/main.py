@@ -9880,6 +9880,41 @@ def api_mesta_razrez():
     return mesta.razrez()
 
 
+@app.get("/blank-grupp", response_class=HTMLResponse, dependencies=AUTH)
+def blank_grupp_page():
+    """Бланки групп «как на бумаге» (просьба Иры 31.10): живые из МойКласса раз в час
+    + правки админов поверх (цвет оплаты, дни, пометки, перенос, ручные строки)."""
+    return HTMLResponse((BASE / "templates" / "blank_grupp.html").read_text(encoding="utf-8"))
+
+
+@app.get("/api/blank-grupp", dependencies=AUTH)
+def api_blank_grupp(refresh: int = 0):
+    from . import blank_grupp
+    st = blank_grupp.model(force=bool(refresh), wait=bool(refresh))
+    if st["model"]:
+        st["model"] = blank_grupp.with_edits(st["model"])
+    return st
+
+
+@app.post("/api/blank-grupp/edit", dependencies=AUTH)
+def api_blank_grupp_edit(payload: dict = Body(...)):
+    from . import blank_grupp
+    try:
+        blank_grupp.save_edit(str(payload.get("k") or ""), payload.get("v"))
+    except ValueError:
+        raise HTTPException(400, "bad key")
+    return {"ok": True}
+
+
+@app.get("/api/blank-grupp/xlsx", dependencies=AUTH)
+def api_blank_grupp_xlsx():
+    from . import blank_grupp
+    data = blank_grupp.xlsx_bytes()
+    name = quote(f"Бланки_групп_{date.today().strftime('%d.%m')}.xlsx")
+    return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{name}"})
+
+
 @app.get("/api/mesta", dependencies=AUTH)
 def api_mesta():
     """Свободные места по группам сезона (см. app/mesta.py) — то же, что блок на плане дня."""

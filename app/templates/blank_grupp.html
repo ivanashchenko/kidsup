@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Бланки групп KidsUP</title>
+<style>
+:root{--blue:#2E86DE;--green:#3BAA35;--lg:#D9F2D0;--pink:#F9C9DD;--ink:#1f2340;--mut:#6b6f86;--line:#e3e5ee;--bg:#f6f7fb;--paid:#C6EFCE;--unpaid:#FFC7CE}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.3 Calibri,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+header{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:8px 12px}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.bar h1{font-size:17px;margin:0 10px 0 0}
+.bar button,.bar a.btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 10px;font:inherit;cursor:pointer;color:var(--ink);text-decoration:none}
+.bar button:hover,.bar a.btn:hover{border-color:var(--blue)}
+.st{color:var(--mut);font-size:12px;margin-left:auto}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:14px;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer}
+.tabs button.on{background:var(--pink);border-color:#e9a3c1;font-weight:700}
+main{padding:12px}
+.title{display:inline-block;background:var(--pink);font-weight:700;font-size:16px;padding:4px 10px;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));grid-auto-flow:column;grid-template-rows:repeat(3,auto);gap:14px 10px}
+.page{margin-bottom:18px}
+.blk{background:#fff;border:1px solid var(--line);border-radius:4px;padding:4px 6px 6px}
+.blk.drop{outline:2px dashed var(--blue)}
+.bh{display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px;min-height:22px}
+.bh .t{background:var(--lg);padding:1px 6px;font-weight:700}
+.bh.day{background:var(--lg);padding:2px 6px}
+.cap{margin-left:auto;font-weight:400;color:var(--mut);font-size:11px;white-space:nowrap}
+.row{display:grid;grid-template-columns:22px 1fr 54px 58px 66px;align-items:center;min-height:22px;border-bottom:1px solid var(--c)}
+.row.ind{grid-template-columns:22px 1fr 52px 62px}
+.n{background:var(--c);color:#fff;font-weight:700;text-align:center;align-self:stretch;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none}
+.row [contenteditable],.row input{outline:none;border:0;background:transparent;font:inherit;padding:1px 3px;min-width:0}
+.row [contenteditable]:focus,.row input:focus{background:#fffbe6}
+.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+.nm.g{background:var(--paid)}.nm.r{background:var(--unpaid)}
+.bd{font-size:11px;color:var(--mut)}
+.mk{font-size:11px;text-align:center;white-space:nowrap}
+.tm{background:var(--lg);font-weight:700;text-align:center}
+.ph{font-size:12px;color:var(--mut)}
+.hid .nm{text-decoration:line-through;opacity:.45}
+.mv{font-size:10px;color:var(--blue);display:block;line-height:1}
+.x{opacity:0;cursor:pointer;color:#c33;font-size:12px;padding:0 3px}
+.row:hover .x{opacity:1}
+.free{display:flex;gap:6px;align-items:center;margin-top:4px;font-size:13px}
+.free b{white-space:nowrap}.free [contenteditable]{flex:1;border-bottom:1px dotted var(--line);outline:none;min-height:18px}
+.free .cnt{font-weight:700}
+.help{color:var(--mut);font-size:12px;margin:4px 0 10px}
+.toast{position:fixed;bottom:14px;right:14px;background:var(--ink);color:#fff;padding:6px 12px;border-radius:6px;opacity:0;transition:opacity .2s}
+.toast.on{opacity:.92}
+@media (max-width:900px){.grid{grid-template-columns:1fr;grid-auto-flow:row;grid-template-rows:none}}
+@media print{
+ @page{size:A4 landscape;margin:7mm}
+ header,.help,.x,.toast{display:none}
+ body{background:#fff;font-size:11px}
+ main{padding:0}
+ .blk{border:0;padding:0}
+ .grid{grid-template-columns:repeat(3,1fr)!important;grid-auto-flow:column!important;grid-template-rows:repeat(3,auto)!important;gap:8px 8px}
+ .page{break-after:page}
+ .n,.tm,.bh .t,.bh.day,.title,.nm.g,.nm.r{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<header>
+ <div class="bar">
+  <h1>Бланки групп</h1>
+  <button id="refresh" title="Подтянуть свежие данные из МойКласса">Обновить из МойКласса</button>
+  <a class="btn" href="/api/blank-grupp/xlsx">Скачать Excel</a>
+  <button onclick="window.print()">Печать</button>
+  <span class="st" id="st"></span>
+ </div>
+ <div class="tabs" id="tabs"></div>
+</header>
+<main id="main"><p>Загружаю списки из МойКласса… (первый раз до 2 минут)</p></main>
+<div class="toast" id="toast"></div>
+<datalist id="dd"></datalist>
+<script>
+const $=s=>document.querySelector(s);
+let M=null, cur=localStorage.getItem('blank_grupp_tab')||'';
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),1400)}
+async function save(k,v){
+  try{const r=await fetch('/api/blank-grupp/edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({k,v})});
+   if(!r.ok)throw 0;toast('Сохранено')}catch(e){toast('Не сохранилось — проверьте связь')}
+}
+async function load(force){
+  $('#st').textContent=force?'Обновляю из МойКласса…':'Загружаю…';
+  const r=await fetch('/api/blank-grupp'+(force?'?refresh=1':''));const d=await r.json();
+  if(!d.model){$('#main').innerHTML='<p>'+(d.err||'Данные ещё загружаются, обновите страницу через минуту.')+'</p>';$('#st').textContent='';return}
+  M=d.model;
+  $('#dd').innerHTML=M.days_choices.map(x=>`<option value="${x}">`).join('');
+  $('#st').textContent='Из МойКласса: '+M.built+(d.busy?' · обновляется…':'');
+  if(!M.tabs.find(t=>t.sheet===cur))cur=M.tabs[0].sheet;
+  tabs();draw();
+}
+function tabs(){
+  $('#tabs').innerHTML='';
+  M.tabs.forEach(t=>{const b=document.createElement('button');b.textContent=t.sheet;if(t.sheet===cur)b.className='on';
+   b.onclick=()=>{cur=t.sheet;localStorage.setItem('blank_grupp_tab',cur);tabs();draw()};$('#tabs').appendChild(b)});
+}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function draw(){
+  const t=M.tabs.find(x=>x.sheet===cur);const main=$('#main');main.innerHTML='';
+  const h=document.createElement('div');h.className='title';h.textContent=t.title;main.appendChild(h);
+  const hp=document.createElement('div');hp.className='help';
+  hp.textContent='Клик по номеру — отметка оплаты (зелёный → красный → без цвета). Номер можно перетащить в другую группу. Всё, что вписываете, сохраняется сразу и видно всем админам. ✕ — зачеркнуть (ушёл), повторно — вернуть.';
+  main.appendChild(hp);
+  for(let p=0;p<t.blocks.length;p+=9){
+    const g=document.createElement('div');g.className='grid page';
+    t.blocks.slice(p,p+9).forEach((b,i)=>g.appendChild(block(b,i)));main.appendChild(g);
+  }
+}
+function block(b,i){
+  const col=Math.floor(i/3)===1?'var(--green)':'var(--blue)';
+  const el=document.createElement('div');el.className='blk';el.style.setProperty('--c',col);el.dataset.key=b.key;
+  if(b.kind==='indiv'){
+    el.innerHTML=`<div class="bh day">${esc(b.header)}</div>`;
+    let n=1;
+    for(let j=0;j<5;j++){const s=b.slots[j];
+      const r1=document.createElement('div');r1.className='row ind';
+      const r2=document.createElement('div');r2.className='row ind';
+      if(s){
+        const kids=s.kids.map(k=>k.name).join(', ');
+        r1.innerHTML=`<div class="n">${n}</div><div class="nm ${s.color||''}"><span contenteditable data-k="${s.ck}:note">${esc(s.note||kids)}</span></div><div class="tm">${esc(s.time)}</div><div class="bd">${esc(s.kids[0]?.bd||'')}</div>`;
+        r2.innerHTML=`<div class="n">${n+1}</div><div class="ph">${esc(s.kids.map(k=>k.phone).filter(Boolean).join(', '))}</div><div></div><div></div>`;
+        r1.querySelector('.n').onclick=()=>{s.color=cyc(s.color);r1.querySelector('.nm').className='nm '+(s.color||'');save(s.ck+':color',s.color)};
+      }else{r1.innerHTML=`<div class="n">${n}</div><div></div><div></div><div></div>`;r2.innerHTML=`<div class="n">${n+1}</div><div></div><div></div><div></div>`}
+      el.appendChild(r1);el.appendChild(r2);n+=2;
+    }
+    bindEdits(el);return el;
+  }
+  const cap=b.kind==='group'?(b.cap||10):10;
+  let hd;
+  if(b.kind==='group'){hd=`<div class="bh"><span>${esc(b.header.replace(b.time,'').replace(/\s+/,' '))}</span>${b.time?`<span class="t">${esc(b.time)}</span>`:''}<span class="cap">мест ${cap}</span></div>`}
+  else hd=`<div class="bh day">${esc(b.header)}</div>`;
+  el.innerHTML=hd;
+  const kids=b.kids, man=b.manual||[];
+  const rows=Math.max(10,kids.length+man.length+1);
+  for(let j=0;j<rows;j++){
+    const r=document.createElement('div');r.className='row';
+    if(j<kids.length){const k=kids[j];
+      if(k.hidden)r.classList.add('hid');
+      r.innerHTML=`<div class="n" draggable="true">${j+1}</div>
+       <div class="nm ${k.color||''}"><span contenteditable data-k="${k.ck}:name">${esc(k.name)}</span>${k.moved_from?`<span class="mv">↪ из ${esc(k.moved_from)}</span>`:''}${b.kind==='wait'&&k.note?`<span class="mv">${esc(k.note)}</span>`:''}</div>
+       <input list="dd" value="${esc(b.kind==='wait'?(k.age?k.age+' г.':''):k.days)}" data-k="${k.ck}:days" ${b.kind==='wait'?'readonly':''}>
+       <div class="bd">${esc(k.bd)}</div>
+       <div class="mk"><span contenteditable data-k="${k.ck}:mark">${esc(k.mark)}</span><span class="x" title="Зачеркнуть / вернуть">✕</span></div>`;
+      const n=r.querySelector('.n');
+      n.onclick=()=>{k.color=cyc(k.color);r.querySelector('.nm').className='nm '+(k.color||'');save(k.ck+':color',k.color)};
+      n.ondragstart=e=>{e.dataTransfer.setData('text/plain',JSON.stringify({ck:k.ck,from:b.key}))};
+      r.querySelector('.x').onclick=()=>{k.hidden=!k.hidden;r.classList.toggle('hid');save(k.ck+':hide',k.hidden?'1':'')};
+    }else{const mi=j-kids.length;const m=man[mi]||{};
+      r.innerHTML=`<div class="n">${j+1}</div>
+       <div class="nm ${m.color||''}"><span contenteditable data-m="name">${esc(m.name||'')}</span></div>
+       <input list="dd" value="${esc(m.days||'')}" data-m="days">
+       <div class="bd"><span contenteditable data-m="bd">${esc(m.bd||'')}</span></div>
+       <div class="mk"><span contenteditable data-m="mark">${esc(m.mark||'')}</span></div>`;
+      r.querySelectorAll('[data-m]').forEach(e=>{const f=e.dataset.m;const ev=e.tagName==='INPUT'?'change':'blur';
+        e.addEventListener(ev,()=>{const v=(e.value??e.innerText).trim();while(man.length<=mi)man.push({});man[mi][f]=v;
+          const clean=man.filter(x=>Object.values(x).some(Boolean));b.manual=clean;save(`b:${b.key}:manual`,clean.length?JSON.stringify(clean):'')})});
+      r.querySelector('.n').onclick=()=>{if(!man[mi])return;man[mi].color=cyc(man[mi].color);r.querySelector('.nm').className='nm '+(man[mi].color||'');save(`b:${b.key}:manual`,JSON.stringify(man))};
+    }
+    el.appendChild(r);
+  }
+  if(b.kind==='group'){
+    const busy=kids.filter(k=>!k.hidden).length+man.filter(x=>x.name).length;
+    const f=document.createElement('div');f.className='free';
+    f.innerHTML=`<b>Свободно:</b><span contenteditable data-k="b:${b.key}:free">${esc(b.free||'')}</span><span class="cnt" title="мест по МойКлассу минус дети в списке">${Math.max(0,cap-busy)}</span>`;
+    el.appendChild(f);
+  }
+  el.ondragover=e=>{e.preventDefault();el.classList.add('drop')};
+  el.ondragleave=()=>el.classList.remove('drop');
+  el.ondrop=async e=>{e.preventDefault();el.classList.remove('drop');
+    try{const d=JSON.parse(e.dataTransfer.getData('text/plain'));if(d.from===b.key)return;
+      const home=d.ck.split(':')[1];await save(d.ck+':move',b.key===home?'':b.key);load(false)}catch(_){}};
+  bindEdits(el);return el;
+}
+function cyc(c){return c==='g'?'r':c==='r'?'':'g'}
+function bindEdits(el){
+  el.querySelectorAll('[data-k]').forEach(e=>{
+    const ev=e.tagName==='INPUT'?'change':'blur';const was=()=>e.tagName==='INPUT'?e.value:e.innerText;let old=was();
+    e.addEventListener(ev,()=>{const v=was().trim();if(v===old.trim())return;old=v;save(e.dataset.k,v)});
+    if(e.isContentEditable)e.addEventListener('keydown',x=>{if(x.key==='Enter'){x.preventDefault();e.blur()}});
+  });
+}
+$('#refresh').onclick=()=>load(true);
+load(false);
+setInterval(()=>{if(!document.querySelector(':focus'))load(false)},10*60*1000);
+</script>
+</body>
+</html>
