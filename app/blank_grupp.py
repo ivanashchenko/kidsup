@@ -637,11 +637,11 @@ def xlsx_bytes() -> bytes:
 
 
 def _paint(path: str, m: dict) -> None:
-    """Зелёный/красный фон ФИО — как отметила администратор на странице."""
+    """Фон ФИО — как отметила администратор: зелёный оплатили, жёлтый ссылка выслана, красный не оплатили."""
     from openpyxl import load_workbook
     from openpyxl.styles import PatternFill
     wb = load_workbook(path)
-    col = {"g": "C6EFCE", "r": "FFC7CE"}
+    col = {"g": "C6EFCE", "y": "FFEB9C", "r": "FFC7CE"}
     for t in m["tabs"]:
         ws = wb[t["sheet"]]
         N = t["slots"]

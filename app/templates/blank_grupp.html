@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Бланки групп KidsUP</title>
 <style>
-:root{--blue:#2E86DE;--green:#3BAA35;--lg:#D9F2D0;--pink:#F9C9DD;--ink:#1f2340;--mut:#6b6f86;--line:#e3e5ee;--bg:#f6f7fb;--paid:#C6EFCE;--unpaid:#FFC7CE}
+:root{--blue:#2E86DE;--green:#3BAA35;--lg:#D9F2D0;--pink:#F9C9DD;--ink:#1f2340;--mut:#6b6f86;--line:#e3e5ee;--bg:#f6f7fb;--paid:#C6EFCE;--link:#FFEB9C;--unpaid:#FFC7CE}
 *{box-sizing:border-box}
 body{margin:0;font:14px/1.3 Calibri,Arial,sans-serif;color:var(--ink);background:var(--bg)}
 header{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:8px 12px}
@@ -33,7 +33,7 @@ main{padding:12px}
 .row [contenteditable],.row input{outline:none;border:0;background:transparent;font:inherit;padding:1px 3px;min-width:0}
 .row [contenteditable]:focus,.row input:focus{background:#fffbe6}
 .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
-.nm.g{background:var(--paid)}.nm.r{background:var(--unpaid)}
+.nm.g{background:var(--paid)}.nm.y{background:var(--link)}.nm.r{background:var(--unpaid)}
 .bd{font-size:11px;color:var(--mut)}
 .mk{font-size:11px;text-align:center;white-space:nowrap}
 .tm{background:var(--lg);font-weight:700;text-align:center}
@@ -57,7 +57,7 @@ main{padding:12px}
  .blk{border:0;padding:0}
  .grid{grid-template-columns:repeat(3,1fr)!important;grid-auto-flow:column!important;grid-template-rows:repeat(3,auto)!important;gap:8px 8px}
  .page{break-after:page}
- .n,.tm,.bh .t,.bh.day,.title,.nm.g,.nm.r{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .n,.tm,.bh .t,.bh.day,.title,.nm.g,.nm.y,.nm.r{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 </style>
 </head>
@@ -103,7 +103,7 @@ function draw(){
   const t=M.tabs.find(x=>x.sheet===cur);const main=$('#main');main.innerHTML='';
   const h=document.createElement('div');h.className='title';h.textContent=t.title;main.appendChild(h);
   const hp=document.createElement('div');hp.className='help';
-  hp.textContent='Клик по номеру — отметка оплаты (зелёный → красный → без цвета). Номер можно перетащить в другую группу. Всё, что вписываете, сохраняется сразу и видно всем админам. ✕ — зачеркнуть (ушёл), повторно — вернуть.';
+  hp.textContent='Клик по номеру — отметка оплаты: зелёный — оплатили, жёлтый — выслали ссылку, ещё не оплатили, красный — не оплатили, ещё клик — без цвета. Номер можно перетащить в другую группу. Всё, что вписываете, сохраняется сразу и видно всем админам. ✕ — зачеркнуть (ушёл), повторно — вернуть.';
   main.appendChild(hp);
   for(let p=0;p<t.blocks.length;p+=9){
     const g=document.createElement('div');g.className='grid page';
@@ -175,7 +175,7 @@ function block(b,i){
       const home=d.ck.split(':')[1];await save(d.ck+':move',b.key===home?'':b.key);load(false)}catch(_){}};
   bindEdits(el);return el;
 }
-function cyc(c){return c==='g'?'r':c==='r'?'':'g'}
+function cyc(c){return c==='g'?'y':c==='y'?'r':c==='r'?'':'g'}
 function bindEdits(el){
   el.querySelectorAll('[data-k]').forEach(e=>{
     const ev=e.tagName==='INPUT'?'change':'blur';const was=()=>e.tagName==='INPUT'?e.value:e.innerText;let old=was();
