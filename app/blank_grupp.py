@@ -477,7 +477,13 @@ def to_xlsx(model: dict, path: str) -> None:
             if b["kind"] == "group":
                 for i, k in enumerate(b["kids"][:N]):
                     rr = top + 1 + i
-                    ws.cell(rr, c0 + 1, k["name"])
+                    nm = ("⚠ " if k.get("risk") else "") + k["name"]
+                    tr = k.get("trial") or {}
+                    if tr.get("date"):
+                        nm += f" · пробн. {tr['date']}" + (" ✓" if tr.get("came") else "") + (" купил" if tr.get("bought") else "")
+                    nc = ws.cell(rr, c0 + 1, nm)
+                    if PAY_FILL.get(k.get("color")):
+                        nc.fill = fill(PAY_FILL[k["color"]])
                     ws.cell(rr, c0 + 2, k["days"])
                     d = ws.cell(rr, c0 + 3, k["bd"])
                     d.font = Font(name=FONT, size=9)
@@ -519,7 +525,48 @@ def to_xlsx(model: dict, path: str) -> None:
         ws.page_margins.left = ws.page_margins.right = 0.25
         ws.page_margins.top = ws.page_margins.bottom = 0.3
         ws.print_title_rows = "1:1"
+    _sheet_zvonit(wb, model, fill, Font, Alignment, FONT)
     wb.save(path)
+
+
+PAY_FILL = {"g": "C6EFCE", "y": "FFEB9C", "r": "FFC7CE"}
+
+
+def _sheet_zvonit(wb, model, fill, Font, Alignment, FONT):
+    """Лист «Позвонить»: «уходит молча» (⚠) и не оплатившие месяц — по педагогам и группам."""
+    ws = wb.create_sheet("Позвонить", 0)
+    mon = model.get("pay_month") or ""
+    ws.cell(1, 1, f"Позвонить: ⚠ уходят молча и не оплатили {mon}").font = Font(name=FONT, size=13, bold=True)
+    ws.cell(2, 1, f"из МойКласса {model.get('built', '')} · сначала ⚠, потом красные; после разговора — комментарий в карточку").font = Font(name=FONT, size=9, italic=True, color="666666")
+    hdr = ["Педагог", "Группа", "Ребёнок", "Что", "Оплата", "Итог разговора"]
+    for i, h in enumerate(hdr):
+        c = ws.cell(4, i + 1, h)
+        c.font = Font(name=FONT, size=11, bold=True)
+    for i, w in enumerate([24, 34, 26, 40, 34, 30]):
+        ws.column_dimensions[_col(i + 1)].width = w
+    rows = []
+    for tab in model.get("tabs", []):
+        for b in tab.get("blocks", []):
+            if b.get("kind") != "group":
+                continue
+            for k in b.get("kids", []):
+                if k.get("risk") or k.get("color") == "r":
+                    rows.append((0 if k.get("risk") else 1, tab.get("title", ""), b.get("header") or "",
+                                 k["name"], k.get("risk", ""), k.get("pay", ""), k.get("color", "")))
+    rows.sort(key=lambda r: (r[0], r[1], r[2], r[3]))
+    for j, r in enumerate(rows):
+        rr = 5 + j
+        for i, v in enumerate(r[1:6]):
+            c = ws.cell(rr, i + 1, ("⚠ " if i == 2 and r[0] == 0 else "") + str(v))
+            c.font = Font(name=FONT, size=10)
+            c.alignment = Alignment(wrap_text=True, vertical="top")
+        if PAY_FILL.get(r[6]):
+            ws.cell(rr, 3).fill = fill(PAY_FILL[r[6]])
+    ws.freeze_panes = "A5"
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
 
 
 def _col(n: int) -> str:
