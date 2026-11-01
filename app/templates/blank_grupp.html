@@ -46,6 +46,18 @@ main{padding:12px}
 .free b{white-space:nowrap}.free [contenteditable]{flex:1;border-bottom:1px dotted var(--line);outline:none;min-height:18px}
 .free .cnt{font-weight:700}
 .help{color:var(--mut);font-size:12px;margin:4px 0 10px}
+.sum{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.sum details{background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px;max-width:100%}
+.sum summary{cursor:pointer;font-weight:700}
+.sum ul{margin:6px 0 0;padding-left:18px}.sum li{margin:2px 0}
+.sum .r{color:#b3261e}.sum .w{color:#a15c00}.sum .p{color:#1d6fb8}
+.rk{color:#b3261e;font-weight:700;cursor:help;margin-left:3px}
+.tr{font-size:10px;line-height:1.1;display:block;color:#1d6fb8}
+.tr.no{color:#b3261e}.tr.ok{color:#2e7d32}
+.fr{margin-top:6px;font-size:12px;border-top:1px dashed var(--line);padding-top:4px}
+.fr b{display:block;margin-bottom:2px}
+.lg{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lg i{display:inline-block;width:12px;height:12px;border:1px solid #ccc;vertical-align:-2px;margin-right:3px}
 .toast{position:fixed;bottom:14px;right:14px;background:var(--ink);color:#fff;padding:6px 12px;border-radius:6px;opacity:0;transition:opacity .2s}
 .toast.on{opacity:.92}
 @media (max-width:900px){.grid{grid-template-columns:1fr;grid-auto-flow:row;grid-template-rows:none}}
@@ -57,6 +69,7 @@ main{padding:12px}
  .blk{border:0;padding:0}
  .grid{grid-template-columns:repeat(3,1fr)!important;grid-auto-flow:column!important;grid-template-rows:repeat(3,auto)!important;gap:8px 8px}
  .page{break-after:page}
+ .sum{display:none}
  .n,.tm,.bh .t,.bh.day,.title,.nm.g,.nm.y,.nm.r{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 </style>
@@ -103,13 +116,34 @@ function draw(){
   const t=M.tabs.find(x=>x.sheet===cur);const main=$('#main');main.innerHTML='';
   const h=document.createElement('div');h.className='title';h.textContent=t.title;main.appendChild(h);
   const hp=document.createElement('div');hp.className='help';
-  hp.textContent='Клик по номеру — отметка оплаты: зелёный — оплатили, жёлтый — выслали ссылку, ещё не оплатили, красный — не оплатили, ещё клик — без цвета. Номер можно перетащить в другую группу. Всё, что вписываете, сохраняется сразу и видно всем админам. ✕ — зачеркнуть (ушёл), повторно — вернуть.';
+  const mon=M.pay_month||'месяц';
+  hp.innerHTML=`<span class="lg">Цвет имени — оплата за ${esc(mon)} по МойКлассу, сам: <span><i style="background:var(--paid)"></i>оплачен</span><span><i style="background:var(--link)"></i>оплачен частично</span><span><i style="background:var(--unpaid)"></i>не оплачен</span></span><br>
+   Наведите на имя — увидите подробности. <b class="rk">⚠</b> — «уходит молча»: 2 пропуска подряд или абонемент кончается, а нового нет; позвонить до того, как семья уйдёт. Синяя строчка под именем — пробное: дата, пришёл ли, купил ли.<br>
+   Клик по номеру — поставить цвет вручную (зелёный → жёлтый «выслали ссылку» → красный → без цвета → снова как в МойКлассе). Номер можно перетащить в другую группу. ✕ — зачеркнуть (ушёл), повторно — вернуть. Всё сохраняется сразу и видно всем админам.`;
   main.appendChild(hp);
+  main.appendChild(summary(t));
   for(let p=0;p<t.blocks.length;p+=9){
     const g=document.createElement('div');g.className='grid page';
     t.blocks.slice(p,p+9).forEach((b,i)=>g.appendChild(block(b,i)));main.appendChild(g);
   }
 }
+function allKids(t){const out=[];t.blocks.forEach(b=>{if(b.kind==='group')(b.kids||[]).forEach(k=>{if(!k.hidden)out.push([b,k])})});return out}
+function gname(b){return b.header.replace(/\s+/g,' ').trim()}
+function summary(t){
+  const box=document.createElement('div');box.className='sum';
+  const all=allKids(t);
+  const risk=all.filter(([b,k])=>k.risk);
+  const unpaid=all.filter(([b,k])=>k.color==='r'&&k.status===2);
+  const tri=all.filter(([b,k])=>k.trial);
+  const li=(arr,f)=>arr.map(([b,k])=>`<li>${esc(k.name)} — ${esc(gname(b))}${f?': '+esc(f(k)):''}</li>`).join('');
+  let h='';
+  h+=`<details ${risk.length?'open':''}><summary class="r">⚠ Уходят молча: ${risk.length}</summary><ul>${li(risk,k=>k.risk)||'<li>никого</li>'}</ul></details>`;
+  h+=`<details><summary class="w">Не оплатили ${esc(M.pay_month||'месяц')}: ${unpaid.length}</summary><ul>${li(unpaid,k=>k.pay)||'<li>все оплатили</li>'}</ul></details>`;
+  const came=tri.filter(([b,k])=>k.trial.came===true).length, bought=tri.filter(([b,k])=>k.trial.bought).length;
+  h+=`<details><summary class="p">Пробные: ${tri.length} · пришли ${came} · купили ${bought}</summary><ul>${li(tri,k=>trialTxt(k.trial))||'<li>нет</li>'}</ul></details>`;
+  box.innerHTML=h;return box;
+}
+function trialTxt(tr){const c=tr.came===true?'пришёл':tr.came===false?'не пришёл':'ждём';return `пробное ${tr.date||'—'} · ${c}${tr.came===true||tr.bought?(tr.bought?' · купил':' · не купил'):''}`}
 function block(b,i){
   const col=Math.floor(i/3)===1?'var(--green)':'var(--blue)';
   const el=document.createElement('div');el.className='blk';el.style.setProperty('--c',col);el.dataset.key=b.key;
@@ -141,12 +175,14 @@ function block(b,i){
     if(j<kids.length){const k=kids[j];
       if(k.hidden)r.classList.add('hid');
       r.innerHTML=`<div class="n" draggable="true">${j+1}</div>
-       <div class="nm ${k.color||''}"><span contenteditable data-k="${k.ck}:name">${esc(k.name)}</span>${k.moved_from?`<span class="mv">↪ из ${esc(k.moved_from)}</span>`:''}${b.kind==='wait'&&k.note?`<span class="mv">${esc(k.note)}</span>`:''}</div>
+       <div class="nm ${k.color||''}" title="${esc(k.pay||'')}${k.risk?' · ⚠ '+esc(k.risk):''}"><span contenteditable data-k="${k.ck}:name">${esc(k.name)}</span>${k.risk?`<span class="rk" title="${esc(k.risk)}">⚠</span>`:''}${k.trial?`<span class="tr ${k.trial.came===false||(k.trial.came&&!k.trial.bought)?'no':k.trial.bought?'ok':''}">${esc(trialTxt(k.trial))}</span>`:''}${k.moved_from?`<span class="mv">↪ из ${esc(k.moved_from)}</span>`:''}${b.kind==='wait'&&k.note?`<span class="mv">${esc(k.note)}</span>`:''}</div>
        <input list="dd" value="${esc(b.kind==='wait'?(k.age?k.age+' г.':''):k.days)}" data-k="${k.ck}:days" ${b.kind==='wait'?'readonly':''}>
        <div class="bd">${esc(k.bd)}</div>
        <div class="mk"><span contenteditable data-k="${k.ck}:mark">${esc(k.mark)}</span><span class="x" title="Зачеркнуть / вернуть">✕</span></div>`;
       const n=r.querySelector('.n');
-      n.onclick=()=>{k.color=cyc(k.color);r.querySelector('.nm').className='nm '+(k.color||'');save(k.ck+':color',k.color)};
+      n.onclick=()=>{const cur=k.manual_color?(k.color||'-'):'';const nx=cyc2(cur);k.manual_color=!!nx;
+        k.color=nx===''?(k.auto_color||''):nx==='-'?'':nx;r.querySelector('.nm').className='nm '+(k.color||'');save(k.ck+':color',nx);
+        toast(nx===''?'Цвет снова из МойКласса':'Цвет поставлен вручную')};
       n.ondragstart=e=>{e.dataTransfer.setData('text/plain',JSON.stringify({ck:k.ck,from:b.key}))};
       r.querySelector('.x').onclick=()=>{k.hidden=!k.hidden;r.classList.toggle('hid');save(k.ck+':hide',k.hidden?'1':'')};
     }else{const mi=j-kids.length;const m=man[mi]||{};
@@ -168,6 +204,13 @@ function block(b,i){
     f.innerHTML=`<b>Свободно:</b><span contenteditable data-k="b:${b.key}:free">${esc(b.free||'')}</span><span class="cnt" title="мест по МойКлассу минус дети в списке">${Math.max(0,cap-busy)}</span>`;
     el.appendChild(f);
   }
+  if(b.kind==='wait'){
+    const t=M.tabs.find(x=>x.sheet===cur);
+    const fr=t.blocks.filter(x=>x.kind==='group').map(x=>{const busy=(x.kids||[]).filter(k=>!k.hidden).length+(x.manual||[]).filter(m=>m.name).length;return [x,Math.max(0,(x.cap||10)-busy)]}).filter(([x,n])=>n>0);
+    const f=document.createElement('div');f.className='fr';
+    f.innerHTML=`<b>Свободные места — кого из листа звать:</b>${fr.length?fr.map(([x,n])=>`${esc(gname(x))} — <b style="display:inline">${n}</b>`).join('<br>'):'свободных мест нет'}`;
+    el.appendChild(f);
+  }
   el.ondragover=e=>{e.preventDefault();el.classList.add('drop')};
   el.ondragleave=()=>el.classList.remove('drop');
   el.ondrop=async e=>{e.preventDefault();el.classList.remove('drop');
@@ -176,6 +219,7 @@ function block(b,i){
   bindEdits(el);return el;
 }
 function cyc(c){return c==='g'?'y':c==='y'?'r':c==='r'?'':'g'}
+function cyc2(c){return c===''?'g':c==='g'?'y':c==='y'?'r':c==='r'?'-':''}
 function bindEdits(el){
   el.querySelectorAll('[data-k]').forEach(e=>{
     const ev=e.tagName==='INPUT'?'change':'blur';const was=()=>e.tagName==='INPUT'?e.value:e.innerText;let old=was();

@@ -126,9 +126,40 @@ def _first_name(full: str) -> str:
     return (full or "").split()[0] if full else ""
 
 
+def _d(x):
+    try:
+        return dt.date.fromisoformat(str(x)[:10])
+    except Exception:
+        return None
+
+
+def pay_month(today: dt.date) -> tuple[dt.date, dt.date]:
+    """Месяц, оплату которого показываем: текущий, а с 25-го — следующий."""
+    first = today.replace(day=1)
+    if today.day >= 25:
+        first = (first + dt.timedelta(days=32)).replace(day=1)
+    last = (first + dt.timedelta(days=32)).replace(day=1) - dt.timedelta(days=1)
+    return first, last
+
+
+MONTHS_RU = ["", "январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август",
+             "сентябрь", "октябрь", "ноябрь", "декабрь"]
+
+
 def build_model(meta: dict, lessons: list, joins: list, users: dict,
-                today: dt.date | None = None) -> dict:
+                today: dt.date | None = None, subs: list | None = None) -> dict:
     today = today or dt.date.today()
+    m0, m1 = pay_month(today)
+    # абонементы: userId -> [{cids, begin, end, price, payed, left}]
+    subs_by_u: dict = defaultdict(list)
+    for x in subs or []:
+        b, e = _d(x.get("beginDate")), _d(x.get("endDate"))
+        if not b or not e:
+            continue
+        cids = set(x.get("classIds") or []) | ({x["mainClassId"]} if x.get("mainClassId") else set())
+        vc, vd = x.get("visitCount") or 0, x.get("visitedCount") or 0
+        subs_by_u[x.get("userId")].append({"cids": cids, "b": b, "e": e, "price": x.get("price") or 0,
+                                           "payed": x.get("payed") or 0, "left": (vc - vd) if vc else 99})
     classes = {c["id"]: c for c in _list(meta.get("classes"), "classes")}
     courses = {c["id"]: c["name"] for c in _list(meta.get("courses"), "courses")}
     managers = {m["id"]: m["name"] for m in _list(meta.get("managers"), "managers")}
@@ -139,6 +170,7 @@ def build_model(meta: dict, lessons: list, joins: list, users: dict,
     tcount: dict[int, Counter] = defaultdict(Counter)
     cdays: dict[int, set] = defaultdict(set)
     recs: dict[tuple, list] = defaultdict(list)       # (classId, userId) -> [(date, test)]
+    visits: dict[tuple, list] = defaultdict(list)     # (classId, userId) -> [(date, visit, held, test)]
     for l in lessons:
         cid = l.get("classId")
         for t in l.get("teacherIds") or []:
@@ -148,8 +180,10 @@ def build_model(meta: dict, lessons: list, joins: list, users: dict,
         except Exception:
             continue
         cdays[cid].add(d.weekday())
+        held = l.get("status") == 1
         for r in l.get("records") or []:
             recs[(cid, r.get("userId"))].append((d, bool(r.get("test"))))
+            visits[(cid, r.get("userId"))].append((d, bool(r.get("visit")), held, bool(r.get("test"))))
     by_first = defaultdict(set)
     for name in managers.values():
         by_first[_first_name(name)].add(name)
@@ -190,10 +224,63 @@ def build_model(meta: dict, lessons: list, joins: list, users: dict,
         elif st in (58132, 58131) or tests:
             mark = "п" + (f" ({tests[0].strftime('%d.%m')})" if tests else "")
         bd = _bd(u)
-        return {"uid": uid, "name": name, "days": days,
-                "bd": dt.date.fromisoformat(bd).strftime("%d.%m.%y") if bd else "",
-                "age": _age(bd, today), "phone": _phone(u.get("phone")), "mark": mark,
-                "status": st}
+        k = {"uid": uid, "name": name, "days": days,
+             "bd": dt.date.fromisoformat(bd).strftime("%d.%m.%y") if bd else "",
+             "age": _age(bd, today), "phone": _phone(u.get("phone")), "mark": mark,
+             "status": st}
+        if subs is not None:
+            k.update(_money(uid, cid, st, sorted(visits.get((cid, uid), []))))
+        return k
+
+    def _money(uid, cid, st, vis):
+        """Оплата месяца (цвет), тревога «уходит молча», пробное — всё из МойКласса."""
+        out = {}
+        mine = [x for x in subs_by_u.get(uid, []) if not x["cids"] or cid in x["cids"]]
+        # пробное: дата, пришёл ли, купил ли
+        tests = [v for v in vis if v[3]]
+        if st in (58132, 58131) or tests:
+            td = tests[0][0] if tests else None
+            came = None
+            if tests and td <= today and (tests[0][2] or tests[0][1]):
+                came = tests[0][1]
+            since = (td or today) - dt.timedelta(days=3)
+            bought = any(x["payed"] > 0 and x["b"] >= since and (x["left"] > 1 or x["price"] > 3000)
+                         for x in mine)
+            out["trial"] = {"date": td.strftime("%d.%m") if td else "", "came": came, "bought": bought}
+        if st != 2:          # пробники и отработки — без цвета оплаты
+            return out
+        # оплата месяца: абонемент на этот месяц (начат не раньше чем за неделю до 1-го)
+        # или длинный, который покрывает почти весь месяц и в нём ещё есть занятия
+        cov = [x for x in mine if x["b"] <= m1 and x["e"] >= m0 and
+               (x["b"] >= m0 - dt.timedelta(days=7) or (x["e"] >= m0 + dt.timedelta(days=20) and x["left"] > 0))]
+        price = sum(x["price"] for x in cov)
+        payed = sum(x["payed"] for x in cov)
+        if cov and payed >= price - 1:
+            out["pay"], out["auto_color"] = "оплачен", "g"
+        elif cov and payed > 0:
+            out["pay"], out["auto_color"] = f"оплачено {int(payed)} из {int(price)}", "y"
+        elif cov:
+            out["pay"], out["auto_color"] = "абонемент без оплаты", "r"
+        else:
+            prev = [x for x in mine if x["payed"] > 0 and x["e"] >= m0]
+            out["pay"] = (f"оплачено до {max(x['e'] for x in prev).strftime('%d.%m')}, за месяц — нет"
+                          if prev else "за месяц не оплачено")
+            out["auto_color"] = "r"
+        # уходит молча: 2 последних проведённых занятия — пропуски
+        held = [v for v in vis if v[2] and v[0] < today]
+        why = []
+        if len(held) >= 2 and not held[-1][1] and not held[-2][1]:
+            why.append(f"2 пропуска подряд (последний {held[-1][0].strftime('%d.%m')})")
+        # абонемент кончается и нового нет
+        now = [x for x in mine if x["b"] <= today <= x["e"]]
+        if now:
+            end = max(x["e"] for x in now)
+            nxt = any(x["b"] > today and x["b"] >= end - dt.timedelta(days=3) for x in mine)
+            if end <= today + dt.timedelta(days=7) and not nxt:
+                why.append(f"абонемент до {end.strftime('%d.%m')}, продления нет")
+        if why:
+            out["risk"] = "; ".join(why)
+        return out
 
     in_class = defaultdict(list)
     waiting_by_course = defaultdict(list)
@@ -319,7 +406,7 @@ def build_model(meta: dict, lessons: list, joins: list, users: dict,
         if seen_names[t["sheet"]] > 1:
             t["sheet"] = t["sheet"][:28] + f" {seen_names[t['sheet']]}"
     return {"built": dt.datetime.now().strftime("%d.%m.%Y %H:%M"), "tabs": out,
-            "days_choices": DAYS_CHOICES}
+            "days_choices": DAYS_CHOICES, "pay_month": MONTHS_RU[m0.month] if subs is not None else ""}
 
 
 # ---------------------------------------------------------------- Excel
@@ -498,7 +585,7 @@ def _fetch_live() -> dict:
         "managers": _items(mk.get("/v1/company/managers"), "managers"),
     }
     today = dt.date.today()
-    d0, d1 = (today - dt.timedelta(days=7)).isoformat(), (today + dt.timedelta(days=14)).isoformat()
+    d0, d1 = (today - dt.timedelta(days=28)).isoformat(), (today + dt.timedelta(days=14)).isoformat()
     lessons = mk.fetch_all("/v1/company/lessons", ["lessons"], {"date": [d0, d1], "includeRecords": "true"})
     opened = {c["id"] for c in meta["classes"] if c.get("status") == "opened"}
     joins = [j for j in mk.fetch_all("/v1/company/joins", ["joins"]) if j.get("classId") in opened]
@@ -521,7 +608,21 @@ def _fetch_live() -> dict:
             users[uid] = mk.get(f"/v1/company/users/{uid}")
         except Exception as e:  # карточка удалена и т. п.
             _log.warning("blank_grupp: user %s: %s", uid, e)
-    return build_model(meta, lessons, joins, users, today)
+    subs = []
+    try:
+        with db.get_conn() as c:
+            for r in c.execute("SELECT raw FROM user_subscriptions WHERE end_date >= ?",
+                               ((today - dt.timedelta(days=45)).isoformat(),)):
+                try:
+                    x = _json.loads(r["raw"] or "{}")
+                except Exception:
+                    continue
+                if x.get("userId") in uids:
+                    subs.append(x)
+    except Exception as e:      # без абонементов страница всё равно работает (без цветов оплаты)
+        _log.warning("blank_grupp: абонементы: %s", e)
+        subs = None
+    return build_model(meta, lessons, joins, users, today, subs)
 
 
 def _refresh():
@@ -579,9 +680,13 @@ def with_edits(m: dict) -> dict:
             for k in b["kids"]:
                 ck = f"u:{b['key']}:{k['uid']}"
                 k["ck"] = ck
+                k["color"] = k.get("auto_color", "")
                 for f in ("days", "mark", "color", "note", "name"):
                     if f"{ck}:{f}" in E:
                         k[f] = E[f"{ck}:{f}"]
+                if k["color"] == "-":           # админ сняла цвет вручную
+                    k["color"] = ""
+                k["manual_color"] = f"{ck}:color" in E
                 to = E.get(f"{ck}:move")
                 if E.get(f"{ck}:hide"):
                     k["hidden"] = True
