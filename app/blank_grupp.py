@@ -488,8 +488,8 @@ def to_xlsx(model: dict, path: str) -> None:
                 for i, k in enumerate(b["kids"][:N]):
                     rr = top + 1 + i
                     nc = ws.cell(rr, c0 + 1, k.get("name", ""))
-                    if PAY_FILL.get(k.get("color")):
-                        nc.fill = fill(PAY_FILL[k["color"]])
+                    if PAY_FILL.get(k.get("view")):
+                        nc.fill = fill(PAY_FILL[k["view"]])
                     ws.cell(rr, c0 + 2, k.get("days", ""))
                     m = ws.cell(rr, c0 + 4, k.get("mark", ""))
                     m.alignment = Alignment(horizontal="center", shrink_to_fit=True)
@@ -536,7 +536,7 @@ def to_xlsx(model: dict, path: str) -> None:
     wb.save(path)
 
 
-PAY_FILL = {"g": "C6EFCE", "y": "FFEB9C", "r": "FFC7CE"}
+PAY_FILL = {"g": "C6EFCE", "y": "FFEB9C", "r": "FFC7CE", "x": "C9A2FF"}
 
 
 def _sheet_zvonit(wb, model, Font, Alignment, FONT):
@@ -544,8 +544,8 @@ def _sheet_zvonit(wb, model, Font, Alignment, FONT):
     ws = wb.create_sheet("Позвонить", 0)
     mon = model.get("pay_month") or ""
     due = f" ({model['pay_due']})" if model.get("pay_due") else ""
-    ws.cell(1, 1, f"Проверка по МойКлассу: уходят молча и не оплатили {mon}{due}").font = Font(name=FONT, size=13, bold=True)
-    ws.cell(2, 1, f"выгружено {model.get('built', '')} · сначала «уходят молча», потом оплаты; "
+    ws.cell(1, 1, f"Проверка по МойКлассу: некорректные оплаты, уходят молча, не оплатили {mon}{due}").font = Font(name=FONT, size=13, bold=True)
+    ws.cell(2, 1, f"выгружено {model.get('built', '')} · сначала некорректные оплаты (в CRM есть, денег нет), потом «уходят молча», потом неоплаты; "
                   "кого знаете (болеет, уехал) — не звонить; после разговора — комментарий в карточку"
             ).font = Font(name=FONT, size=9, italic=True, color="666666")
     hdr = ["Педагог", "Группа", "Ребёнок", "Что", "Итог разговора"]
@@ -556,7 +556,7 @@ def _sheet_zvonit(wb, model, Font, Alignment, FONT):
     rows = []
     for tab in model.get("tabs", []):
         ch = tab.get("checks") or {}
-        for kind, lst in ((0, ch.get("risk", [])), (1, ch.get("unpaid", []))):
+        for kind, lst in ((0, ch.get("badpay", [])), (1, ch.get("risk", [])), (2, ch.get("unpaid", []))):
             for x in lst:
                 rows.append((kind, tab.get("title", ""), x["g"], x["name"], x["txt"]))
     rows.sort()
@@ -758,7 +758,7 @@ def _freeze(m: dict, E: dict) -> None:
             r = {"id": f"u{k['uid']}", "uid": k["uid"],
                  "name": E.get(f"{ck}:name", k["name"]) or f"(без имени, карточка {k['uid']})",
                  "days": E.get(f"{ck}:days", k["days"]), "mark": E.get(f"{ck}:mark", k["mark"]),
-                 "color": "" if color == "-" else color}
+                 "color": color}
             if f"{ck}:mark" not in E and ((k.get("trial") or {}).get("bought") or r["mark"] == "О"):
                 r["mark"] = ""
             to = E.get(f"{ck}:move")
@@ -844,14 +844,27 @@ def with_edits(m: dict) -> dict:
                     s["ck"] = f"b:{b['key']}:{s['time'].replace('.', '')}"
                     s["note"] = E.get(s["ck"] + ":note", "")
                     s["color"] = E.get(s["ck"] + ":color", "")
+    try:                                  # «некорректная оплата»: в CRM оплачено, денег в кассах нет
+        badpay = {int(k): v for k, v in _json.loads(E.get("b:badpay") or "{}").get("uids", {}).items()}
+    except Exception:
+        badpay = {}
+    m["badpay_at"] = (_json.loads(E.get("b:badpay") or "{}") or {}).get("at", "") if badpay else ""
     for t in m["tabs"]:
-        t["checks"] = _checks(t, in_blank, today)
+        t["checks"] = _checks(t, in_blank, today, badpay)
+        for b in t["blocks"]:
+            if b["kind"] == "group":
+                for r in b["kids"]:
+                    c = r.get("color") or r.get("auto", "")
+                    r["view"] = "" if c == "-" else c
     return m
 
 
-def _checks(t: dict, in_blank: dict, today: dt.date) -> dict:
-    """Расхождения бланка с МойКлассом — только для блоков вверху, в бланк ничего не пишем."""
-    ch = {"missing": [], "extra": [], "risk": [], "unpaid": [], "trials": []}
+def _checks(t: dict, in_blank: dict, today: dt.date, badpay: dict | None = None) -> dict:
+    """Расхождения бланка с МойКлассом для блоков вверху + цвет оплаты строки.
+    Цвет: ручной (админ) важнее автоматического; «-» — админ сняла цвет.
+    Автоматический: g оплачен, y частично, r не оплачен, x некорректная оплата."""
+    badpay = badpay or {}
+    ch = {"missing": [], "extra": [], "risk": [], "unpaid": [], "trials": [], "badpay": []}
     for b in t["blocks"]:
         if b["kind"] != "group":
             continue
@@ -880,13 +893,20 @@ def _checks(t: dict, in_blank: dict, today: dt.date) -> dict:
             if r.get("uid") and r["uid"] not in mk_by and id(r) not in linked:
                 ch["extra"].append({"g": g, "name": r.get("name", ""),
                                     "txt": "в бланке есть, в CRM в этой группе не числится"})
+        for r in rows:
+            r["auto"], r["pay"] = "", ""
         for uid, r in found.items():
             k = mk_by[uid]
             nm = r.get("name") or k["name"] or f"карточка {uid}"
+            if k.get("status") == 2:
+                r["auto"], r["pay"] = k.get("auto_color", ""), k.get("pay", "")
+            if uid in badpay:
+                r["auto"], r["pay"] = "x", badpay[uid]
+                ch["badpay"].append({"g": g, "name": nm, "txt": badpay[uid]})
             if k.get("risk"):
                 ch["risk"].append({"g": g, "name": nm, "txt": k["risk"]})
             if k.get("status") == 2 and k.get("auto_color") in ("r", "y"):
-                note = " · в бланке отмечен зелёным" if r.get("color") == "g" else ""
+                note = " · в бланке вручную отмечен зелёным" if r.get("color") == "g" else ""
                 ch["unpaid"].append({"g": g, "name": nm, "txt": (k.get("pay") or "") + note})
             tr = k.get("trial")
             has_p = "п" in (r.get("mark") or "").lower()
@@ -925,7 +945,7 @@ def row_op(p: dict) -> list:
             if f not in ("name", "days", "mark", "color") or row is None:
                 raise ValueError("bad field/row")
             v = clip(p.get("value"))
-            if f == "color" and v not in ("", "g", "y", "r"):
+            if f == "color" and v not in ("", "g", "y", "r", "-"):
                 raise ValueError("bad color")
             if f == "name" and not v:
                 rows.remove(row)

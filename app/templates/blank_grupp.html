@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Бланки групп KidsUP</title>
 <style>
-:root{--blue:#2E86DE;--green:#3BAA35;--lg:#D9F2D0;--pink:#F9C9DD;--ink:#1f2340;--mut:#6b6f86;--line:#e3e5ee;--bg:#f6f7fb;--paid:#C6EFCE;--link:#FFEB9C;--unpaid:#FFC7CE}
+:root{--blue:#2E86DE;--green:#3BAA35;--lg:#D9F2D0;--pink:#F9C9DD;--ink:#1f2340;--mut:#6b6f86;--line:#e3e5ee;--bg:#f6f7fb;--paid:#C6EFCE;--link:#FFEB9C;--unpaid:#FFC7CE;--bad:#C9A2FF}
 *{box-sizing:border-box}
 body{margin:0;font:14px/1.3 Calibri,Arial,sans-serif;color:var(--ink);background:var(--bg)}
 header{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:8px 12px}
@@ -36,6 +36,7 @@ main{padding:12px}
 .row input{font-size:13px;letter-spacing:-.2px}
 .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nm.g{background:var(--paid)}.nm.y{background:var(--link)}.nm.r{background:var(--unpaid)}
+.nm.x{background:var(--bad);font-weight:700;box-shadow:inset 0 0 0 2px #7b2cbf}
 .bd{font-size:11px;color:var(--mut);white-space:nowrap}
 .mk{font-size:11px;text-align:center;white-space:nowrap;overflow:hidden}
 .tm{background:var(--lg);font-weight:700;text-align:center}
@@ -54,7 +55,7 @@ main{padding:12px}
 .sum details{background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px;max-width:100%}
 .sum summary{cursor:pointer;font-weight:700}
 .sum ul{margin:6px 0 0;padding-left:18px}.sum li{margin:3px 0}
-.sum .r{color:#b3261e}.sum .w{color:#a15c00}.sum .p{color:#1d6fb8}.sum .c{color:#5b2a86}
+.sum .x{color:#6a1fb0}.sum .r{color:#b3261e}.sum .w{color:#a15c00}.sum .p{color:#1d6fb8}.sum .c{color:#5b2a86}
 .sum .warn{color:#b3261e}
 .sum .sub{font-weight:400;color:var(--mut)}
 .sum button{border:1px solid var(--line);background:#fff;border-radius:5px;padding:1px 7px;font:inherit;font-size:12px;cursor:pointer;margin-left:4px}
@@ -72,7 +73,7 @@ main{padding:12px}
  .blk{border:0;padding:0}
  .grid{grid-template-columns:repeat(3,1fr)!important;grid-auto-flow:column!important;grid-template-rows:repeat(3,auto)!important;gap:8px 8px}
  .page{break-after:page}
- .n,.tm,.bh .t,.bh.day,.title,.nm.g,.nm.y,.nm.r{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .n,.tm,.bh .t,.bh.day,.title,.nm.g,.nm.y,.nm.r,.nm.x{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 </style>
 </head>
@@ -124,7 +125,8 @@ function draw(){
   const h=document.createElement('div');h.className='title';h.textContent=t.title;main.appendChild(h);
   const lg=document.createElement('details');lg.className='lgd';
   lg.innerHTML=`<summary>Условные обозначения <span class="ar">▸</span></summary>
-   <p>Заливку имени ставите вы — клик по номеру: <i style="background:var(--paid)"></i>оплатили <i style="background:var(--link)"></i>выслали ссылку <i style="background:var(--unpaid)"></i>не оплатили → без цвета.</p>
+   <p>Заливка имени — оплата месяца по МойКлассу, ставится сама: <i style="background:var(--paid)"></i>оплачен <i style="background:var(--link)"></i>оплачен частично <i style="background:var(--unpaid)"></i>не оплачен <i style="background:var(--bad)"></i><b>некорректная оплата</b> — в МойКлассе оплачено, а денег нет ни на терминале, ни по ссылке (проверить, не нажали ли не тот способ оплаты).</p>
+   <p>Ваш цвет важнее автоматического: клик по номеру — зелёный → жёлтый «выслали ссылку» → красный → без цвета → снова как в МойКлассе.</p>
    <p>«Отм.»: п — пробное, О — только отработка. Номер можно перетащить в другую группу. Стереть имя — строка удалится, список сдвинется. Новый ребёнок — впишите в пустую строку.</p>
    <p>Бланк меняете только вы. МойКласс ничего в бланк не дописывает — расхождения с ним в блоках-проверках над бланком.</p>`;
   main.appendChild(lg);
@@ -139,7 +141,9 @@ function summary(t){
   const c=t.checks||{missing:[],extra:[],risk:[],unpaid:[],trials:[]};
   const li=(arr)=>arr.map(x=>`<li>${esc(x.name)} — ${esc(x.g)}: ${esc(x.txt)}${x.warn?` <span class="warn">· ${esc(x.warn)}</span>`:''}</li>`).join('');
   const crm=c.missing.length+c.extra.length;
-  let h=`<details ${crm?'':''}><summary class="c">Сверка с МойКлассом: ${crm}</summary><ul>`+
+  let h='';
+  if(c.badpay&&c.badpay.length)h+=`<details open><summary class="x">Некорректная оплата: ${c.badpay.length} <span class="sub">· в CRM оплачено, денег в кассах нет${M.badpay_at?' · сверка '+esc(M.badpay_at):''}</span></summary><ul>${li(c.badpay)}</ul></details>`;
+  h+=`<details><summary class="c">Сверка с МойКлассом: ${crm}</summary><ul>`+
     c.missing.map((x,i)=>`<li>${esc(x.name)} — ${esc(x.g)}: ${esc(x.txt)} <button data-add="${i}" title="Вписать в бланк этой группы">+ в бланк</button></li>`).join('')+
     li(c.extra)+(crm?'':'<li>всё совпадает</li>')+`</ul></details>`;
   h+=`<details><summary class="r">⚠ Уходят молча: ${c.risk.length}</summary><ul>${li(c.risk)||'<li>никого</li>'}</ul></details>`;
@@ -160,23 +164,25 @@ function block(b,i){
   el.innerHTML=`<div class="bh">${b.hpre?`<span>${esc(b.hpre)}</span>`:''}${b.time?`<span class="t">${esc(b.time)}</span>`:''}${b.hpost?`<span>${esc(b.hpost)}</span>`:''}</div>`;
   const kids=b.kids;
   const n=Math.max(10,kids.length+1);
-  const redraw=rows=>{if(!rows)return;b.kids=rows;const ne=block(b,i);el.replaceWith(ne)};
+  const redraw=rows=>{if(!rows)return;b.kids=merge(b.kids,rows);const ne=block(b,i);el.replaceWith(ne)};
   for(let j=0;j<n;j++){
     const r=document.createElement('div');r.className='row';
     const k=kids[j];
     r.innerHTML=`<div class="n" ${k?'draggable="true"':''}>${j+1}</div>
-      <div class="nm ${k&&k.color||''}"><span contenteditable data-f="name">${esc(k?k.name:'')}</span></div>
+      <div class="nm ${k&&k.view||''}" title="${esc(k&&k.pay||'')}"><span contenteditable data-f="name">${esc(k?k.name:'')}</span></div>
       <input list="dd" data-f="days" value="${esc(k?k.days:'')}">
       <div class="mk"><span contenteditable data-f="mark">${esc(k?k.mark:'')}</span></div>`;
     if(k){
       const nn=r.querySelector('.n');
-      nn.onclick=async()=>{k.color=cyc(k.color||'');r.querySelector('.nm').className='nm '+k.color;
-        await op({op:'set',block:b.key,id:k.id,field:'color',value:k.color})};
+      nn.onclick=async()=>{const nx=cyc2(k.color||'');k.color=nx;k.view=nx==='-'?'':(nx||k.auto||'');
+        r.querySelector('.nm').className='nm '+k.view;
+        await op({op:'set',block:b.key,id:k.id,field:'color',value:nx});
+        toast(nx===''?'Цвет снова из МойКласса':'Цвет поставлен вручную')};
       nn.ondragstart=e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:k.id,from:b.key}))};
       bindRow(r,async(f,v)=>{
         if(f==='name'&&!v){if(!confirm('Убрать «'+k.name+'» из бланка группы?')){r.querySelector('[data-f=name]').innerText=k.name;return}}
         const rows=await op({op:'set',block:b.key,id:k.id,field:f,value:v});
-        if(f==='name'&&!v)redraw(rows);else if(rows)b.kids=rows});
+        if(f==='name'&&!v)redraw(rows);else if(rows)b.kids=merge(b.kids,rows)});
     }else{
       bindRow(r,async()=>{const g=f=>{const e=r.querySelector(`[data-f=${f}]`);return (e.value??e.innerText).trim()};
         if(!g('name'))return;
@@ -232,7 +238,10 @@ function indiv(el,b){
   }
   bindEdits(el);return el;
 }
+function merge(old,rows){const m={};(old||[]).forEach(x=>m[x.id]=x);
+  rows.forEach(r=>{const o=m[r.id]||{};r.auto=o.auto||'';r.pay=o.pay||'';r.view=r.color==='-'?'':(r.color||r.auto)});return rows}
 function cyc(c){return c===''?'g':c==='g'?'y':c==='y'?'r':''}
+function cyc2(c){return c===''?'g':c==='g'?'y':c==='y'?'r':c==='r'?'-':''}
 function bindRow(r,cb){
   r.querySelectorAll('[data-f]').forEach(e=>{
     const ev=e.tagName==='INPUT'?'change':'blur';const val=()=>(e.tagName==='INPUT'?e.value:e.innerText).trim();let old=val();
