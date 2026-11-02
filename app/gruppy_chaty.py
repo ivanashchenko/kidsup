@@ -91,6 +91,34 @@ def _remember_avtory(pairs: dict) -> None:
         db.set_setting("gruppy_avtory", json.dumps(cur, ensure_ascii=False))
 
 
+def _iz_citaty(q, chat_id: str, chat_name: str, ts_otveta: str = ""):
+    """02.11: Wazzup иногда не присылает сообщение группы отдельным событием (вопрос Бориса
+    в «Подготовке к школе» в 10:06 так и не пришёл), но оно приходит цитатой, когда кто-то
+    на него отвечает. Такое сообщение сохраняем из цитаты; уже сохранённое не трогаем
+    (INSERT OR IGNORE по message_id). isEcho в цитате ненадёжен — Wazzup ставит true
+    и чужим сообщениям, поэтому «наше» — только по подписи «🤖 Клод» или authorName.
+    Время ставим временем ответа, а настоящее — в начало текста: рутины читают чат
+    «с последних 12 минут», и сообщение со старым временем они бы не увидели."""
+    if not is_group(q) or not q.get("messageId"):
+        return None
+    t = q.get("text")
+    text = (t if isinstance(t, str) else "").strip()
+    if not text and not q.get("contentUri"):
+        return None
+    contact = q.get("contact") if isinstance(q.get("contact"), dict) else {}
+    username = str(contact.get("username") or "")
+    echo = bool(q.get("authorName")) or text.startswith("🤖 Клод")
+    author = str(q.get("authorName") or "") or (avtory().get(username, "") if username else "")
+    kind = str(q.get("type") or "text")
+    raw = dict(q, _iz_citaty=True)
+    napisano = _ts(q)
+    pometka = f"[дошло только цитатой, написано {napisano[11:16]}] " if napisano[:10] == (ts_otveta or napisano)[:10] \
+        else f"[дошло только цитатой, написано {napisano[8:10]}.{napisano[5:7]} {napisano[11:16]}] "
+    return (ts_otveta or napisano, str(q.get("chatId") or chat_id), chat_name, str(q.get("chatType") or "").lower(),
+            author, username, (pometka + (text or f"[{kind}]"))[:4000], kind, 1 if echo else 0, str(q["messageId"]),
+            str(q.get("contentUri") or ""), json.dumps(raw, ensure_ascii=False, default=str)[:3000])
+
+
 def store(payload: dict) -> int:
     """Сообщения групп из вебхука Wazzup — в gruppy_chaty. Возвращает число новых."""
     rows, edits, deletes = [], [], []
@@ -121,6 +149,9 @@ def store(payload: dict) -> int:
             rows.append((_ts(msg), chat_id, chat_name, str(msg.get("chatType") or "").lower(),
                          author, username, (text or f"[{kind}]")[:4000], kind, 1 if echo else 0, mid,
                          str(msg.get("contentUri") or ""), json.dumps(msg, ensure_ascii=False, default=str)[:3000]))
+            q = _iz_citaty(msg.get("quotedMessage"), chat_id, chat_name, _ts(msg))
+            if q:
+                rows.append(q)
         except Exception:  # noqa: BLE001 — одно кривое сообщение не роняет остальные
             log.exception("групповое сообщение не разобрано")
     if not rows and not edits and not deletes:
