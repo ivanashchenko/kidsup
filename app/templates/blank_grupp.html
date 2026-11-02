@@ -18,58 +18,60 @@ header{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid v
 .tabs button{border:1px solid var(--line);background:#fff;border-radius:14px;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer}
 .tabs button.on{background:var(--pink);border-color:#e9a3c1;font-weight:700}
 main{padding:12px}
-.title{display:inline-block;background:var(--pink);font-weight:700;font-size:16px;padding:4px 10px;margin-bottom:10px}
+.title{display:inline-block;background:var(--pink);font-weight:700;font-size:16px;padding:4px 10px;margin-bottom:8px}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));grid-auto-flow:column;grid-template-rows:repeat(3,auto);gap:14px 10px}
 .page{margin-bottom:18px}
 .blk{background:#fff;border:1px solid var(--line);border-radius:4px;padding:4px 6px 6px}
 .blk.drop{outline:2px dashed var(--blue)}
 .bh{display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px;min-height:22px}
-.bh .t{background:var(--lg);padding:1px 6px;font-weight:700}
+.bh .t{background:var(--lg);padding:1px 8px;font-weight:700}
 .bh.day{background:var(--lg);padding:2px 6px}
-.cap{margin-left:auto;font-weight:400;color:var(--mut);font-size:11px;white-space:nowrap}
-.row{display:grid;grid-template-columns:22px 1fr 54px 58px 66px;align-items:center;min-height:22px;border-bottom:1px solid var(--c)}
+.row{display:grid;grid-template-columns:22px 1fr 104px 56px;align-items:center;min-height:22px;border-bottom:1px solid var(--c)}
 .row.ind{grid-template-columns:22px 1fr 52px 62px}
-.n{background:var(--c);color:#fff;font-weight:700;text-align:center;align-self:stretch;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none}
-.row [contenteditable],.row input{outline:none;border:0;background:transparent;font:inherit;padding:1px 3px;min-width:0}
+.row.wt{grid-template-columns:22px 1fr 58px 104px}
+.n{background:var(--c);color:#fff;font-weight:700;text-align:center;align-self:stretch;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none}
+.n[draggable=true]{cursor:grab}
+.row [contenteditable],.row input{outline:none;border:0;background:transparent;font:inherit;padding:1px 3px;min-width:0;width:100%}
 .row [contenteditable]:focus,.row input:focus{background:#fffbe6}
-.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+.row input{font-size:13px;letter-spacing:-.2px}
+.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nm.g{background:var(--paid)}.nm.y{background:var(--link)}.nm.r{background:var(--unpaid)}
-.bd{font-size:11px;color:var(--mut)}
-.mk{font-size:11px;text-align:center;white-space:nowrap}
+.bd{font-size:11px;color:var(--mut);white-space:nowrap}
+.mk{font-size:11px;text-align:center;white-space:nowrap;overflow:hidden}
 .tm{background:var(--lg);font-weight:700;text-align:center}
-.ph{font-size:12px;color:var(--mut)}
-.hid .nm{text-decoration:line-through;opacity:.45}
-.mv{font-size:10px;color:var(--blue);display:block;line-height:1}
-.x{opacity:0;cursor:pointer;color:#c33;font-size:12px;padding:0 3px}
-.row:hover .x{opacity:1}
+.ph{font-size:11px;color:var(--mut);display:block;line-height:1.1;padding-left:3px}
+.mv{font-size:10px;color:var(--blue);display:block;line-height:1;padding-left:3px}
 .free{display:flex;gap:6px;align-items:center;margin-top:4px;font-size:13px}
 .free b{white-space:nowrap}.free [contenteditable]{flex:1;border-bottom:1px dotted var(--line);outline:none;min-height:18px}
 .free .cnt{font-weight:700}
-.help{color:var(--mut);font-size:12px;margin:4px 0 10px}
-.sum{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.lgd{font-size:12px;color:var(--mut);margin:0 0 8px}
+.lgd summary{cursor:pointer;list-style:none;color:var(--ink)}
+.lgd summary::-webkit-details-marker{display:none}
+.lgd[open] summary .ar{display:inline-block;transform:rotate(90deg)}
+.lgd p{margin:4px 0}
+.lgd i{display:inline-block;width:12px;height:12px;border:1px solid #ccc;vertical-align:-2px;margin:0 3px 0 8px}
+.sum{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;align-items:flex-start}
 .sum details{background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px;max-width:100%}
 .sum summary{cursor:pointer;font-weight:700}
-.sum ul{margin:6px 0 0;padding-left:18px}.sum li{margin:2px 0}
-.sum .r{color:#b3261e}.sum .w{color:#a15c00}.sum .p{color:#1d6fb8}
-.rk{color:#b3261e;font-weight:700;cursor:help;margin-left:3px}
-.tr{font-size:10px;line-height:1.1;display:block;color:#1d6fb8}
-.tr.no{color:#b3261e}.tr.ok{color:#2e7d32}
+.sum ul{margin:6px 0 0;padding-left:18px}.sum li{margin:3px 0}
+.sum .r{color:#b3261e}.sum .w{color:#a15c00}.sum .p{color:#1d6fb8}.sum .c{color:#5b2a86}
+.sum .warn{color:#b3261e}
+.sum .sub{font-weight:400;color:var(--mut)}
+.sum button{border:1px solid var(--line);background:#fff;border-radius:5px;padding:1px 7px;font:inherit;font-size:12px;cursor:pointer;margin-left:4px}
+.sum button:hover{border-color:var(--blue)}
 .fr{margin-top:6px;font-size:12px;border-top:1px dashed var(--line);padding-top:4px}
 .fr b{display:block;margin-bottom:2px}
-.lg{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
-.lg i{display:inline-block;width:12px;height:12px;border:1px solid #ccc;vertical-align:-2px;margin-right:3px}
 .toast{position:fixed;bottom:14px;right:14px;background:var(--ink);color:#fff;padding:6px 12px;border-radius:6px;opacity:0;transition:opacity .2s}
 .toast.on{opacity:.92}
 @media (max-width:900px){.grid{grid-template-columns:1fr;grid-auto-flow:row;grid-template-rows:none}}
 @media print{
  @page{size:A4 landscape;margin:7mm}
- header,.help,.x,.toast{display:none}
+ header,.lgd,.toast,.sum{display:none}
  body{background:#fff;font-size:11px}
  main{padding:0}
  .blk{border:0;padding:0}
  .grid{grid-template-columns:repeat(3,1fr)!important;grid-auto-flow:column!important;grid-template-rows:repeat(3,auto)!important;gap:8px 8px}
  .page{break-after:page}
- .sum{display:none}
  .n,.tm,.bh .t,.bh.day,.title,.nm.g,.nm.y,.nm.r{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 </style>
@@ -78,14 +80,14 @@ main{padding:12px}
 <header>
  <div class="bar">
   <h1>Бланки групп</h1>
-  <button id="refresh" title="Подтянуть свежие данные из МойКласса">Обновить из МойКласса</button>
+  <button id="refresh" title="Пересчитать проверки по свежим данным МойКласса. Бланк не меняется.">Обновить проверки из МойКласса</button>
   <a class="btn" href="/api/blank-grupp/xlsx">Скачать Excel</a>
   <button onclick="window.print()">Печать</button>
   <span class="st" id="st"></span>
  </div>
  <div class="tabs" id="tabs"></div>
 </header>
-<main id="main"><p>Загружаю списки из МойКласса… (первый раз до 2 минут)</p></main>
+<main id="main"><p>Загружаю… (первый раз до 2 минут)</p></main>
 <div class="toast" id="toast"></div>
 <datalist id="dd"></datalist>
 <script>
@@ -96,13 +98,17 @@ async function save(k,v){
   try{const r=await fetch('/api/blank-grupp/edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({k,v})});
    if(!r.ok)throw 0;toast('Сохранено')}catch(e){toast('Не сохранилось — проверьте связь')}
 }
+async function op(p){
+  try{const r=await fetch('/api/blank-grupp/row',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+   if(!r.ok)throw 0;const d=await r.json();toast('Сохранено');return d.rows}catch(e){toast('Не сохранилось — проверьте связь');return null}
+}
 async function load(force){
-  $('#st').textContent=force?'Обновляю из МойКласса…':'Загружаю…';
+  $('#st').textContent=force?'Обновляю проверки из МойКласса…':'Загружаю…';
   const r=await fetch('/api/blank-grupp'+(force?'?refresh=1':''));const d=await r.json();
   if(!d.model){$('#main').innerHTML='<p>'+(d.err||'Данные ещё загружаются, обновите страницу через минуту.')+'</p>';$('#st').textContent='';return}
   M=d.model;
   $('#dd').innerHTML=M.days_choices.map(x=>`<option value="${x}">`).join('');
-  $('#st').textContent='Из МойКласса: '+M.built+(d.busy?' · обновляется…':'');
+  $('#st').textContent='Проверки по МойКлассу: '+M.built+(d.busy?' · обновляются…':'');
   if(!M.tabs.find(t=>t.sheet===cur))cur=M.tabs[0].sheet;
   tabs();draw();
 }
@@ -112,118 +118,134 @@ function tabs(){
    b.onclick=()=>{cur=t.sheet;localStorage.setItem('blank_grupp_tab',cur);tabs();draw()};$('#tabs').appendChild(b)});
 }
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function curTab(){return M.tabs.find(x=>x.sheet===cur)}
 function draw(){
-  const t=M.tabs.find(x=>x.sheet===cur);const main=$('#main');main.innerHTML='';
+  const t=curTab();const main=$('#main');main.innerHTML='';
   const h=document.createElement('div');h.className='title';h.textContent=t.title;main.appendChild(h);
-  const hp=document.createElement('div');hp.className='help';
-  const mon=M.pay_month||'месяц';
-  hp.innerHTML=`<span class="lg">Цвет имени — оплата за ${esc(mon)} по МойКлассу, сам: <span><i style="background:var(--paid)"></i>оплачен</span><span><i style="background:var(--link)"></i>оплачен частично</span><span><i style="background:var(--unpaid)"></i>не оплачен</span></span><br>
-   Наведите на имя — увидите подробности. <b class="rk">⚠</b> — «уходит молча»: 2 пропуска подряд или абонемент кончается, а нового нет; позвонить до того, как семья уйдёт. Синяя строчка под именем — пробное: дата, пришёл ли, купил ли.<br>
-   Клик по номеру — поставить цвет вручную (зелёный → жёлтый «выслали ссылку» → красный → без цвета → снова как в МойКлассе). Номер можно перетащить в другую группу. ✕ — зачеркнуть (ушёл), повторно — вернуть. Всё сохраняется сразу и видно всем админам.`;
-  main.appendChild(hp);
+  const lg=document.createElement('details');lg.className='lgd';
+  lg.innerHTML=`<summary>Условные обозначения <span class="ar">▸</span></summary>
+   <p>Заливку имени ставите вы — клик по номеру: <i style="background:var(--paid)"></i>оплатили <i style="background:var(--link)"></i>выслали ссылку <i style="background:var(--unpaid)"></i>не оплатили → без цвета.</p>
+   <p>«Отм.»: п — пробное, О — только отработка. Номер можно перетащить в другую группу. Стереть имя — строка удалится, список сдвинется. Новый ребёнок — впишите в пустую строку.</p>
+   <p>Бланк меняете только вы. МойКласс ничего в бланк не дописывает — расхождения с ним в блоках-проверках над бланком.</p>`;
+  main.appendChild(lg);
   main.appendChild(summary(t));
   for(let p=0;p<t.blocks.length;p+=9){
     const g=document.createElement('div');g.className='grid page';
     t.blocks.slice(p,p+9).forEach((b,i)=>g.appendChild(block(b,i)));main.appendChild(g);
   }
 }
-function allKids(t){const out=[];t.blocks.forEach(b=>{if(b.kind==='group')(b.kids||[]).forEach(k=>{if(!k.hidden)out.push([b,k])})});return out}
-function gname(b){return b.header.replace(/\s+/g,' ').trim()}
 function summary(t){
   const box=document.createElement('div');box.className='sum';
-  const all=allKids(t);
-  const risk=all.filter(([b,k])=>k.risk);
-  const unpaid=all.filter(([b,k])=>k.color==='r'&&k.status===2);
-  const tri=all.filter(([b,k])=>k.trial);
-  const li=(arr,f)=>arr.map(([b,k])=>`<li>${esc(k.name)} — ${esc(gname(b))}${f?': '+esc(f(k)):''}</li>`).join('');
-  let h='';
-  h+=`<details ${risk.length?'open':''}><summary class="r">⚠ Уходят молча: ${risk.length}</summary><ul>${li(risk,k=>k.risk)||'<li>никого</li>'}</ul></details>`;
-  h+=`<details><summary class="w">Не оплатили ${esc(M.pay_month||'месяц')}: ${unpaid.length}</summary><ul>${li(unpaid,k=>k.pay)||'<li>все оплатили</li>'}</ul></details>`;
-  const came=tri.filter(([b,k])=>k.trial.came===true).length, bought=tri.filter(([b,k])=>k.trial.bought).length;
-  h+=`<details><summary class="p">Пробные: ${tri.length} · пришли ${came} · купили ${bought}</summary><ul>${li(tri,k=>trialTxt(k.trial))||'<li>нет</li>'}</ul></details>`;
-  box.innerHTML=h;return box;
+  const c=t.checks||{missing:[],extra:[],risk:[],unpaid:[],trials:[]};
+  const li=(arr)=>arr.map(x=>`<li>${esc(x.name)} — ${esc(x.g)}: ${esc(x.txt)}${x.warn?` <span class="warn">· ${esc(x.warn)}</span>`:''}</li>`).join('');
+  const crm=c.missing.length+c.extra.length;
+  let h=`<details ${crm?'':''}><summary class="c">Сверка с МойКлассом: ${crm}</summary><ul>`+
+    c.missing.map((x,i)=>`<li>${esc(x.name)} — ${esc(x.g)}: ${esc(x.txt)} <button data-add="${i}" title="Вписать в бланк этой группы">+ в бланк</button></li>`).join('')+
+    li(c.extra)+(crm?'':'<li>всё совпадает</li>')+`</ul></details>`;
+  h+=`<details><summary class="r">⚠ Уходят молча: ${c.risk.length}</summary><ul>${li(c.risk)||'<li>никого</li>'}</ul></details>`;
+  h+=`<details><summary class="w">Не оплатили ${esc(M.pay_month||'месяц')}: ${c.unpaid.length}${M.pay_due?` <span class="sub">· ${esc(M.pay_due)}</span>`:''}</summary><ul>${li(c.unpaid)||'<li>все оплатили</li>'}</ul></details>`;
+  const tw=c.trials.filter(x=>x.warn).length;
+  h+=`<details><summary class="p">Пробные: ${c.trials.length}${tw?` · расхождений ${tw}`:''}</summary><ul>${li(c.trials)||'<li>нет</li>'}</ul></details>`;
+  box.innerHTML=h;
+  box.querySelectorAll('[data-add]').forEach(bt=>bt.onclick=async()=>{
+    const x=c.missing[+bt.dataset.add];const rows=await op({op:'add',block:x.block,uid:x.uid,name:x.name,days:x.days});
+    if(rows){toast('Вписан в бланк');load(false)}});
+  return box;
 }
-function trialTxt(tr){const c=tr.came===true?'пришёл':tr.came===false?'не пришёл':'ждём';return `пробное ${tr.date||'—'} · ${c}${tr.came===true||tr.bought?(tr.bought?' · купил':' · не купил'):''}`}
+function hcol(i){return Math.floor(i/3)===1?'var(--green)':'var(--blue)'}
 function block(b,i){
-  const col=Math.floor(i/3)===1?'var(--green)':'var(--blue)';
-  const el=document.createElement('div');el.className='blk';el.style.setProperty('--c',col);el.dataset.key=b.key;
-  if(b.kind==='indiv'){
-    el.innerHTML=`<div class="bh day">${esc(b.header)}</div>`;
-    let n=1;
-    for(let j=0;j<5;j++){const s=b.slots[j];
-      const r1=document.createElement('div');r1.className='row ind';
-      const r2=document.createElement('div');r2.className='row ind';
-      if(s){
-        const kids=s.kids.map(k=>k.name).join(', ');
-        r1.innerHTML=`<div class="n">${n}</div><div class="nm ${s.color||''}"><span contenteditable data-k="${s.ck}:note">${esc(s.note||kids)}</span></div><div class="tm">${esc(s.time)}</div><div class="bd">${esc(s.kids[0]?.bd||'')}</div>`;
-        r2.innerHTML=`<div class="n">${n+1}</div><div class="ph">${esc(s.kids.map(k=>k.phone).filter(Boolean).join(', '))}</div><div></div><div></div>`;
-        r1.querySelector('.n').onclick=()=>{s.color=cyc(s.color);r1.querySelector('.nm').className='nm '+(s.color||'');save(s.ck+':color',s.color)};
-      }else{r1.innerHTML=`<div class="n">${n}</div><div></div><div></div><div></div>`;r2.innerHTML=`<div class="n">${n+1}</div><div></div><div></div><div></div>`}
-      el.appendChild(r1);el.appendChild(r2);n+=2;
-    }
-    bindEdits(el);return el;
-  }
-  const cap=b.kind==='group'?(b.cap||10):10;
-  let hd;
-  if(b.kind==='group'){hd=`<div class="bh"><span>${esc(b.header.replace(b.time,'').replace(/\s+/,' '))}</span>${b.time?`<span class="t">${esc(b.time)}</span>`:''}<span class="cap">мест ${cap}</span></div>`}
-  else hd=`<div class="bh day">${esc(b.header)}</div>`;
-  el.innerHTML=hd;
-  const kids=b.kids, man=b.manual||[];
-  const rows=Math.max(10,kids.length+man.length+1);
-  for(let j=0;j<rows;j++){
+  const el=document.createElement('div');el.className='blk';el.style.setProperty('--c',hcol(i));el.dataset.key=b.key;
+  if(b.kind==='indiv')return indiv(el,b);
+  if(b.kind==='wait')return wait(el,b);
+  el.innerHTML=`<div class="bh">${b.hpre?`<span>${esc(b.hpre)}</span>`:''}${b.time?`<span class="t">${esc(b.time)}</span>`:''}${b.hpost?`<span>${esc(b.hpost)}</span>`:''}</div>`;
+  const kids=b.kids;
+  const n=Math.max(10,kids.length+1);
+  const redraw=rows=>{if(!rows)return;b.kids=rows;const ne=block(b,i);el.replaceWith(ne)};
+  for(let j=0;j<n;j++){
     const r=document.createElement('div');r.className='row';
-    if(j<kids.length){const k=kids[j];
-      if(k.hidden)r.classList.add('hid');
-      r.innerHTML=`<div class="n" draggable="true">${j+1}</div>
-       <div class="nm ${k.color||''}" title="${esc(k.pay||'')}${k.risk?' · ⚠ '+esc(k.risk):''}"><span contenteditable data-k="${k.ck}:name">${esc(k.name)}</span>${k.risk?`<span class="rk" title="${esc(k.risk)}">⚠</span>`:''}${k.trial?`<span class="tr ${k.trial.came===false||(k.trial.came&&!k.trial.bought)?'no':k.trial.bought?'ok':''}">${esc(trialTxt(k.trial))}</span>`:''}${k.moved_from?`<span class="mv">↪ из ${esc(k.moved_from)}</span>`:''}${b.kind==='wait'&&k.note?`<span class="mv">${esc(k.note)}</span>`:''}</div>
-       <input list="dd" value="${esc(b.kind==='wait'?(k.age?k.age+' г.':''):k.days)}" data-k="${k.ck}:days" ${b.kind==='wait'?'readonly':''}>
-       <div class="bd">${esc(k.bd)}</div>
-       <div class="mk"><span contenteditable data-k="${k.ck}:mark">${esc(k.mark)}</span><span class="x" title="Зачеркнуть / вернуть">✕</span></div>`;
-      const n=r.querySelector('.n');
-      n.onclick=()=>{const cur=k.manual_color?(k.color||'-'):'';const nx=cyc2(cur);k.manual_color=!!nx;
-        k.color=nx===''?(k.auto_color||''):nx==='-'?'':nx;r.querySelector('.nm').className='nm '+(k.color||'');save(k.ck+':color',nx);
-        toast(nx===''?'Цвет снова из МойКласса':'Цвет поставлен вручную')};
-      n.ondragstart=e=>{e.dataTransfer.setData('text/plain',JSON.stringify({ck:k.ck,from:b.key}))};
-      r.querySelector('.x').onclick=()=>{k.hidden=!k.hidden;r.classList.toggle('hid');save(k.ck+':hide',k.hidden?'1':'')};
-    }else{const mi=j-kids.length;const m=man[mi]||{};
-      r.innerHTML=`<div class="n">${j+1}</div>
-       <div class="nm ${m.color||''}"><span contenteditable data-m="name">${esc(m.name||'')}</span></div>
-       <input list="dd" value="${esc(m.days||'')}" data-m="days">
-       <div class="bd"><span contenteditable data-m="bd">${esc(m.bd||'')}</span></div>
-       <div class="mk"><span contenteditable data-m="mark">${esc(m.mark||'')}</span></div>`;
-      r.querySelectorAll('[data-m]').forEach(e=>{const f=e.dataset.m;const ev=e.tagName==='INPUT'?'change':'blur';
-        e.addEventListener(ev,()=>{const v=(e.value??e.innerText).trim();while(man.length<=mi)man.push({});man[mi][f]=v;
-          const clean=man.filter(x=>Object.values(x).some(Boolean));b.manual=clean;save(`b:${b.key}:manual`,clean.length?JSON.stringify(clean):'')})});
-      r.querySelector('.n').onclick=()=>{if(!man[mi])return;man[mi].color=cyc(man[mi].color);r.querySelector('.nm').className='nm '+(man[mi].color||'');save(`b:${b.key}:manual`,JSON.stringify(man))};
+    const k=kids[j];
+    r.innerHTML=`<div class="n" ${k?'draggable="true"':''}>${j+1}</div>
+      <div class="nm ${k&&k.color||''}"><span contenteditable data-f="name">${esc(k?k.name:'')}</span></div>
+      <input list="dd" data-f="days" value="${esc(k?k.days:'')}">
+      <div class="mk"><span contenteditable data-f="mark">${esc(k?k.mark:'')}</span></div>`;
+    if(k){
+      const nn=r.querySelector('.n');
+      nn.onclick=async()=>{k.color=cyc(k.color||'');r.querySelector('.nm').className='nm '+k.color;
+        await op({op:'set',block:b.key,id:k.id,field:'color',value:k.color})};
+      nn.ondragstart=e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:k.id,from:b.key}))};
+      bindRow(r,async(f,v)=>{
+        if(f==='name'&&!v){if(!confirm('Убрать «'+k.name+'» из бланка группы?')){r.querySelector('[data-f=name]').innerText=k.name;return}}
+        const rows=await op({op:'set',block:b.key,id:k.id,field:f,value:v});
+        if(f==='name'&&!v)redraw(rows);else if(rows)b.kids=rows});
+    }else{
+      bindRow(r,async()=>{const g=f=>{const e=r.querySelector(`[data-f=${f}]`);return (e.value??e.innerText).trim()};
+        if(!g('name'))return;
+        redraw(await op({op:'add',block:b.key,name:g('name'),days:g('days'),mark:g('mark')}))});
     }
     el.appendChild(r);
   }
-  if(b.kind==='group'){
-    const busy=kids.filter(k=>!k.hidden).length+man.filter(x=>x.name).length;
-    const f=document.createElement('div');f.className='free';
-    f.innerHTML=`<b>Свободно:</b><span contenteditable data-k="b:${b.key}:free">${esc(b.free||'')}</span><span class="cnt" title="мест по МойКлассу минус дети в списке">${Math.max(0,cap-busy)}</span>`;
-    el.appendChild(f);
-  }
-  if(b.kind==='wait'){
-    const t=M.tabs.find(x=>x.sheet===cur);
-    const fr=t.blocks.filter(x=>x.kind==='group').map(x=>{const busy=(x.kids||[]).filter(k=>!k.hidden).length+(x.manual||[]).filter(m=>m.name).length;return [x,Math.max(0,(x.cap||10)-busy)]}).filter(([x,n])=>n>0);
-    const f=document.createElement('div');f.className='fr';
-    f.innerHTML=`<b>Свободные места — кого из листа звать:</b>${fr.length?fr.map(([x,n])=>`${esc(gname(x))} — <b style="display:inline">${n}</b>`).join('<br>'):'свободных мест нет'}`;
-    el.appendChild(f);
-  }
+  const free=b.cap>=kids.length?b.cap-kids.length:null;
+  const f=document.createElement('div');f.className='free';
+  f.innerHTML=`<b>Свободно:</b><span contenteditable data-k="b:${b.key}:free">${esc(b.free||'')}</span>${free!==null?`<span class="cnt" title="мест в группе по МойКлассу минус дети в бланке">${free}</span>`:''}`;
+  el.appendChild(f);
+  bindEdits(el);
   el.ondragover=e=>{e.preventDefault();el.classList.add('drop')};
   el.ondragleave=()=>el.classList.remove('drop');
   el.ondrop=async e=>{e.preventDefault();el.classList.remove('drop');
-    try{const d=JSON.parse(e.dataTransfer.getData('text/plain'));if(d.from===b.key)return;
-      const home=d.ck.split(':')[1];await save(d.ck+':move',b.key===home?'':b.key);load(false)}catch(_){}};
+    try{const d=JSON.parse(e.dataTransfer.getData('text/plain'));if(!d.id||d.from===b.key)return;
+      if(await op({op:'move',block:d.from,id:d.id,to:b.key}))load(false)}catch(_){}};
+  return el;
+}
+function wait(el,b){
+  el.innerHTML=`<div class="bh day">${esc(b.header)}</div>`;
+  const n=Math.max(10,b.kids.length);
+  for(let j=0;j<n;j++){const k=b.kids[j];
+    const r=document.createElement('div');r.className='row wt';
+    if(k){
+      r.innerHTML=`<div class="n">${j+1}</div>
+       <div class="nm"><span contenteditable data-k="${k.ck}:name">${esc(k.name)}</span>${k.phone?`<span class="ph">${esc(k.phone)}</span>`:''}${k.note?`<span class="mv">${esc(k.note)}</span>`:''}</div>
+       <div class="bd" title="дата рождения">${esc(k.bd)}</div>
+       <input list="dd" value="${esc(k.days)}" data-k="${k.ck}:days" title="желаемые дни">`;
+    }else r.innerHTML=`<div class="n">${j+1}</div><div></div><div></div><div></div>`;
+    el.appendChild(r);
+  }
+  const t=curTab();
+  const fr=t.blocks.filter(x=>x.kind==='group'&&x.cap>x.kids.length).map(x=>[x,x.cap-x.kids.length]);
+  const f=document.createElement('div');f.className='fr';
+  f.innerHTML=`<b>Свободные места — кого из листа звать:</b>${fr.length?fr.map(([x,n])=>`${esc([x.hpre,x.time,x.hpost].filter(Boolean).join(' '))} — <b style="display:inline">${n}</b>`).join('<br>'):'свободных мест нет'}`;
+  el.appendChild(f);
   bindEdits(el);return el;
 }
-function cyc(c){return c==='g'?'y':c==='y'?'r':c==='r'?'':'g'}
-function cyc2(c){return c===''?'g':c==='g'?'y':c==='y'?'r':c==='r'?'-':''}
+function indiv(el,b){
+  el.innerHTML=`<div class="bh day">${esc(b.header)}</div>`;
+  let n=1;
+  for(let j=0;j<5;j++){const s=b.slots[j];
+    const r1=document.createElement('div');r1.className='row ind';
+    const r2=document.createElement('div');r2.className='row ind';
+    if(s){
+      const kids=s.kids.map(k=>k.name).join(', ');
+      r1.innerHTML=`<div class="n">${n}</div><div class="nm ${s.color||''}"><span contenteditable data-k="${s.ck}:note">${esc(s.note||kids)}</span></div><div class="tm">${esc(s.time)}</div><div class="bd">${esc(s.kids[0]?.bd||'')}</div>`;
+      r2.innerHTML=`<div class="n">${n+1}</div><div class="ph">${esc(s.kids.map(k=>k.phone).filter(Boolean).join(', '))}</div><div></div><div></div>`;
+      r1.querySelector('.n').onclick=()=>{s.color=cyc(s.color||'');r1.querySelector('.nm').className='nm '+s.color;save(s.ck+':color',s.color)};
+    }else{r1.innerHTML=`<div class="n">${n}</div><div></div><div></div><div></div>`;r2.innerHTML=`<div class="n">${n+1}</div><div></div><div></div><div></div>`}
+    el.appendChild(r1);el.appendChild(r2);n+=2;
+  }
+  bindEdits(el);return el;
+}
+function cyc(c){return c===''?'g':c==='g'?'y':c==='y'?'r':''}
+function bindRow(r,cb){
+  r.querySelectorAll('[data-f]').forEach(e=>{
+    const ev=e.tagName==='INPUT'?'change':'blur';const val=()=>(e.tagName==='INPUT'?e.value:e.innerText).trim();let old=val();
+    e.addEventListener(ev,()=>{const v=val();if(v===old)return;old=v;cb(e.dataset.f,v)});
+    if(e.isContentEditable)e.addEventListener('keydown',x=>{if(x.key==='Enter'){x.preventDefault();e.blur()}});
+  });
+}
 function bindEdits(el){
   el.querySelectorAll('[data-k]').forEach(e=>{
     const ev=e.tagName==='INPUT'?'change':'blur';const was=()=>e.tagName==='INPUT'?e.value:e.innerText;let old=was();
-    e.addEventListener(ev,()=>{const v=was().trim();if(v===old.trim())return;old=v;save(e.dataset.k,v)});
+    e.addEventListener(ev,()=>{const v=was().trim();if(v===old.trim())return;old=v;
+      if(!v&&/^u:.*:name$/.test(e.dataset.k)){save(e.dataset.k.replace(/:name$/,':hide'),'1');e.closest('.row').style.display='none';return}
+      save(e.dataset.k,v)});
     if(e.isContentEditable)e.addEventListener('keydown',x=>{if(x.key==='Enter'){x.preventDefault();e.blur()}});
   });
 }

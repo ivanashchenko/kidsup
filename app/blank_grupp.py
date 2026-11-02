@@ -415,6 +415,8 @@ LIGHT_GREEN, PINK = "D9F2D0", "F9C9DD"
 
 
 def to_xlsx(model: dict, path: str) -> None:
+    """Excel = то же, что на странице: бланк админов (№ / Ф.И. / Дни / Отм., заливка — их),
+    лист ожидания (Ф.И., д.р., желаемые дни, телефон) и лист «Позвонить» из проверок."""
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.worksheet.datavalidation import DataValidation
@@ -423,10 +425,9 @@ def to_xlsx(model: dict, path: str) -> None:
     wb.remove(wb.active)
     FONT = "Calibri"
     fill = lambda c: PatternFill("solid", fgColor=c)
-    widths = [3.6, 22, 7, 8.2, 7.5]               # №, Ф.И., Дни, Д.р., Отм.
+    widths = [3.6, 23, 8.5, 8, 13]               # №, Ф.И., [Дни | д.р.], [Дни], [Отм. | телефон]
     for tab in model["tabs"]:
         ws = wb.create_sheet(tab["sheet"])
-        ncols = 3 * 5 + 2
         for col in range(3):
             for i, w in enumerate(widths):
                 ws.column_dimensions[_col(col * 6 + i + 1)].width = w
@@ -435,7 +436,7 @@ def to_xlsx(model: dict, path: str) -> None:
         ws.cell(1, 1, tab["title"]).font = Font(name=FONT, size=13, bold=True)
         ws.cell(1, 1).fill = fill(PINK)
         ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
-        ws.cell(1, 7, f"из МойКласса {model['built']}").font = Font(name=FONT, size=9, italic=True, color="666666")
+        ws.cell(1, 7, f"выгружено {model['built']}").font = Font(name=FONT, size=9, italic=True, color="666666")
         ws.freeze_panes = "A2"
         dv = DataValidation(type="list", formula1='"' + ",".join(model["days_choices"]) + '"',
                             allow_blank=True, showErrorMessage=False)
@@ -448,20 +449,26 @@ def to_xlsx(model: dict, path: str) -> None:
             c0 = col * 6 + 1
             color = GREEN if col == 1 else BLUE
             side = Side(style="thin", color=color)
-            hdr = ws.cell(top, c0)
             if b["kind"] == "group":
-                ws.cell(top, c0, b["header"]).font = Font(name=FONT, size=10, bold=True)
-                ws.merge_cells(start_row=top, start_column=c0, end_row=top, end_column=c0 + 3)
-                tc = ws.cell(top, c0 + 4, b["time"])
+                h = ws.cell(top, c0, b.get("hpre", ""))
+                h.font = Font(name=FONT, size=10, bold=True)
+                h.alignment = Alignment(horizontal="left", vertical="center", shrink_to_fit=True)
+                ws.merge_cells(start_row=top, start_column=c0, end_row=top, end_column=c0 + 1)
+                tc = ws.cell(top, c0 + 2, b.get("time", ""))
                 tc.fill = fill(LIGHT_GREEN)
+                ws.cell(top, c0 + 3).fill = fill(LIGHT_GREEN)
                 tc.font = Font(name=FONT, size=11, bold=True)
-                tc.alignment = Alignment(horizontal="center")
+                tc.alignment = Alignment(horizontal="center", shrink_to_fit=True)
+                ws.merge_cells(start_row=top, start_column=c0 + 2, end_row=top, end_column=c0 + 3)
+                a = ws.cell(top, c0 + 4, b.get("hpost", ""))
+                a.font = Font(name=FONT, size=10, bold=True)
+                a.alignment = Alignment(shrink_to_fit=True)
             else:
                 ws.cell(top, c0, b["header"]).font = Font(name=FONT, size=11, bold=True)
                 for k in range(5):
                     ws.cell(top, c0 + k).fill = fill(LIGHT_GREEN)
                 ws.merge_cells(start_row=top, start_column=c0, end_row=top, end_column=c0 + 4)
-            hdr.alignment = Alignment(horizontal="left", vertical="center", shrink_to_fit=True)
+                ws.cell(top, c0).alignment = Alignment(horizontal="left", vertical="center", shrink_to_fit=True)
             for i in range(N):
                 rr = top + 1 + i
                 n = ws.cell(rr, c0, i + 1)
@@ -472,32 +479,30 @@ def to_xlsx(model: dict, path: str) -> None:
                     ws.cell(rr, c0 + k).border = Border(bottom=side)
                     if k:
                         ws.cell(rr, c0 + k).font = Font(name=FONT, size=11)
-                if b["kind"] in ("group", "wait"):
+                if b["kind"] == "group":
+                    ws.merge_cells(start_row=rr, start_column=c0 + 2, end_row=rr, end_column=c0 + 3)
                     dv.add(ws.cell(rr, c0 + 2))
+                elif b["kind"] == "wait":
+                    dv.add(ws.cell(rr, c0 + 3))
             if b["kind"] == "group":
                 for i, k in enumerate(b["kids"][:N]):
                     rr = top + 1 + i
-                    nm = ("⚠ " if k.get("risk") else "") + k["name"]
-                    tr = k.get("trial") or {}
-                    if tr.get("date"):
-                        nm += f" · пробн. {tr['date']}" + (" ✓" if tr.get("came") else "") + (" купил" if tr.get("bought") else "")
-                    nc = ws.cell(rr, c0 + 1, nm)
+                    nc = ws.cell(rr, c0 + 1, k.get("name", ""))
                     if PAY_FILL.get(k.get("color")):
                         nc.fill = fill(PAY_FILL[k["color"]])
-                    ws.cell(rr, c0 + 2, k["days"])
-                    d = ws.cell(rr, c0 + 3, k["bd"])
-                    d.font = Font(name=FONT, size=9)
-                    ws.cell(rr, c0 + 4, k["mark"])
-                extra = b["kids"][N:]
+                    ws.cell(rr, c0 + 2, k.get("days", ""))
+                    m = ws.cell(rr, c0 + 4, k.get("mark", ""))
+                    m.alignment = Alignment(horizontal="center", shrink_to_fit=True)
                 fr = top + 1 + N
                 ws.cell(fr, c0, "Свободно:").font = Font(name=FONT, size=10, bold=True)
                 ws.merge_cells(start_row=fr, start_column=c0, end_row=fr, end_column=c0 + 1)
                 ws.cell(fr, c0 + 1).alignment = Alignment(horizontal="left")
-                if extra:
-                    ws.cell(fr, c0 + 2, "ещё: " + ", ".join(k["name"] for k in extra)).font = Font(name=FONT, size=8, color="C00000")
-                f = ws.cell(fr, c0 + 4, f"=MAX(0,{b['cap']}-COUNTA({_col(c0 + 1)}{top + 1}:{_col(c0 + 1)}{top + N}))")
-                f.font = Font(name=FONT, size=11, bold=True)
-                f.alignment = Alignment(horizontal="center")
+                if b.get("free"):
+                    ws.cell(fr, c0 + 2, b["free"]).font = Font(name=FONT, size=9)
+                if b["cap"] >= len(b["kids"]):
+                    f = ws.cell(fr, c0 + 4, f"=MAX(0,{b['cap']}-COUNTA({_col(c0 + 1)}{top + 1}:{_col(c0 + 1)}{top + N}))")
+                    f.font = Font(name=FONT, size=11, bold=True)
+                    f.alignment = Alignment(horizontal="center")
             elif b["kind"] == "indiv":
                 for i, s in enumerate(b["slots"]):
                     r1 = top + 1 + 2 * i
@@ -505,18 +510,20 @@ def to_xlsx(model: dict, path: str) -> None:
                     tm.fill = fill(LIGHT_GREEN)
                     tm.font = Font(name=FONT, size=11, bold=True)
                     tm.alignment = Alignment(horizontal="center")
-                    ws.cell(r1, c0 + 1, ", ".join(k["name"] for k in s["kids"]))
+                    ws.cell(r1, c0 + 1, s.get("note") or ", ".join(k["name"] for k in s["kids"]))
+                    if PAY_FILL.get(s.get("color")):
+                        ws.cell(r1, c0 + 1).fill = fill(PAY_FILL[s["color"]])
                     ws.cell(r1 + 1, c0 + 1, ", ".join(k["phone"] for k in s["kids"] if k["phone"]))
                     ws.cell(r1 + 1, c0 + 1).font = Font(name=FONT, size=10)
                     if s["kids"]:
                         ws.cell(r1, c0 + 3, s["kids"][0]["bd"]).font = Font(name=FONT, size=9)
-            else:
-                for i, k in enumerate(b["kids"]):
+            else:                                    # лист ожидания: Ф.И., д.р., желаемые дни, телефон
+                for i, k in enumerate(b["kids"][:N]):
                     rr = top + 1 + i
                     ws.cell(rr, c0 + 1, k["name"])
-                    ws.cell(rr, c0 + 2, k.get("note", ""))
-                    ws.cell(rr, c0 + 3, k["age"])
-                    ws.cell(rr, c0 + 4, k["mark"])
+                    ws.cell(rr, c0 + 2, k.get("bd", "")).font = Font(name=FONT, size=9)
+                    ws.cell(rr, c0 + 3, k.get("days", ""))
+                    ws.cell(rr, c0 + 4, k.get("phone", "")).font = Font(name=FONT, size=9)
         ws.page_setup.orientation = "landscape"
         ws.page_setup.paperSize = ws.PAPERSIZE_A4
         ws.page_setup.fitToWidth = 1
@@ -525,43 +532,39 @@ def to_xlsx(model: dict, path: str) -> None:
         ws.page_margins.left = ws.page_margins.right = 0.25
         ws.page_margins.top = ws.page_margins.bottom = 0.3
         ws.print_title_rows = "1:1"
-    _sheet_zvonit(wb, model, fill, Font, Alignment, FONT)
+    _sheet_zvonit(wb, model, Font, Alignment, FONT)
     wb.save(path)
 
 
 PAY_FILL = {"g": "C6EFCE", "y": "FFEB9C", "r": "FFC7CE"}
 
 
-def _sheet_zvonit(wb, model, fill, Font, Alignment, FONT):
-    """Лист «Позвонить»: «уходит молча» (⚠) и не оплатившие месяц — по педагогам и группам."""
+def _sheet_zvonit(wb, model, Font, Alignment, FONT):
+    """Лист «Позвонить» — из проверок: «уходит молча» и не оплатившие месяц по МойКлассу."""
     ws = wb.create_sheet("Позвонить", 0)
     mon = model.get("pay_month") or ""
-    ws.cell(1, 1, f"Позвонить: ⚠ уходят молча и не оплатили {mon}").font = Font(name=FONT, size=13, bold=True)
-    ws.cell(2, 1, f"из МойКласса {model.get('built', '')} · сначала ⚠, потом красные; после разговора — комментарий в карточку").font = Font(name=FONT, size=9, italic=True, color="666666")
-    hdr = ["Педагог", "Группа", "Ребёнок", "Что", "Оплата", "Итог разговора"]
+    due = f" ({model['pay_due']})" if model.get("pay_due") else ""
+    ws.cell(1, 1, f"Проверка по МойКлассу: уходят молча и не оплатили {mon}{due}").font = Font(name=FONT, size=13, bold=True)
+    ws.cell(2, 1, f"выгружено {model.get('built', '')} · сначала «уходят молча», потом оплаты; "
+                  "кого знаете (болеет, уехал) — не звонить; после разговора — комментарий в карточку"
+            ).font = Font(name=FONT, size=9, italic=True, color="666666")
+    hdr = ["Педагог", "Группа", "Ребёнок", "Что", "Итог разговора"]
     for i, h in enumerate(hdr):
-        c = ws.cell(4, i + 1, h)
-        c.font = Font(name=FONT, size=11, bold=True)
-    for i, w in enumerate([24, 34, 26, 40, 34, 30]):
+        ws.cell(4, i + 1, h).font = Font(name=FONT, size=11, bold=True)
+    for i, w in enumerate([24, 34, 26, 46, 30]):
         ws.column_dimensions[_col(i + 1)].width = w
     rows = []
     for tab in model.get("tabs", []):
-        for b in tab.get("blocks", []):
-            if b.get("kind") != "group":
-                continue
-            for k in b.get("kids", []):
-                if k.get("risk") or k.get("color") == "r":
-                    rows.append((0 if k.get("risk") else 1, tab.get("title", ""), b.get("header") or "",
-                                 k["name"], k.get("risk", ""), k.get("pay", ""), k.get("color", "")))
-    rows.sort(key=lambda r: (r[0], r[1], r[2], r[3]))
+        ch = tab.get("checks") or {}
+        for kind, lst in ((0, ch.get("risk", [])), (1, ch.get("unpaid", []))):
+            for x in lst:
+                rows.append((kind, tab.get("title", ""), x["g"], x["name"], x["txt"]))
+    rows.sort()
     for j, r in enumerate(rows):
-        rr = 5 + j
-        for i, v in enumerate(r[1:6]):
-            c = ws.cell(rr, i + 1, ("⚠ " if i == 2 and r[0] == 0 else "") + str(v))
+        for i, v in enumerate(r[1:]):
+            c = ws.cell(5 + j, i + 1, v)
             c.font = Font(name=FONT, size=10)
             c.alignment = Alignment(wrap_text=True, vertical="top")
-        if PAY_FILL.get(r[6]):
-            ws.cell(rr, 3).fill = fill(PAY_FILL[r[6]])
     ws.freeze_panes = "A5"
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
@@ -615,7 +618,7 @@ def save_edit(k: str, v: str | None) -> None:
             c.execute("DELETE FROM blank_grupp_edits WHERE k=?", (k,))
         else:
             c.execute("INSERT OR REPLACE INTO blank_grupp_edits(k, v, ts) VALUES(?,?,?)",
-                      (k, str(v)[:2000], dt.datetime.now().isoformat(timespec="seconds")))
+                      (k, str(v)[:20000], dt.datetime.now().isoformat(timespec="seconds")))
 
 
 def _items(r, key):
@@ -708,54 +711,250 @@ def _bkey(tab: dict, b: dict, i: int) -> str:
     return re.sub(r"[^\w]", "", f"{b['kind']}{tab['sheet']}{i}")[:60]
 
 
+# ---------------------------------------------------------------- бланк админов
+# Замечания Иры 02.11: бланк ведут администраторы. Состав группы один раз берётся из
+# текущего бланка (МойКласс + все правки админов), дальше в бланке меняется только то,
+# что поменяла админ. МойКласс — только в проверках вверху страницы.
+WAIT_OFF = ("Мини-сад, ПШ и Лицей_Татьяна",)     # Ира 02.11: здесь лист ожидания не нужен
+OTRAB = 5                                          # статус записи «отработка» — не в бланк
+_ROWS_LOCK = _threading.Lock()
+
+
+def _rows(E: dict, key: str) -> list:
+    try:
+        return _json.loads(E.get(f"b:{key}:rows") or "[]")
+    except Exception:
+        return []
+
+
+def _rid() -> str:
+    import secrets
+    return "r" + secrets.token_hex(4)
+
+
+def _norm(s: str) -> list:
+    return re.sub(r"[^\wё ]", " ", (s or "").lower().replace("ё", "е")).split()
+
+
+def _same(a: str, b: str) -> bool:
+    """Ручная строка «Иванова Маша» ↔ карточка «Иванова Мария»: фамилия + 3 буквы имени."""
+    x, y = _norm(a), _norm(b)
+    return len(x) >= 2 and len(y) >= 2 and x[0] == y[0] and x[1][:3] == y[1][:3]
+
+
+def _freeze(m: dict, E: dict) -> None:
+    """Один раз: то, что сейчас видно в бланке (дети из МойКласса + правки админов:
+    имена, дни, «Отм.», ручная заливка, переносы, ручные строки), становится бланком админов.
+    Отработчиков и вычеркнутых не берём; у купивших после пробного «п» не держим."""
+    blocks = {b["key"]: b for t in m["tabs"] for b in t["blocks"] if b["kind"] == "group"}
+    out: dict = {k: [] for k in blocks}
+    moved = []
+    for key, b in blocks.items():
+        for k in b["kids"]:
+            ck = f"u:{key}:{k['uid']}"
+            if E.get(f"{ck}:hide") or k.get("status") == OTRAB:
+                continue
+            color = E.get(f"{ck}:color", "")
+            r = {"id": f"u{k['uid']}", "uid": k["uid"],
+                 "name": E.get(f"{ck}:name", k["name"]) or f"(без имени, карточка {k['uid']})",
+                 "days": E.get(f"{ck}:days", k["days"]), "mark": E.get(f"{ck}:mark", k["mark"]),
+                 "color": "" if color == "-" else color}
+            if f"{ck}:mark" not in E and ((k.get("trial") or {}).get("bought") or r["mark"] == "О"):
+                r["mark"] = ""
+            to = E.get(f"{ck}:move")
+            if to in blocks and to != key:
+                moved.append((to, r))
+            else:
+                out[key].append(r)
+        try:
+            man = _json.loads(E.get(f"b:{key}:manual") or "[]")
+        except Exception:
+            man = []
+        for x in man:
+            if (x.get("name") or "").strip():
+                out[key].append({"id": _rid(), "uid": None, "name": x.get("name", ""),
+                                 "days": x.get("days", ""), "mark": x.get("mark", ""),
+                                 "color": x.get("color", "")})
+    for to, r in moved:
+        out[to].append(r)
+    for key, rows in out.items():
+        if f"b:{key}:rows" not in E:
+            save_edit(f"b:{key}:rows", _json.dumps(rows, ensure_ascii=False))
+    save_edit("b:frozen", dt.datetime.now().isoformat(timespec="minutes"))
+
+
+def _header_parts(b: dict) -> tuple[str, str, str]:
+    """Как на бумаге: «гр.№ (дни)» · время (зелёная ячейка) · «(возраст)». Время — один раз."""
+    g = b.get("g") or {}
+    tm = g.get("time") or ""
+    notes = re.sub(r"[_\s]*\d{1,2}[:.]\d{2}\s*[-–]\s*\d{1,2}[:.]\d{2}", " ", g.get("notes") or "")
+    notes = re.sub(r"\s+", " ", notes.replace("_", " ")).strip()
+    pre = (f"гр.{g['num']}" if g.get("num") else "") + (f" ({g['days']})" if g.get("days") else "")
+    post = f"({g['age']})" if g.get("age") else ""
+    if notes:
+        if pre:
+            post = (post + " " + notes).strip()
+        else:
+            pre = notes
+    return pre.strip(), tm, post
+
+
 def with_edits(m: dict) -> dict:
-    """Модель + правки: скрытые/перенесённые дети, ручные строки, цвета, пометки."""
+    """Бланк админов + лист ожидания и логопеды из МойКласса + проверки вверху (t["checks"])."""
     import copy
     m = copy.deepcopy(m)
-    E = edits()
-    blocks_by_key = {}
     for t in m["tabs"]:
         for i, b in enumerate(t["blocks"]):
             b["key"] = _bkey(t, b, i)
-            blocks_by_key[b["key"]] = b
-    moved = []
+    E = edits()
+    if not E.get("b:frozen"):
+        with _ROWS_LOCK:
+            E = edits()
+            if not E.get("b:frozen"):
+                _freeze(m, E)
+                E = edits()
+    today = dt.date.today()
+    m["pay_due"] = "срок оплаты до 5 числа" if (today.day <= 5 or today.day >= 25) else ""
+    in_blank: dict = defaultdict(list)          # uid -> [заголовки групп, где он в бланке]
     for t in m["tabs"]:
+        t["blocks"] = [b for b in t["blocks"]
+                       if not (b["kind"] == "wait" and any(w in t["sheet"] for w in WAIT_OFF))]
         for b in t["blocks"]:
-            if b["kind"] == "indiv":
-                continue
-            keep = []
-            for k in b["kids"]:
-                ck = f"u:{b['key']}:{k['uid']}"
-                k["ck"] = ck
-                k["color"] = k.get("auto_color", "")
-                for f in ("days", "mark", "color", "note", "name"):
-                    if f"{ck}:{f}" in E:
-                        k[f] = E[f"{ck}:{f}"]
-                if k["color"] == "-":           # админ сняла цвет вручную
-                    k["color"] = ""
-                k["manual_color"] = f"{ck}:color" in E
-                to = E.get(f"{ck}:move")
-                if E.get(f"{ck}:hide"):
-                    k["hidden"] = True
-                if to and to in blocks_by_key and to != b["key"]:
-                    k["moved_from"] = b.get("header", "")
-                    moved.append((to, k))
-                    continue
-                keep.append(k)
-            b["kids"] = keep
-            extra = E.get(f"b:{b['key']}:manual")
-            b["manual"] = _json.loads(extra) if extra else []
-            b["free"] = E.get(f"b:{b['key']}:free", "")
-    for to, k in moved:
-        blocks_by_key[to]["kids"].append(k)
-    for t in m["tabs"]:
-        for b in t["blocks"]:
-            if b["kind"] == "indiv":
+            if b["kind"] == "group":
+                b["mk"] = [k for k in b["kids"] if k.get("status") != OTRAB]
+                b["kids"] = _rows(E, b["key"])
+                b["free"] = E.get(f"b:{b['key']}:free", "")
+                b["hpre"], b["time"], b["hpost"] = _header_parts(b)
+                for r in b["kids"]:
+                    if r.get("uid"):
+                        in_blank[r["uid"]].append(b["hpre"] or b["header"])
+            elif b["kind"] == "wait":
+                keep = []
+                for k in b["kids"]:
+                    ck = f"u:{b['key']}:{k['uid']}"
+                    k["ck"] = ck
+                    for f in ("days", "name"):
+                        if f"{ck}:{f}" in E:
+                            k[f] = E[f"{ck}:{f}"]
+                    if not E.get(f"{ck}:hide") and k["name"].strip():
+                        keep.append(k)
+                b["kids"] = keep
+            else:
                 for s in b["slots"]:
                     s["ck"] = f"b:{b['key']}:{s['time'].replace('.', '')}"
                     s["note"] = E.get(s["ck"] + ":note", "")
                     s["color"] = E.get(s["ck"] + ":color", "")
+    for t in m["tabs"]:
+        t["checks"] = _checks(t, in_blank, today)
     return m
+
+
+def _checks(t: dict, in_blank: dict, today: dt.date) -> dict:
+    """Расхождения бланка с МойКлассом — только для блоков вверху, в бланк ничего не пишем."""
+    ch = {"missing": [], "extra": [], "risk": [], "unpaid": [], "trials": []}
+    for b in t["blocks"]:
+        if b["kind"] != "group":
+            continue
+        g = " ".join(x for x in (b["hpre"], b["time"], b["hpost"]) if x)
+        mk_by = {k["uid"]: k for k in b["mk"]}
+        rows = b["kids"]
+        found = {}                                 # uid из МойКласса -> строка бланка
+        for r in rows:
+            if r.get("uid") in mk_by:
+                found[r["uid"]] = r
+        for k in b["mk"]:
+            if k["uid"] in found:
+                continue
+            r = next((r for r in rows if not r.get("uid") and _same(r.get("name", ""), k["name"])), None)
+            if r:
+                found[k["uid"]] = r
+                continue
+            where = [w for w in in_blank.get(k["uid"], []) if w != (b["hpre"] or b["header"])]
+            st = "пробное" if k.get("status") in (58132, 58131) else "учится"
+            ch["missing"].append({"g": g, "name": k["name"], "uid": k["uid"], "block": b["key"],
+                                  "days": k.get("days", ""),
+                                  "txt": f"в CRM числится ({st}), в бланке нет"
+                                         + (f" — в бланке он в {', '.join(where)}" if where else "")})
+        linked = {id(r) for r in found.values()}
+        for r in rows:
+            if r.get("uid") and r["uid"] not in mk_by and id(r) not in linked:
+                ch["extra"].append({"g": g, "name": r.get("name", ""),
+                                    "txt": "в бланке есть, в CRM в этой группе не числится"})
+        for uid, r in found.items():
+            k = mk_by[uid]
+            nm = r.get("name") or k["name"] or f"карточка {uid}"
+            if k.get("risk"):
+                ch["risk"].append({"g": g, "name": nm, "txt": k["risk"]})
+            if k.get("status") == 2 and k.get("auto_color") in ("r", "y"):
+                note = " · в бланке отмечен зелёным" if r.get("color") == "g" else ""
+                ch["unpaid"].append({"g": g, "name": nm, "txt": (k.get("pay") or "") + note})
+            tr = k.get("trial")
+            has_p = "п" in (r.get("mark") or "").lower()
+            if tr:
+                txt = f"пробное {tr.get('date') or '—'}"
+                txt += {True: " · пришёл", False: " · не пришёл"}.get(tr.get("came"), " · ждём")
+                if tr.get("came") is True or tr.get("bought"):
+                    txt += " · купил" if tr.get("bought") else " · не купил"
+                warn = ""
+                if tr.get("bought") and has_p:
+                    warn = "купил абонемент — «п» в бланке можно стереть"
+                elif not tr.get("bought") and not has_p:
+                    warn = "в бланке нет отметки «п»"
+                ch["trials"].append({"g": g, "name": nm, "txt": txt, "warn": warn})
+            elif has_p and k.get("status") == 2:
+                ch["trials"].append({"g": g, "name": nm, "txt": "в бланке «п», в CRM пробного нет",
+                                     "warn": "в бланке «п», в CRM пробного нет"})
+    return ch
+
+
+def row_op(p: dict) -> list:
+    """Правка бланка админом: set (поле строки), add (новая строка / «+ в бланк»), del, move.
+    Стёртое имя = строка удалена, список сдвигается. Возвращает строки блока."""
+    key = str(p.get("block") or "")
+    if not re.match(r"^g\d{1,12}$", key):
+        raise ValueError("bad block")
+    op = p.get("op")
+    rid = str(p.get("id") or "")
+    clip = lambda v: re.sub(r"\s+", " ", str(v or "")).strip()[:80]
+    with _ROWS_LOCK:
+        E = edits()
+        rows = _rows(E, key)
+        row = next((r for r in rows if r.get("id") == rid), None)
+        if op == "set":
+            f = p.get("field")
+            if f not in ("name", "days", "mark", "color") or row is None:
+                raise ValueError("bad field/row")
+            v = clip(p.get("value"))
+            if f == "color" and v not in ("", "g", "y", "r"):
+                raise ValueError("bad color")
+            if f == "name" and not v:
+                rows.remove(row)
+            else:
+                row[f] = v
+        elif op == "add":
+            uid = int(p["uid"]) if str(p.get("uid") or "").isdigit() else None
+            r = {"id": _rid(), "uid": uid, "name": clip(p.get("name")), "days": clip(p.get("days")),
+                 "mark": clip(p.get("mark")), "color": ""}
+            if not r["name"]:
+                raise ValueError("no name")
+            if not (uid and any(x.get("uid") == uid for x in rows)):
+                rows.append(r)
+        elif op == "del":
+            if row is not None:
+                rows.remove(row)
+        elif op == "move":
+            to = str(p.get("to") or "")
+            if not re.match(r"^g\d{1,12}$", to) or row is None:
+                raise ValueError("bad move")
+            if to != key:
+                rows.remove(row)
+                dest = _rows(E, to)
+                dest.append(row)
+                save_edit(f"b:{to}:rows", _json.dumps(dest, ensure_ascii=False))
+        else:
+            raise ValueError("bad op")
+        save_edit(f"b:{key}:rows", _json.dumps(rows, ensure_ascii=False))
+    return rows
 
 
 def _need_openpyxl():
@@ -775,34 +974,7 @@ def xlsx_bytes() -> bytes:
         raise RuntimeError(st["err"] or "данные ещё загружаются")
     m = with_edits(st["model"])
     for t in m["tabs"]:
-        for b in t["blocks"]:
-            if b["kind"] != "indiv":
-                b["kids"] = [k for k in b["kids"] if not k.get("hidden")] + [
-                    {"name": r.get("name", ""), "days": r.get("days", ""), "bd": r.get("bd", ""),
-                     "mark": r.get("mark", ""), "age": "", "note": "", "color": r.get("color", "")}
-                    for r in b.get("manual", [])]
-        t["slots"] = max([len(b["kids"]) for b in t["blocks"] if b["kind"] == "group"] + [SLOTS])
+        t["slots"] = max([len(b["kids"]) for b in t["blocks"] if b["kind"] in ("group", "wait")] + [SLOTS])
     with tempfile.NamedTemporaryFile(suffix=".xlsx") as f:
         to_xlsx(m, f.name)
-        _paint(f.name, m)
         return open(f.name, "rb").read()
-
-
-def _paint(path: str, m: dict) -> None:
-    """Фон ФИО — как отметила администратор: зелёный оплатили, жёлтый ссылка выслана, красный не оплатили."""
-    from openpyxl import load_workbook
-    from openpyxl.styles import PatternFill
-    wb = load_workbook(path)
-    col = {"g": "C6EFCE", "y": "FFEB9C", "r": "FFC7CE"}
-    for t in m["tabs"]:
-        ws = wb[t["sheet"]]
-        N = t["slots"]
-        for bi, b in enumerate(t["blocks"]):
-            if b["kind"] == "indiv":
-                continue
-            page, c, r = bi // 9, (bi % 9) // 3, bi % 3
-            top = 3 + (page * 3 + r) * (N + 3)
-            for i, k in enumerate(b["kids"][:N]):
-                if k.get("color") in col:
-                    ws.cell(top + 1 + i, c * 6 + 2).fill = PatternFill("solid", fgColor=col[k["color"]])
-    wb.save(path)

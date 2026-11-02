@@ -9882,8 +9882,8 @@ def api_mesta_razrez():
 
 @app.get("/blank-grupp", response_class=HTMLResponse, dependencies=AUTH)
 def blank_grupp_page():
-    """Бланки групп «как на бумаге» (просьба Иры 31.10): живые из МойКласса раз в час
-    + правки админов поверх (цвет оплаты, дни, пометки, перенос, ручные строки)."""
+    """Бланки групп «как на бумаге» (просьба Иры 31.10). С 02.11 бланк ведут админы,
+    МойКласс — только в проверках вверху (замечания Иры 02.11)."""
     return HTMLResponse((BASE / "templates" / "blank_grupp.html").read_text(encoding="utf-8"))
 
 
@@ -9904,6 +9904,16 @@ def api_blank_grupp_edit(payload: dict = Body(...)):
     except ValueError:
         raise HTTPException(400, "bad key")
     return {"ok": True}
+
+
+@app.post("/api/blank-grupp/row", dependencies=AUTH)
+def api_blank_grupp_row(payload: dict = Body(...)):
+    """Строка бланка группы (ведут админы): set / add / del / move."""
+    from . import blank_grupp
+    try:
+        return {"ok": True, "rows": blank_grupp.row_op(payload)}
+    except (ValueError, KeyError):
+        raise HTTPException(400, "bad request")
 
 
 @app.get("/api/blank-grupp/xlsx", dependencies=AUTH)
