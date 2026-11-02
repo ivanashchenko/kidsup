@@ -4132,6 +4132,22 @@ def wazzup_watchdog() -> dict:
                     "меняет интеграция МойКласс при пересохранении.")
     except Exception as e:
         log.warning("watchdog: вебхук не проверился: %s", e)
+    # 02.11: адрес был наш, но Wazzup перестал слать события с 10:44 до 12:05,
+    # пока подписку не пересохранили. Днём тишина дольше 40 минут — не норма:
+    # пересохраняем вебхук сами (повторно не чаще раза в час).
+    try:
+        now = _now().replace(tzinfo=None)          # МСК, как ts в wazzup_raw
+        if 9 <= now.hour < 21:
+            with db.get_conn() as c:
+                last = c.execute("SELECT MAX(ts) FROM wazzup_raw").fetchone()[0]
+            if last:
+                gap = (now - datetime.fromisoformat(str(last)[:19])).total_seconds() / 60
+                res["silence_min"] = int(gap)
+                if gap > 40 and _mark("wz_silence", now.strftime("%Y-%m-%d %H")):
+                    res["resubscribed"] = wz.set_webhook()
+                    log.warning("Wazzup молчит %d мин — вебхук пересохранён (%s)", gap, res["resubscribed"])
+    except Exception as e:
+        log.warning("watchdog: проверка тишины не удалась: %s", e)
 
     try:
         senders = [s.strip() for s in (db.get_setting("wa_senders") or "").split(",") if s.strip()]
