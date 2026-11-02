@@ -6699,6 +6699,28 @@ def api_wazzup_users():
     return {"users": r.json()}
 
 
+@app.get("/api/wazzup/webhook", dependencies=OWNER_AUTH)
+def api_wazzup_webhook_status():
+    """Куда Wazzup шлёт события и когда было последнее (02.11: события пропали в 10:44)."""
+    import httpx as _hx
+    from . import wazzup
+    r = _hx.get(f"{wazzup.API}/webhooks", headers=wazzup._headers(), timeout=30)
+    with db.get_conn() as c:
+        try:
+            last = c.execute("SELECT MAX(ts) FROM wazzup_raw").fetchone()[0]
+        except Exception:
+            last = None
+    return {"http": r.status_code, "wazzup": (r.json() if r.status_code == 200 else r.text[:300]),
+            "ours": wazzup.OUR_HOOK, "last_event": last}
+
+
+@app.post("/api/wazzup/webhook", dependencies=OWNER_AUTH)
+def api_wazzup_webhook_restore():
+    """Вернуть вебхук Wazzup на наш портал (подписки — как в set_webhook)."""
+    from . import wazzup
+    return {"ok": wazzup.set_webhook(), "uri": wazzup.webhook_uri()}
+
+
 @app.get("/api/wazzup/channels", dependencies=AUTH)
 def api_wazzup_channels():
     """Каналы Wazzup со статусами — видно, жив ли WABA-номер и в каком он профиле."""
