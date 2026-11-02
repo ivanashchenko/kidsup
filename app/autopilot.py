@@ -3066,6 +3066,15 @@ def evening_digest(mk: MoyklassClient) -> None:
     по людям, записи, автоматика, невыполненные обещания клиентам,
     горящие группы на завтра."""
     from . import mango
+    # 03.11, Борис: «зачем ты мне шлёшь такую фигню?» — сводка повторяла вечерний
+    # итог Клода, с устаревшими админами и «горящими» группами, которых нет.
+    # digest_off=1: сводку не шлём, остаётся только тревога «пополнить Манго».
+    if str(db.get_setting("digest_off") or "").strip() in ("1", "true", "да"):
+        bal = mango.balance()
+        phone = db.get_setting("digest_phone") or ""
+        if bal is not None and bal < 500 and phone:
+            _wa(phone, f"🤖 Баланс Манго {bal:.0f} ₽ — пополнить, иначе встанут звонки и СМС.", kind="digest")
+        return
     today = _today().isoformat()
     lines = [f"KidsUP · сводка за {_today().strftime('%d.%m')}"]
     try:
@@ -4166,7 +4175,10 @@ def wazzup_watchdog() -> dict:
                 if c.get("state") == "active":
                     alive.add(pid)
                     kind[pid] = tr
-        dead = [s for s in senders if s not in alive]
+        # 03.11: номера, которые ещё не запущены (WABA 3507), сторож не проверяет —
+        # иначе каждую ночь «канал не активен» про то, что и так известно
+        skip = {x.strip() for x in (db.get_setting("wa_watch_skip") or "").split(",") if x.strip()}
+        dead = [s for s in senders if s not in alive and s not in skip]
         res["dead_senders"] = dead
         if dead and _mark("wz_dead_sender", f"{_today()}:{','.join(dead)}"):
             how = []
