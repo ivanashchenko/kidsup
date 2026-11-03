@@ -143,15 +143,27 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 _security = HTTPBasic(auto_error=False)
 
 
+def _is_owner(credentials: HTTPBasicCredentials | None) -> bool:
+    """Логин boris с паролем владельца (настройка owner_password)."""
+    owner_pw = db.get_setting("owner_password")
+    return bool(owner_pw and credentials is not None
+                and secrets.compare_digest(credentials.username, "boris")
+                and secrets.compare_digest(credentials.password, owner_pw))
+
+
 def check_auth(credentials: HTTPBasicCredentials | None = Depends(_security)):
-    """HTTP Basic — только если задан APP_PASSWORD."""
+    """HTTP Basic — только если задан APP_PASSWORD.
+
+    03.11.2026 Борис: «сделай, чтобы под логином boris я имел доступ ко всем
+    страницам admin». Владелец проходит везде, где проходит admin, — одним
+    входом, без второго окна пароля между /owner и админскими страницами."""
     if not config.APP_PASSWORD:
         return
     ok = (
         credentials is not None
         and secrets.compare_digest(credentials.username, config.APP_USER)
         and secrets.compare_digest(credentials.password, config.APP_PASSWORD)
-    )
+    ) or _is_owner(credentials)
     if not ok:
         raise HTTPException(status_code=401, detail="Требуется авторизация",
                             headers={"WWW-Authenticate": "Basic"})
@@ -168,13 +180,9 @@ def check_owner(credentials: HTTPBasicCredentials | None = Depends(_security)):
     браузер МойКласса и деплой закрыты отдельным паролем. Пока owner_password не
     задан — работает обычная авторизация (чтобы можно было задать его в первый раз).
     """
-    owner_pw = db.get_setting("owner_password")
-    if not owner_pw:
+    if not db.get_setting("owner_password"):
         return check_auth(credentials)
-    ok = (credentials is not None
-          and secrets.compare_digest(credentials.username, "boris")
-          and secrets.compare_digest(credentials.password, owner_pw))
-    if not ok:
+    if not _is_owner(credentials):
         raise HTTPException(status_code=401, detail="Только для владельца",
                             headers={"WWW-Authenticate": "Basic"})
 
