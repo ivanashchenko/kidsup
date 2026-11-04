@@ -151,7 +151,11 @@ GIVEN_NAMES = set("""
 FEM_SOFT = {"любовь"}                            # женские на -ь: Любови
 INDECLINABLE = {"николь", "адель", "нелли",      # не склоняются
                 "марьям", "анаит", "айлин", "мадлен"}
-GEN_SPECIAL = {"лев": "Льва", "павел": "Павла"}  # беглые гласные
+GEN_SPECIAL = {"лев": "Льва", "павел": "Павла",   # беглые гласные
+               # запасное слово, когда имени ребёнка в карточке нет:
+               # раньше подставляли уже склонённое «ребёнка», и выходило
+               # «на занятия ребёнки» (Лиза, 04.11)
+               "ребёнок": "ребёнка", "ребенок": "ребенка"}
 
 
 def _genitive(name: str) -> str:
@@ -2104,7 +2108,7 @@ def welcome_series(mk: MoyklassClient) -> None:
                      (user.get("phone") or "")[-4:], user.get("clientStateId"))
             continue
         phone = user.get("phone") or ""
-        child = _child_name(user.get("name") or "") or "ребёнка"
+        child = _child_name(user.get("name") or "") or "ребёнок"
         f = _group_facts(mk, uid)
         lines = [f"Спасибо, что выбрали KidsUP 🌿",
                  f"Место {_genitive(child)} в группе "
@@ -2161,7 +2165,7 @@ def welcome_series(mk: MoyklassClient) -> None:
                      stage, (user.get("phone") or "")[-4:], user.get("clientStateId"))
             continue
         phone = user.get("phone") or ""
-        child = _child_name(user.get("name") or "") or "ребёнка"
+        child = _child_name(user.get("name") or "") or "ребёнок"
         f = _group_facts(mk, uid)
         if stage == 2:
             kit = WELCOME_KIT.get(f["course"], "сменная обувь — всё остальное наше")
@@ -2289,7 +2293,7 @@ def after_trial(mk: MoyklassClient) -> None:
             user = mk.get(f"/v1/company/users/{uid}")
         except Exception:
             continue
-        child = _child_name(user.get("name") or "") or "ребёнка"
+        child = _child_name(user.get("name") or "") or "ребёнок"
         if admins:
             _task(mk, admins[0]["managerId"], uid,
                   "🔥 БЫЛ НА ПРОБНОМ СЕГОДНЯ — позвонить завтра до обеда, пока впечатление живое. "
