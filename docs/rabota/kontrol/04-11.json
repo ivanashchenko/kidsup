@@ -1,0 +1,57 @@
+{
+ "den": "2026-11-04",
+ "istoriya": {
+  "sobytiy": 1414,
+  "lena": {
+   "sobytiy": 466,
+   "okno": "09:51-19:51",
+   "platezhey": 11,
+   "abonementov": 13,
+   "zapisey_sozdano": 153,
+   "zapisey_udaleno": 133,
+   "primechanie": "переводы и отработки английского; двойной наличный платёж у одного ученика — дубль убран Лизой"
+  },
+  "ira": {
+   "sobytiy": 332,
+   "okno": "12:14-19:50",
+   "platezhey": 9,
+   "abonementov": 16,
+   "kommentariev": 19,
+   "primechanie": "3 безнал-оплаты внесены и затем удалены Лизой с переоформлением счетами"
+  },
+  "liza": {
+   "sobytiy": 472,
+   "okno": "09:10-19:46",
+   "zanyatiy_udaleno": 36,
+   "zanyatiy_izmeneno": 201,
+   "platezhey_udaleno": 5,
+   "abonementov_udaleno": 6,
+   "prodazh_udaleno": 1,
+   "primechanie": "удалены будущие занятия одного слота логопеда; удаления платежей — исправления"
+  },
+  "v_dolg": 33
+ },
+ "oplaty": {
+  "chislo": 22,
+  "summa": 132340,
+  "karta": 14,
+  "beznal_online": 6,
+  "nal": 2,
+  "nal_summa": 14875,
+  "komtet": "работает, 15 чеков; 1 наличный платёж без чека"
+ },
+ "yavka": {
+  "03-11": "9/80",
+  "04-11": "9/83",
+  "status": "не закрыта"
+ },
+ "kamery": {
+  "kadrov": 27,
+  "rashozhdeniy": 3
+ },
+ "punkty": {
+  "Лена": 3,
+  "Лиза": 1,
+  "Борис_pult": 5
+ }
+}
