@@ -30,6 +30,10 @@ COURSE_SHORT = {
     "Шахматы": "Шахматы",
 }
 SKIP_COURSES = {"Праздник", "Заявки Roistat", "Набор на новые предметы 26/27"}
+# Ира 04.11: мини-сад и нулевой класс — бланк по дням недели (один блок = один день)
+DAY_COURSE = "Английский детский сад"
+DAY_WD = [("пн", "mo", "ПН"), ("вт", "tu", "ВТ"), ("ср", "we", "СР"), ("чт", "th", "ЧТ"), ("пт", "fr", "ПТ")]
+TRIAL_ST = (58132, 58131)               # записан на пробное / посетил пробное
 DAYS_CHOICES = ["пн", "вт", "ср", "чт", "пт", "сб", "вс", "пн-ср", "пн-чт", "пн-пт",
                 "вт-чт", "вт-пт", "ср-пт", "ср-сб", "пн-сб", "чт-сб"]
 
@@ -284,6 +288,7 @@ def build_model(meta: dict, lessons: list, joins: list, users: dict,
 
     in_class = defaultdict(list)
     waiting_by_course = defaultdict(list)
+    waiting_in_class = defaultdict(list)      # лист ожидания конкретной группы (мини-сад/НК по дням)
     for j in joins:
         cid, st = j.get("classId"), j.get("statusId")
         if cid not in opened:
@@ -301,6 +306,7 @@ def build_model(meta: dict, lessons: list, joins: list, users: dict,
             c = child(j["userId"], cid, st)
             c["note"] = "в " + (parse_group(cname)["num"] and "гр." + parse_group(cname)["num"] or cname[5:30])
             waiting_by_course[classes[cid]["courseId"]].append(c)
+            waiting_in_class[cid].append(c)
 
     # вкладки по педагогам
     tabs: dict[str, dict] = {}
@@ -330,9 +336,22 @@ def build_model(meta: dict, lessons: list, joins: list, users: dict,
                 g = {"num": "", "days": "", "time": g["time"] or "", "age": "",
                      "notes": c["name"].replace("2627_", "")}
             kids = sorted(in_class.get(cid, []), key=lambda k: k["name"])
-            tab["groups"].append({"classId": cid, "header": group_header(g), "time": g["time"],
-                                  "g": g, "cap": c.get("maxStudents") or SLOTS, "kids": kids,
-                                  "course": course})
+            grp = {"classId": cid, "header": group_header(g), "time": g["time"],
+                   "g": g, "cap": c.get("maxStudents") or SLOTS, "kids": kids, "course": course}
+            if course == DAY_COURSE:
+                # мини-сад и НК раскладываются по дням недели (with_edits → _day_tab):
+                # лист ожидания этой группы + общий по направлению («Заявки»)
+                # (у мини-сада и НК одно направление, поэтому из общего берём только «Заявки»,
+                # а не ожидающих соседней группы)
+                wl, seen_w = [], set()
+                common = [k for k in waiting_by_course.get(c["courseId"], []) if not k["note"]]
+                for k in sorted(waiting_in_class.get(cid, []), key=lambda k: k["name"]) + \
+                        sorted(common, key=lambda k: k["name"]):
+                    if k["uid"] not in seen_w:
+                        seen_w.add(k["uid"])
+                        wl.append(k)
+                grp["wait_kids"] = wl
+            tab["groups"].append(grp)
 
     out = []
     first_names = Counter(_first_name(t["teacher"]) for t in tabs.values() if t["teacher"])
@@ -479,7 +498,7 @@ def to_xlsx(model: dict, path: str) -> None:
                     ws.cell(rr, c0 + k).border = Border(bottom=side)
                     if k:
                         ws.cell(rr, c0 + k).font = Font(name=FONT, size=11)
-                if b["kind"] == "group":
+                if b["kind"] in ("group", "day"):
                     ws.merge_cells(start_row=rr, start_column=c0 + 2, end_row=rr, end_column=c0 + 3)
                     dv.add(ws.cell(rr, c0 + 2))
                 elif b["kind"] == "wait":
@@ -517,6 +536,42 @@ def to_xlsx(model: dict, path: str) -> None:
                     ws.cell(r1 + 1, c0 + 1).font = Font(name=FONT, size=10)
                     if s["kids"]:
                         ws.cell(r1, c0 + 3, s["kids"][0]["bd"]).font = Font(name=FONT, size=9)
+            elif b["kind"] == "day":                 # мини-сад/НК по дням: абонементы, пропуск, серые ручные
+                i = 0
+                for k in b["kids"]:
+                    if i >= N:
+                        break
+                    rr = top + 1 + i
+                    nc = ws.cell(rr, c0 + 1, k.get("name", ""))
+                    if PAY_FILL.get(k.get("view")):
+                        nc.fill = fill(PAY_FILL[k["view"]])
+                    if k.get("first") and k.get("days"):
+                        ws.cell(rr, c0 + 2, f"({k['days']})")
+                    mc = ws.cell(rr, c0 + 4, k.get("mark", ""))
+                    mc.alignment = Alignment(horizontal="center", shrink_to_fit=True)
+                    i += 1
+                i += 1 if b["kids"] else 0           # пропуск перед пробными/временными
+                for g in b.get("gray") or []:
+                    if i >= N:
+                        break
+                    rr = top + 1 + i
+                    nc = ws.cell(rr, c0 + 1, g.get("name", ""))
+                    nc.font = Font(name=FONT, size=11, color="8A8A8A")
+                    if PAY_FILL.get(g.get("view")):
+                        nc.fill = fill(PAY_FILL[g["view"]])
+                    if g.get("days"):
+                        ws.cell(rr, c0 + 2, g["days"]).font = Font(name=FONT, size=11, color="8A8A8A")
+                    mc = ws.cell(rr, c0 + 4, g.get("mark", ""))
+                    mc.font = Font(name=FONT, size=11, color="8A8A8A")
+                    mc.alignment = Alignment(horizontal="center", shrink_to_fit=True)
+                    i += 1
+                fr = top + 1 + N
+                ws.cell(fr, c0, "Свободно:").font = Font(name=FONT, size=10, bold=True)
+                ws.merge_cells(start_row=fr, start_column=c0, end_row=fr, end_column=c0 + 1)
+                if b.get("free"):
+                    ws.cell(fr, c0 + 2, b["free"]).font = Font(name=FONT, size=9)
+            elif b["kind"] == "empty":
+                pass
             else:                                    # лист ожидания: Ф.И., д.р., желаемые дни, телефон
                 for i, k in enumerate(b["kids"][:N]):
                     rr = top + 1 + i
@@ -849,14 +904,102 @@ def with_edits(m: dict) -> dict:
     except Exception:
         badpay = {}
     m["badpay_at"] = (_json.loads(E.get("b:badpay") or "{}") or {}).get("at", "") if badpay else ""
+    _day_tabs(m, E)
     for t in m["tabs"]:
-        t["checks"] = _checks(t, in_blank, today, badpay)
+        src = t.pop("src_block", None)
+        # вкладка «по дням» проверяется по своей группе (она в бланке скрыта, но строки — её)
+        t["checks"] = _checks({"blocks": [src]} if src else t, in_blank, today, badpay)
         for b in t["blocks"]:
             if b["kind"] == "group":
                 for r in b["kids"]:
                     c = r.get("color") or r.get("auto", "")
                     r["view"] = "" if c == "-" else c
     return m
+
+
+def _wd_list(s: str) -> list:
+    """«пн-ср-пт», «пн, чт» → ['пн', 'ср', 'пт']: дни перечислены, а не диапазон."""
+    return re.findall(r"пн|вт|ср|чт|пт|сб|вс", (s or "").lower())
+
+
+def _day_tabs(m: dict, E: dict) -> None:
+    """Ира 04.11: мини-сад и нулевой класс — отдельной вкладкой по дням недели.
+    Блок группы уходит из вкладки педагога; новая вкладка ставится перед ней."""
+    new = []
+    for t in m["tabs"]:
+        keep = []
+        for b in t["blocks"]:
+            if b["kind"] == "group" and b.get("course") == DAY_COURSE:
+                s = " ".join([b.get("header") or "", (b.get("g") or {}).get("notes") or "", b.get("hpre") or ""])
+                lab = "Мини-сад" if "Мини-сад" in s else ("Нулевой класс" if "Нулевой" in s else "")
+                if lab:
+                    new.append((t, _day_tab(t, b, lab, E)))
+                    continue
+            keep.append(b)
+        t["blocks"] = keep
+    for parent, nt in new:
+        m["tabs"].insert(m["tabs"].index(parent), nt)
+
+
+def _day_tab(t: dict, b: dict, lab: str, E: dict) -> dict:
+    """Блоки ПН ВТ СР | ЧТ ПТ (без дней) | лист ожидания, пусто, пусто — заполнение сверху вниз.
+    Сверху блока дня — дети с абонементом по алфавиту: это строки бланка админов этой группы
+    (правка имени, дней, «Отм.», заливки пишется туда же — одна строка на ребёнка).
+    Ниже — ручные строки админа (пробные, временные): хранятся отдельно по дню (b:d…:rows),
+    Клод их не заполняет, не переносит и при обновлении не стирает. Автоцвета оплаты нет —
+    заливку ставит администратор."""
+    cid = b["classId"]
+    fn = _first_name(t.get("teacher") or "") or t["sheet"].split("_")[-1]
+    st = {k["uid"]: k.get("status") for k in b.get("mk", [])}
+    subs = []
+    for r in b["kids"]:
+        uid = r.get("uid")
+        if uid and st.get(uid) in TRIAL_ST:
+            continue                               # пробники — ручные строки админа
+        if not uid and (r.get("mark") or "").strip().lower().startswith("п"):
+            continue
+        if not (r.get("name") or "").strip():
+            continue
+        c = r.get("color") or ""
+        subs.append({**r, "view": "" if c in ("", "-") else c, "src": b["key"]})
+    subs.sort(key=lambda r: (r.get("name") or "").lower().replace("ё", "е"))
+    blocks, seen = [], set()
+    for wd, lat, up in DAY_WD:
+        key = f"d{cid}{lat}"
+        rows = []
+        for r in subs:
+            if wd in _wd_list(r.get("days")):
+                rows.append({**r, "first": r["id"] not in seen})
+                seen.add(r["id"])
+        gray = _rows(E, key)
+        for g in gray:
+            c = g.get("color") or ""
+            g["view"] = "" if c in ("", "-") else c
+        blocks.append({"kind": "day", "key": key, "header": up, "src": b["key"], "kids": rows,
+                       "gray": gray, "free": E.get(f"b:{key}:free", "")})
+    nod = [{**r, "first": True} for r in subs if not _wd_list(r.get("days"))]
+    if nod:
+        blocks.append({"kind": "day", "key": f"d{cid}nd", "header": "БЕЗ ДНЕЙ — впишите дни", "src": b["key"],
+                       "kids": nod, "gray": [], "nogray": True, "free": ""})
+    else:
+        blocks.append({"kind": "empty", "key": f"e{cid}0", "header": ""})
+    wkey = f"w{cid}"
+    wl = []
+    for k in b.get("wait_kids") or []:
+        k = dict(k)
+        ck = f"u:{wkey}:{k['uid']}"
+        k["ck"] = ck
+        for f in ("days", "name"):
+            if f"{ck}:{f}" in E:
+                k[f] = E[f"{ck}:{f}"]
+        if not E.get(f"{ck}:hide") and (k.get("name") or "").strip():
+            wl.append(k)
+    blocks.append({"kind": "wait", "key": wkey, "header": "ЛИСТ ОЖИДАНИЯ", "kids": wl})
+    blocks.append({"kind": "empty", "key": f"e{cid}1", "header": ""})
+    blocks.append({"kind": "empty", "key": f"e{cid}2", "header": ""})
+    sheet = re.sub(r"[/\\?*\[\]:]", "", f"{lab}_{fn}")[:31]
+    return {"sheet": sheet, "title": f"{lab} — {fn}", "teacher": t.get("teacher", ""),
+            "blocks": blocks, "slots": SLOTS, "by_days": True, "src_block": b}
 
 
 def _checks(t: dict, in_blank: dict, today: dt.date, badpay: dict | None = None) -> dict:
@@ -931,9 +1074,12 @@ def row_op(p: dict) -> list:
     """Правка бланка админом: set (поле строки), add (новая строка / «+ в бланк»), del, move.
     Стёртое имя = строка удалена, список сдвигается. Возвращает строки блока."""
     key = str(p.get("block") or "")
-    if not re.match(r"^g\d{1,12}$", key):
+    # g… — группа; d…mo/tu/… — ручные (серые) строки дня в бланке мини-сада/НК по дням
+    if not re.match(r"^(g\d{1,12}|d\d{1,12}(mo|tu|we|th|fr))$", key):
         raise ValueError("bad block")
     op = p.get("op")
+    if op == "move" and not key.startswith("g"):
+        raise ValueError("bad move")
     rid = str(p.get("id") or "")
     clip = lambda v: re.sub(r"\s+", " ", str(v or "")).strip()[:80]
     with _ROWS_LOCK:
@@ -977,6 +1123,13 @@ def row_op(p: dict) -> list:
     return rows
 
 
+def _day_rows(b: dict) -> int:
+    """Строк в блоке дня: абонементы + пропуск + серые ручные + одна свободная под новую."""
+    if b.get("nogray"):
+        return len(b["kids"])
+    return len(b["kids"]) + 1 + len(b.get("gray") or []) + 1
+
+
 def _need_openpyxl():
     try:
         import openpyxl  # noqa: F401
@@ -994,7 +1147,8 @@ def xlsx_bytes() -> bytes:
         raise RuntimeError(st["err"] or "данные ещё загружаются")
     m = with_edits(st["model"])
     for t in m["tabs"]:
-        t["slots"] = max([len(b["kids"]) for b in t["blocks"] if b["kind"] in ("group", "wait")] + [SLOTS])
+        t["slots"] = max([len(b["kids"]) for b in t["blocks"] if b["kind"] in ("group", "wait")]
+                         + [_day_rows(b) for b in t["blocks"] if b["kind"] == "day"] + [SLOTS])
     with tempfile.NamedTemporaryFile(suffix=".xlsx") as f:
         to_xlsx(m, f.name)
         return open(f.name, "rb").read()

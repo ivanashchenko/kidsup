@@ -40,6 +40,8 @@ main{padding:12px}
 .bd{font-size:11px;color:var(--mut);white-space:nowrap}
 .mk{font-size:11px;text-align:center;white-space:nowrap;overflow:hidden}
 .tm{background:var(--lg);font-weight:700;text-align:center}
+.row.gray .nm [contenteditable],.row.gray input,.row.gray .mk{color:#8a8a8a}
+.row.gap .n{opacity:.55}
 .ph{font-size:11px;color:var(--mut);display:block;line-height:1.1;padding-left:3px}
 .mv{font-size:10px;color:var(--blue);display:block;line-height:1;padding-left:3px}
 .free{display:flex;gap:6px;align-items:center;margin-top:4px;font-size:13px}
@@ -128,7 +130,8 @@ function draw(){
    <p>Заливка имени — оплата месяца по МойКлассу, ставится сама: <i style="background:var(--paid)"></i>оплачен <i style="background:var(--link)"></i>оплачен частично <i style="background:var(--unpaid)"></i>не оплачен <i style="background:var(--bad)"></i><b>некорректная оплата</b> — в МойКлассе оплачено, а денег нет ни на терминале, ни по ссылке (проверить, не нажали ли не тот способ оплаты).</p>
    <p>Ваш цвет важнее автоматического: клик по номеру — зелёный → жёлтый «выслали ссылку» → красный → без цвета → снова как в МойКлассе.</p>
    <p>«Отм.»: п — пробное, О — только отработка. Номер можно перетащить в другую группу. Стереть имя — строка удалится, список сдвинется. Новый ребёнок — впишите в пустую строку.</p>
-   <p>Бланк меняете только вы. МойКласс ничего в бланк не дописывает — расхождения с ним в блоках-проверках над бланком.</p>`;
+   <p>Бланк меняете только вы. МойКласс ничего в бланк не дописывает — расхождения с ним в блоках-проверках над бланком.</p>`+
+   (t.by_days?`<p><b>По дням недели:</b> один блок — один день. Сверху дети с абонементом по алфавиту, дни в скобках — один раз, в первом дне недели; поменяете дни — ребёнок сам переедет в нужные блоки. Ниже пропуск и серые строки — пробные и временные дети: вписываете сами, при обновлении они не стираются. Заливку оплаты (клик по номеру) и «Отм.» ставите сами.</p>`:'');
   main.appendChild(lg);
   main.appendChild(summary(t));
   for(let p=0;p<t.blocks.length;p+=9){
@@ -161,6 +164,8 @@ function block(b,i){
   const el=document.createElement('div');el.className='blk';el.style.setProperty('--c',hcol(i));el.dataset.key=b.key;
   if(b.kind==='indiv')return indiv(el,b);
   if(b.kind==='wait')return wait(el,b);
+  if(b.kind==='day')return day(el,b);
+  if(b.kind==='empty')return empty(el,b);
   el.innerHTML=`<div class="bh">${b.hpre?`<span>${esc(b.hpre)}</span>`:''}${b.time?`<span class="t">${esc(b.time)}</span>`:''}${b.hpost?`<span>${esc(b.hpost)}</span>`:''}</div>`;
   const kids=b.kids;
   const n=Math.max(10,kids.length+1);
@@ -216,11 +221,75 @@ function wait(el,b){
     el.appendChild(r);
   }
   const t=curTab();
-  const fr=t.blocks.filter(x=>x.kind==='group'&&x.cap>x.kids.length).map(x=>[x,x.cap-x.kids.length]);
   const f=document.createElement('div');f.className='fr';
-  f.innerHTML=`<b>Свободные места — кого из листа звать:</b>${fr.length?fr.map(([x,n])=>`${esc([x.hpre,x.time,x.hpost].filter(Boolean).join(' '))} — <b style="display:inline">${n}</b>`).join('<br>'):'свободных мест нет'}`;
+  if(t.by_days){
+    const dd=t.blocks.filter(x=>x.kind==='day'&&x.free);
+    f.innerHTML=`<b>Свободно по дням (из строк «Свободно»):</b>${dd.length?dd.map(x=>`${esc(x.header)} — ${esc(x.free)}`).join('<br>'):'не заполнено'}`;
+  }else{
+    const fr=t.blocks.filter(x=>x.kind==='group'&&x.cap>x.kids.length).map(x=>[x,x.cap-x.kids.length]);
+    f.innerHTML=`<b>Свободные места — кого из листа звать:</b>${fr.length?fr.map(([x,n])=>`${esc([x.hpre,x.time,x.hpost].filter(Boolean).join(' '))} — <b style="display:inline">${n}</b>`).join('<br>'):'свободных мест нет'}`;
+  }
   el.appendChild(f);
   bindEdits(el);return el;
+}
+// Мини-сад и НК по дням (Ира 04.11): сверху абонементы — строки бланка группы (правка идёт туда,
+// поэтому ребёнок меняется сразу во всех днях), ниже пропуск и серые ручные строки этого дня.
+function day(el,b){
+  el.innerHTML=`<div class="bh day">${esc(b.header)}</div>`;
+  const kids=b.kids||[],gray=b.gray||[];
+  const total=Math.max(10,kids.length+(b.nogray?0:(kids.length?1:0)+gray.length+1));
+  let j=0;
+  kids.forEach(k=>{
+    const r=document.createElement('div');r.className='row';
+    const col=k.color==='-'?'':(k.color||'');
+    r.innerHTML=`<div class="n">${j+1}</div>
+      <div class="nm ${k.view||''}"><span contenteditable data-f="name">${esc(k.name)}</span></div>
+      ${k.first?`<input list="dd" data-f="days" value="${esc(k.days?'('+k.days+')':'')}" title="дни ребёнка — в скобках один раз; поменяете — переедет по дням">`:'<div></div>'}
+      <div class="mk"><span contenteditable data-f="mark">${esc(k.mark||'')}</span></div>`;
+    r.querySelector('.n').onclick=async()=>{const nx=cyc(col);r.querySelector('.nm').className='nm '+nx;
+      if(await op({op:'set',block:k.src,id:k.id,field:'color',value:nx}))load(false)};
+    bindRow(r,async(f,v)=>{
+      if(f==='days')v=v.replace(/[()\s]/g,'');
+      if(f==='name'&&!v){if(!confirm('Убрать «'+k.name+'» из бланка (из всех дней)?')){r.querySelector('[data-f=name]').innerText=k.name;return}}
+      if(await op({op:'set',block:k.src,id:k.id,field:f,value:v}))load(false)});
+    el.appendChild(r);j++;
+  });
+  if(!b.nogray){
+    if(kids.length){const r=document.createElement('div');r.className='row gap';r.innerHTML=`<div class="n">${j+1}</div><div></div><div></div><div></div>`;el.appendChild(r);j++}
+    gray.forEach(g=>{
+      const r=document.createElement('div');r.className='row gray';
+      r.innerHTML=`<div class="n">${j+1}</div>
+        <div class="nm ${g.view||''}"><span contenteditable data-f="name">${esc(g.name)}</span></div>
+        <input list="dd" data-f="days" value="${esc(g.days||'')}">
+        <div class="mk"><span contenteditable data-f="mark">${esc(g.mark||'')}</span></div>`;
+      r.querySelector('.n').onclick=async()=>{const nx=cyc(g.color==='-'?'':(g.color||''));g.color=nx;r.querySelector('.nm').className='nm '+nx;
+        await op({op:'set',block:b.key,id:g.id,field:'color',value:nx})};
+      bindRow(r,async(f,v)=>{if(await op({op:'set',block:b.key,id:g.id,field:f,value:v})&&f==='name'&&!v)load(false)});
+      el.appendChild(r);j++;
+    });
+  }
+  while(j<total){
+    const r=document.createElement('div');r.className='row'+(b.nogray?'':' gray');
+    if(b.nogray){r.innerHTML=`<div class="n">${j+1}</div><div></div><div></div><div></div>`}
+    else{
+      r.innerHTML=`<div class="n">${j+1}</div><div class="nm"><span contenteditable data-f="name"></span></div><input list="dd" data-f="days" value=""><div class="mk"><span contenteditable data-f="mark"></span></div>`;
+      bindRow(r,async()=>{const g=f=>{const e=r.querySelector(`[data-f=${f}]`);return (e.value??e.innerText).trim()};
+        if(!g('name'))return;
+        if(await op({op:'add',block:b.key,name:g('name'),days:g('days'),mark:g('mark')}))load(false)});
+    }
+    el.appendChild(r);j++;
+  }
+  if(!b.nogray){
+    const f=document.createElement('div');f.className='free';
+    f.innerHTML=`<b>Свободно:</b><span contenteditable data-k="b:${b.key}:free">${esc(b.free||'')}</span>`;
+    el.appendChild(f);
+  }
+  bindEdits(el);return el;
+}
+function empty(el,b){
+  el.innerHTML=`<div class="bh day">${esc(b.header||'')}&nbsp;</div>`;
+  for(let j=0;j<10;j++){const r=document.createElement('div');r.className='row';r.innerHTML=`<div class="n">${j+1}</div><div></div><div></div><div></div>`;el.appendChild(r)}
+  return el;
 }
 function indiv(el,b){
   el.innerHTML=`<div class="bh day">${esc(b.header)}</div>`;
