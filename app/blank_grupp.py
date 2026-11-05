@@ -307,6 +307,15 @@ def build_model(meta: dict, lessons: list, joins: list, users: dict,
             c["note"] = "в " + (parse_group(cname)["num"] and "гр." + parse_group(cname)["num"] or cname[5:30])
             waiting_by_course[classes[cid]["courseId"]].append(c)
             waiting_in_class[cid].append(c)
+    # Ира 05.11: «из листа ожидания записали на пробное — а из листа не удалить, после
+    # обновления появляется снова». Заявка («Заявки …») остаётся висеть и после записи
+    # в группу, поэтому того, кто уже учится или записан на пробное в группе этого
+    # направления, из общего листа убираем сами. Ожидание конкретной группы (перевод
+    # в другое время) не трогаем.
+    busy = {(classes[cid]["courseId"], k["uid"]) for cid, ks in in_class.items() for k in ks}
+    for crs in list(waiting_by_course):
+        waiting_by_course[crs] = [k for k in waiting_by_course[crs]
+                                  if k["note"] or (crs, k["uid"]) not in busy]
 
     # вкладки по педагогам
     tabs: dict[str, dict] = {}
@@ -854,6 +863,23 @@ def _header_parts(b: dict) -> tuple[str, str, str]:
     return pre.strip(), tm, post
 
 
+def _wait_row(k: dict, old_ck: str, E: dict) -> bool:
+    """Строка листа ожидания: правки и «удалить» — по ребёнку (u:w:<uid>), а не по блоку.
+    Ира 05.11: лист ожидания общий для нескольких вкладок одного направления, и удалённый
+    на одной вкладке ребёнок оставался на соседней. Старые правки по ключу блока читаем
+    по-прежнему. False — строку не показывать."""
+    ck = f"u:w:{k['uid']}"
+    k["ck"] = ck
+    for f in ("days", "name"):
+        for key in (f"{ck}:{f}", f"{old_ck}:{f}"):
+            if key in E:
+                k[f] = E[key]
+                break
+    if E.get(f"{ck}:hide") or E.get(f"{old_ck}:hide"):
+        return False
+    return bool((k.get("name") or "").strip())
+
+
 def with_edits(m: dict) -> dict:
     """Бланк админов + лист ожидания и логопеды из МойКласса + проверки вверху (t["checks"])."""
     import copy
@@ -886,12 +912,7 @@ def with_edits(m: dict) -> dict:
             elif b["kind"] == "wait":
                 keep = []
                 for k in b["kids"]:
-                    ck = f"u:{b['key']}:{k['uid']}"
-                    k["ck"] = ck
-                    for f in ("days", "name"):
-                        if f"{ck}:{f}" in E:
-                            k[f] = E[f"{ck}:{f}"]
-                    if not E.get(f"{ck}:hide") and k["name"].strip():
+                    if _wait_row(k, f"u:{b['key']}:{k['uid']}", E):
                         keep.append(k)
                 b["kids"] = keep
             else:
@@ -987,12 +1008,7 @@ def _day_tab(t: dict, b: dict, lab: str, E: dict) -> dict:
     wl = []
     for k in b.get("wait_kids") or []:
         k = dict(k)
-        ck = f"u:{wkey}:{k['uid']}"
-        k["ck"] = ck
-        for f in ("days", "name"):
-            if f"{ck}:{f}" in E:
-                k[f] = E[f"{ck}:{f}"]
-        if not E.get(f"{ck}:hide") and (k.get("name") or "").strip():
+        if _wait_row(k, f"u:{wkey}:{k['uid']}", E):
             wl.append(k)
     blocks.append({"kind": "wait", "key": wkey, "header": "ЛИСТ ОЖИДАНИЯ", "kids": wl})
     blocks.append({"kind": "empty", "key": f"e{cid}1", "header": ""})
