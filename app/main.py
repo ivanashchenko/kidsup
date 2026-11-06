@@ -2745,6 +2745,42 @@ def api_boris_docs_remove(payload: dict = Body(...)):
     return {"ok": boris_docs.remove(str(payload.get("slug") or ""))}
 
 
+# Отметки на страницах владельца (06.11.2026, «пульт внедрения»): статус, ответственный,
+# срок и заметка по каждому пункту документа — на сервере, а не в одном браузере.
+@app.get("/api/doc-state/{doc}", dependencies=OWNER_AUTH)
+def api_doc_state(doc: str):
+    from . import doc_state
+    try:
+        return {"doc": doc, "items": doc_state.get(doc)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/doc-state/{doc}/log", dependencies=OWNER_AUTH)
+def api_doc_state_log(doc: str, limit: int = 200):
+    from . import doc_state
+    try:
+        return {"doc": doc, "log": doc_state.log(doc, limit)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/doc-state/{doc}", dependencies=OWNER_AUTH)
+def api_doc_state_put(doc: str, payload: dict = Body(...)):
+    """{"item": "zima", "fields": {"status": "v_rabote", "owner": "Ира"}, "author": "Борис"}
+    или {"items": {"zima": {...}, "otzyvy": {...}}, "author": "..."}. Пустое значение
+    или null убирает поле."""
+    from . import doc_state
+    author = str(payload.get("author") or "")
+    try:
+        if "items" in payload:
+            return {"ok": True, "items": doc_state.put_many(doc, payload.get("items"), author)}
+        item = str(payload.get("item") or "")
+        return {"ok": True, "item": item, "data": doc_state.put(doc, item, payload.get("fields"), author)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 # Списки для администраторов (16.10.2026): та же папка на сервере, что у документов
 # владельца, но читают под логином admin, а выкладывает только владелец.
 @app.get("/admin/docs", response_class=HTMLResponse, dependencies=AUTH)
