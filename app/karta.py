@@ -126,12 +126,37 @@ def _ensure(conn) -> None:
         user_id INTEGER PRIMARY KEY, note TEXT, ts TEXT, author TEXT)""")
 
 
+def _sad_pn_sr(conn) -> tuple[set, set]:
+    """Маша 06.11: «не все ребята из мини-сада и нулевого класса ходят на
+    английский». Английский там только пн и ср, а дети ходят по своим дням.
+    Кто в пн/ср (записи ±4 недели от сегодня) — (user_id, class_id); и группы,
+    по которым записи вообще есть (если синхронизации нет — никого не прячем)."""
+    from datetime import timedelta
+    t = date.today()
+    d0, d1 = (t - timedelta(days=28)).isoformat(), (t + timedelta(days=28)).isoformat()
+    est, pn_sr = set(), set()
+    for r in conn.execute(
+            "SELECT lr.user_id, l.class_id, l.date FROM lesson_records lr "
+            "JOIN lessons l ON l.id = lr.lesson_id JOIN classes c ON c.id = l.class_id "
+            "WHERE l.date BETWEEN ? AND ? AND (c.name LIKE '2627_Мини-сад%' "
+            "OR c.name LIKE '2627_Нулевой класс%')", (d0, d1)):
+        est.add(r["class_id"])
+        try:
+            if date.fromisoformat(r["date"]).weekday() in (0, 2):
+                pn_sr.add((r["user_id"], r["class_id"]))
+        except (TypeError, ValueError):
+            pass
+    return est, pn_sr
+
+
 def _deti(conn) -> list[dict]:
     """Все, кто сидит в группах английского сезона: учится, на пробном, был
-    на пробном. Педагогу нужен весь класс, а не только оформленные."""
+    на пробном. Педагогу нужен весь класс, а не только оформленные.
+    В мини-саду и нулевом классе — только те, кто ходит в пн или ср."""
     q = ",".join("?" * len(LIVE))
+    sad_est, sad_pn_sr = _sad_pn_sr(conn)
     rows = conn.execute(
-        "SELECT j.user_id, j.status_id, c.name AS cls, u.name AS kid, u.phone "
+        "SELECT j.user_id, j.status_id, j.class_id, c.name AS cls, u.name AS kid, u.phone "
         "FROM joins j JOIN classes c ON c.id = j.class_id "
         "LEFT JOIN users u ON u.id = j.user_id "
         f"WHERE j.status_id IN ({q}) AND (c.name LIKE '2627_АЯ%' "
@@ -143,7 +168,12 @@ def _deti(conn) -> list[dict]:
         cls = (r["cls"] or "").replace("2627_АЯ_", "").replace("2627_", "")
         for k, v in SAD.items():
             if cls.startswith(k):
+                if r["class_id"] in sad_est and (r["user_id"], r["class_id"]) not in sad_pn_sr:
+                    cls = ""          # ходит только вт/чт/пт — английского у него нет
+                    break
                 cls = v
+        if not cls:
+            continue
         key = (r["user_id"], cls)
         out[key] = {
             "user_id": r["user_id"], "имя": r["kid"] or str(r["user_id"]),
