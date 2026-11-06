@@ -41,13 +41,6 @@ main{padding:12px}
 .mk{font-size:11px;text-align:center;white-space:nowrap;overflow:hidden}
 .tm{background:var(--lg);font-weight:700;text-align:center}
 .row.gray .nm [contenteditable],.row.gray input,.row.gray .mk{color:#8a8a8a}
-.row.gap .n{opacity:.55}
-.row.gap .gapl{color:var(--mut);font-size:11px;padding-left:3px}
-.addsub{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 10px}
-.addsub input{border:1px solid var(--line);border-radius:5px;padding:4px 6px;font:inherit;min-width:0}
-.addsub input[data-a=name]{flex:1 1 180px}.addsub input[data-a=days]{flex:0 1 130px}
-.addsub button{border:1px solid var(--line);background:#fff;border-radius:5px;padding:4px 10px;font:inherit;cursor:pointer}
-.addsub .sub{color:var(--mut);font-size:12px;flex-basis:100%}
 .ph{font-size:11px;color:var(--mut);display:block;line-height:1.1;padding-left:3px}
 .mv{font-size:10px;color:var(--blue);display:block;line-height:1;padding-left:3px}
 .free{display:flex;gap:6px;align-items:center;margin-top:4px;font-size:13px}
@@ -75,8 +68,7 @@ main{padding:12px}
 @media (max-width:900px){.grid{grid-template-columns:1fr;grid-auto-flow:row;grid-template-rows:none}}
 @media print{
  @page{size:A4 landscape;margin:7mm}
- header,.lgd,.toast,.sum,.addsub{display:none}
- .row.gap .gapl{visibility:hidden}
+ header,.lgd,.toast,.sum{display:none}
  body{background:#fff;font-size:11px}
  main{padding:0}
  .blk{border:0;padding:0}
@@ -138,10 +130,9 @@ function draw(){
    <p>Ваш цвет важнее автоматического: клик по номеру — зелёный → жёлтый «выслали ссылку» → красный → без цвета → снова как в МойКлассе.</p>
    <p>«Отм.»: п — пробное, О — только отработка. Номер можно перетащить в другую группу. Стереть имя — строка удалится, список сдвинется. Новый ребёнок — впишите в пустую строку.</p>
    <p>Бланк меняете только вы. МойКласс ничего в бланк не дописывает — расхождения с ним в блоках-проверках над бланком.</p>`+
-   (t.by_days?`<p><b>По дням недели:</b> один блок — один день. Сверху дети с абонементом по алфавиту, дни в скобках — один раз, в первом дне недели; поменяете дни — ребёнок сам переедет в нужные блоки. Ниже пустая строка-разделитель (в неё не пишут) и серые строки — пробные и временные дети: вписываете сами, при обновлении они не стираются. Ребёнок с абонементом — строкой «Новый ребёнок с абонементом» над блоками: он встанет в верхний список во все свои дни. Заливку оплаты (клик по номеру) и «Отм.» ставите сами.</p>`:'');
+   (t.by_days?`<p><b>По дням недели:</b> один блок — один день. Сверху дети с абонементом по алфавиту, дни в скобках — один раз, в первом дне недели; поменяете дни — ребёнок сам переедет в нужные блоки. Сразу под ними — серые строки: пробные и временные дети, вписываете сами, при обновлении они не стираются. Ребёнка, которого записали в группу в МойКлассе, добавляет кнопка «+ в бланк» в «Сверке с МойКлассом» — он встанет во все свои дни. Заливку оплаты (клик по номеру) и «Отм.» ставите сами.</p>`:'');
   main.appendChild(lg);
   main.appendChild(summary(t));
-  if(t.by_days)main.appendChild(addSub(t));
   for(let p=0;p<t.blocks.length;p+=9){
     const g=document.createElement('div');g.className='grid page';
     t.blocks.slice(p,p+9).forEach((b,i)=>g.appendChild(block(b,i)));main.appendChild(g);
@@ -166,20 +157,6 @@ function summary(t){
     const x=c.missing[+bt.dataset.add];const rows=await op({op:'add',block:x.block,uid:x.uid,name:x.name,days:x.days});
     if(rows){toast('Вписан в бланк');load(false)}});
   return box;
-}
-function addSub(t){
-  // Ира 06.11: в бланке по дням ребёнка с абонементом было некуда вписать — только серой строкой дня.
-  // Строка добавляет его в бланк группы (верхний список) с днями — он встаёт во все свои дни.
-  const a=document.createElement('div');a.className='addsub';
-  const src=(t.blocks.find(x=>x.kind==='day')||{}).src;
-  if(!src)return a;
-  a.innerHTML=`<b>Новый ребёнок с абонементом:</b><input data-a="name" placeholder="Фамилия Имя" aria-label="Фамилия и имя ребёнка"><input data-a="days" list="dd" placeholder="дни: пн-ср-пт" aria-label="Дни посещения"><button type="button">Добавить в верхний список</button><span class="sub">Встанет во все свои дни по алфавиту. Пробных и временных — в серые строки нужного дня.</span>`;
-  a.querySelector('button').onclick=async()=>{
-    const nm=a.querySelector('[data-a=name]').value.trim(),ds=a.querySelector('[data-a=days]').value.trim();
-    if(!nm){toast('Впишите фамилию и имя');return}
-    if(!/пн|вт|ср|чт|пт/i.test(ds)){toast('Впишите дни, например пн-ср-пт');return}
-    if(await op({op:'add',block:src,name:nm,days:ds.toLowerCase()})){toast('Добавлен в верхний список');load(false)}};
-  return a;
 }
 function hcol(i){return Math.floor(i/3)===1?'var(--green)':'var(--blue)'}
 function block(b,i){
@@ -259,7 +236,7 @@ function wait(el,b){
 function day(el,b){
   el.innerHTML=`<div class="bh day">${esc(b.header)}</div>`;
   const kids=b.kids||[],gray=b.gray||[];
-  const total=Math.max(10,kids.length+(b.nogray?0:(kids.length?1:0)+gray.length+1));
+  const total=Math.max(10,kids.length+(b.nogray?0:gray.length+1));
   let j=0;
   kids.forEach(k=>{
     const r=document.createElement('div');r.className='row';
@@ -277,7 +254,6 @@ function day(el,b){
     el.appendChild(r);j++;
   });
   if(!b.nogray){
-    if(kids.length){const r=document.createElement('div');r.className='row gap';r.title='Разделитель: ниже — пробные и временные';r.innerHTML=`<div class="n">${j+1}</div><div class="gapl">— ниже пробные и временные —</div><div></div><div></div>`;el.appendChild(r);j++}
     gray.forEach(g=>{
       const r=document.createElement('div');r.className='row gray';
       r.innerHTML=`<div class="n">${j+1}</div>

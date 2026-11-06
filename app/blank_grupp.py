@@ -545,7 +545,7 @@ def to_xlsx(model: dict, path: str) -> None:
                     ws.cell(r1 + 1, c0 + 1).font = Font(name=FONT, size=10)
                     if s["kids"]:
                         ws.cell(r1, c0 + 3, s["kids"][0]["bd"]).font = Font(name=FONT, size=9)
-            elif b["kind"] == "day":                 # мини-сад/НК по дням: абонементы, пропуск, серые ручные
+            elif b["kind"] == "day":                 # мини-сад/НК по дням: абонементы, сразу под ними серые ручные
                 i = 0
                 for k in b["kids"]:
                     if i >= N:
@@ -559,7 +559,6 @@ def to_xlsx(model: dict, path: str) -> None:
                     mc = ws.cell(rr, c0 + 4, k.get("mark", ""))
                     mc.alignment = Alignment(horizontal="center", shrink_to_fit=True)
                     i += 1
-                i += 1 if b["kids"] else 0           # пропуск перед пробными/временными
                 for g in b.get("gray") or []:
                     if i >= N:
                         break
@@ -1140,10 +1139,10 @@ def row_op(p: dict) -> list:
 
 
 def _day_rows(b: dict) -> int:
-    """Строк в блоке дня: абонементы + пропуск + серые ручные + одна свободная под новую."""
+    """Строк в блоке дня: абонементы + серые ручные + одна свободная под новую (пропуска нет — Ира 06.11)."""
     if b.get("nogray"):
         return len(b["kids"])
-    return len(b["kids"]) + 1 + len(b.get("gray") or []) + 1
+    return len(b["kids"]) + len(b.get("gray") or []) + 1
 
 
 def _need_openpyxl():
