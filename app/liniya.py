@@ -724,7 +724,8 @@ def _obshchij_kontekst(imya: str, novaya: bool) -> dict:
     return {
         "imya_rebenka": imya or "ребёнок", "adres": content.ADDRESS, "metro": content.METRO,
         "skidka_pervyj": autopilot.SKIDKA_PERVYJ, "skidka_sad": autopilot.SKIDKA_SAD,
-        "skidka_vtoroj": autopilot.SKIDKA_VTOROJ, "probnoe_ceny": ", ".join(ceny) or "по прайсу",
+        "skidka_vtoroj": autopilot.SKIDKA_VTOROJ, "skidka_sad_semya": autopilot.SKIDKA_SAD_SEMYA,
+        "probnoe_ceny": ", ".join(ceny) or "по прайсу",
         "skidka": f"{autopilot.SKIDKA_PERVYJ}%" if novaya else "",
         "gruppa": "", "vremya": "", "cena": "", "raz_v_nedelyu": "",
         # без группы: общий вид меньшего шага; у конкретной группы — строка прайса или пусто
@@ -1021,7 +1022,8 @@ def _semya(conn, p: str, segodnya: date, age, child) -> dict:
                      f"на первый абонемент (мини-сад и нулевой класс — минус {autopilot.SKIDKA_SAD}%).")
     else:
         podskazka = (f"Семья уже платила: скидка дня первого занятия не действует; второй предмет "
-                     f"или второй ребёнок — минус {autopilot.SKIDKA_VTOROJ}%. Скидки не суммируются.")
+                     f"или второй ребёнок — минус {autopilot.SKIDKA_VTOROJ}% (мини-сад и нулевой "
+                     f"класс — минус {autopilot.SKIDKA_SAD_SEMYA}%). Скидки не суммируются.")
     res.update({
         "v_crm": True, "vtoroj_nomer": vtoroj, "deti": deti, "fokus": fokus["id"],
         "fokus_imya": fokus["imya"], "roditel": roditel, "oplata": oplata,

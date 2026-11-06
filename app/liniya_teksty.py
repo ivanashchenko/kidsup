@@ -33,7 +33,7 @@
   {drugaya_gruppa} {drugoe_vremya} — другая группа той же программы и уровня
                     в другое время, где место есть по живым записям CRM
   {adres} {metro}   адрес центра (app/content.py)
-  {skidka_pervyj} {skidka_sad} {skidka_vtoroj} — числа скидок
+  {skidka_pervyj} {skidka_sad} {skidka_vtoroj} {skidka_sad_semya} — числа скидок
                     (app/autopilot.py, SKIDKA_*), чтобы в тексте не жило своё число
   {probnoe_ceny}    цены платных пробных из прайса
   {cena_probnogo}   цена платного пробного у этой группы
@@ -195,7 +195,8 @@ OTVETY = {
                   "это для новых семей; в мини-саду и нулевом классе в этот день минус {skidka_sad}% "
                   "на первый месяц. "
                   "Минус {skidka_vtoroj}% — на второй предмет, на второго ребёнка, многодетным семьям "
-                  "и семьям участников СВО. "
+                  "и семьям участников СВО; на мини-сад, нулевой класс и летний лагерь эти скидки — "
+                  "минус {skidka_sad_semya}%. "
                   "Скидки не суммируются: действует одна, самая большая из тех, что вам подходят. "
                   "Скажите, что из этого про вас, — посчитаю точную сумму."),
         "shag": ("Уточнить, что подходит семье (новые ли, второй предмет или ребёнок, многодетные "
@@ -242,7 +243,7 @@ PODSTANOVKI = frozenset({
     "imya_rebenka", "gruppa", "vremya", "cena", "cena_menshe", "raz_v_nedelyu",
     "skidka", "pervoe_zanyatie", "mesto", "vopros_uroven", "drugaya_gruppa",
     "drugoe_vremya", "adres", "metro", "skidka_pervyj", "skidka_sad",
-    "skidka_vtoroj", "probnoe_ceny", "cena_probnogo",
+    "skidka_vtoroj", "skidka_sad_semya", "probnoe_ceny", "cena_probnogo",
 })
 # Подстановки, которые сами — целые предложения (из словарей выше).
 CELYE = ("pervoe_zanyatie", "mesto", "vopros_uroven")

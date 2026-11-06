@@ -401,9 +401,9 @@ def test_stranicy(c, m):
              and nk["cena"] == "35 500 ₽ за 20 посещений (5 дней)", nk)
     otv = j["otvety"]
     proverka("API: ответы для каждой группы", all(str(g["id"]) in otv for g in top))
-    proverka("API: в ответе про нулевой класс — бесплатный пробный день и скидка 8%",
+    proverka("API: в ответе про нулевой класс — бесплатный пробный день и скидка 7%",
              "бесплатный пробный день" in otv[str(nk["id"])]["skolko_stoit"]["otvet"]
-             and "скидка 8%" in otv[str(nk["id"])]["skolko_stoit"]["otvet"])
+             and "скидка 7%" in otv[str(nk["id"])]["skolko_stoit"]["otvet"])
     proverka("API: в ответе про ПШ — группа и цена",
              "В группе «Подготовка к школе, ПШ1 нечитающие, 5–7 лет» абонемент — 8 400 ₽ за 8 занятий"
              in otv[str(psh["id"])]["skolko_stoit"]["otvet"])
