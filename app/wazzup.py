@@ -528,6 +528,11 @@ def chat_id_for(transport: str, phone: str = "", uid: str | int | None = None) -
         got = _msgr_index(kind).get(str(uid))
         if got:
             return got
+        # Чат может быть привязан к карточке брата или сестры с тем же номером
+        for sib in _same_phone_uids(digits, uid):
+            got = _msgr_index(kind).get(sib)
+            if got:
+                return got
     # Телеграму телефон не подходит принципиально, MAX его иногда принимает
     return "" if kind == "telegram" else (digits and ("7" + digits) or "")
 
@@ -781,6 +786,22 @@ _LIVE_CACHE: dict = {}
 _INDEX_CACHE: dict = {}
 
 
+def _same_phone_uids(digits: str, uid: str | int | None) -> list[str]:
+    """Другие карточки с тем же номером телефона — братья и сёстры одного
+    родителя. Нужны, чтобы чат в MAX/Telegram, привязанный к карточке одного
+    ребёнка, находился и для второго. Пусто, если номера нет или база недоступна."""
+    digits = "".join(c for c in str(digits or "") if c.isdigit())[-10:]
+    if len(digits) != 10 or uid is None:
+        return []
+    try:
+        with db.get_conn() as conn:
+            rows = conn.execute("SELECT id FROM users WHERE phone LIKE ? LIMIT 6",
+                                ("%" + digits,)).fetchall()
+    except Exception:
+        return []
+    return [str(r[0]) for r in rows if str(r[0]) != str(uid)]
+
+
 def _contact_index() -> tuple[dict, dict]:
     """Указатели «кто где пишет»: по id карточки и по телефону.
 
@@ -868,6 +889,13 @@ def channels_for(phone: str = "", uid: str | int | None = None,
     found = list(by_uid.get(str(uid), [])) if uid is not None else []
     if not found and digits:
         found = list(by_phone.get(digits, []))
+    # Братья и сёстры на одном номере: мессенджер привязан к карточке одного
+    # ребёнка, а родитель тот же. 06.11 отчёт про Сергея Шиша ушёл только
+    # в WhatsApp, про его близнеца Савелия — ещё и в MAX и Telegram; папа
+    # открыл MAX и спросил, куда делся Сергей. Разовым берём и их чаты.
+    if not mass and uid is not None:
+        for sib in _same_phone_uids(digits, uid):
+            found += [k for k in by_uid.get(sib, []) if k not in found]
     live = _live_transports()
 
     out: list[str] = []
