@@ -97,7 +97,12 @@ align-items:center;gap:.5rem 1.1rem;padding:.6rem 1rem}
 
 <script src="/static/charts.js"></script>
 <script>
+// 08.11: страницу открыл педагог по ключу (?k=, карточка речи) — служебные виджеты
+// админов (синхронизация, «кто ждёт ответа») не опрашивать: их 401 заставлял браузер
+// просить пароль каждые 3 минуты.
+window.KIDSUP_PED = new URLSearchParams(location.search).has('k');
 (function () {
+  if (window.KIDSUP_PED) return;
   const btn = document.getElementById('sync-btn');
   const box = document.getElementById('sync-status');
   let timer = null;
@@ -160,7 +165,7 @@ align-items:center;gap:.5rem 1.1rem;padding:.6rem 1rem}
 /* --- бейдж «кто ждёт ответа» -------------------------------------------- */
 (function () {
   const b = document.getElementById('wait-badge');
-  if (!b) return;
+  if (!b || window.KIDSUP_PED) return;
   async function tick() {
     try {
       const w = await (await fetch('/api/waiting')).json();
