@@ -208,16 +208,40 @@ function block(b,i){
 }
 function wait(el,b){
   el.innerHTML=`<div class="bh day">${esc(b.header)}</div>`;
-  const n=Math.max(10,b.kids.length);
-  for(let j=0;j<n;j++){const k=b.kids[j];
+  // Ира 10.11: «не можем записывать в лист ожидания» — под детьми из МойКласса
+  // ручные строки админа (общие для всех вкладок направления) и одна пустая для новой.
+  const man=b.mkey?(b.manual||[]):[];
+  const n=Math.max(10,b.kids.length+(b.mkey?man.length+1:0));
+  let j=0;
+  b.kids.forEach(k=>{
     const r=document.createElement('div');r.className='row wt';
-    if(k){
-      r.innerHTML=`<div class="n">${j+1}</div>
+    r.innerHTML=`<div class="n">${j+1}</div>
        <div class="nm"><span contenteditable data-k="${k.ck}:name">${esc(k.name)}</span>${k.phone?`<span class="ph">${esc(k.phone)}</span>`:''}${k.note?`<span class="mv">${esc(k.note)}</span>`:''}</div>
        <div class="bd" title="дата рождения">${esc(k.bd)}</div>
        <input list="dd" value="${esc(k.days)}" data-k="${k.ck}:days" title="желаемые дни">`;
-    }else r.innerHTML=`<div class="n">${j+1}</div><div></div><div></div><div></div>`;
-    el.appendChild(r);
+    el.appendChild(r);j++;
+  });
+  if(b.mkey){
+    const cells=(g)=>`<div class="n">${j+1}</div>
+       <div class="nm"><span contenteditable data-f="name">${esc(g.name||'')}</span></div>
+       <div class="bd"><span contenteditable data-f="mark" title="дата рождения, телефон">${esc(g.mark||'')}</span></div>
+       <input list="dd" data-f="days" value="${esc(g.days||'')}" title="желаемые дни">`;
+    man.forEach(g=>{
+      const r=document.createElement('div');r.className='row wt';r.innerHTML=cells(g);
+      bindRow(r,async(f,v)=>{if(await op({op:'set',block:b.mkey,id:g.id,field:f,value:v})&&f==='name'&&!v)load(false)});
+      el.appendChild(r);j++;
+    });
+    const r=document.createElement('div');r.className='row wt';r.innerHTML=cells({});
+    r.title='Впишите ребёнка в лист ожидания: Ф.И., ниже — дата рождения/телефон, справа — желаемые дни';
+    bindRow(r,async()=>{const g=f=>{const e=r.querySelector(`[data-f=${f}]`);return (e.value??e.innerText).trim()};
+      if(!g('name'))return;
+      if(await op({op:'add',block:b.mkey,name:g('name'),days:g('days'),mark:g('mark')}))load(false)});
+    el.appendChild(r);j++;
+  }
+  while(j<n){
+    const r=document.createElement('div');r.className='row wt';
+    r.innerHTML=`<div class="n">${j+1}</div><div></div><div></div><div></div>`;
+    el.appendChild(r);j++;
   }
   const t=curTab();
   const f=document.createElement('div');f.className='fr';

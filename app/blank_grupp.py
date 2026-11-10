@@ -416,7 +416,8 @@ def build_model(meta: dict, lessons: list, joins: list, users: dict,
         shared = any(sum(1 for tt in tabs.values() if c in tt["courses"]) > 1 for c in t["courses"])
         for i in range(0, max(len(wl), 1), SLOTS):
             blocks.append({"kind": "wait", "header": "ЛИСТ ОЖИДАНИЯ" + (" (общий по направлению)" if shared else "")
-                           + (" — продолжение" if i else ""), "kids": wl[i:i + SLOTS]})
+                           + (" — продолжение" if i else ""), "kids": wl[i:i + SLOTS],
+                           "courses": sorted(t["courses"])})
         mx = max([len(b["kids"]) for b in blocks if b["kind"] == "group"] + [SLOTS])
         out.append({"sheet": sheet, "title": title, "teacher": teacher, "blocks": blocks, "slots": mx})
 
@@ -581,7 +582,9 @@ def to_xlsx(model: dict, path: str) -> None:
             elif b["kind"] == "empty":
                 pass
             else:                                    # лист ожидания: Ф.И., д.р., желаемые дни, телефон
-                for i, k in enumerate(b["kids"][:N]):
+                hand = [{"name": x.get("name", ""), "bd": x.get("mark", ""), "days": x.get("days", "")}
+                        for x in b.get("manual") or [] if (x.get("name") or "").strip()]
+                for i, k in enumerate((b["kids"] + hand)[:N]):
                     rr = top + 1 + i
                     ws.cell(rr, c0 + 1, k["name"])
                     ws.cell(rr, c0 + 2, k.get("bd", "")).font = Font(name=FONT, size=9)
@@ -783,6 +786,51 @@ OTRAB = 5                                          # статус записи �
 _ROWS_LOCK = _threading.Lock()
 
 
+AUTO_TRIAL = 58132                                 # «записан на пробное» — сам встаёт в бланк (Ира 10.11)
+
+
+def _gone(E: dict, key: str) -> set:
+    try:
+        return set(_json.loads(E.get(f"b:{key}:gone") or "[]"))
+    except Exception:
+        return set()
+
+
+def _gone_set(E: dict, key: str, uid, add: bool) -> None:
+    """Память «админ убрала ребёнка из бланка группы»: автопробное его обратно не вернёт."""
+    if not uid:
+        return
+    g = _gone(E, key)
+    (g.add if add else g.discard)(uid)
+    save_edit(f"b:{key}:gone", _json.dumps(sorted(g)))
+
+
+def _auto_trials(b: dict, E: dict) -> list:
+    """Ира 10.11: «перестало подтягиваться из программы пробных учеников». С 02.11 бланк
+    ведут админы, и записанные на пробное в МойКлассе в группу сами не вставали — только
+    кнопкой «+ в бланк». Теперь записанный на пробное встаёт строкой с «п» сам; кого админ
+    из бланка убрала или перенесла — больше не возвращаем."""
+    rows = b["kids"]
+    have = {r.get("uid") for r in rows if r.get("uid")}
+    gone = _gone(E, b["key"])
+    out = []
+    for k in b.get("mk") or []:
+        if k.get("status") != AUTO_TRIAL or k["uid"] in have or k["uid"] in gone:
+            continue
+        if any(not r.get("uid") and _same(r.get("name", ""), k["name"]) for r in rows):
+            continue
+        out.append({"id": f"u{k['uid']}", "uid": k["uid"],
+                    "name": k["name"] or f"(без имени, карточка {k['uid']})",
+                    "days": k.get("days", ""), "mark": k.get("mark") or "п", "color": ""})
+    return out
+
+
+def _wait_key(src: str) -> str:
+    """Ключ ручных строк листа ожидания: общий для всех вкладок одного направления."""
+    import hashlib
+    return "wm" + hashlib.md5(src.encode("utf-8")).hexdigest()[:10]
+
+
 def _rows(E: dict, key: str) -> list:
     try:
         return _json.loads(E.get(f"b:{key}:rows") or "[]")
@@ -903,6 +951,15 @@ def with_edits(m: dict) -> dict:
             if b["kind"] == "group":
                 b["mk"] = [k for k in b["kids"] if k.get("status") != OTRAB]
                 b["kids"] = _rows(E, b["key"])
+                if _auto_trials(b, E):
+                    with _ROWS_LOCK:
+                        E = edits()
+                        b["kids"] = _rows(E, b["key"])
+                        new = _auto_trials(b, E)
+                        if new:
+                            b["kids"] = b["kids"] + new
+                            save_edit(f"b:{b['key']}:rows", _json.dumps(b["kids"], ensure_ascii=False))
+                            E = edits()
                 b["free"] = E.get(f"b:{b['key']}:free", "")
                 b["hpre"], b["time"], b["hpost"] = _header_parts(b)
                 for r in b["kids"]:
@@ -914,11 +971,18 @@ def with_edits(m: dict) -> dict:
                     if _wait_row(k, f"u:{b['key']}:{k['uid']}", E):
                         keep.append(k)
                 b["kids"] = keep
+                b["manual"], b["mkey"] = [], ""
             else:
                 for s in b["slots"]:
                     s["ck"] = f"b:{b['key']}:{s['time'].replace('.', '')}"
                     s["note"] = E.get(s["ck"] + ":note", "")
                     s["color"] = E.get(s["ck"] + ":color", "")
+    for t in m["tabs"]:                   # ручные строки листа ожидания (Ира 10.11) — в последнем блоке вкладки
+        ws = [b for b in t["blocks"] if b["kind"] == "wait"]
+        if ws:
+            b = ws[-1]
+            b["mkey"] = _wait_key(",".join(b.get("courses") or []) or t["sheet"])
+            b["manual"] = _rows(E, b["mkey"])
     try:                                  # «некорректная оплата»: в CRM оплачено, денег в кассах нет
         badpay = {int(k): v for k, v in _json.loads(E.get("b:badpay") or "{}").get("uids", {}).items()}
     except Exception:
@@ -1009,7 +1073,9 @@ def _day_tab(t: dict, b: dict, lab: str, E: dict) -> dict:
         k = dict(k)
         if _wait_row(k, f"u:{wkey}:{k['uid']}", E):
             wl.append(k)
-    blocks.append({"kind": "wait", "key": wkey, "header": "ЛИСТ ОЖИДАНИЯ", "kids": wl})
+    mkey = _wait_key(wkey)
+    blocks.append({"kind": "wait", "key": wkey, "header": "ЛИСТ ОЖИДАНИЯ", "kids": wl,
+                   "mkey": mkey, "manual": _rows(E, mkey)})
     blocks.append({"kind": "empty", "key": f"e{cid}1", "header": ""})
     blocks.append({"kind": "empty", "key": f"e{cid}2", "header": ""})
     sheet = re.sub(r"[/\\?*\[\]:]", "", f"{lab}_{fn}")[:31]
@@ -1090,7 +1156,7 @@ def row_op(p: dict) -> list:
     Стёртое имя = строка удалена, список сдвигается. Возвращает строки блока."""
     key = str(p.get("block") or "")
     # g… — группа; d…mo/tu/… — ручные (серые) строки дня в бланке мини-сада/НК по дням
-    if not re.match(r"^(g\d{1,12}|d\d{1,12}(mo|tu|we|th|fr))$", key):
+    if not re.match(r"^(g\d{1,12}|d\d{1,12}(mo|tu|we|th|fr)|wm[0-9a-f]{10})$", key):
         raise ValueError("bad block")
     op = p.get("op")
     if op == "move" and not key.startswith("g"):
@@ -1110,6 +1176,8 @@ def row_op(p: dict) -> list:
                 raise ValueError("bad color")
             if f == "name" and not v:
                 rows.remove(row)
+                if key.startswith("g"):
+                    _gone_set(E, key, row.get("uid"), True)
             else:
                 row[f] = v
         elif op == "add":
@@ -1120,15 +1188,21 @@ def row_op(p: dict) -> list:
                 raise ValueError("no name")
             if not (uid and any(x.get("uid") == uid for x in rows)):
                 rows.append(r)
+            if key.startswith("g"):
+                _gone_set(E, key, uid, False)
         elif op == "del":
             if row is not None:
                 rows.remove(row)
+                if key.startswith("g"):
+                    _gone_set(E, key, row.get("uid"), True)
         elif op == "move":
             to = str(p.get("to") or "")
             if not re.match(r"^g\d{1,12}$", to) or row is None:
                 raise ValueError("bad move")
             if to != key:
                 rows.remove(row)
+                _gone_set(E, key, row.get("uid"), True)
+                _gone_set(E, to, row.get("uid"), False)
                 dest = _rows(E, to)
                 dest.append(row)
                 save_edit(f"b:{to}:rows", _json.dumps(dest, ensure_ascii=False))
@@ -1162,7 +1236,7 @@ def xlsx_bytes() -> bytes:
         raise RuntimeError(st["err"] or "данные ещё загружаются")
     m = with_edits(st["model"])
     for t in m["tabs"]:
-        t["slots"] = max([len(b["kids"]) for b in t["blocks"] if b["kind"] in ("group", "wait")]
+        t["slots"] = max([len(b["kids"]) + len(b.get("manual") or []) for b in t["blocks"] if b["kind"] in ("group", "wait")]
                          + [_day_rows(b) for b in t["blocks"] if b["kind"] == "day"] + [SLOTS])
     with tempfile.NamedTemporaryFile(suffix=".xlsx") as f:
         to_xlsx(m, f.name)
