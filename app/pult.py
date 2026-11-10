@@ -812,8 +812,8 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             # 10.11, Лиза: причину правки (коррекция, списание, перенос) писать
             # в сам пункт, а не в карточку — в карточке это каша для коллег.
             ctrl += (f" <a href='#' style='font-size:12px;color:#6c6a86;white-space:nowrap' "
-                     f"title='Дописать в пункт причину или что сделано — пункт не закрывается' "
-                     f"onclick=\"pultNote({it['id']});return false\">✎ причина</a>")
+                     f"title='Комментарий к пункту: что сделано, причина, договорённость — пункт не закрывается' "
+                     f"onclick=\"pultNote({it['id']});return false\">✎ комментарий</a>")
         lis.append((it["done"] == 1, it["done"] == 0, bool(it.get("staryj")),
             head + f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
             f"<input type='checkbox' {'checked' if it['done'] == 1 else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
@@ -1091,7 +1091,7 @@ function pultDone(box, kind, id, note){{
    .catch(function(){{ box.checked = !box.checked; alert('Не сохранилось, попробуйте ещё раз'); }});
 }}
 function pultNote(id){{
-  var n = prompt('Причина или что сделано — одной строкой (сохранится в пункте, пункт не закроется):', '');
+  var n = prompt('Комментарий к пункту — что сделано, причина, договорённость (сохранится в пункте, пункт не закроется):', '');
   if (n === null) return;
   n = n.trim(); if (!n) return;
   fetch('/api/plan/inbox/note', {{method:'POST', headers:{{'Content-Type':'application/json'}},

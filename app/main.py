@@ -7518,7 +7518,7 @@ def api_plan_inbox_note(payload: dict = Body(...)):
     with db.get_conn() as conn:
         _inbox_init(conn)
         n = conn.execute("UPDATE plan_inbox SET text=text||? WHERE id=?",
-                         (f" · ✎ причина ({stamp}): {note}", iid)).rowcount
+                         (f" · ✎ {stamp}: {note}", iid)).rowcount
     if not n:
         raise HTTPException(404, "пункт не найден")
     return {"ok": True, "id": iid}
