@@ -106,7 +106,7 @@ def owner(method: str, path: str, params: dict | None = None, payload=None,
                 json.dump(payload, fh, ensure_ascii=False)
             args += ["-H", "Content-Type: application/json", "--data-binary", "@" + tmp]
         try:
-            p = subprocess.run(args, input=_owner_cfg(), capture_output=True, text=True)
+            p = subprocess.run(args, input=_owner_cfg(), capture_output=True, text=True, encoding="utf-8")
         finally:
             if tmp:
                 os.unlink(tmp)

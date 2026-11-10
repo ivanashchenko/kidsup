@@ -814,7 +814,8 @@ class Sverka:
                        for s in sorted(self.nodeb, key=lambda s: (s.get("sellDate") or "", s["id"])))
         H.append(f'<p class="muted">{self.mes_i.capitalize()} — абонементы в группы с {ddmm(self.m1)} и абонементы на несколько занятий, '
                  f"купленные с {ddmm(self.start_sales)}. Разовые занятия и праздники не считаю. «С баланса» — абонемент оплачен с баланса "
-                 "ребёнка, деньги пришли раньше (показан тот приход). «Второй терминал» — у центра есть терминал, которого нет в выдаче "
+                 "ребёнка, деньги пришли раньше (показан приход, из которого по порядку баланса оплачено списание; ✓ — если сошлись "
+                 "все такие приходы). «Второй терминал» — у центра есть терминал, которого нет в выдаче "
                  "банка по операциям: такая оплата сходится с зачислением за день до рубля."
                  + (f" Не считаю {len(self.nodeb)} абонемент(а) без списания — оплачены в МойКлассе, но в выгрузке платежей нет ни одного "
                     f"списания на них (удалили, переоформили или оплата не выгрузилась): {nd}." if self.nodeb else "") + "</p>\n")
@@ -967,8 +968,14 @@ def main(argv=None) -> int:
         if na:
             raise SystemExit("--post вместе с --na не выкладываю")
         title = f"Сверка оплат {S.mes_r}: МойКласс ↔ Т-Банк ↔ Комтет ↔ тетрадь"
+        # owner() возвращает ответ только при HTTP 200, иначе — исключение
         r = owner("POST", "/api/boris-docs", payload={"slug": SLUG, "title": title, "html": page, "note": note, "order": 100})
-        print("Выложено:", json.dumps(r, ensure_ascii=False)[:300])
+        print("Выложено (HTTP 200):", json.dumps(r, ensure_ascii=False)[:300])
+        got = owner("GET", f"/boris/docs/{SLUG}", raw=True)
+        if got != page:
+            print(f"ОШИБКА: GET /boris/docs/{SLUG} отдаёт не то, что выложено ({len(got)} против {len(page)} символов)")
+            return 1
+        print(f"Проверено: GET /boris/docs/{SLUG} (HTTP 200) отдаёт новую версию, {len(got.encode('utf-8'))} байт")
     return 0
 
 
