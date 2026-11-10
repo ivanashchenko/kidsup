@@ -50,6 +50,26 @@ MES_R = ["", "января", "февраля", "марта", "апреля", "м
 MES_I = ["", "январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август",
          "сентябрь", "октябрь", "ноябрь", "декабрь"]
 SLUG = "sverka-oplat"
+# правила — на странице в разделе «Как сверяю» (те же, что в README)
+PRAVILA = (
+    "Безнал (ссылка, СБП) → СБП «Терминал Kids UP» той же суммы в пределах 15 минут; остальное — реестр интернет-эквайринга "
+    "за день (сумма до комиссии = сумма онлайн-оплат дня или их часть).",
+    "Карта → операция нашего терминала в тот же день (по дате оплаты в МойКлассе), та же сумма, ближайшая по времени. "
+    "Одна банковская операция идёт только к одной оплате.",
+    "Одна операция терминала за несколько оплат в МойКлассе (родитель приложил карту один раз за всех детей, админ внёс "
+    "по отдельности) — сходится, если сумма оплат в пределах 90 минут равна операции до копейки; так же оплата двумя операциями.",
+    "Нал или карта в МойКлассе, а по банку СБП или терминал той же суммы рядом по времени — один пункт «поправить тип», "
+    "деньги найдены.",
+    "Карты нет в списке операций — остаток дня «зачислено − операции» (у центра есть терминал, которого банк по операциям "
+    "не отдаёт): сходится до рубля — «второй терминал». Терминал клуба Буракова ±20 минут — деньги на чужом счёте.",
+    "Наличные → строка прихода в тетради за день той же суммы (по фото из чата); что поштучно не сошлось — сумма "
+    "оставшихся оплат наличными дня против суммы оставшихся строк прихода.",
+    "Маткапитал → поступление ОСФР той же суммы (приходит на счёт «Клуб Буракова» того же ИП, оттуда переводится на KidsUP).",
+    "Сумма строки — все списания на абонемент; деньги — приход, внесённый вместе со списанием, иначе «с баланса»: приходы, "
+    "из которых по порядку баланса ученика оплачено это списание (самый старый приход с остатком).",
+    "Чек → Комтет: external_id = id платежа, иначе «Уч №ученика» + сумма (до 3 суток), иначе онлайн-чек на брата/сестру "
+    "той же суммы в пределах 3 часов. Касса клуба Буракова (Люберцы) не учитывается.",
+)
 OK, BAD, WAIT = "ok", "bad", "wait"
 SYM = {OK: '<span class="ok">✓</span>', BAD: '<span class="bad">✗</span>', WAIT: '<span class="wait">…</span>'}
 
@@ -596,8 +616,64 @@ class Sverka:
             return WAIT, ""
         return BAD, "чека нет"
 
+    # ── откуда деньги на списание: баланс ученика по порядку ────────────────
+    def fund_map(self) -> dict:
+        """id списания → [(приход, сколько из него), …].
+
+        Баланс ученика проходим по времени создания: приход кладёт деньги, списание и
+        возврат забирают. Списание берёт сначала из прихода, внесённого вместе с ним
+        (±2 минуты — МойКласс пишет их в одну секунду), потом из самого старого
+        прихода с остатком. Если денег на балансе нет (в долг), списание гасит
+        следующий приход. Раньше «с баланса» показывался последний приход до списания,
+        даже если его целиком съели другие списания."""
+        TW = 120
+        by_user = defaultdict(list)
+        for p in self.P:
+            if p.get("t") is not None and p["optype"] in ("income", "debit", "refund") and abs(p.get("summa") or 0) >= 0.005:
+                by_user[p["userId"]].append(p)
+        fund = {}
+        for evs in by_user.values():
+            # в одну секунду приход раньше списания (МойКласс так и пишет: id прихода меньше)
+            evs = sorted(evs, key=lambda p: (p["t"], p["optype"] != "income", p["id"]))
+            pool, debts = [], []          # [приход, остаток] / [списание, непокрыто]
+            for p in evs:
+                amt = round(abs(p.get("summa") or 0), 2)
+                if p["optype"] == "income":
+                    rest = amt
+                    for dd in debts:      # сначала гасим долг
+                        if rest < 0.005:
+                            break
+                        take = round(min(rest, dd[1]), 2)
+                        if take >= 0.005:
+                            dd[1] = round(dd[1] - take, 2)
+                            rest = round(rest - take, 2)
+                            if dd[0]["optype"] == "debit":
+                                fund.setdefault(dd[0]["id"], []).append((p, take))
+                    debts = [dd for dd in debts if dd[1] >= 0.005]
+                    pool.append([p, rest])
+                    continue
+                need = amt
+                twin = sorted((x for x in pool if x[1] >= 0.005 and abs((x[0]["t"] - p["t"]).total_seconds()) <= TW),
+                              key=lambda x: (abs((x[0]["t"] - p["t"]).total_seconds()), abs(x[0]["id"] - p["id"])))
+                tid = {id(x) for x in twin}
+                for x in twin + [x for x in pool if id(x) not in tid]:
+                    if need < 0.005:
+                        break
+                    if x[1] < 0.005:
+                        continue
+                    take = round(min(need, x[1]), 2)
+                    x[1] = round(x[1] - take, 2)
+                    need = round(need - take, 2)
+                    if p["optype"] == "debit":
+                        fund.setdefault(p["id"], []).append((x[0], take))
+                pool = [x for x in pool if x[1] >= 0.005]
+                if need >= 0.005:
+                    debts.append([p, need])
+        return fund
+
     # ── оплаты месяца ───────────────────────────────────────────────────────
     def build_rows(self) -> None:
+        fund = self.fund_map()
         deb = defaultdict(list)
         for p in self.P:
             if p["optype"] == "debit" and p.get("userSubscriptionId"):
@@ -638,16 +714,29 @@ class Sverka:
                 if abs(pair["summa"] - total) > 0.6:
                     row["bank"] += f" (приход {num(pair['summa'])} ₽, на абонемент {num(total)})"
             else:
-                src = [p for p in inc_by_user.get(s["userId"], []) if p["t"] and main["t"] and p["t"] <= main["t"] + timedelta(minutes=2)]
+                # с баланса: приходы, из которых по порядку баланса оплачено главное списание
+                src = [(f, a) for f, a in fund.get(main["id"], []) if f["optype"] == "income"]
                 row.update(when_d=main["date"], when_t=main["t"])
                 if src:
-                    f = max(src, key=lambda p: p["t"])
-                    r = self.res.get(f["id"])
-                    if r is None:
-                        r = {"st": WAIT, "txt": "до начала сверки" if f["d"] < self.start_sales_window() else f"банк за {ddmm(f['d'])} не загружен"}
-                    st = r["st"] if r["st"] != BAD else BAD
-                    row.update(how=self.how(f), pay=f["id"], st=st,
-                               bank=f"с баланса; приход {ddmm(f['d'])} {num(f['summa'])} ₽ — {r['txt']}", balans=True)
+                    def st_of(f):
+                        r = self.res.get(f["id"])
+                        if r is None:
+                            r = {"st": WAIT, "txt": "до начала сверки" if (f.get("d") or f["date"]) < self.start_sales_window()
+                                 else f"банк за {ddmm(f.get('d') or f['date'])} не загружен"}
+                        return r
+                    f, a = max(src, key=lambda x: (x[1], x[0]["t"]))
+                    r = st_of(f)
+                    sts = [st_of(x)["st"] for x, _ in src]
+                    st = BAD if BAD in sts else OK if all(x == OK for x in sts) else WAIT
+                    fd = f.get("d") or f["date"]
+                    txt = f"с баланса; приход {ddmm(fd)} {num(f['summa'])} ₽ — {r['txt']}"
+                    if len(src) > 1:
+                        others = [(x, y) for x, y in src if x is not f]
+                        txt += (f"; ещё {num(sum(y for _, y in others))} ₽ — из " +
+                                ", ".join(f"прихода {ddmm(x.get('d') or x['date'])} {num(x['summa'])} ₽ ({TYPE_SHORT.get(x.get('paymentTypeId'), '?')}"
+                                          + {OK: ", ✓", BAD: ", ✗", WAIT: ""}[st_of(x)["st"]] + ")" for x, _ in others[:3])
+                                + (f" и ещё {len(others) - 3}" if len(others) > 3 else ""))
+                    row.update(how=self.how(f), pay=f["id"], st=st, bank=txt, balans=True)
                 else:
                     row.update(how="?, ", pay=None, st=BAD, bank="платёж не найден: прихода до списания в МойКлассе нет")
             if len(ds) > 1:
@@ -658,6 +747,15 @@ class Sverka:
             rows.append(row)
         rows.sort(key=lambda r: (r["when_d"], r["when_t"] or now_msk()))
         self.rows, self.nodeb = rows, nodeb
+
+    def zametki(self) -> list:
+        """Заметки владельцу из <папка>/zametki.json (данные, не код — там могут быть имена):
+        [{"s": "2026-11-10", "do": "2026-11-30", "zagolovok": "…", "abzacy": ["…"], "spisok": ["…"]}].
+        Показываются на странице с «s» по «do» включительно (без дат — всегда)."""
+        z = load_json(sverka_dir() / "zametki.json", []) or []
+        if isinstance(z, dict):
+            z = [z]
+        return [x for x in z if isinstance(x, dict) and (x.get("s") or "") <= self.today <= (x.get("do") or "9999")]
 
     # ── итоги ───────────────────────────────────────────────────────────────
     def itogi(self) -> dict:
@@ -698,6 +796,11 @@ class Sverka:
               (rub(I["naideno"]), "деньги нашлись в банке"), (f"{I['s_chekom']} из {I['oplat']}", "с чеком Комтет"),
               (str(I["rashozhdeniy"]), "расхождения по деньгам"), (str(I["bez_cheka"]), f"оплат без чека с {ddmm(self.start_sales)}")]
         H.append('<div class="kp">' + "".join(f"<div><b>{e(a)}</b><span>{e(b)}</span></div>" for a, b in kp) + "</div>\n")
+        for z in self.zametki():
+            H.append('<div class="card dec">' + (f"<h3>{e(z['zagolovok'])}</h3>" if z.get("zagolovok") else "")
+                     + "".join(f"<p>{e(a)}</p>" for a in z.get("abzacy") or [])
+                     + ("<ul>" + "".join(f"<li>{e(x)}</li>" for x in z["spisok"]) + "</ul>" if z.get("spisok") else "")
+                     + "</div>\n")
         # 1. каждая оплата
         H.append(f'<h2 id="noyabr">1. Каждая оплата за {self.mes_i}</h2>\n<div class="tw"><table><tr><th>Когда</th><th>Ребёнок</th><th>Группа</th>'
                  '<th style="text-align:right">₽</th><th>Как внесено в МК</th><th>Деньги в банке</th><th>Чек</th></tr>\n')
@@ -802,6 +905,7 @@ class Sverka:
                  "<li>Наличные: МК ↔ запись в тетради за день ↔ чек Комтет. Нет фото — пункт дежурной в пульт.</li>\n"
                  "<li>Каждое расхождение — пунктом в пульт: чек и тетрадь — дежурной, правка в МойКлассе — Лизе, деньги, которых нет в банке, — вам. Итог — в вечерней сводке.</li>\n"
                  "</ol>\n")
+        H.append("<h3>Правила сверки</h3>\n<ul>\n" + "".join(f"<li>{e(x)}</li>\n" for x in PRAVILA) + "</ul>\n")
         H.append(f'<p class="muted">Составлено Клодом {now:%d.%m}, {now:%H:%M} МСК.</p>\n</div></body></html>')
         note = (f"Обновлено {now:%d.%m}, {now:%H:%M}: {I['oplat']} оплат {self.mes_r}, расхождений по деньгам {I['rashozhdeniy']}, "
                 f"без чека {I['bez_cheka']}")
