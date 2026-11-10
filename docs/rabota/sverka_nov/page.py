@@ -961,7 +961,7 @@ def main(argv=None) -> int:
               {"at": S.now.isoformat(timespec="seconds"), "month": month, "itogi": S.I, "note": note,
                "rows": [{k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in r.items()} for r in S.rows],
                "problems": S.problems}, indent=1)
-    print(f"{out}: {len(page)} байт")
+    print(f"{out}: {len(page.encode('utf-8'))} байт")
     print(note)
     print("Итоги:", json.dumps(S.I, ensure_ascii=False))
     if a.post:
