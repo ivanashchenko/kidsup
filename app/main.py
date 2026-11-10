@@ -8138,7 +8138,7 @@ def api_mkweb_history_result(by_day: int = 0, events: int = 0):
 def api_raspisanie_pravka(payload: dict = Body(...)):
     """Удалить/создать занятия в МойКлассе по готовому плану, в фоне (app/raspisanie_pravka.py):
     {"ops": [{"op": "delete", "lesson_id", "class_id", "date", "begin", "records"} |
-             {"op": "create", "body": {...POST /lessons...}, "records": [userId, ...]}],
+             {"op": "create", "body": {...POST /lessons...}, "records": [userId, ...], "template_lessons": [id, id]}],
      "dry_run": true, "label": "..."}. По умолчанию dry_run — только сверка."""
     from . import raspisanie_pravka as rp
     p = payload or {}
@@ -8150,8 +8150,16 @@ def api_raspisanie_pravka(payload: dict = Body(...)):
 
 @app.get("/api/raspisanie/pravka", dependencies=OWNER_AUTH)
 def api_raspisanie_pravka_status(full: int = 0):
+    """Ход и итог запуска; после перезапуска сервера — по журналу на диске."""
     from . import raspisanie_pravka as rp
     return rp.status(bool(full))
+
+
+@app.post("/api/raspisanie/pravka/stop", dependencies=OWNER_AUTH)
+def api_raspisanie_pravka_stop():
+    """Остановить запуск после текущей операции."""
+    from . import raspisanie_pravka as rp
+    return rp.stop()
 
 
 @app.post("/api/yaweb/login", dependencies=OWNER_AUTH)
