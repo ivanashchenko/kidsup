@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """Сверка оплат месяца — выгрузка данных.
 
-    python3 sverka_nov/sverka.py fetch <от YYYY-MM-DD> <до YYYY-MM-DD>
+    python3 sverka_nov/sverka.py fetch <от YYYY-MM-DD> <до YYYY-MM-DD> [источники]
+
+(источники через запятую — mk,bank,terminal,komtet,chat; без них — все.
+Например, догрузить банк и чеки за прошлые дни без фото: ... fetch 2026-09-01 2026-10-21 bank,terminal,komtet)
 
 Качает свежую копию всего, что нужно странице сверки (page.py), в <папка>/in/
 и складывает нормализованный накопительный снимок в <папка>/snap/:
@@ -123,7 +126,7 @@ def _norm_op(o: dict, acc: dict) -> dict:
     payer = o.get("payer") or {}
     n = {"id": o.get("operationId"), "acc": acc["last4"], "acc_name": acc["name"], "chuzhoy": acc["chuzhoy"],
          "dir": o.get("typeOfOperation"), "cat": o.get("category"), "amount": o.get("operationAmount"),
-         "op_utc": o.get("operationDate"), "auth_utc": ad, "msk": to_msk(ad).isoformat(timespec="seconds") if ad else None,
+         "op_utc": o.get("operationDate"), "post_utc": o.get("trxnPostDate"), "auth_utc": ad, "msk": to_msk(ad).isoformat(timespec="seconds") if ad else None,
          "purpose": o.get("payPurpose") or o.get("description") or "",
          "payer": payer.get("name") or "", "payer_inn": payer.get("inn") or ""}
     n.update(_bank_kind(o))
@@ -286,10 +289,14 @@ def fetch_foto(meta: dict, d1: str, d2: str) -> None:
     todo = [f for f in foto if f.get("ts") not in used]
     log(f"  чат: сообщений {len(msgs)}, новых фото {new}; не разобрано в tetrad.json: {len(todo)}")
     for f in todo:
-        log(f"    {f['ts']}  {f['file']}  {(f.get('author') or '').strip()} {(f.get('text') or '')[:60]}")
+        txt = " ".join((f.get("text") or "").split())[:60]
+        log(f"    {f['ts']}  {f['file']}  {(f.get('author') or '').strip()} {txt}")
 
 
-def fetch(d1: str, d2: str) -> int:
+ISTOCHNIKI = ("mk", "bank", "terminal", "komtet", "chat")
+
+
+def fetch(d1: str, d2: str, tolko: str = "") -> int:
     date.fromisoformat(d1), date.fromisoformat(d2)
     if d1 > d2:
         raise SystemExit("от > до")
@@ -298,9 +305,15 @@ def fetch(d1: str, d2: str) -> int:
     meta = load_json(p_snap() / "meta.json", {}) or {}
     run = {"at": now_msk().isoformat(timespec="seconds"), "from": d1, "till": d2, "errors": {}}
     log(f"Сверка: выгрузка {d1} — {d2} в {base}")
-    for name, fn, args in (("МойКласс", fetch_mk, (meta,)), ("банк", fetch_bank, (meta, d1, d2)),
-                           ("терминал", fetch_terminal, (meta, d1, d2)), ("Комтет", fetch_komtet, (meta, d1, d2)),
-                           ("чат", fetch_foto, (meta, d1, d2))):
+    want = {x.strip() for x in tolko.split(",") if x.strip()} or set(ISTOCHNIKI)
+    if want - set(ISTOCHNIKI):
+        raise SystemExit(f"источники: {', '.join(ISTOCHNIKI)}")
+    run["tolko"] = sorted(want)
+    for key, name, fn, args in (("mk", "МойКласс", fetch_mk, (meta,)), ("bank", "банк", fetch_bank, (meta, d1, d2)),
+                                ("terminal", "терминал", fetch_terminal, (meta, d1, d2)),
+                                ("komtet", "Комтет", fetch_komtet, (meta, d1, d2)), ("chat", "чат", fetch_foto, (meta, d1, d2))):
+        if key not in want:
+            continue
         log(f"— {name}")
         try:
             fn(*args)
@@ -317,7 +330,7 @@ def fetch(d1: str, d2: str) -> int:
 
 def main(argv: list[str]) -> int:
     if len(argv) >= 4 and argv[1] == "fetch":
-        return fetch(argv[2], argv[3])
+        return fetch(argv[2], argv[3], argv[4] if len(argv) > 4 else "")
     print(__doc__)
     return 2
 
