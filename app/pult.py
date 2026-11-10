@@ -808,6 +808,12 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             ctrl = (f" <a href='#' style='font-size:12px;color:#8a5a00;white-space:nowrap' "
                     f"title='Набрала, никто не взял — дело останется, попытка запишется' onclick=\""
                     f"pultMiss('{it['kind']}',{it['id']});return false\">не дозвонилась ☎</a>") + ctrl
+        if it["kind"] != "task":
+            # 10.11, Лиза: причину правки (коррекция, списание, перенос) писать
+            # в сам пункт, а не в карточку — в карточке это каша для коллег.
+            ctrl += (f" <a href='#' style='font-size:12px;color:#6c6a86;white-space:nowrap' "
+                     f"title='Дописать в пункт причину или что сделано — пункт не закрывается' "
+                     f"onclick=\"pultNote({it['id']});return false\">✎ причина</a>")
         lis.append((it["done"] == 1, it["done"] == 0, bool(it.get("staryj")),
             head + f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
             f"<input type='checkbox' {'checked' if it['done'] == 1 else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
@@ -1083,6 +1089,16 @@ function pultDone(box, kind, id, note){{
      location.reload();
    }})
    .catch(function(){{ box.checked = !box.checked; alert('Не сохранилось, попробуйте ещё раз'); }});
+}}
+function pultNote(id){{
+  var n = prompt('Причина или что сделано — одной строкой (сохранится в пункте, пункт не закроется):', '');
+  if (n === null) return;
+  n = n.trim(); if (!n) return;
+  fetch('/api/plan/inbox/note', {{method:'POST', headers:{{'Content-Type':'application/json'}},
+        body: JSON.stringify({{id:id, note:n}})}})
+   .then(function(r){{ if (!r.ok) throw 0; return r.json(); }})
+   .then(function(){{ location.reload(); }})
+   .catch(function(){{ alert('Не сохранилось — проверьте связь и нажмите ещё раз'); }});
 }}
 function pultMiss(kind, id){{
   fetch('/api/pult/nedozvon', {{method:'POST', headers:{{'Content-Type':'application/json'}},

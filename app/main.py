@@ -7506,6 +7506,24 @@ def api_plan_inbox_done(payload: dict = Body(...)):
     return {"ok": True}
 
 
+@app.post("/api/plan/inbox/note", dependencies=AUTH)
+def api_plan_inbox_note(payload: dict = Body(...)):
+    """Дописать в пункт пульта причину или что сделано, не закрывая его: {id, note}.
+    10.11, Лиза: причины правок — в пункте, а не в карточке клиента."""
+    iid = int(payload.get("id") or 0)
+    note = " ".join(str(payload.get("note") or "").split())[:300]
+    if not iid or not note:
+        raise HTTPException(400, "нужны id и note")
+    stamp = autopilot._now().strftime("%d.%m %H:%M")
+    with db.get_conn() as conn:
+        _inbox_init(conn)
+        n = conn.execute("UPDATE plan_inbox SET text=text||? WHERE id=?",
+                         (f" · ✎ причина ({stamp}): {note}", iid)).rowcount
+    if not n:
+        raise HTTPException(404, "пункт не найден")
+    return {"ok": True, "id": iid}
+
+
 INBOX_DONE_JS = "<script>function inboxDone(b,i){fetch('/api/plan/inbox/done',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:i,done:b.checked})}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(x){if(x&&x.ok===false){b.checked=!b.checked;alert('Не сохранилось');return}location.reload()}).catch(function(){b.checked=!b.checked;alert('Не сохранилось — проверьте связь и нажмите ещё раз')})}</script>"
 
 
