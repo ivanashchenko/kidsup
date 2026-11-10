@@ -8116,6 +8116,26 @@ def api_mkweb_history_result(by_day: int = 0, events: int = 0):
     return st
 
 
+@app.post("/api/raspisanie/pravka", dependencies=OWNER_AUTH)
+def api_raspisanie_pravka(payload: dict = Body(...)):
+    """Удалить/создать занятия в МойКлассе по готовому плану, в фоне (app/raspisanie_pravka.py):
+    {"ops": [{"op": "delete", "lesson_id", "class_id", "date", "begin", "records"} |
+             {"op": "create", "body": {...POST /lessons...}, "records": [userId, ...]}],
+     "dry_run": true, "label": "..."}. По умолчанию dry_run — только сверка."""
+    from . import raspisanie_pravka as rp
+    p = payload or {}
+    try:
+        return rp.start(p.get("ops") or [], bool(p.get("dry_run", True)), str(p.get("label") or "")[:80])
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/raspisanie/pravka", dependencies=OWNER_AUTH)
+def api_raspisanie_pravka_status(full: int = 0):
+    from . import raspisanie_pravka as rp
+    return rp.status(bool(full))
+
+
 @app.post("/api/yaweb/login", dependencies=OWNER_AUTH)
 def api_yaweb_login():
     """Браузерный вход в Яндекс (Директ) технической учёткой."""
