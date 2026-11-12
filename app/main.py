@@ -1,4 +1,4 @@
-"""KidsUp Analytics — выгрузка и аналитика данных из CRM МойКласс."""
+"""KidsUP — рабочее приложение центра (app.kidsup.ru) поверх CRM МойКласс."""
 
 import csv
 import html
@@ -28,7 +28,7 @@ logging.basicConfig(level=logging.INFO,
 
 db.init_db()
 
-app = FastAPI(title="KidsUp Analytics")
+app = FastAPI(title="KidsUP")
 
 from . import autopilot  # noqa: E402  (нужен db.init_db выше)
 autopilot.start()
@@ -250,18 +250,23 @@ for _otkuda, _kuda in UBRANO.items():
 
 
 def _domoy(request: Request) -> str:
-    """Стартовая страница роли: админам — пульт, владельцу — его стартовая страница
-    (документ start выкладывается на сервер запросом; пока его нет — список документов)."""
-    if _rol(request) != "owner":
-        return "/pult"
-    from . import boris_docs
-    return "/boris/docs/start" if (boris_docs.BORIS.dir / "start.html").exists() else "/boris/docs"
+    """Стартовая страница роли: админам — пульт, владельцу — список его документов.
+
+    Не документ start: на сервере лежит его сборка 10.11, а в ней раздел «Разделы
+    приложения» повторяет старое меню (Макеты, Контент, Ученики, Платежи…) и все
+    документы, которые уходят в архив, — первым экраном владелец увидел бы ровно то,
+    что просил скрыть (проверка 12.11). В списке документов архив уже свёрнут.
+    Вернуть start главной — после пересборки по новому меню (шаг 2)."""
+    return "/boris/docs" if _rol(request) == "owner" else "/pult"
 
 
 def _vladelcu(request: Request):
-    """Архивная страница с базой клиентов, деньгами, рассылкой или фото детей — только
-    владельцу. Админа уводим на пульт без окна пароля: адрес мог остаться в закладке,
-    а окно пароля на знакомой странице читается как «сайт сломался»."""
+    """Страница только владельцу: архивная (база клиентов, деньги, рассылка, фото детей)
+    или из раздела «Владельцу», которая до 12.11 стояла в меню админов (журнал, источники
+    заявок) или о самих админах (сверка честности, аномалии). Админа уводим на пульт без
+    окна пароля: адрес мог остаться в закладке, а окно пароля на знакомой странице
+    читается как «сайт сломался». Это скрытие страницы, не защита данных: их API на
+    шаге 1 частью под общим входом (см. комментарии у /api/audit и /export/raw)."""
     if _rol(request) != "owner":
         return RedirectResponse("/pult", status_code=303)
 
@@ -278,6 +283,8 @@ def render(request: Request, template: str, **ctx) -> HTMLResponse:
         # страницу не попадает вовсе, педагогу по ключу меню не рисуется.
         "rol": rol,
         "menu": nav.menu(rol),
+        # архивная или переезжающая страница — плашка «это не рабочая страница, иди туда»
+        "plashka": nav.plashka(request.url.path, rol),
     })
     return templates.TemplateResponse(request, template, ctx)
 
@@ -372,11 +379,19 @@ def root(request: Request,
         return await_page("week")
     check_auth(credentials, request)   # служебный хост — как раньше, под паролем
     # 12.11.2026, Борис: «скрой не нужные / не актуальные / старые страницы». Главной был
-    # дашборд от 10.07 с графиками за год — в работе им не пользовались. Теперь главная —
-    # рабочее место роли. Переход стоит после разводки публичных доменов и после входа:
-    # посетитель kidsup.ru сюда не доходит, а без пароля адрес по-прежнему отвечает 401.
-    # 303, а не 301: постоянный переход браузер запомнил бы навсегда.
-    return RedirectResponse(_domoy(request), status_code=303)
+    # дашборд от 10.07 с графиками за год — в работе им не пользовались. Сначала главная
+    # стала переходом на рабочее место роли, но в тот же вечер Борис спросил: «Почему
+    # app.kidsup.ru под админами перекидывает на Пульт?! А подомной на документы
+    # владельца?!» — и выбрал страницу разделов: всё меню с пояснениями, сверху кнопка
+    # пульта, у владельца ещё его раздел и действующие документы (архивные — нет).
+    docs = []
+    if _rol(request) == "owner":
+        try:
+            from . import boris_docs
+            docs = [r for r in boris_docs.BORIS.spisok() if not r.get("arhiv")]
+        except Exception:
+            docs = []
+    return render(request, "glavnaya.html", active="", opis=nav.OPIS, docs=docs)
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
@@ -1776,9 +1791,9 @@ def base_doc(slug: str):
 
 
 # 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
-# «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
-# Ни рутины, ни автопилот эту страницу не открывают (проверено по списку рутин 12.11).
-@app.get("/journal", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+# «Владельцу»: админа уводим на пульт (_vladelcu), а не окном пароля — до 12.11 «Журнал»
+# стоял в меню админов и остался у них в закладках. Ни рутины, ни автопилот её не открывают.
+@app.get("/journal", response_class=HTMLResponse, dependencies=AUTH)
 def journal_page(request: Request, day: str = ""):
     """Кто что сделал: записи в группы, оплаты, комментарии — с автором.
 
@@ -1787,6 +1802,9 @@ def journal_page(request: Request, day: str = ""):
     userComment.managerId — кто написал. Этого хватает, чтобы видеть работу
     поимённо, без вебхуков и без входа в интерфейс.
     """
+    r = _vladelcu(request)
+    if r:
+        return r
     d = day or autopilot._today().isoformat()
     # 12.10.2026: _admins() не отдаёт уволенных — журнал за прошлые дни подписываем всеми
     names = {a["managerId"]: a["name"] for a in autopilot._admins(vse=True)}
@@ -2682,6 +2700,17 @@ def api_hvost_proverka_zakryt(payload: dict = Body(default={})):
     return hvost.proverit(zakryt=True, dry=False)
 
 
+@app.get("/api/hvost/staroe", dependencies=AUTH)
+def api_hvost_staroe(dry: int = 1):
+    """Решение Бориса 12.11 «старые звонки»: какие открытые звонки дежурных
+    подпадают под правило и с какой пометкой их закрыло бы утро пульта.
+    Только просмотр — закрывать этим адресом нельзя (dry=0 — отказ)."""
+    if not int(dry):
+        raise HTTPException(400, "только просмотр: такие пункты закрывает утро пульта")
+    from . import hvost
+    return hvost.staroe()
+
+
 @app.post("/api/hvost/razobrat", dependencies=OWNER_AUTH)
 def api_hvost_razobrat(payload: dict = Body(default={})):
     """Сделать разбор: протухшее закрыть с пометкой, живое перенести на
@@ -3048,6 +3077,9 @@ def export_attendance():
         [tuple(r) for r in rows])
 
 
+# 12.11.2026, честно: страницы «Ученики» и «Платежи» ушли в архив владельца, но эта выгрузка
+# (вся база с телефонами, все платежи) — под общим входом: её читают рутины «Места» и «Сверка
+# оплат». Закрыть её можно только вместе со служебным входом рутин и личными логинами — шаг 3.
 @app.get("/export/raw/{table}.json", dependencies=AUTH)
 def export_raw(table: str):
     allowed = {"users", "joins", "payments", "invoices", "classes", "courses",
@@ -3642,11 +3674,14 @@ def nezvonili_page(request: Request, since: str = "", until: str = ""):
 
 
 # 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
-# «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
-# Ни рутины, ни автопилот её не открывают; /api/istochniki остаётся под общим входом.
-@app.get("/istochniki", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+# «Владельцу»: админа уводим на пульт (_vladelcu), а не окном пароля — до 12.11 «Откуда
+# заявки» стояли в меню админов. Ни рутины, ни автопилот её не открывают.
+@app.get("/istochniki", response_class=HTMLResponse, dependencies=AUTH)
 def istochniki_page(request: Request, since: str = "", until: str = ""):
     """Откуда заявки и что из них вышло."""
+    r = _vladelcu(request)
+    if r:
+        return r
     from . import istochniki
     return render(request, "istochniki.html", active="istochniki",
                   d=istochniki.otchet(since, until))
@@ -3744,7 +3779,9 @@ def api_tvoyklass_status():
     return tvoyklass.status()
 
 
-@app.get("/api/istochniki", dependencies=AUTH)
+# 12.11.2026: только владельцу, как и страница «Откуда заявки». Ни рутины (опись 12.11),
+# ни страницы приложения этот адрес не зовут; разборы 23.09 читали его разово.
+@app.get("/api/istochniki", dependencies=OWNER_AUTH)
 def api_istochniki(since: str = "", until: str = ""):
     """Откуда пришли заявки и что из них вышло. Чтение."""
     from . import istochniki
@@ -4192,7 +4229,9 @@ def _sverka_den(day: str, code: int) -> str | None:
         raise HTTPException(code, "нет такого дня" if code == 404 else "day: нужна дата ГГГГ-ММ-ДД")
 
 
-@app.get("/api/sverka-chestnosti", dependencies=AUTH)
+# 12.11.2026: отчёт сверки честности — о самих админах, поэтому, как и страница, только
+# владельцу. Ни рутины (опись 12.11), ни страницы приложения этот адрес не зовут.
+@app.get("/api/sverka-chestnosti", dependencies=OWNER_AUTH)
 def api_sverka_chestnosti(day: str = ""):
     from . import sverka_chestnosti
     return sverka_chestnosti.load(_sverka_den(day, 404))
@@ -4214,10 +4253,13 @@ def api_sverka_chestnosti_run(day: str = "", dry: int = 1):
 
 
 # 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
-# «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
-# Ни рутины, ни автопилот её не открывают; /api/sverka-chestnosti остаётся под общим входом.
-@app.get("/sverka-chestnosti", response_class=HTMLResponse, dependencies=OWNER_AUTH)
-def sverka_chestnosti_page(day: str = ""):
+# «Владельцу»: админа уводим на пульт (_vladelcu), без окна пароля — как у архивных страниц.
+# Ни рутины, ни автопилот её не открывают.
+@app.get("/sverka-chestnosti", response_class=HTMLResponse, dependencies=AUTH)
+def sverka_chestnosti_page(request: Request, day: str = ""):
+    r = _vladelcu(request)
+    if r:
+        return r
     from . import sverka_chestnosti
     return HTMLResponse(sverka_chestnosti.html(_sverka_den(day, 404)))
 
@@ -4462,11 +4504,23 @@ def api_chaty_snapshot_run():
     return chaty.snapshot_start()
 
 
-@app.post("/api/chaty/deliver", dependencies=AUTH)
-def api_chaty_deliver(limit: int = 3, dry: int = 1):
-    """Отправить приглашения разовыми сообщениями, порциями по limit."""
+def _po_nastoyashchemu(payload) -> bool:
+    """Отправлять ли по-настоящему: только {"dry": false} в JSON-теле запроса.
+
+    12.11.2026. Раньше dry=0 стоял в строке запроса POST без тела. Такую форму может
+    отправить любая чужая страница, открытая в том же браузере, — браузер сам подставит
+    сохранённый вход. Запрос с JSON-телом чужая страница без разрешения сервера не
+    отправит. ?dry=0 в адресе теперь ничего не значит: без тела — только подсчёт."""
+    return isinstance(payload, dict) and payload.get("dry") is False
+
+
+@app.post("/api/chaty/deliver", dependencies=OWNER_AUTH)
+def api_chaty_deliver(limit: int = 3, payload: dict = Body(default={})):
+    """Отправить приглашения разовыми сообщениями, порциями по limit. Отправляет сразу,
+    без очереди, поэтому, как и /api/chaty/send, только владельцу (12.11.2026): кнопки
+    нет ни на одной странице, автопилот зовёт модуль chaty сам."""
     from . import chaty
-    return chaty.deliver(limit=limit, dry=bool(dry))
+    return chaty.deliver(limit=limit, dry=not _po_nastoyashchemu(payload))
 
 
 @app.post("/api/chaty/reply", dependencies=AUTH)
@@ -4486,12 +4540,12 @@ def api_chaty_find_links(limit: int = 40):
 
 
 @app.post("/api/chaty/send", dependencies=OWNER_AUTH)
-def api_chaty_send(dry: int = 1):
-    """Поставить приглашения в очередь рассылки. dry=1 — только посчитать.
-    Только владельцу (12.11.2026): кнопка стоит на архивной /chaty, автопилот
-    зовёт модуль chaty сам, без этого адреса."""
+def api_chaty_send(payload: dict = Body(default={})):
+    """Поставить приглашения в очередь рассылки. Без тела — только посчитать,
+    {"dry": false} — по-настоящему (_po_nastoyashchemu). Только владельцу (12.11.2026):
+    кнопка стоит на архивной /chaty, автопилот зовёт модуль chaty сам, без этого адреса."""
     from . import chaty
-    return chaty.send(dry=bool(dry))
+    return chaty.send(dry=not _po_nastoyashchemu(payload))
 
 
 @app.get("/go/{channel}")
@@ -4616,7 +4670,7 @@ def _wazzup_process(payload: dict) -> None:
 
 
 # 12.11.2026 — шаг 1 «скрыть старое»: по смене версии в /api/health видно, что новая сборка поднялась
-APP_VERSION = "2026-11-12.1"
+APP_VERSION = "2026-11-12.2"
 
 
 @app.get("/api/net")
@@ -6522,7 +6576,7 @@ def otkazy_page():
             f"<td>{'снят' if r['снят'] else 'не пишем'}</td></tr>")
     n_live = sum(1 for r in rows if not r["снят"])
     return f"""<!doctype html><meta charset=utf-8>
-<title>Отказы — KidsUP</title>
+<title>Стоп-лист — KidsUP</title>
 <style>
 body{{font:15px/1.5 system-ui,sans-serif;margin:24px;color:#312783;max-width:1100px}}
 h1{{font-size:22px}} .sub{{color:#666;margin-bottom:18px}}
@@ -6531,8 +6585,10 @@ td,th{{border-bottom:1px solid #e6e6ef;padding:8px 10px;vertical-align:top;text-
 th{{background:#f6f6fb;font-size:13px;color:#555}}
 tr.off{{opacity:.45}} .q{{color:#444;font-style:italic}}
 .warn{{color:#E30613}}
+.nazad a{{color:#1DA7E0;text-decoration:none}}
 </style>
-<h1>Отказы: {n_live} семей, которым автоматика не пишет</h1>
+<p class=nazad><a href="/pult">← Пульт</a> · <a href="/pult#razdely">Разделы</a></p>
+<h1>Стоп-лист: {n_live} семей, которым автоматика не пишет</h1>
 <div class=sub>Сюда попадает всё, где клиент письменно просил снять бронь.
 Пока строка активна, ни одна рассылка этому телефону не уходит — только
 живые ответы администратора. Снять стоп-лист может только человек:
@@ -10241,7 +10297,10 @@ async def api_roistat_push(since: str = "", dry_run: int = 1, collect: int = 1):
     return {**result, **out}
 
 
-@app.get("/api/audit", dependencies=AUTH)
+# 12.11.2026: лента аномалий — только владельцу, как и страница «Аномалии». Рутины (опись
+# 12.11) и страницы её не читают; /api/audit/resolve остаётся под общим входом — им
+# пользуется админская /pravila-kontrol.
+@app.get("/api/audit", dependencies=OWNER_AUTH)
 async def api_audit(status: str = "new", limit: int = 200):
     """Лента аномалий: деньги без подписи, возвраты, скидки вне правил,
     стоп-слова в разговорах и переписке."""
@@ -10265,11 +10324,14 @@ async def api_audit_resolve(flag_id: int, status: str = "ok"):
 
 
 # 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
-# «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
-# Ни рутины, ни автопилот её не открывают; /api/audit остаётся под общим входом.
-@app.get("/audit", response_class=HTMLResponse, dependencies=OWNER_AUTH)
-async def audit_page():
+# «Владельцу»: админа уводим на пульт (_vladelcu), без окна пароля — на /audit ведёт и
+# методичка chto_ya_delayu, которую админы видят в /base. Ни рутины, ни автопилот её не открывают.
+@app.get("/audit", response_class=HTMLResponse, dependencies=AUTH)
+async def audit_page(request: Request):
     """Лента аномалий человеческим лицом: красное сверху, кнопки разбора."""
+    r = _vladelcu(request)
+    if r:
+        return r
     from . import audit
     s = audit.summary()
     flags = audit.feed("new", 200)
@@ -10498,7 +10560,8 @@ async def money_page():
     from . import crmcheck
     d = crmcheck.debts_report()
     if not d.get("ready"):
-        return HTMLResponse("<p>Нет ключа МойКласс</p>")
+        return HTMLResponse('<p><a href="/pult">← Пульт</a> · <a href="/pult#razdely">Разделы</a></p>'
+                            "<p>Нет ключа МойКласс</p>")
     t = d["totals"]
     rows, nobill = d["rows"], d["nobill"]
     BUCKET = {
@@ -10547,7 +10610,7 @@ async def money_page():
                         for x in nobill) + '</table></div></section>')
     return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Долги по абонементам и занятиям</title><style>
+<title>Долги — KidsUP</title><style>
 :root{{--paper:#FCFBF7;--ink:#1B1D2B;--muted:#5F6478;--line:#E7E4DA;--card:#fff;--fill:#F3F1E9}}
 @media (prefers-color-scheme:dark){{:root{{--paper:#14151D;--ink:#E7E6EC;--muted:#9A9EAE;
   --line:#292B37;--card:#1B1D26;--fill:#20222C}}}}
@@ -10578,6 +10641,7 @@ td.w{{white-space:nowrap}}
 .how ol{{margin:.5rem 0;padding-left:1.2rem}} .how li{{margin:.3rem 0}}
 a{{color:inherit}}
 </style></head><body><div class="wrap">
+<p class="m"><a href="/pult">← Пульт</a> · <a href="/pult#razdely">Разделы</a></p>
 <h1>Долги по абонементам и занятиям</h1>
 <p class="sub">Данные тянутся из МойКласс при каждом открытии страницы —
 на {d["as_of"]}. Источник: счета с датой оплаты, поэтому просрочка считается точно.</p>

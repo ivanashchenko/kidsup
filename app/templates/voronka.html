@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Воронка к цели — KidsUP{% endblock %}
+{% block title %}Без оплаты — KidsUP{% endblock %}
 {% block content %}
-<h1>Кто в группах без оплаты</h1>
+<h1>Без оплаты: кто в группах, но не оплатил</h1>
 <p class="muted">Каждая строка — ребёнок, записанный в группу сезона, но без оплаченного абонемента, и с ним
 нужно что-то сделать: <b>учится без оплаты</b> — счёт сегодня (в том числе второй предмет у тех, кто платил за
 другой); <b>абонемент закончился</b> — продление; <b>посетил пробное</b> — звонок и предложение абонемента;
@@ -36,7 +36,7 @@
   <input id="q" placeholder="имя или телефон" oninput="filt(cur)" style="padding:.45rem .7rem;margin-left:.6rem">
 </p>
 
-<table id="t" style="width:100%;border-collapse:collapse;font-size:.93rem">
+<div class="scroll"><table id="t" style="width:100%;border-collapse:collapse;font-size:.93rem">
 <thead><tr style="text-align:left;border-bottom:2px solid #e4e2f2">
   <th>Ребёнок</th><th>Телефон</th><th>Группа</th><th>Стадия</th><th>Тишина</th><th>Последний звонок</th><th>Последнее сообщение</th><th>Комментарий админа</th><th>Карточка</th></tr></thead>
 <tbody>
@@ -57,13 +57,13 @@
   <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td>
 </tr>
 {% endfor %}{% endfor %}
-</tbody></table>
+</tbody></table></div>
 
 <h2 style="margin-top:1.8rem">Отложено по договорённости — {{ v.отложено|length }}</h2>
 <p class="muted">В комментарии стоит дата следующего контакта. Строка вернётся в работу в этот день.
 {% if v.убрано_по_статусу %}Ещё {{ v.убрано_по_статусу }} строк убрано по статусу «отказ / не писать / некачественный».{% endif %}</p>
 {% if v.отложено %}
-<table style="width:100%;border-collapse:collapse;font-size:.9rem">
+<div class="scroll"><table style="width:100%;border-collapse:collapse;font-size:.9rem">
 <thead><tr style="text-align:left;border-bottom:2px solid #e4e2f2"><th>Вернуть</th><th>Ребёнок</th><th>Стадия</th><th>Комментарий</th><th>Карточка</th></tr></thead>
 <tbody>
 {% for r in v.отложено %}
@@ -75,7 +75,7 @@
   <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td>
 </tr>
 {% endfor %}
-</tbody></table>
+</tbody></table></div>
 {% endif %}
 
 <h2 style="margin-top:1.8rem">Ждём на пробное — {{ v.ждём|length }}</h2>
@@ -90,7 +90,7 @@
 {% for r in безфлага %}<a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">{{ r.name }}</a> <span class="muted">{{ r.пробное.дата[5:]|replace('-','.') }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</p>
 {% endif %}
 <details><summary class="btn" style="display:inline-block;cursor:pointer">Показать список</summary>
-<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:.6rem">
+<div class="scroll"><table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:.6rem">
 <thead><tr style="text-align:left;border-bottom:2px solid #e4e2f2"><th>Пробное</th><th>Ребёнок</th><th>Группа</th><th>Комментарий админа</th><th>Карточка</th></tr></thead>
 <tbody>
 {% for r in v.ждём %}
@@ -102,7 +102,7 @@
   <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td>
 </tr>
 {% endfor %}
-</tbody></table></details>
+</tbody></table></div></details>
 {% if v.нет_в_crm %}
 <h2 style="margin-top:1.8rem">Карточки нет в МойКлассе — {{ v.нет_в_crm|length }}</h2>
 <p class="muted">Эти строки убраны из работы: карточку в CRM удалили или слили с другой, а в нашей копии
@@ -122,7 +122,7 @@
 Список нужен только чтобы проверить, что именно закрыли и кто.</p>
 {% if v.сделанные %}
 <details><summary class="btn" style="display:inline-block;cursor:pointer">Показать сделанные</summary>
-<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:.6rem">
+<div class="scroll"><table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-top:.6rem">
 <thead><tr style="text-align:left;border-bottom:2px solid #e4e2f2"><th>Ребёнок</th><th>Стадия</th><th>Кто закрыл</th><th>Комментарий</th><th>Карточка</th></tr></thead>
 <tbody>
 {% for r in v.сделанные %}
@@ -134,7 +134,7 @@
   <td><a href="https://app.moyklass.com/user/{{ r.uid }}" target="_blank" rel="noopener">CRM →</a></td>
 </tr>
 {% endfor %}
-</tbody></table></details>
+</tbody></table></div></details>
 {% endif %}
 
 <style>.pill{display:inline-block;padding:.1rem .55rem;border-radius:99px;background:#EEF3FF;font-size:.82rem}

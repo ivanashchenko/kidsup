@@ -564,6 +564,10 @@ label input[type="checkbox"], label input[type="radio"] {
 }
 
 /* ---------------------------------------------------------- служебное --- */
+/* Обёртка широкой таблицы: прокручивается сама, а не растягивает страницу вбок.
+   12.11.2026: класс стоял в «Местах», «Без оплаты» и ещё шести шаблонах, но определён
+   был только в lp.css — на телефоне эти страницы уезжали вбок на 700+ пикселей. */
+.scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
 .muted { color: var(--muted); }
 .small { font-size: 12.5px; }
 .green, .pos { color: var(--green); font-weight: 650; }

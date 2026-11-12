@@ -194,6 +194,38 @@ def _semey(n: int) -> str:
     return f"{n} семей"
 
 
+def _zayavok(n: int) -> str:
+    tail = n % 100
+    if not 11 <= tail <= 14:
+        if n % 10 == 1:
+            return f"{n} заявка"
+        if n % 10 in (2, 3, 4):
+            return f"{n} заявки"
+    return f"{n} заявок"
+
+
+# Решение Бориса 12.11 («старые звонки»): по заявке старше месяца без единой
+# записи на занятие и без оплат не звоним. Блок больше не зовёт звонить по
+# таким — они сведены в одну строку; смену статуса записи по-прежнему видно.
+def _pravilo_12_11():
+    """Функция «строка заявки старая по правилу?» (дней, телефон) -> bool."""
+    from . import zvonok_filtr
+    zmax = zvonok_filtr.porogi()[1]
+    try:
+        with db.get_conn() as conn:
+            s_zapisyu = zvonok_filtr.nomera_s_zapisyu(conn)
+    except Exception:  # noqa: BLE001
+        s_zapisyu = set()
+    return lambda dney, phone: zvonok_filtr.zayavka_staraya(dney, phone, s_zapisyu, zmax)
+
+
+def _stroka_starye(n: int) -> str:
+    if not n:
+        return ""
+    return (f"<div style='font-size:12.5px;color:#6c6a86;margin-top:8px'>{_zayavok(n)} старше месяца — "
+            f"по правилу 12.11 не звоним, только статус.</div>")
+
+
 def _checked_block() -> str:
     """Блок по перепроверенному списку (app/zayavki_audit.py).
 
@@ -208,9 +240,13 @@ def _checked_block() -> str:
     if not d:
         return ""
     fams = [f for f in d["семьи"] if not skryto(f.get("phone"), f.get("created", ""))]
+    staraya = _pravilo_12_11()
+    stare = {f["phone"] for f in fams if f["kind"] in ("не доделали", "писали", "звонили")
+             and staraya(f.get("days_min", f["days"]), f["phone"])}
+    n_stare = sum(len(f["хочет"]) or 1 for f in fams if f["phone"] in stare)
 
     def _sec(kind: str) -> list[dict]:
-        return [f for f in fams if f["kind"] == kind]
+        return [f for f in fams if f["kind"] == kind and f["phone"] not in stare]
 
     def _li_f(f: dict, tail: str = "") -> str:
         want = " + ".join(dict.fromkeys(x for x in f["хочет"] if x))[:70]
@@ -258,6 +294,9 @@ def _checked_block() -> str:
                 ("talked", "Разговор был, решения нет — дожать и поставить статус", "#F59C00"),
                 ("tail", "Старый хвост: заявка висит, семья записана в другую группу", "#6c6a86")):
             rows = [r for r in raw[key] if r.get("phone") not in {f["phone"] for f in fams}]
+            if key == "talked":                  # «дожать» — это звонок: старые не зовём
+                n_stare += sum(1 for r in rows if staraya(r["days"], r["phone"]))
+                rows = [r for r in rows if not staraya(r["days"], r["phone"])]
             if not rows:
                 continue
             p.append(f"<details style='margin-top:8px;font-size:13.5px'><summary style='cursor:pointer;"
@@ -268,6 +307,7 @@ def _checked_block() -> str:
                                for r in rows) + "</ul></details>")
     except Exception:  # проверенный блок важнее хвостов
         pass
+    p.append(_stroka_starye(n_stare))
     skr = [(ph, v) for ph, v in provereno().items()]
     if skr:
         p.append(f"<details style='margin-top:8px;font-size:12.5px;color:#6c6a86'><summary "
@@ -295,6 +335,11 @@ def block() -> str:
     except Exception as e:  # страница плана важнее блока
         return (f"<div class='card' style='border-left:4px solid #E30613;margin:14px 0'>"
                 f"<b>Заявки сезона без обработки</b> — не посчитались: {html.escape(str(e))}</div>")
+    staraya = _pravilo_12_11()
+    n_stare = 0
+    for key in ("untouched", "tried", "talked"):     # звонки; хвост — смена статуса, остаётся
+        n_stare += sum(1 for r in d[key] if staraya(r["days"], r["phone"]))
+        d[key] = [r for r in d[key] if not staraya(r["days"], r["phone"])]
     n_hot = len(d["untouched"]) + len(d["tried"])
     parts = [f"<div class='card' style='border-left:4px solid #E30613;margin:14px 0'>"
              f"<b style='display:block;font-size:17px;margin-bottom:4px'>Заявки с 10.08 без обработки ({n_hot})</b>"
@@ -323,6 +368,7 @@ def block() -> str:
                      f"Семья уже записана в другую группу, заявка-хвост — {len(d['tail'])}. Закрыть «Завершил / записан в другую группу»</summary>"
                      "<ul style='list-style:none;padding:0;margin:6px 0 0'>"
                      + "".join(_li(r) for r in d["tail"]) + "</ul></details>")
+    parts.append(_stroka_starye(n_stare))
     parts.append(f"<div style='font-size:12px;color:#6c6a86;margin-top:8px'>Всего «новых заявок» в CRM: {d['season_total'] + d['old_total']}, "
                  f"из них {d['old_total']} — хвосты до 10.08.2026 (прошлые сезоны), закрываются массово по решению Бориса.</div></div>")
     return "".join(parts)
