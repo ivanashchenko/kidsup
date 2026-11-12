@@ -137,12 +137,14 @@ TOLKO_CHELOVEK: frozenset = frozenset({"/owner", "/owner/vhody", "/settings", "/
 # пока ключ рутин ни разу не сработал (у klod пуст posl_zapros). После первого запроса ключом
 # рутин — 403. Личному админу (вход через форму) они закрыты сразу. Во втором выпуске список
 # убирается вместе со старыми входами.
+# Отчёты о самих админах (/api/audit, /api/istochniki, /api/sverka-chestnosti) в списке нет:
+# их закрыла от общего входа ещё выкатка шага 1 (12.11, поправка Д2 в nav_testy), и общему
+# admin они отвечают 401, как до личных входов.
 PEREHOD_ADMIN: frozenset = frozenset({
     "/export/leads.csv", "/export/lessons.csv", "/export/attendance.csv",
-    "/api/audit", "/api/audit/run",
-    "/api/sverka-chestnosti", "/api/nabor/analiz",
+    "/api/audit/run", "/api/nabor/analiz",
     "/clicks", "/api/clicks/summary",
-    "/api/istochniki", "/api/istochniki/spravochnik",
+    "/api/istochniki/spravochnik",
 })
 PEREHOD_PREFIKS: tuple = ("/export/raw", "/kadry/file")
 AVTO_PUTI = frozenset({("POST", "/api/plan/inbox"), ("GET", "/api/duty"), ("GET", "/api/dialogs")})

@@ -809,5 +809,16 @@ Can I have the red one, please? На видео с 0:20».</li>
 
 
 </div>
+<script>
+/* 12.11.2026: педагог входит по ключу из ссылки (?k=). С карточки речи ключ приходит сюда —
+   несём его обратно в ссылки на карточку, иначе там окно пароля. */
+(function () {
+  var k = new URLSearchParams(location.search).get('k');
+  if (!k) return;
+  document.querySelectorAll('a[href^="/english/karta"]').forEach(function (a) {
+    a.href = '/english/karta?k=' + encodeURIComponent(k) + (a.hash || '');
+  });
+})();
+</script>
 </body>
 </html>

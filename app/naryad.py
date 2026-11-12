@@ -162,11 +162,33 @@ def _duty(day: str) -> list[str]:
 
 def sobrat(day: str = "") -> list[dict]:
     """Что сегодня ничьё. Список пунктов: {kind, phone, name, text}."""
-    from . import pult, zayavki, zayavki_audit
+    return _sobrat(day)[0]
+
+
+def _sobrat(day: str = "") -> tuple[list[dict], int]:
+    """sobrat() и сколько семей со старыми заявками отсекло правило 12.11."""
+    from . import pult, zayavki, zayavki_audit, zvonok_filtr
     day = day or pult.today()
     busy = _busy(day)
     items: list[dict] = []
     seen: set[str] = set()
+    # Решение Бориса 12.11: заявка старше zayavka_max_dney (30) без единой записи
+    # на занятие и без оплат — не звоним. Свежая заявка той же семьи идёт своей
+    # строкой и проходит. Смена статуса в CRM — не звонок, её правило не трогает.
+    zmax = zvonok_filtr.porogi()[1]
+    try:
+        with db.get_conn() as conn:
+            s_zapisyu = zvonok_filtr.nomera_s_zapisyu(conn)
+    except Exception:  # noqa: BLE001
+        s_zapisyu = set()
+    otsecheno: set[str] = set()
+
+    def _staraya(phone, dney) -> bool:
+        if not zvonok_filtr.zayavka_staraya(dney, phone, s_zapisyu, zmax):
+            return False
+        if _p10(phone) and _p10(phone) not in busy:
+            otsecheno.add(_p10(phone))
+        return True
 
     def _add(kind: str, phone: str, name: str, text: str) -> None:
         p = _p10(phone)
@@ -186,6 +208,10 @@ def sobrat(day: str = "") -> list[dict]:
         want = " + ".join(dict.fromkeys(x for x in f.get("хочет") or [] if x))[:60]
         nm = f.get("name") or f.get("phone")
         days = f.get("days")
+        if f["kind"] in ("не доделали", "писали", "звонили"):
+            days = f.get("days_min", days)       # звоним по самой свежей заявке семьи
+            if _staraya(f.get("phone"), days):
+                continue             # и она старше месяца — не звоним (12.11)
         if f["kind"] == "не доделали":
             _add("звонок", f["phone"], nm,
                  f"Заявка без единого касания: {_imya(nm)}"
@@ -212,11 +238,15 @@ def sobrat(day: str = "") -> list[dict]:
         log.warning("наряд: заявки не собрались: %s", e)
         raw = {"untouched": [], "tried": [], "talked": [], "tail": []}
     for r in raw["untouched"] + raw["tried"]:
+        if _staraya(r["phone"], r["days"]):
+            continue
         _add("звонок", r["phone"], r["name"],
              f"Заявка сезона без результата: {_imya(r['name'])}"
              + (f", {_hochet(r['comment'] or r['class'])}" if _hochet(r['comment'] or r['class']) else "")
              + f", {r['days']} дн. Позвонить.")
     for r in raw["talked"]:
+        if _staraya(r["phone"], r["days"]):
+            continue
         _add("звонок", r["phone"], r["name"],
              f"С семьёй говорили, решения нет: {_imya(r['name'])}"
              + (f", {_hochet(r['comment'] or r['class'])}" if _hochet(r['comment'] or r['class']) else "")
@@ -278,7 +308,8 @@ def sobrat(day: str = "") -> list[dict]:
     calls = [i for i in items if i["kind"] != "хвост"][:max(0, LIMIT_CALLS - postavleno)]
     tails = [i for i in items if i["kind"] == "хвост"][
         :max(0, LIMIT_TAILS - max(0, postavleno - LIMIT_CALLS))]
-    return calls + tails
+    # семья, у которой прошла свежая заявка, отсечённой не считается
+    return calls + tails, len(otsecheno - seen)
 
 
 def _postavleno(day: str) -> int:
@@ -310,14 +341,15 @@ def raspredelit(day: str = "", dry: bool = False) -> dict:
     """Разложить ничьи строки по дежурным. Возвращает, что поставлено."""
     from . import autopilot, pult
     day = day or pult.today()
-    items = sobrat(day)
+    items, stare = _sobrat(day)
     on = _duty(day)
     free = [w for w in on if dry or not _peregruz(day, w)]
     out: dict[str, list[str]] = {w: [] for w in on}
     if not free:
         log.info("наряд %s: у всех дежурных больше 25 открытых пунктов — не доливаем", day)
         return {"день": day, "дежурные": on, "ничьих": len(items),
-                "поставлено": {w: 0 for w in on}, "перегруз": True, "пункты": out}
+                "поставлено": {w: 0 for w in on}, "перегруз": True, "пункты": out,
+                "старше_30_дн": stare}
     for n, it in enumerate(items):
         who = free[n % len(free)]
         if dry:
@@ -330,4 +362,5 @@ def raspredelit(day: str = "", dry: bool = False) -> dict:
                  sum(len(v) for v in out.values()),
                  ", ".join(f"{w}: {len(v)}" for w, v in out.items()))
     return {"день": day, "дежурные": on, "ничьих": len(items),
-            "поставлено": {w: len(v) for w, v in out.items()}, "пункты": out}
+            "поставлено": {w: len(v) for w, v in out.items()}, "пункты": out,
+            "старше_30_дн": stare}          # звонки по старым заявкам, отсечённые правилом 12.11

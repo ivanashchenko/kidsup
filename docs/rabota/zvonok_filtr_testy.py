@@ -238,6 +238,101 @@ def test_nedavno():
              zf.nedavno_govorili(c, "79990000042", "2026-10-17T11:00:00"), False)
 
 
+def test_staroe_1211():
+    # 12.11.2026, решение Бориса «старые звонки»: «думает» без живого контакта
+    # дольше 21 дня и заявки старше 30 дней без записи — звонок не ставим.
+    print("Старые звонки (решение 12.11): pauza_do, staroe, staryy_zvonok")
+    from datetime import timedelta
+    D12 = date(2026, 11, 12)
+
+    def dn(n):
+        return (D12 - timedelta(days=n)).isoformat()
+    proverka("«думает» 22 дня без контакта — не ставим", bool(zf.staroe("думает", D12, kontakt=dn(22))), True)
+    proverka("«думает» 20 дней — ставим", zf.staroe("думает", D12, kontakt=dn(20)), "")
+    proverka("ровно 21 день — ещё ставим", zf.staroe("думает", D12, kontakt=dn(21)), "")
+    proverka("контакта не было вовсе — не ставим", bool(zf.staroe("думает", D12)), True)
+    proverka("порог из настройки: 30 дней — 22 ещё ставим", zf.staroe("думает", D12, kontakt=dn(22), dmax=30), "")
+
+    def kom(*k):
+        return {1: [(x[0], x[2] if len(x) > 2 else ADMIN, x[1]) for x in k]}
+    ne_ranshe = kom(("2026-10-13T11:55:00", "Пошли в сад, заниматься планируют, но не раньше ноября."))
+    pd = zf.pauza_do(ne_ranshe, [1], [("2026-10-13T14:54:00+03:00", "out", "talked")])
+    proverka("«не раньше ноября» (13.10) — пауза до 01.11", pd, date(2026, 11, 1))
+    proverka("… 20.10 otvet держит паузу", bool(zf.otvet(ne_ranshe, [1], [], date(2026, 10, 20))), True)
+    proverka("… 12.11 пауза кончилась — otvet не держит", zf.otvet(ne_ranshe, [1], [], D12), "")
+    proverka("просила «в ноябре», дата прошла 11 дней назад — один звонок ставим",
+             zf.staroe("думает", D12, kontakt="2026-10-13", pauza=pd, nabirali="2026-10-13T14:54:00+03:00"), "")
+    proverka("… этот звонок уже был (05.11, не дозвонились) — больше не ставим",
+             bool(zf.staroe("думает", D12, kontakt="2026-10-13", pauza=pd, nabirali="2026-11-05T12:00:00+03:00")), True)
+    proverka("… через 19 дней после даты — не ставим",
+             bool(zf.staroe("думает", date(2026, 11, 20), kontakt="2026-10-13", pauza=pd)), True)
+    cherez = kom(("2026-10-06T12:06:00", "через месяц перезвонить", ADMIN2))
+    proverka("«через месяц перезвонить» (06.10) — дата 06.11", zf.pauza_do(cherez, [1]), date(2026, 11, 6))
+    proverka("… 12.11 — один звонок ставим",
+             zf.staroe("думает", D12, kontakt="2026-10-06", pauza=zf.pauza_do(cherez, [1])), "")
+    proverka("после просьбы — живой ответ без паузы: просьба не в счёт",
+             zf.pauza_do(kom(("2026-10-06T12:06:00", "через месяц перезвонить"),
+                             ("2026-10-20T09:00:00", "Поговорили, выбирают между ИЗО и английским")), [1]), None)
+    proverka("последний ответ — «свяжусь сама»: паузы нет", zf.pauza_do(kom(("2026-10-06T12:06:00", "Подумаю, свяжусь сама")), [1]), None)
+    proverka("после просьбы семья объявилась — паузы нет",
+             zf.pauza_do(cherez, [1], [("2026-10-10T11:00:00+03:00", "in", "missed")]), None)
+    proverka("«звонить не раньше 18.00» — время, не срок",
+             stop(("2026-10-10T09:00:00", "звонить не раньше 18.00, днём на работе")), False)
+
+    k = kom(("2026-11-07T09:00:00", "Поговорили с мамой с мобильного, думают до выходных"),
+            ("2026-11-08T09:00:00", "но"),
+            ("2026-11-09T09:00:00", "11.10 11:45 Клод: напомнили о себе (мессенджер)"),
+            ("2026-11-10T09:00:00", "Поговорили, ждут места", 999999))
+    proverka("комментарий админа о разговоре — контакт (МСК)", zf.kontakt_v_kartochke(k, [1]), "2026-11-07T12:00")
+    proverka("«но», служебное и не-админ — не контакт", zf.kontakt_v_kartochke(kom(("2026-11-08T09:00:00", "но")), [1]), "")
+
+    proverka("заявка 31 день без записи — не ставим", bool(zf.staroe("заявка", D12, zayavka=dn(31))), True)
+    proverka("заявка 30 дней — ставим", zf.staroe("заявка", D12, zayavka=dn(30)), "")
+    proverka("бывший ученик с оплатами — ставим", zf.staroe("заявка", D12, zapis=True, zayavka=dn(300)), "")
+    proverka("дата заявки неизвестна — не отсекаем", zf.staroe("заявка", D12), "")
+    proverka("разговор 0 с (длительность не записана) — контакт", zf.razgovor_zachet("talked", 0), True)
+    proverka("разговор 5 с — не контакт", zf.razgovor_zachet("talked", 5), False)
+    proverka("разговор 48 с — контакт", zf.razgovor_zachet("talked", 48), True)
+
+    # то же правило по базе — для пунктов, которые уже стоят в пульте
+    c = sqlite3.connect(":memory:")
+    c.executescript("""
+        CREATE TABLE crm_comments (id INTEGER PRIMARY KEY, user_id INTEGER, ts TEXT, manager_id INTEGER, text TEXT);
+        CREATE TABLE mango_calls (id INTEGER PRIMARY KEY, ts TEXT, phone TEXT, direction TEXT, state TEXT, secs INTEGER);
+        CREATE TABLE wazzup_inbox (id INTEGER PRIMARY KEY, ts TEXT, phone TEXT);
+        CREATE TABLE users (id INTEGER PRIMARY KEY, phone TEXT, created_at TEXT);
+        CREATE TABLE lessons (id INTEGER PRIMARY KEY, date TEXT, class_id INTEGER);
+        CREATE TABLE lesson_records (id INTEGER PRIMARY KEY, lesson_id INTEGER, user_id INTEGER, visit INTEGER);
+        CREATE TABLE payments (id INTEGER PRIMARY KEY, user_id INTEGER, date TEXT, summa REAL);
+        CREATE TABLE joins (id INTEGER PRIMARY KEY, user_id INTEGER, class_id INTEGER, status_id INTEGER, created_at TEXT);
+        CREATE TABLE classes (id INTEGER PRIMARY KEY, name TEXT);
+    """)
+    por = (21, 30)
+    for uid, ph in ((51, "79990000051"), (52, "79990000052"), (53, "79990000053"), (54, "79990000054"),
+                    (55, "79990000055")):
+        c.execute("INSERT INTO users (id, phone, created_at) VALUES (?, ?, ?)", (uid, ph, dn(60) + "T10:00:00+00:00"))
+        c.execute("INSERT INTO mango_calls (ts, phone, direction, state, secs) VALUES (?, ?, 'out', 'talked', 60)",
+                  (dn(25) + "T12:00:00+03:00", ph))
+    proverka("по базе: 25 дней без контакта — старый", bool(zf.staryy_zvonok(c, [51], "79990000051", D12, "думает", por)), True)
+    c.execute("INSERT INTO crm_comments (user_id, ts, manager_id, text) VALUES (52, ?, ?, ?)",
+              (dn(4) + "T09:00:00", ADMIN, "Созвонились с папой с мобильного, думают"))
+    proverka("по базе: комментарий админа 4 дня назад — не старый", zf.staryy_zvonok(c, [52], "79990000052", D12, "думает", por), "")
+    c.execute("INSERT INTO lessons (id, date) VALUES (1, ?)", ((D12 + timedelta(days=4)).isoformat(),))
+    c.execute("INSERT INTO lesson_records (lesson_id, user_id) VALUES (1, 53)")
+    proverka("по базе: записаны на занятие вперёд — правило не применяем",
+             zf.staryy_zvonok(c, [53], "79990000053", D12, "думает", por), "")
+    c.execute("INSERT INTO wazzup_inbox (ts, phone) VALUES (?, '79990000054')", (dn(3) + "T10:00:00+03:00",))
+    proverka("по базе: семья написала сама 3 дня назад — не старый", zf.staryy_zvonok(c, [54], "79990000054", D12, "думает", por), "")
+    proverka("по базе: заявка 60 дней без записи — старая", bool(zf.staryy_zvonok(c, [55], "79990000055", D12, "заявка", por)), True)
+    c.execute("INSERT INTO classes (id, name) VALUES (7, '2627_Заявки_Робототехника')")
+    c.execute("INSERT INTO joins (user_id, class_id, status_id, created_at) VALUES (55, 7, 50509, ?)", (dn(6) + "T10:00:00+00:00",))
+    proverka("по базе: та же семья оставила свежую заявку — не старая",
+             zf.staryy_zvonok(c, [55], "79990000055", D12, "заявка", por), "")
+    c.execute("INSERT INTO payments (user_id, date, summa) VALUES (51, '2025-03-01', 5000)")
+    proverka("по базе: бывший ученик с оплатами — по заявке не старый",
+             zf.staryy_zvonok(c, [51], "79990000051", D12, "заявка", por), "")
+
+
 test_ne_zvonit()
 test_zvonit_mozhno()
 test_otmetki_i_avtomatika()
@@ -247,5 +342,6 @@ test_semya()
 test_popytki()
 test_revyu_1710()
 test_nedavno()
+test_staroe_1211()
 print("\nошибок:", oshibok)
 sys.exit(1 if oshibok else 0)

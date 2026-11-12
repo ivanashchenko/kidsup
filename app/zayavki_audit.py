@@ -243,11 +243,15 @@ def audit(limit: int = 0) -> dict:
     fam: dict[str, dict] = {}
     for x in sorted(out, key=lambda x: KIND_ORDER.index(x["kind"]) if x["kind"] in KIND_ORDER else 9):
         f = fam.setdefault(x["phone"], {"phone": x["phone"], "name": x["name"], "kind": x["kind"],
-                                        "why": x["why"], "days": x["days"], "uid": x["uid"],
-                                        "cards": len(x["cards"]), "хочет": []})
+                                        "why": x["why"], "days": x["days"], "days_min": x["days"],
+                                        "uid": x["uid"], "cards": len(x["cards"]), "хочет": []})
         f["хочет"].append(x["class"] or x["comment"])
         f["days"] = max(f["days"], x["days"])
-    families = sorted(fam.values(), key=lambda f: -f["days"])
+        # 12.11, решение Бориса «старые звонки»: заявка старше месяца — не звоним,
+        # но свежая заявка той же семьи — звоним. Поэтому храним и самую свежую.
+        f["days_min"] = min(f["days_min"], x["days"])
+    # свежие первыми: свежий лид конвертируется лучше (было — самые старые сверху)
+    families = sorted(fam.values(), key=lambda f: (f["days_min"], f["days"]))
 
     by: dict[str, int] = {}
     for x in out:

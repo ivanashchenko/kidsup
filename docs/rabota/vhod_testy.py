@@ -220,10 +220,14 @@ def test_kak_segodnya():
     r = kl().get("/liniya", headers=STR, auth=OBSHCHIY)
     proverka("страница под старым входом — 200 и без единой метки", r.status_code == 200 and not metki(r),
              (r.status_code, sorted(metki(r))))
-    proverka("корень: admin → /pult, boris → его стартовая",
-             (kl().get("/", auth=OBSHCHIY).headers.get("location"),
-              kl().get("/", auth=STARYY_VLADELCA).headers.get("location", "").startswith("/boris/docs"))
-             == ("/pult", True))
+    # 12.11.2026, вечер, решение Бориса: главная — страница разделов, без перехода на пульт.
+    ra, rb = kl().get("/", auth=OBSHCHIY), kl().get("/", auth=STARYY_VLADELCA)
+    proverka("корень — страница разделов: admin → 200 без раздела «Владельцу», boris → 200 с ним",
+             (ra.status_code, rb.status_code) == (200, 200) and "Открыть пульт" in ra.text
+             and "Владельцу" not in ra.text and "Владельцу" in rb.text and "Мои дела на пульте" in rb.text,
+             (ra.status_code, rb.status_code))
+    proverka("…без входа корень → 401 с окном пароля, как раньше",
+             kl().get("/").status_code == 401 and "basic" in kl().get("/").headers.get("www-authenticate", "").lower())
     proverka("переход /boris: admin → /pult, boris → /boris/docs",
              (kl().get("/boris", auth=OBSHCHIY).headers.get("location"),
               kl().get("/boris", auth=STARYY_VLADELCA).headers.get("location")) == ("/pult", "/boris/docs"))
@@ -1524,12 +1528,20 @@ POST /api/hooppy/post · GET /api/hooppy/posty · POST /api/hooppy/udalit · GET
 # Список 5.2 плана: что 12.11.2026 переведено с общего входа на вход владельца (и что уже перевёл шаг 1).
 SPISOK_52 = """
 GET /export/leads.csv · GET /export/students.csv · GET /export/payments.csv · GET /export/lessons.csv
-GET /export/attendance.csv · GET /export/raw/{table}.json · GET /journal · GET /audit · GET /api/audit
-POST /api/audit/run · GET /sverka-chestnosti · GET /api/sverka-chestnosti · GET /api/nabor/analiz · GET /clicks
-GET /api/clicks/summary · GET /kadry/file/{day}/{name} · GET /istochniki · GET /api/istochniki
+GET /export/attendance.csv · GET /export/raw/{table}.json · GET /api/audit
+POST /api/audit/run · GET /api/sverka-chestnosti · GET /api/nabor/analiz · GET /clicks
+GET /api/clicks/summary · GET /kadry/file/{day}/{name} · GET /api/istochniki
 POST /api/istochniki/spravochnik · GET /api/boris/tasks · POST /api/boris/tasks · POST /api/boris/status
-POST /api/chaty/send
+POST /api/chaty/send · POST /api/chaty/deliver
 """
+# Четыре страницы из списка 5.2, которые до 12.11 стояли в меню админов или на которые ведут их
+# методички. Решение Бориса при выкатке шага 1 (nav_testy, VLADELCU_NA_PULT): админа уводим на
+# пульт (303) без окна пароля и без страницы отказа. Они стоят под общим входом, а не владельцу
+# их закрывает сам обработчик (main._vladelcu) — по роли вошедшего. Данных админ не получает.
+NA_PULT = ("/journal", "/istochniki", "/sverka-chestnosti", "/audit")
+# Страницы владельца, которые закрыты входом владельца (check_owner): админу — 403 со страницей
+# «Только для владельца». Эти пять — для проверки после выкладки (план, 7.1 и 9.4).
+PYAT_STRANIC = ("/owner", "/settings", "/boris/docs", "/arhiv", "/clicks")
 # Остались под общим входом вопреки списку 5.2 — каждое с причиной (см. отчёт исполнителя В).
 OSTALIS_ADMINAM = {
     "POST /api/audit/resolve": "кнопки «принято / исправлено» жмут админы на /pravila-kontrol",
@@ -1655,6 +1667,17 @@ def test_prava_v_den_vykladki():
              all(vm.get(f"{a} {b}") == "owner" for a, b in sp), [x for x in sp if vm.get(f"{x[0]} {x[1]}") != "owner"])
     proverka("…два адреса остались админам — названы поимённо, с причиной",
              all(vm.get(x) == "auth" for x in OSTALIS_ADMINAM), {x: vm.get(x) for x in OSTALIS_ADMINAM})
+    proverka("…четыре страницы «на пульт» стоят под общим входом и закрыты обработчиком (_vladelcu)",
+             all(vm.get(f"GET {a}") == "auth" for a in NA_PULT), {a: vm.get(f"GET {a}") for a in NA_PULT})
+    na_pult = [(r_.status_code, r_.headers.get("location"), "www-authenticate" in r_.headers)
+               for r_ in (kl().get(a, auth=OBSHCHIY, headers=STR) for a in NA_PULT)]
+    proverka("общий admin на них → 303 на пульт без окна пароля, как на основной ветке",
+             na_pult == [(303, "/pult", False)] * 4, na_pult)
+    proverka("прежний boris открывает все четыре",
+             [kl().get(a, auth=STARYY_VLADELCA, headers=STR).status_code for a in NA_PULT] == [200] * 4)
+    proverka("отчёты о самих админах общему admin закрыты и в день выкладки (401, как на основной ветке)",
+             [kl().get(a, auth=OBSHCHIY).status_code for a in ("/api/audit", "/api/istochniki", "/api/sverka-chestnosti")]
+             == [401] * 3 and kl().post("/api/chaty/deliver", auth=OBSHCHIY).status_code == 401)
     V = m.vhod
     perehod = [(a, b) for a, b in vl if V._v_spiske(adres_puti(b), V.PEREHOD_ADMIN, V.PEREHOD_PREFIKS)]
     proverka("каждая запись PEREHOD_ADMIN и PEREHOD_PREFIKS — существующий адрес под входом владельца",
@@ -1697,10 +1720,12 @@ def test_prava_v_den_vykladki():
     r = po_vsem(vl, auth=OBSHCHIY, hdr=KAK)
     proverka("общий admin с X-Kak: admin — тоже везде 403: переходная поблажка на него не действует",
              set(r) == {"403в"}, {k_: v[:5] for k_, v in r.items() if k_ != "403в"})
-    kody = [c.get(a, auth=STARYY_VLADELCA, headers={**STR, **KAK}).status_code
-            for a in ("/owner", "/settings", "/journal", "/istochniki", "/audit")]
+    kody = [c.get(a, auth=STARYY_VLADELCA, headers={**STR, **KAK}).status_code for a in PYAT_STRANIC]
     proverka("пять страниц владельца с X-Kak: admin → 403 (проверка шага 1 выкладки)", kody == [403] * 5, kody)
-    r = c.get("/journal", auth=STARYY_VLADELCA, headers={**STR, **KAK})
+    na_pult = [(r_.status_code, r_.headers.get("location"))
+               for r_ in (c.get(a, auth=STARYY_VLADELCA, headers={**STR, **KAK}) for a in NA_PULT)]
+    proverka("…а четыре страницы «на пульт» с X-Kak: admin → 303 на пульт", na_pult == [(303, "/pult")] * 4, na_pult)
+    r = c.get("/clicks", auth=STARYY_VLADELCA, headers={**STR, **KAK})
     proverka("странице — «Только для владельца · ← На пульт», без окна пароля и без кеша",
              r.status_code == 403 and "Только для владельца" in r.text and "href='/pult'" in r.text
              and "На пульт" in r.text and "/static/vhod.js" in r.text and not r.headers.get("www-authenticate")
@@ -1713,8 +1738,10 @@ def test_prava_v_den_vykladki():
              c.get("/api/pult/tasks", auth=STARYY_VLADELCA, headers=KAK).status_code == 200
              and kto(c, auth=STARYY_VLADELCA, headers=KAK) == {"login": "boris", "imya": "Борис", "rol": "admin",
                                                                 "sposob": "staryy"})
-    proverka("…корень с X-Kak ведёт на пульт, а не на страницу владельца",
-             c.get("/", auth=STARYY_VLADELCA, headers=KAK).headers.get("location") == "/pult")
+    r = c.get("/", auth=STARYY_VLADELCA, headers=KAK)
+    proverka("…корень с X-Kak — страница разделов админа: без раздела «Владельцу» и без документов владельца",
+             r.status_code == 200 and "Открыть пульт" in r.text and "Владельцу" not in r.text
+             and "Ваши документы" not in r.text, r.status_code)
     proverka("другое значение заголовка ничего не меняет: X-Kak: owner под общим admin — по-прежнему 401",
              c.get("/api/settings", auth=OBSHCHIY, headers={"x-kak": "owner"}).status_code == 401
              and kto(c, auth=OBSHCHIY, headers={"x-kak": "owner"})["rol"] == "admin")
@@ -1747,11 +1774,23 @@ def test_prava_lyudey():
     proverka("владелец через форму: проходит всё, кроме четырёх адресов выкладки (там 403)",
              set(r) == {200, "403в"} and {x.split(" ", 1)[1] for x in zakryto} == set(VYKLADKA4)
              and len(r[200]) == len(vl) - len(zakryto), (zakryto, {k_: v[:5] for k_, v in r.items() if k_ not in (200, "403в")}))
-    kody = [lena.get(a, headers=STR).status_code for a in ("/owner", "/settings", "/journal", "/istochniki", "/audit",
-                                                           "/sverka-chestnosti", "/clicks", "/boris/docs")]
+    kody = [lena.get(a, headers=STR).status_code for a in PYAT_STRANIC]
     proverka("Лена открывает страницы владельца в браузере → 403 со страницей, а не окно пароля и не форма",
-             kody == [403] * 8, kody)
-    r = lena.get("/audit", headers=STR)
+             kody == [403] * 5, kody)
+    na_pult = [(r_.status_code, r_.headers.get("location"), "www-authenticate" in r_.headers)
+               for r_ in (lena.get(a, headers=STR) for a in NA_PULT)]
+    proverka("…а с четырёх бывших пунктов меню админов её уводит на пульт (303), без окна и без формы",
+             na_pult == [(303, "/pult", False)] * 4, na_pult)
+    proverka("…владелец через форму открывает все четыре",
+             [boris.get(a, headers=STR).status_code for a in NA_PULT] == [200] * 4)
+    r = lena.get("/", headers=STR)
+    proverka("главная у Лены — страница разделов с её именем, без раздела «Владельцу»",
+             r.status_code == 200 and "Открыть пульт" in r.text and "Владельцу" not in r.text
+             and "Лена" in r.text and "Ваши документы" not in r.text, r.status_code)
+    r = boris.get("/", headers=STR)
+    proverka("главная у владельца через форму — с разделом «Владельцу»",
+             r.status_code == 200 and "Владельцу" in r.text and "Мои дела на пульте" in r.text, r.status_code)
+    r = lena.get("/clicks", headers=STR)
     proverka("…на странице отказа — её имя и ссылка на пульт",
              "Вы вошли как Лена" in r.text and "href='/pult'" in r.text and not r.headers.get("www-authenticate"))
     r = lena.get("/api/audit", headers=FETCH)
@@ -2023,8 +2062,10 @@ def test_prava_klyuchey(klyuchi):
     proverka("ключ выкладки и ключ рутин с X-Kak: admin — все адреса владельца → 403",
              set(po_vsem(vl, hdr={**KV, **KAK})) == {"403в"} and set(po_vsem(vl, hdr={**KR, **KAK})) == {"403в"})
     proverka("…пять страниц владельца ключом выкладки с X-Kak → 403; рабочие адреса открыты; /api/kto → права админа",
-             [kl().get(a, headers={**KV, **KAK, **STR}).status_code for a in ("/owner", "/settings", "/journal", "/istochniki", "/audit")]
-             == [403] * 5 and kl().get("/api/pult/tasks", headers={**KV, **KAK}).status_code == 200
+             [kl().get(a, headers={**KV, **KAK, **STR}).status_code for a in PYAT_STRANIC]
+             == [403] * 5
+             and [kl().get(a, headers={**KV, **KAK, **STR}).headers.get("location") for a in NA_PULT] == ["/pult"] * 4
+             and kl().get("/api/pult/tasks", headers={**KV, **KAK}).status_code == 200
              and kto(kl(), headers={**KV, **KAK}) == {"login": "klod-vykladka", "imya": "Клод (выкладка)", "rol": "admin",
                                                      "sposob": "klyuch"})
     proverka("…выкладка с X-Kak: admin не проходит даже ключом выкладки",

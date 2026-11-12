@@ -69,7 +69,8 @@ async function plan() {
 }
 async function send() {
   if (!confirm('Отправить приглашения родителям?')) return;
-  const j = await (await fetch('/api/chaty/send?dry=0', {method: 'POST'})).json();
+  const j = await (await fetch('/api/chaty/send', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({dry: false})})).json();
   out.textContent = j.ok ? `Поставлено в очередь: ${j.queued} из ${j.total}` : j.error;
 }
 </script>
