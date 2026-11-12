@@ -889,9 +889,12 @@ def r7(D: Dannye) -> list[dict]:
             # 7г: открыт после возврата всей оплаты (сумма возвратов по модулю, без ограничения датой продажи)
             if st in (2, 3) and payed > 0:
                 rf = [p for p in vozvraty.get(uid, []) if p["date"] >= (prodan or "9")]
-                if rf and sum(abs(p["summa"]) for p in rf) >= payed - 1 and (
+                vozvr = sum(abs(p["summa"]) for p in rf)
+                if rf and vozvr >= payed - 1 and (
                         any(p.get("userSubscriptionId") == s["id"] for p in rf)
-                        or len([y for y in ss if y.get("statusId") in (2, 3) and _num(y.get("payed")) > 0]) == 1):
+                        or len([y for y in ss if y.get("statusId") in (2, 3) and _num(y.get("payed")) > 0]) == 1
+                        # возврат ровно на оплату абонемента, по которому никто не ходил (п. 3767, летние)
+                        or (any(abs(abs(p["summa"]) - payed) < 1 for p in rf) and not _num(s.get("visitedCount")))):
                     vd = max(p["date"] for p in rf)
                     out.append(_stroka("7г", f"r7g:{s['id']}", kogda=f"возврат {_dm(vd)}",
                                        chto=f"абонемент открыт, хотя вся оплата {rub(payed)} возвращена",
@@ -1125,8 +1128,11 @@ def r10(D: Dannye) -> list[dict]:
                 continue         # правку откатили
         if kind.startswith("удаление: user_subscriptions"):
             raw = (polya or {}).get("raw") or {}
-            if _num(raw.get("payed")) == 0 and not _num(raw.get("visitedCount")):
-                continue         # удалён неоплаченный абонемент без посещений — это действие раздела 7
+            if _num(raw.get("payed")) == 0:
+                # удалён неоплаченный абонемент — это действие раздела 7 (дубль, висящий);
+                # посещения с него переносят на оплаченный. Иначе петля: исправленная
+                # строка 7а рождала бы строку «объясни в карточке» (поправка скептика)
+                continue
         if tbl == "payments" and kind.startswith("правка:") and "summa" in polya:
             cur = D.pay_by_id.get(rid)
             if cur is not None and abs(cur["summa"] - _num((polya["summa"] + [0])[0])) < 0.01:
@@ -1166,6 +1172,12 @@ def r11(D: Dannye) -> list[dict]:
         p = _p10(u["phone"])
         if p:
             po_nomeru[p].append(uid)
+    # номер в имени карточки (заявка из мессенджера) — тоже номер: п. 4824, две пустышки
+    po_nomeru_imya = defaultdict(set)
+    for uid, u in D.users.items():
+        for p in {_p10(u["phone"]), _p10(u["name"]) if NOMER_V_IMENI.fullmatch(u["name"] or "") else ""}:
+            if p:
+                po_nomeru_imya[p].add(uid)
     obn = D.obnovitsya("kartochka")
     for uid, u in D.users.items():
         n, st = u["name"], u["state"]
@@ -1176,7 +1188,7 @@ def r11(D: Dannye) -> list[dict]:
                                sdelat="если это дубль — объединить с основной карточкой или в архив; если настоящий ребёнок — убрать «ДУБЛЬ» из имени",
                                obnovitsya=obn, fakty={"name": n, "state": st}))
         elif st in ZHIVYE and NOMER_V_IMENI.fullmatch(n or ""):
-            drugie = [x for x in po_nomeru.get(_p10(u["phone"]), []) if x != uid]
+            drugie = sorted({x for p in {_p10(u["phone"]), _p10(n)} if p for x in po_nomeru_imya.get(p, ()) if x != uid})
             # поправка скептика: только если на номер есть вторая карточка или разговор уже был
             if not drugie and st in (NOVYI_LID, NET_OTVETA):
                 continue
@@ -1289,8 +1301,10 @@ def r12(D: Dannye) -> list[dict]:
         if not bud and cid not in posl:
             continue
         konec = posl.get(cid) or max(bud)
-        kraj = "2027-05-24" if svezho else (date.fromisoformat(gorizont) - timedelta(days=14)).isoformat()
-        if konec < kraj:
+        # без ночной проверки — только локальные занятия (полный синк берёт +62 дня).
+        # Запас две недели: у новогодних каникул следующее занятие недельной группы
+        # может лежать за краем горизонта, и неделя запаса давала ложные строки
+        if (konec < "2027-05-24") if svezho else (konec <= (date.fromisoformat(gorizont) - timedelta(days=14)).isoformat()):
             out.append(_stroka("12в", f"r12v:{cid}", gruppa=D.gruppa(cid), class_id=cid, data=D.today,
                                kogda=f"последнее занятие {_dm(konec)}",
                                chto=f"занятия в расписании кончаются {_dm(konec)}, раньше 31.05",
