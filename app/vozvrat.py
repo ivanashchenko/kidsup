@@ -23,8 +23,17 @@ vozvrat_v_den (по умолчанию 24), кому — дежурные из v
 ребёнок уже посещал, потом — что подходит по возрасту. Платное пробное
 (шахматы, ИЗО, робототехника) называем с ценой.
 
-Живой контакт — разговор от 20 секунд в любую сторону или сообщение от
-клиента. Наши рассылки контактом не считаются. Только чтение CRM; запись —
+Живой контакт — разговор в любую сторону (короче 10 секунд не в счёт),
+сообщение от клиента или живой итог админа в карточке (разговор с мобильного
+тоже разговор). Наши рассылки контактом не считаются.
+
+12.11.2026, решение Бориса («старые звонки», правило в zvonok_filtr.staroe):
+«думает» без живого контакта дольше 21 дня и заявки старше 30 дней без
+единой записи на занятие в обзвон больше не попадают. Семья сама просила
+«в ноябре» / «через месяц» — один звонок после этой даты. Пороги — настройки
+dumaet_max_dney и zayavka_max_dney. Сколько семей отсекло — «старые_по_правилу».
+
+Только чтение CRM; запись —
 в наш инбокс. Сообщения семьям — только через /api/vozvrat/napisat, по
 отмашке, стандартной схемой (мессенджер с перепиской + WhatsApp, СМС тем,
 кто платил).
@@ -242,15 +251,17 @@ def _dannye(conn) -> dict:
     # 17.10.2026: итоговые строки журнала (без событий вебхука) — для правила
     # «звонить ли семье» (zvonok_filtr); popytki ниже считаются как раньше
     zvonki_t: dict[str, list[tuple]] = defaultdict(list)
-    for ts, phone, direction, state in conn.execute(
-            "SELECT ts, phone, direction, state FROM mango_calls WHERE ts >= ?", ("2025-06-01",)):
+    # 12.11: разговор короче 10 секунд — не живой контакт (zvonok_filtr.razgovor_zachet)
+    sek = "secs" if "secs" in {c[1] for c in conn.execute("PRAGMA table_info(mango_calls)")} else "NULL"
+    for ts, phone, direction, state, secs in conn.execute(
+            f"SELECT ts, phone, direction, state, {sek} FROM mango_calls WHERE ts >= ?", ("2025-06-01",)):
         p = _p10(phone)
         if not p:
             continue
         if state in ("talked", "short", "missed") and str(ts) >= NABOR_S:
             zvonki_t[p].append((str(ts), str(direction or ""), state))
         if state == "talked":
-            if str(ts) > zhivoy.get(p, ""):
+            if zvonok_filtr.razgovor_zachet(state, secs) and str(ts) > zhivoy.get(p, ""):
                 zhivoy[p] = str(ts)
         elif direction == "out" and str(ts) >= NABOR_S:
             popytki[p].append(str(ts))
@@ -278,10 +289,36 @@ def _dannye(conn) -> dict:
     zhdut = {r[0] for r in conn.execute(
         "SELECT DISTINCT j.user_id FROM joins j JOIN classes c ON c.id = j.class_id "
         "WHERE c.name LIKE ? AND (c.name LIKE ? OR j.status_id = 50509)", ("2627_%", "%Заявк%"))}
+    # 12.11, решение Бориса «старые звонки»: кто уже записан на занятие вперёд,
+    # у кого была хоть одна запись (бывший ученик), когда семья оставила заявку
+    # и когда админ последний раз записал в карточку живой итог.
+    budushchie = {r[0] for r in conn.execute(
+        "SELECT DISTINCT lr.user_id FROM lesson_records lr JOIN lessons l ON l.id = lr.lesson_id "
+        "WHERE l.date >= ?", (today.isoformat(),))}
+    byla_zapis = {r[0] for r in conn.execute("SELECT DISTINCT user_id FROM lesson_records")}
+    zayavka_uid: dict[int, str] = {}
+    for uid, ts in conn.execute(
+            "SELECT j.user_id, MAX(j.created_at) FROM joins j LEFT JOIN classes c ON c.id = j.class_id "
+            "WHERE j.status_id = ? OR c.name LIKE ? GROUP BY j.user_id", (zvonok_filtr.ZAYAVKA_JOIN, "%Заявк%")):
+        zayavka_uid[uid] = str(ts or "")[:10]
+    kom = zvonok_filtr.kommentarii(conn)
+    zayavka_ts: dict[str, str] = {}
+    kom_kontakt: dict[str, str] = {}
+    for u in users.values():
+        p = _p10(u[2])
+        if not p:
+            continue
+        z = max(str(u[4] or "")[:10], zayavka_uid.get(u[0], ""))
+        if z > zayavka_ts.get(p, ""):
+            zayavka_ts[p] = z
+        kk = zvonok_filtr.kontakt_v_kartochke(kom, [u[0]])
+        if kk > kom_kontakt.get(p, ""):
+            kom_kontakt[p] = kk
     return {"today": today, "st": st_names, "mertvye": mertvye, "users": users, "zhivoy": zhivoy,
             "popytki": popytki, "zvonki_t": zvonki_t, "pisali_nam": pisali_nam, "my_pisali": my_pisali,
             "seychas": seychas, "uchitsya": uchitsya, "platil": platil, "zhdut": zhdut,
-            "kom": zvonok_filtr.kommentarii(conn)}
+            "kom": kom, "budushchie": budushchie, "byla_zapis": byla_zapis,
+            "zayavka_ts": zayavka_ts, "kom_kontakt": kom_kontakt}
 
 
 def _semi(D: dict, uids) -> dict[str, list]:
@@ -334,13 +371,14 @@ def spiski() -> dict:
     """Три очереди: думает, недозвон, база 2024/25 — с предложением по каждой семье."""
     grp = gruppy()
     _NAGRUZKA.clear()
+    dmax, zmax = zvonok_filtr.porogi()          # решение Бориса 12.11: 21 и 30 дней по умолчанию
     with db.get_conn() as conn:
         D = _dannye(conn)
         today = D["today"]
         na_nomere = _vse_na_nomere(D)
 
         def kontakt(p):
-            return max(D["zhivoy"].get(p, ""), D["pisali_nam"].get(p, ""))[:10]
+            return max(D["zhivoy"].get(p, ""), D["pisali_nam"].get(p, ""), D["kom_kontakt"].get(p, ""))[:10]
 
         def rebenok(u):
             age = nabor._age(nabor._birthday(u[5]), today)
@@ -377,8 +415,25 @@ def spiski() -> dict:
                 return f"{n} звонка без ответа и наше сообщение"
             return ""
 
+        def staryy_dumaet(p) -> str:
+            """Решение Бориса 12.11 для «думает». Входящий звонок семьи — тоже контакт
+            (сама объявилась). Сбой разбора — семья остаётся в очереди, как до правила."""
+            try:
+                zv = D["zvonki_t"].get(p, [])
+                uids = [x[0] for x in na_nomere.get(p, [])]
+                vh = max((t for t, napr, st in zv if not napr.startswith(("out", "исх"))), default="")
+                nab = max((t for t, napr, st in zv if napr.startswith(("out", "исх"))), default="")
+                return zvonok_filtr.staroe("думает", today, kontakt=max(kontakt(p), vh[:10]),
+                                           pauza=zvonok_filtr.pauza_do(D["kom"], uids, zv),
+                                           nabirali=nab, dmax=dmax)
+            except Exception:
+                log.exception("возврат: правило 12.11 не разобрало %s", p)
+                return ""
+
         zhdut_semey = Counter()
         otvetili_semey = Counter()
+        stare = Counter()                    # решение Бориса 12.11: сколько семей отсекло правило
+        zapisany = Counter()
 
         # ---- думает
         dumaet = []
@@ -396,6 +451,12 @@ def spiski() -> dict:
             k = kontakt(p)
             posl_pop = max(D["popytki"].get(p, [""]))[:10]
             dney = (today - date.fromisoformat(k)).days if k else 999
+            if any(x[0] in D["budushchie"] for x in na_nomere.get(p, [])):
+                zapisany["думает"] += 1
+                continue                               # уже записаны на занятие — звонок не нужен
+            if dney > dmax and staryy_dumaet(p):
+                stare[f"думает>{dmax}"] += 1
+                continue                               # решение Бориса 12.11: не звоним
             if dney < 7 or (posl_pop and (today - date.fromisoformat(posl_pop)).days < 2):
                 continue                               # срок ещё не подошёл / только что набирали
             deti = [rebenok(u) for u in us]
@@ -421,6 +482,13 @@ def spiski() -> dict:
                 continue
             if semya_zhdet(p):
                 zhdut_semey["недозвон"] += 1
+                continue
+            # решение Бориса 12.11: заявка старше месяца без единой записи на занятие
+            # и без оплат — не звоним; бывших учеников правило не меняет
+            vse = [x[0] for x in na_nomere.get(p, [])]
+            if zvonok_filtr.staroe("заявка", today, zapis=any(u in D["byla_zapis"] or u in D["platil"] for u in vse),
+                                   zayavka=D["zayavka_ts"].get(p, ""), zmax=zmax):
+                stare[f"заявка>{zmax}"] += 1
                 continue
             # три попытки здесь — своё правило (сообщение и «Архив набора»), не звонок
             if otvetili(p, i_popytki=False):
@@ -532,7 +600,9 @@ def spiski() -> dict:
     return {"дата": today.isoformat(), "думает": dumaet, "недозвон": nedozvon, "база2425": baza,
             "итог2425": dict(itog25), "групп_с_местами": len(grp),
             "лист_ожидания_исключено": dict(zhdut_semey),
-            "ответ_в_карточке_исключено": dict(otvetili_semey)}
+            "ответ_в_карточке_исключено": dict(otvetili_semey),
+            "записаны_на_занятие_исключено": dict(zapisany),
+            "старые_по_правилу": dict(stare)}
 
 
 # ------------------------------------------------------------ раздача по сменам
@@ -554,7 +624,7 @@ def _tekst(r: dict) -> str:
     if r["вид"] == "думает":
         head = (f"ДУМАЕТ, {r['дней_без_контакта'] if r['дней_без_контакта'] < 999 else 'много'} дн. без контакта"
                 f"{' (платили раньше)' if r['платил'] else ''}: {deti}.")
-        tail = " Предложить: " + pred + ". Итог и статус — в карточку (думают — звонок через ≤7 дн.)."
+        tail = " Предложить: " + pred + ". Итог и статус — в карточку (нет ответа 3 недели — звонок больше не поставим)."
     elif r["вид"] == "недозвон":
         head = f"НЕДОЗВОН, {r['действие']}{' (платили раньше)' if r['платил'] else ''}: {deti}."
         tail = (" Дозвонились — предложить: " + pred + "." if r["действие"].startswith("попытка") else "")
@@ -635,6 +705,7 @@ def razdat(day: str = "", dry: bool = False, v_den: int = 0) -> dict:
         vybor += moi
     return {"ok": True, "день": day, "кому": kto, "квоты": kvoty, "положено": dict(polozheno),
             "очередь": {k: len(S[k]) for k in ("думает", "недозвон", "база2425")},
+            "старые_по_правилу": S.get("старые_по_правилу", {}),
             "dry_run": dry, "пример": _tekst(vybor[0]) if vybor else ""}
 
 

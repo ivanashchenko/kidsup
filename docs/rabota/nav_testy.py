@@ -226,6 +226,8 @@ PROPALI = {"POST /api/ask", "GET /api/ask/health", "POST /api/publish", "GET /ap
 # Новые адреса шага 1: страница «Архив» и признак «архив» у документов — ровно эти три,
 # чужих новых адресов быть не должно.
 NOVYE = {"GET /arhiv", "POST /api/boris-docs/arhiv", "POST /api/admin-docs/arhiv"}
+# Не из шага 1: разовый просмотр «старых звонков» (решение Бориса 12.11), только чтение.
+NOVYE_ZVONKI_1211 = {"GET /api/hvost/staroe"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
 # чтобы пропажа была видна и без снимка «до».
 NUZHNY = """
@@ -254,8 +256,8 @@ def test_marshruty(m, fajl_do):
     proverka("снимок «до» — 471 маршрут", len(do) == 471, len(do))
     proverka("пропали ровно пять — те, что звала только убранная страница", do - posle == PROPALI,
              sorted((do - posle) ^ PROPALI))
-    proverka("появились ровно три: «Архив» и признак «архив» у документов", posle - do == NOVYE,
-             sorted((posle - do) ^ NOVYE))
+    proverka("появились ровно три: «Архив» и признак «архив» у документов (и просмотр старых звонков 12.11)",
+             posle - do == NOVYE | NOVYE_ZVONKI_1211, sorted((posle - do) ^ (NOVYE | NOVYE_ZVONKI_1211)))
     nuzhny = [x.strip() for x in NUZHNY.replace("\n", " · ").split(" · ") if x.strip()]
     net = [x for x in nuzhny if x not in posle]
     proverka(f"{len(nuzhny)} адресов рутин, автопилота и сайта — на месте", not net, net)

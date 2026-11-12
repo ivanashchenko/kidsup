@@ -335,6 +335,282 @@ def test_utro():
         pult.today, pult.duty, config.DB_PATH = st_today, st_duty, staryj
 
 
+# ── 10. «Старые звонки» (решение Бориса 12.11) ───────────────────────────
+# «Думает» без живого контакта дольше 21 дня и заявки старше 30 дней без
+# записи на занятие больше не ставятся звонком; уже стоящие такие пункты утро
+# закрывает по правилу, а не «вернётся в общую очередь». Данные выдуманные.
+def _baza_1211():
+    """Временная база со всеми таблицами, которые читают очереди звонков."""
+    from app import config, db
+    config.DB_PATH = os.path.join(tempfile.mkdtemp(), "t.db")
+    db.init_db()
+    conn = sqlite3.connect(config.DB_PATH)
+    conn.executescript("""
+        CREATE TABLE crm_comments (id INTEGER PRIMARY KEY, user_id INTEGER, ts TEXT, manager_id INTEGER, text TEXT);
+        CREATE TABLE mango_calls (id INTEGER PRIMARY KEY, ts TEXT, phone TEXT, direction TEXT, state TEXT,
+                                  rec_id TEXT, secs INTEGER, ext TEXT);
+        CREATE TABLE wazzup_inbox (id INTEGER PRIMARY KEY, ts TEXT, phone TEXT, text TEXT);
+        CREATE TABLE wazzup_outbox (id INTEGER PRIMARY KEY, ts TEXT, phone TEXT, text TEXT);
+        CREATE TABLE plan_inbox (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT, who TEXT,
+                                 text TEXT, phone TEXT, source TEXT, done INTEGER DEFAULT 0,
+                                 tries INTEGER DEFAULT 0, prio INTEGER);
+    """)
+    return conn
+
+
+def _semya_1211(conn, uid, phone, status, sozdana, razgovor="", kom="", kom_ts="", oplata=False, zanyatie=""):
+    conn.execute("INSERT INTO users (id, name, phone, client_state_id, created_at, raw) VALUES (?,?,?,?,?,?)",
+                 (uid, f"Тестов {uid}", phone, status, sozdana + "T10:00:00+00:00", "{}"))
+    if razgovor:
+        conn.execute("INSERT INTO mango_calls (ts, phone, direction, state, secs) VALUES (?,?,'out','talked',60)",
+                     (razgovor + "T12:00:00+03:00", phone))
+    if kom:
+        conn.execute("INSERT INTO crm_comments (user_id, ts, manager_id, text) VALUES (?,?,232763,?)",
+                     (uid, kom_ts + "T09:05:00", kom))
+    if oplata:
+        conn.execute("INSERT INTO payments (user_id, date, summa) VALUES (?, '2025-03-01', 5000)", (uid,))
+    if zanyatie:
+        conn.execute("INSERT INTO lessons (id, date, class_id) VALUES (?,?,1)", (uid, zanyatie))
+        conn.execute("INSERT INTO lesson_records (id, lesson_id, user_id, visit) VALUES (?,?,?,0)", (uid, uid, uid))
+
+
+def test_vozvrat_1211():
+    print("Очереди обзвона (vozvrat.spiski): правило 12.11")
+    from datetime import date, timedelta
+    from app import config, db, vozvrat
+    staryj = config.DB_PATH
+    try:
+        conn = _baza_1211()
+        t = date.today()
+
+        def dn(n):
+            return (t - timedelta(days=n)).isoformat()
+        DUM, NED = vozvrat.DUMAET, vozvrat.NEDOZVON
+        _semya_1211(conn, 101, "79990000101", DUM, dn(90), razgovor=dn(22))
+        _semya_1211(conn, 102, "79990000102", DUM, dn(90), razgovor=dn(20))
+        _semya_1211(conn, 103, "79990000103", DUM, dn(90), razgovor=dn(40), zanyatie=(t + timedelta(days=3)).isoformat())
+        _semya_1211(conn, 104, "79990000104", DUM, dn(90), razgovor=dn(30), kom_ts=dn(30),
+                    kom=f"Пошли в сад, просили перезвонить {(t - timedelta(days=5)):%d.%m}")
+        _semya_1211(conn, 105, "79990000105", DUM, dn(90), razgovor=dn(40), kom_ts=dn(10),
+                    kom="Поговорили с мамой с мобильного, думают про английский")
+        _semya_1211(conn, 106, "79990000106", NED, dn(31))
+        _semya_1211(conn, 107, "79990000107", NED, dn(400), oplata=True)
+        _semya_1211(conn, 108, "79990000108", NED, dn(10))
+        conn.commit()
+        conn.close()
+        S = vozvrat.spiski()
+        dum = {r["телефон"]: r for r in S["думает"]}
+        ned = {r["телефон"] for r in S["недозвон"]}
+        proverka("«думает» 22 дня без контакта — не ставится", "79990000101" in dum, False)
+        proverka("«думает» 20 дней — ставится", "79990000102" in dum, True)
+        proverka("с будущей записью на занятие — не ставится", "79990000103" in dum, False)
+        proverka("просили перезвонить к дате, прошло 5 дней — один звонок ставится", "79990000104" in dum, True)
+        proverka("комментарий админа о разговоре — контакт (10 дн., а не 40)",
+                 dum.get("79990000105", {}).get("дней_без_контакта"), 10)
+        proverka("заявка 31 день без записи — не ставится", "79990000106" in ned, False)
+        proverka("бывший ученик с оплатами — ставится", "79990000107" in ned, True)
+        proverka("свежая заявка — ставится", "79990000108" in ned, True)
+        proverka("счётчик правила", S["старые_по_правилу"], {"думает>21": 1, "заявка>30": 1})
+        proverka("счётчик «записаны на занятие»", S["записаны_на_занятие_исключено"], {"думает": 1})
+        tekst = vozvrat._tekst(dum["79990000102"])
+        proverka("текст пункта не обещает звонок через 7 дней",
+                 ("≤7" in tekst, "звонок больше не поставим" in tekst), (False, True))
+        db.set_setting("dumaet_max_dney", "25")
+        proverka("порог из настройки: при 25 днях 22-дневный снова ставится",
+                 "79990000101" in {r["телефон"] for r in vozvrat.spiski()["думает"]}, True)
+    finally:
+        config.DB_PATH = staryj
+
+
+def test_utro_1211():
+    print("Утро пульта (hvost.utro): закрытие по правилу 12.11, пометка админа")
+    from app import config, hvost, pult
+    staryj, st_today, st_duty = config.DB_PATH, pult.today, pult.duty
+    try:
+        conn = _baza_1211()
+        pult.today = lambda: "2026-11-13"          # пятница, в смене Лена
+        pult.duty = lambda day: ["Лена"]
+        DUM, NED = 146950, 345768
+        _semya_1211(conn, 301, "79990000301", DUM, "2026-08-01", razgovor="2026-10-20")
+        _semya_1211(conn, 302, "79990000302", DUM, "2026-08-01", razgovor="2026-10-03")
+        _semya_1211(conn, 303, "79990000303", DUM, "2026-08-01", razgovor="2026-11-03")
+        _semya_1211(conn, 304, "79990000304", NED, "2026-09-20")
+        _semya_1211(conn, 305, "79990000305", NED, "2026-10-01")
+        _semya_1211(conn, 306, "79990000306", NED, "2026-09-01")
+        _semya_1211(conn, 307, "79990000307", 125957, "2024-09-01", oplata=True)
+        _semya_1211(conn, 308, "79990000308", NED, "2024-09-01", oplata=True)
+        for r in (
+            ("2026-11-12", "2026-11-12T08:01+03:00", "Лена", "ДУМАЕТ, 23 дн. без контакта: Тестов Петя", "79990000301", "возврат: думает"),
+            ("2026-11-12", "2026-11-09T08:01+03:00", "Лена",
+             "ДУМАЕТ, 37 дн. без контакта: Тестов Ваня · ✎ 12.11 10:00: мама просила набрать в пятницу",
+             "79990000302", "возврат: думает"),
+            ("2026-11-12", "2026-11-12T08:01+03:00", "Лена", "ДУМАЕТ, 9 дн. без контакта: Тестов Коля", "79990000303", "возврат: думает"),
+            ("2026-11-12", "2026-11-12T08:01+03:00", "Лена", "НЕДОЗВОН, попытка 2 из 3: Тестов Миша", "79990000304", "возврат: недозвон"),
+            ("2026-11-12", "2026-11-12T10:00+03:00", "Лена", "⏳ с 11.11: Заявка сезона без результата: Тестова Аня, 43 дн. Позвонить.",
+             "79990000305", "наряд"),
+            ("2026-11-12", "2026-11-12T10:00+03:00", "Лена", "Клиент ждёт ответа 2 ч: Тестова Оля — «а есть места?»",
+             "79990000306", "наряд"),
+            ("2026-11-12", "2026-11-10T08:01+03:00", "Лена", "БАЗА 2024/25: Тестов Гоша", "79990000307", "возврат: база 2024/25"),
+            ("2026-11-12", "2026-11-12T08:01+03:00", "Лена", "НЕДОЗВОН, попытка 1 из 3 (платили раньше): Тестов Лёва",
+             "79990000308", "возврат: недозвон"),
+        ):
+            conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) VALUES (?,?,?,?,?,?)", r)
+        conn.commit()
+        conn.close()
+        prosmotr = hvost.staroe()
+        proverka("просмотр /api/hvost/staroe: к закрытию — думает, недозвон-заявка и заявка наряда",
+                 sorted(x["id"] for x in prosmotr["закрыть"]), [1, 4, 5])
+        proverka("… пункт с пометкой админа — отдельно", [x["id"] for x in prosmotr["с_пометкой_админа"]], [2])
+        conn = sqlite3.connect(config.DB_PATH)
+        proverka("просмотр ничего не закрыл", conn.execute("SELECT COUNT(*) FROM plan_inbox WHERE done=1").fetchone()[0], 0)
+        conn.close()
+        itog = hvost.utro()
+        conn = sqlite3.connect(config.DB_PATH)
+        got = {r[0]: r[1:] for r in conn.execute("SELECT phone, done, day, who, text FROM plan_inbox")}
+        conn.close()
+        a = got["79990000301"]
+        proverka("«думает» 24 дня без контакта — закрыт по правилу", a[0], 1)
+        proverka("… с пометкой «по правилу 12.11 … в обзвон не вернётся»",
+                 ("по правилу 12.11: «думает» без контакта >21 дн. — в обзвон не вернётся" in a[3],
+                  "общую очередь" in a[3]), (True, False))
+        proverka("пункт с « · ✎ » не закрыт ни по правилу, ни как невзятый — перенесён",
+                 got["79990000302"][:3], (0, "2026-11-13", "Лена"))
+        proverka("«думает» 10 дней — перенесён", got["79990000303"][:2], (0, "2026-11-13"))
+        proverka("недозвон по заявке 54 дня без записи — закрыт по правилу",
+                 (got["79990000304"][0], "заявка >30 дн. без записи — в обзвон не вернётся" in got["79990000304"][3]), (1, True))
+        proverka("заявка наряда 43 дня (с ⏳) — закрыта по правилу", got["79990000305"][0], 1)
+        proverka("«клиент ждёт ответа» правило не трогает", got["79990000306"][0], 0)
+        proverka("база 2024/25 — по-старому: не взята, «вернётся в общую очередь»",
+                 (got["79990000307"][0], "общую очередь обзвона" in got["79990000307"][3]), (1, True))
+        proverka("недозвон бывшего ученика с оплатами — перенесён", got["79990000308"][0], 0)
+        proverka("по правилу закрыто три", itog.get("по_правилу"), 3)
+    finally:
+        pult.today, pult.duty, config.DB_PATH = st_today, st_duty, staryj
+
+
+def test_naryad_1211():
+    print("Наряд (naryad.sobrat): заявки старше 30 дней без записи не звоним")
+    import types
+    from app import config, naryad, zayavki, zayavki_audit
+    staryj = config.DB_PATH
+    st = (naryad._busy, zayavki_audit.cached, zayavki.collect, sys.modules.get("app.main"))
+    try:
+        conn = _baza_1211()
+        _semya_1211(conn, 204, "79990000204", 345768, "2024-09-01", oplata=True)
+        conn.commit()
+        conn.close()
+
+        def stroka(phone, dney):
+            return {"phone": phone, "name": f"Тестов {phone[-3:]}", "comment": "", "class": "Английский",
+                    "days": dney, "uid": int(phone[-3:]), "created": ""}
+        naryad._busy = lambda day: set()
+        zayavki_audit.cached = lambda max_age_min=60: {"семьи": [
+            {"phone": "9990000201", "name": "Тестов 201", "kind": "не доделали", "why": "", "days": 40,
+             "days_min": 40, "uid": 201, "cards": 1, "хочет": ["Английский"]},
+            {"phone": "9990000202", "name": "Тестов 202", "kind": "не доделали", "why": "", "days": 40,
+             "days_min": 5, "uid": 202, "cards": 1, "хочет": ["Английский", "ИЗО"]}]}
+        zayavki.collect = lambda: {"untouched": [stroka("9990000203", 40), stroka("9990000203", 3)],
+                                   "tried": [], "talked": [stroka("9990000204", 45)], "tail": []}
+        zaglushka = types.ModuleType("app.main")
+        zaglushka.api_mesta_voronka = lambda: {"списки": {}}
+
+        async def _zhdut(min_minutes=40):
+            return {"items": []}
+        zaglushka.api_waiting = _zhdut
+        sys.modules["app.main"] = zaglushka
+        items, stare = naryad._sobrat("2026-11-13")
+        po_nomeru = {i["phone"]: i["text"] for i in items}
+        proverka("заявка 40 дней без записи — не берёт", "79990000201" in po_nomeru, False)
+        proverka("у семьи есть свежая заявка — берёт, по свежей (5 дн.)",
+                 ("79990000202" in po_nomeru, ", 5 дн." in po_nomeru.get("79990000202", "")), (True, True))
+        proverka("сырая строка: 40 дней не берёт, свежая той же семьи — берёт",
+                 ", 3 дн." in po_nomeru.get("79990000203", ""), True)
+        proverka("бывший ученик с оплатами — берёт и через 45 дней", "79990000204" in po_nomeru, True)
+        proverka("счётчик отсечённых семей", stare, 1)
+    finally:
+        naryad._busy, zayavki_audit.cached, zayavki.collect = st[:3]
+        if st[3] is None:
+            sys.modules.pop("app.main", None)
+        else:
+            sys.modules["app.main"] = st[3]
+        config.DB_PATH = staryj
+
+
+def test_audit_1211():
+    print("Разбор заявок (zayavki_audit.audit): самая свежая заявка семьи, свежие первыми")
+    from app import config, moyklass_client, zayavki, zayavki_audit
+    staryj = config.DB_PATH
+    st = (zayavki.collect, moyklass_client.MoyklassClient)
+    try:
+        _baza_1211().close()
+
+        class FalshivyjMK:                       # МойКласс не зовём: ни карточек, ни комментариев
+            def __init__(self, *a, **k):
+                pass
+
+            def get(self, path, params=None):
+                if path == "/v1/company/users":
+                    return {"users": []}
+                return {} if path.startswith("/v1/company/users/") else []
+
+            def close(self):
+                pass
+        moyklass_client.MoyklassClient = FalshivyjMK
+
+        def stroka(phone, dney, kl):
+            return {"phone": phone, "name": f"Тестов {phone[-3:]}", "comment": "", "class": kl, "days": dney,
+                    "uid": int(phone[-3:]), "created": "2026-10-01", "calls": 0, "out": 0, "in": 0}
+        zayavki.collect = lambda: {"untouched": [stroka("9990000501", 60, "ИЗО"), stroka("9990000502", 12, "ИЗО"),
+                                                 stroka("9990000501", 4, "Английский")],
+                                   "tried": [], "talked": [], "tail": []}
+        sem = zayavki_audit.audit()["семьи"]
+        proverka("у семьи две заявки: самая старая 60, самая свежая 4",
+                 [(f["phone"], f["days"], f["days_min"]) for f in sem if f["phone"] == "9990000501"],
+                 [("9990000501", 60, 4)])
+        proverka("свежие первыми (по самой свежей заявке)", [f["phone"] for f in sem], ["9990000501", "9990000502"])
+    finally:
+        zayavki.collect, moyklass_client.MoyklassClient = st
+        config.DB_PATH = staryj
+
+
+def test_zayavki_blok_1211():
+    print("Блок заявок на пульте (zayavki.block): старше месяца — одной строкой")
+    from app import config, zayavki, zayavki_audit
+    staryj = config.DB_PATH
+    st = (zayavki_audit.cached, zayavki.collect)
+    try:
+        _baza_1211().close()
+
+        def stroka(phone, dney):
+            return {"phone": phone, "name": f"Тестов {phone[-3:]}", "comment": "", "class": "Английский",
+                    "days": dney, "uid": int(phone[-3:]), "created": "2026-10-01", "calls": 0, "out": 0, "in": 0}
+        zayavki.collect = lambda: {"untouched": [stroka("9990000401", 40), stroka("9990000402", 4)],
+                                   "tried": [stroka("9990000403", 35)], "talked": [stroka("9990000404", 50)],
+                                   "tail": [stroka("9990000405", 60)], "season_total": 5, "old_total": 0}
+        zayavki_audit.cached = lambda max_age_min=60: None
+        h = zayavki.block()
+        proverka("сырой блок: старые не зовут звонить, свежая и хвост на месте",
+                 ("9990000401" in h, "9990000403" in h, "9990000404" in h, "9990000402" in h, "9990000405" in h),
+                 (False, False, False, True, True))
+        proverka("сырой блок: «3 заявки старше месяца — по правилу 12.11 не звоним, только статус»",
+                 "3 заявки старше месяца — по правилу 12.11 не звоним, только статус" in h, True)
+        zayavki_audit.cached = lambda max_age_min=60: {"проверено": 3, "семьи": [
+            {"phone": "9990000411", "name": "Тестов 411", "kind": "не доделали", "why": "", "days": 40, "days_min": 40,
+             "uid": 411, "cards": 1, "хочет": ["Английский"]},
+            {"phone": "9990000412", "name": "Тестов 412", "kind": "не доделали", "why": "", "days": 40, "days_min": 6,
+             "uid": 412, "cards": 1, "хочет": ["Английский", "ИЗО"]},
+            {"phone": "9990000413", "name": "Тестов 413", "kind": "говорили", "why": "был разговор", "days": 50,
+             "days_min": 50, "uid": 413, "cards": 1, "хочет": ["ИЗО"]}]}
+        h = zayavki.block()
+        proverka("по разбору: 40 дней — строкой, свежая заявка семьи — в списке, смена статуса — на месте",
+                 ("9990000411" in h, "9990000412" in h, "9990000413" in h), (False, True, True))
+        proverka("по разбору: строка про старые (одна семейная + одна «дожать»)",
+                 "2 заявки старше месяца — по правилу 12.11 не звоним" in h, True)
+    finally:
+        zayavki_audit.cached, zayavki.collect = st
+        config.DB_PATH = staryj
+
+
 def test_boris_desyat():
     # 12.11.2026, Борис: в его колонке 10 решений сверху, остальное — «Позже».
     # И номер пункта виден у каждого пункта инбокса (вопрос «где их видно?»).
@@ -373,7 +649,8 @@ def test_boris_desyat():
 def main():
     for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_bloki, test_audit,
               test_data_gruppy, test_povtor,
-              test_zayavki_odin_punkt, test_utro, test_boris_desyat):
+              test_zayavki_odin_punkt, test_utro, test_boris_desyat,
+              test_vozvrat_1211, test_utro_1211, test_naryad_1211, test_audit_1211, test_zayavki_blok_1211):
         t()
         print()
     if oshibok:

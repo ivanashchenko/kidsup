@@ -2689,6 +2689,17 @@ def api_hvost_proverka_zakryt(payload: dict = Body(default={})):
     return hvost.proverit(zakryt=True, dry=False)
 
 
+@app.get("/api/hvost/staroe", dependencies=AUTH)
+def api_hvost_staroe(dry: int = 1):
+    """Решение Бориса 12.11 «старые звонки»: какие открытые звонки дежурных
+    подпадают под правило и с какой пометкой их закрыло бы утро пульта.
+    Только просмотр — закрывать этим адресом нельзя (dry=0 — отказ)."""
+    if not int(dry):
+        raise HTTPException(400, "только просмотр: такие пункты закрывает утро пульта")
+    from . import hvost
+    return hvost.staroe()
+
+
 @app.post("/api/hvost/razobrat", dependencies=OWNER_AUTH)
 def api_hvost_razobrat(payload: dict = Body(default={})):
     """Сделать разбор: протухшее закрыть с пометкой, живое перенести на

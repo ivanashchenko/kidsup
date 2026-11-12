@@ -13,6 +13,8 @@
 
   GET  /api/hvost?dry=1   — что будет сделано (ничего не меняет)
   POST /api/hvost/razobrat — сделать
+  GET  /api/hvost/staroe?dry=1 — какие открытые звонки подпадают под правило
+       «старые звонки» (решение Бориса 12.11); только просмотр
 """
 from __future__ import annotations
 
@@ -20,7 +22,7 @@ import logging
 import re
 from datetime import date, timedelta
 
-from . import db
+from . import db, zvonok_filtr
 
 log = logging.getLogger("kidsup.hvost")
 
@@ -50,6 +52,47 @@ VOZVRAT_DNEY = 2
 VOZVRAT_DNEY_S_POPYTKAMI = 4
 # Предел текста пункта — тот же, что у нового пункта и у правки (main.py).
 PREDEL_TEKSTA = 700
+
+# Решение Бориса 12.11 («старые звонки»): «думает» без живого контакта дольше
+# 21 дня и заявка старше 30 дней без записи на занятие в обзвон не возвращаются.
+# Раньше утро закрывало такие пункты как «не взятые — вернётся в общую очередь»,
+# и раздача наутро ставила ту же семью снова: одну и ту же семью так ставили
+# больше десяти раз. Теперь пункт закрывается по правилу, с честной пометкой.
+# Пункт, к которому админ дописал своё (« · ✎ …», кнопка «комментарий» в
+# пульте), — с ним работали: не закрываем ни по правилу, ни как «не взятый».
+POMETKA_ADMINA = " · ✎ "
+NARYAD_ZAYAVKA = re.compile(r"^(?:⏳ с \d{2}\.\d{2}(?: \([^)]*\))?: )?(?:Заявка|С семьёй говорили)")
+# Что семья начала сама, правило не трогает: пропущенный входящий, сообщение без
+# ответа, новая заявка (пункты автоматики с этим текстом).
+SAMA_NACHALA = re.compile(r"🔥|клиент писал|ждёт ответа|ждет ответа|пропущен|новая заявка|входящ", re.I)
+
+
+def _vid_pravila(source: str, tekst: str, s_avtomatikoy: bool = False, dumaet: bool = False) -> str:
+    """По какому условию правила 12.11 проверять пункт: «думает», «заявка» или ''
+    (правило к пункту не относится). Автоматика — только для просмотра
+    (/api/hvost/staroe): утро её пункты по правилу не закрывает."""
+    s = str(source or "")
+    if s == "возврат: думает":
+        return "думает"
+    if s == "возврат: недозвон":
+        return "заявка"
+    if s == "наряд":
+        return "заявка" if NARYAD_ZAYAVKA.match(tekst or "") else ""
+    if s_avtomatikoy and s == "автоматика" and not SAMA_NACHALA.search(tekst or ""):
+        return "думает" if dumaet else "заявка"
+    return ""
+
+
+def _pravilo(conn, vid: str, uids, p: str, den: date, porogi: tuple[int, int]) -> str:
+    """Причина по правилу 12.11 или ''. Сбой разбора одной семьи — правило
+    не применяем: пункт идёт дальше, как шёл до правила."""
+    if not vid or not p:
+        return ""
+    try:
+        return zvonok_filtr.staryy_zvonok(conn, uids, p, den, vid, porogi)
+    except Exception:
+        log.exception("хвост: правило 12.11 не разобрало %s", p)
+        return ""
 
 # Обязательство перед семьёй или перед законом не гаснет от того, что семья
 # заплатила или сменила статус: деньги вернуть, документ выдать, на жалобу
@@ -397,6 +440,60 @@ def proverit(zakryt: bool = False, dry: bool = True) -> dict:
     return itog
 
 
+def staroe() -> dict:
+    """Разовый просмотр по решению Бориса 12.11: какие открытые звонки дежурных
+    админов подпадают под «старые звонки» и с какой пометкой их закрыло бы
+    правило. Только чтение: закрывать этим адресом нечего — уже стоявшие
+    пункты разобраны вручную, дальше такие пункты закрывает утро (utro).
+    Пункты с пометкой админа показаны отдельно: утро их не закрывает."""
+    from . import pult
+    segodnya = pult.today()
+    den = date.fromisoformat(segodnya)
+    porogi = zvonok_filtr.porogi()
+    itog = {"день": segodnya, "dry": True,
+            "пороги": {"думает_без_контакта_дней": porogi[0], "заявка_без_записи_дней": porogi[1]},
+            "просмотрено": 0, "закрыть": [], "с_пометкой_админа": [], "по_причинам": {}}
+    dezhurnye = sorted(set(pult.COLOR) - {"Борис"} - set(pult.UVOLENY))     # админы в работе
+    with db.get_conn() as conn:
+        try:
+            rows = conn.execute(
+                f"SELECT id, day, who, text, phone, source FROM plan_inbox WHERE done=0 "
+                f"AND who IN ({','.join('?' * len(dezhurnye))}) AND source IN "
+                f"('возврат: думает', 'возврат: недозвон', 'наряд', 'автоматика') ORDER BY day, id",
+                dezhurnye).fetchall()
+        except Exception as e:  # noqa: BLE001
+            return {**itog, "ошибка": str(e)[:120]}
+        semya = _semya(conn)
+        dumaet = set()
+        try:
+            for ph, st in conn.execute("SELECT phone, client_state_id FROM users WHERE client_state_id = 146950"):
+                if _p10(ph):
+                    dumaet.add(_p10(ph))
+        except Exception:
+            pass
+        for r in rows:
+            itog["просмотрено"] += 1
+            tekst = r["text"] or ""
+            p = _p10(r["phone"])
+            if "🔥" in tekst or OBYAZATELSTVO.search(tekst):
+                continue
+            vid = _vid_pravila(r["source"], tekst, s_avtomatikoy=True, dumaet=p in dumaet)
+            pravilo = _pravilo(conn, vid, semya.get(p, set()) if p else set(), p, den, porogi)
+            if not pravilo:
+                continue
+            karta = {"id": r["id"], "день": r["day"], "кто": r["who"], "источник": r["source"],
+                     "почему": f"по правилу 12.11: {pravilo}", "текст": tekst[:90]}
+            if POMETKA_ADMINA in tekst:
+                karta["почему"] += " — но админ дописал пометку, утро не закроет"
+                itog["с_пометкой_админа"].append(karta)
+                continue
+            karta["пометка"] = f" — закрыто {segodnya} по правилу 12.11: {pravilo} — в обзвон не вернётся"
+            itog["закрыть"].append(karta)
+            itog["по_причинам"][pravilo] = itog["по_причинам"].get(pravilo, 0) + 1
+    itog["итого закрыть"] = len(itog["закрыть"])
+    return itog
+
+
 def utro(dry: bool = False) -> dict:
     """Утренняя актуализация пульта — раз в день, до начала смены.
 
@@ -415,6 +512,9 @@ def utro(dry: bool = False) -> dict:
          (prio) сохраняется, пометка «⏳ с ДД.ММ» — чтобы было видно возраст.
     Задачи смены (pult_tasks) не переносим: они собраны под свой день.
     Порции обзвона базы («возврат…») не переносим бесконечно — см. VOZVRAT_DNEY.
+    Звонки, которые подпадают под «старые звонки» (решение Бориса 12.11),
+    закрываем по правилу: такая семья в обзвон не вернётся. Пункт с пометкой
+    админа (POMETKA_ADMINA) не закрываем ни так, ни как «не взятый».
     """
     from . import pult
     from .autopilot import obrezat
@@ -460,11 +560,13 @@ def utro(dry: bool = False) -> dict:
         nagruzka = {w: conn.execute(
             "SELECT COUNT(*) FROM plan_inbox WHERE done=0 AND day=? AND who=?",
             (segodnya, w)).fetchone()[0] for w in smena}
+        porogi = zvonok_filtr.porogi()
         for r in rows:
             den, kto, tekst = r["day"], r["who"], r["text"] or ""
             p = _p10(r["phone"])
             uids = semya.get(p, set()) if p else set()
             sled = []
+            zametka = ""
             if kto != "Борис" and not OBYAZATELSTVO.search(tekst):
                 if any(oplaty.get(u, "") > den for u in uids):
                     sled.append("семья оплатила после этой даты")
@@ -472,8 +574,17 @@ def utro(dry: bool = False) -> dict:
                     sled.append("ребёнок был на занятии после этой даты")
                 if p and razgovory.get(p, "")[:10] > den:
                     sled.append(f"разговор от 30 с {razgovory[p][:10]}")
+            # админ дописал к пункту своё — с ним работали, переносим как живой
+            pometka = POMETKA_ADMINA in tekst
+            if not sled and not pometka and kto != "Борис" and not OBYAZATELSTVO.search(tekst):
+                pravilo = _pravilo(conn, _vid_pravila(r["source"], tekst), uids, p,
+                                   _d.fromisoformat(segodnya), porogi)
+                if pravilo:
+                    sled.append(f"по правилу 12.11: {pravilo}")
+                    zametka = f" — закрыто {segodnya} по правилу 12.11: {pravilo} — в обзвон не вернётся"
+                    itog["по_правилу"] = itog.get("по_правилу", 0) + 1
             # обещание, дописанное к порции («договорились на пятницу»), не гасим
-            if (not sled and kto != "Борис" and not OBYAZATELSTVO.search(tekst)
+            if (not sled and not pometka and kto != "Борис" and not OBYAZATELSTVO.search(tekst)
                     and str(r["source"] or "").startswith("возврат")):
                 sozdan = str(r["ts"] or "")[:10]
                 try:
@@ -492,7 +603,7 @@ def utro(dry: bool = False) -> dict:
                 itog["закрыто"].append({"id": r["id"], "кто": kto, "почему": "; ".join(sled)})
                 if not dry:
                     conn.execute("UPDATE plan_inbox SET done=1, text = text || ? WHERE id=?",
-                                 (f" — закрыто {segodnya} утром: {'; '.join(sled)}", r["id"]))
+                                 (zametka or f" — закрыто {segodnya} утром: {'; '.join(sled)}", r["id"]))
                 continue
             novyj = kto
             den_novyj = segodnya
