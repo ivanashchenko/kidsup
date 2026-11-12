@@ -445,6 +445,118 @@ def test_arhiv(c, m):
     proverka("у владельца — и его раздел", "Владельцу" in blok and "href='/arhiv'" in blok and "href='/owner'" in blok)
 
 
+# --- В. Архив документов: признак в index.json, свёрнутый блок внизу списка ----------
+
+DOK = "<!doctype html><title>стенд</title>" + "<p>документ стенда</p>" * 5
+
+
+def vylozhit(c, put, slug, **eshche):
+    body = {"slug": slug, "title": f"Документ {slug} (стенд)", "html": DOK + slug, **eshche}
+    return c.post(put, json=body, auth=VLADELEC)
+
+
+def zapis(c, put, slug) -> dict:
+    """Запись документа из GET /api/…-docs — так её видят рутины перед выкладкой."""
+    return next((x for x in c.get(put, auth=VLADELEC).json()["items"] if x["slug"] == slug), {})
+
+
+def razrezat(html: str) -> tuple[str, str]:
+    """(часть списка выше блока «Архив», сам блок)."""
+    verh, _, niz = html.partition("<details class=arh")
+    return verh, niz
+
+
+def test_arhiv_dokumentov(c, m, work):
+    from app import boris_docs
+    print("Архив документов владельца (/boris/docs)")
+    for s in ("stend-a", "stend-b", "stend-c"):
+        vylozhit(c, "/api/boris-docs", s)
+    r = c.post("/api/boris-docs/arhiv", json={"slug": "stend-b", "arhiv": True}, auth=VLADELEC)
+    proverka("POST /api/boris-docs/arhiv: владелец → ok, документ помечен",
+             r.status_code == 200 and r.json().get("ok") and r.json().get("izmeneno") == ["stend-b"], r.text[:200])
+    h = c.get("/boris/docs", auth=VLADELEC).text
+    verh, niz = razrezat(h)
+    proverka("в списке — свёрнутый блок «Архив (1)»", "Архив (1)" in niz and "<details class=arh id=arhiv>" in h)
+    proverka("помеченный документ — внутри блока, остальные — выше",
+             "/boris/docs/stend-b" in niz and "/boris/docs/stend-b" not in verh
+             and all(f"/boris/docs/{s}" in verh for s in ("stend-a", "stend-c")))
+    proverka("по ссылке /boris/docs#arhiv блок раскрывается сам", "location.hash==='#arhiv'" in niz)
+    proverka("строка «← Пульт · Архив страниц» над заголовком",
+             'href="/pult"' in verh and 'href="/arhiv"' in verh)
+    proverka("в подзаголовке нет «уходит в архив» (не путать с блоком «Архив»)", "уходит в архив" not in h)
+    r = c.get("/boris/docs/stend-b", auth=VLADELEC)
+    proverka("архивный документ открывается по прежнему адресу — 200",  r.status_code == 200, r.status_code)
+    proverka("…и тело документа сервер не трогает (проверка выкладки mesta_post сравнивает байты)",
+             r.text == DOK + "stend-b")
+    z = zapis(c, "/api/boris-docs", "stend-b")
+    proverka("GET /api/boris-docs: архивный в списке, с \"arhiv\": true", z.get("arhiv") is True, z)
+    proverka("GET /api/boris-docs: у актуальных поля нет", "arhiv" not in zapis(c, "/api/boris-docs", "stend-a"))
+
+    print("Признак переживает перевыкладку")
+    r = vylozhit(c, "/api/boris-docs", "stend-b", note="перевыложено рутиной", order=5)
+    z = zapis(c, "/api/boris-docs", "stend-b")
+    proverka("перевыкладка без поля arhiv (как у рутин) — признак на месте",
+             r.status_code == 200 and z.get("arhiv") is True and z.get("versions") == 2, z)
+    proverka("…и запись обновилась: note, order", z.get("note") == "перевыложено рутиной" and z.get("order") == 5, z)
+    vylozhit(c, "/api/boris-docs", "stend-b", arhiv=None)
+    proverka("\"arhiv\": null — тоже «не трогать»", zapis(c, "/api/boris-docs", "stend-b").get("arhiv") is True)
+    boris_docs.save("stend-b", "Документ stend-b (стенд)", DOK)
+    proverka("save() из кода без параметра — признак на месте", zapis(c, "/api/boris-docs", "stend-b").get("arhiv"))
+    vylozhit(c, "/api/boris-docs", "stend-b", arhiv=False)
+    proverka("выкладка с \"arhiv\": false — снят", "arhiv" not in zapis(c, "/api/boris-docs", "stend-b"))
+    vylozhit(c, "/api/boris-docs", "stend-b", arhiv=True)
+    proverka("выкладка с \"arhiv\": true — поставлен", zapis(c, "/api/boris-docs", "stend-b").get("arhiv") is True)
+
+    print("Снять признак, ошибки запроса")
+    r = c.post("/api/boris-docs/arhiv", json={"slugs": ["stend-b", "net-takogo", "Плохой slug"], "arhiv": False},
+               auth=VLADELEC).json()
+    proverka("снять: izmeneno — stend-b, несуществующие — в net_takih",
+             r.get("izmeneno") == ["stend-b"] and r.get("net_takih") == ["net-takogo", "Плохой slug"], r)
+    h = c.get("/boris/docs", auth=VLADELEC).text
+    proverka("блок «Архив» исчез, документ снова в списке", "<details" not in h and "/boris/docs/stend-b" in h)
+    idx = json.load(open(os.path.join(work, "boris_docs", "index.json"), encoding="utf-8"))
+    proverka("индекс цел: несуществующие slug в него не попали", "net-takogo" not in idx and "stend-b" in idx)
+    r = c.post("/api/boris-docs/arhiv", json={"slug": "stend-a", "arhiv": "false"}, auth=VLADELEC).json()
+    proverka("строка \"false\" значит «нет», а не «да»", r.get("arhiv") is False and r.get("uzhe_tak") == ["stend-a"], r)
+    r = c.post("/api/boris-docs/arhiv", json={"slug": "stend-c"}, auth=VLADELEC).json()
+    proverka("без поля arhiv — «в архив» (по умолчанию да)", r.get("arhiv") is True and r.get("izmeneno") == ["stend-c"], r)
+    r = c.post("/api/boris-docs/arhiv", json={"slug": "stend-c"}, auth=VLADELEC).json()
+    proverka("повтор — uzhe_tak, ничего не меняется", r.get("uzhe_tak") == ["stend-c"] and not r.get("izmeneno"), r)
+    proverka("пустой запрос → 400", c.post("/api/boris-docs/arhiv", json={}, auth=VLADELEC).status_code == 400)
+    proverka("slugs не списком → 400",
+             c.post("/api/boris-docs/arhiv", json={"slugs": "stend-a"}, auth=VLADELEC).status_code == 400)
+    for put in ("/api/boris-docs/arhiv", "/api/admin-docs/arhiv"):
+        proverka(f"POST {put}: админ → 401", c.post(put, json={"slug": "stend-a"}, auth=ADMIN).status_code == 401)
+        proverka(f"POST {put} без входа → 401", c.post(put, json={"slug": "stend-a"}).status_code == 401)
+    n = len(c.get("/api/boris-docs", auth=VLADELEC).json()["items"])
+    proverka("GET /api/boris-docs отдаёт все документы, архивные не пропадают",
+             n == len(boris_docs.BORIS.spisok()) and n >= 4, n)
+
+    print("Архив списков для админов (/admin/docs)")
+    vylozhit(c, "/api/admin-docs", "stend-x")
+    r = c.post("/api/admin-docs/arhiv", json={"slugs": ["stend-x"]}, auth=VLADELEC).json()
+    proverka("POST /api/admin-docs/arhiv: владелец → ok", r.get("ok") and r.get("izmeneno") == ["stend-x"], r)
+    h = c.get("/admin/docs", auth=ADMIN).text
+    proverka("все списки в архиве → «Актуальных документов нет» и «Архив (1)»",
+             "Актуальных документов нет" in h and "Архив (1)" in h)
+    vylozhit(c, "/api/admin-docs", "stend-y")
+    h = c.get("/admin/docs", auth=ADMIN).text
+    verh, niz = razrezat(h)
+    teg = "<details class=arh" + niz.split(">", 1)[0] + ">"
+    proverka("/admin/docs под админом: блок архива есть и свёрнут", "Архив (1)" in niz and " open" not in teg, teg)
+    proverka("актуальный список — выше блока, архивный — в блоке",
+             "/admin/docs/stend-y" in verh and "/admin/docs/stend-x" in niz and "/admin/docs/stend-x" not in verh)
+    proverka("у админов — «← Пульт», ссылки на архив страниц владельца нет",
+             'href="/pult"' in verh and 'href="/arhiv"' not in h)
+    r = c.get("/admin/docs/stend-x", auth=ADMIN)
+    proverka("архивный список открывается по прежнему адресу, тело не тронуто",
+             r.status_code == 200 and r.text == DOK + "stend-x", r.status_code)
+    vylozhit(c, "/api/admin-docs", "stend-x", note="перевыложено")
+    proverka("перевыкладка списка без поля arhiv — признак на месте",
+             zapis(c, "/api/admin-docs", "stend-x").get("arhiv") is True)
+    proverka("склады раздельные: у владельца stend-x нет", not zapis(c, "/api/boris-docs", "stend-x"))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tree", default=ROOT)
@@ -471,6 +583,7 @@ def main():
     test_menu(c, m)
     test_glavnaya(c, m)
     test_arhiv(c, m)
+    test_arhiv_dokumentov(c, m, work)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     print(f"\nИтого: {lt.proshlo} OK, {lt.oshibok} ошибок · стенд {work}")
     sys.exit(1 if lt.oshibok else 0)
