@@ -12,7 +12,7 @@
     админ ставит галочку (POST /api/pult/done), галочка видна всем;
   • живые блоки: «Появилось за день», «Заявки с 10.08 без обработки»,
     «Свободные места сейчас»;
-  • ссылки на рабочие списки (/nabor, /voronka, /mesta, /spiski, /karta) —
+  • ссылки на рабочие списки (/voronka, /mesta, /blank-grupp, /obzvon, /karta) —
     админ не ходит туда сам, а попадает по ссылке из своей задачи.
 
 ?who=Аня — только одна колонка (для вкладки самого админа).
@@ -915,21 +915,17 @@ HOWTO = ("<div class='card' style='border-left:4px solid #312783;margin:10px 0;f
 def _nikogda_ne_zvonili(day: str) -> str:
     """Ответ на вопрос «а где список тех, кому ещё ни разу не позвонили?».
 
-    21.09.2026, Борис. Таких списков у нас три, и они про разных людей:
-    свежие заявки этого сезона, семьи прошлого года и те, кто ходил и ушёл.
-    Показываем их одной карточкой с числами — чтобы не искать по меню.
+    21.09.2026, Борис. Это разные люди: свежие заявки этого сезона и те, кто
+    ходил и ушёл. Показываем их одной карточкой с числами — чтобы не искать по меню.
+    12.11.2026: третьего списка — заявок прошлого года без звонка (/nezvonili) —
+    здесь больше нет: страница ушла в архив владельца, с пульта на неё не ведём.
     """
-    n_new = n_old = None
+    n_new = None
     ob: dict = {}
     try:
         from . import zayavki as _z
         d = _z.collect()
         n_new = len(d["untouched"])
-    except Exception:
-        pass
-    try:
-        from . import nezvonili as _nz
-        n_old = _nz.spisok(_nz.OKNO_S, _nz.OKNO_PO).get("семей_без_звонка")
     except Exception:
         pass
     try:
@@ -950,15 +946,12 @@ def _nikogda_ne_zvonili(day: str) -> str:
               f"{ob.get('никогда_не_набирали', '—')} не набирали ни разу")
     return ("<div class='card' style='border-left:4px solid #1DA7E0'>"
             "<b style='font-size:17px'>Кому мы ещё ни разу не позвонили</b>"
-            "<div style='font-size:12.5px;color:#6c6a86;margin:2px 0 6px'>Три списка, и это разные люди: "
+            "<div style='font-size:12.5px;color:#6c6a86;margin:2px 0 6px'>Два списка, и это разные люди: "
             "одни у нас <b>занимались</b>, другие только <b>оставляли заявку</b>. Самое горячее из них "
             "попадает в колонки само, раз в час.</div>"
             "<ul style='list-style:none;padding:0;margin:0'>"
             + _row(ob.get("детей"), "ХОДИЛИ к нам 01.09.2025 – 30.08.2026, живого разговора не было",
                    "/obzvon", hodili)
-            + _row(n_old, "Оставляли заявку за тот же год, но не занимались", "/nezvonili",
-                   "карточка в CRM заведена, ни одного нашего звонка не было. База холоднее: "
-                   "часть — «Звонок от 79…» без имени и рабочие номера компаний")
             + _row(n_new, "Заявки этого сезона без единого касания", "/pult#zayavki",
                    "ни звонка, ни сообщения, ни комментария — блок «Заявки, где мы не доделали» ниже")
             + "</ul></div>")
@@ -1015,7 +1008,10 @@ def page(day: str = "", who: str = "") -> str:
     cols = "".join(_col(w, tk.get(w, []), w in on or w in ("Лиза", "Борис"), day, now_hm) for w in order)
     if extra:
         cols += "".join(_col(w, tk.get(w, []), False, day, now_hm) for w in extra)
-    slug = f"plan_{d.day:02d}{MON[d.month]}"
+    # 12.11.2026, Борис: «скрой не нужные / не актуальные / старые страницы». Из блока
+    # ссылок внизу ушли /nabor и /nezvonili (архив владельца), /spiski (вместо него —
+    # бланки групп) и «план и списки семей» /base/plan_<сегодня>: последняя страница
+    # плана дня — за 06.09, с тех пор ссылка каждый день вела на 404.
     ver = ""
     try:
         from .main import APP_VERSION
@@ -1065,8 +1061,8 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 {HOWTO}
 <div class='who'>{cols}</div>
 <div class='links card'><b>Рабочие списки</b> — открываются из задачи в колонке, отдельно заходить не нужно:
-<a href='/segodnya'>что горит сегодня</a> · <a href='/nabor'>где теряем набор</a> · <a href='/voronka'>кто без оплаты</a> · <a href='/obzvon'>вернуть ушедших</a> · <a href='/nezvonili'>кому не звонили</a> · <a href='/mesta'>свободные места</a> · <a href='/spiski'>списки занятий</a> · <a href='/karta'>карта развития</a><br>
-<b>Справочное:</b> <a href='/base/{slug}'>план и списки семей</a> · <a href='/base/gruppy_reshenia'>куда зовём, какие группы сливаем</a> · <a href='/base/skripty_v3'>скрипты</a> · <a href='/base'>вся база</a></div>
+<a href='/segodnya'>что горит сегодня</a> · <a href='/voronka'>кто без оплаты</a> · <a href='/obzvon'>вернуть ушедших</a> · <a href='/mesta'>свободные места</a> · <a href='/blank-grupp'>бланки групп</a> · <a href='/karta'>карта развития</a><br>
+<b>Справочное:</b> <a href='/base/gruppy_reshenia'>куда зовём, какие группы сливаем</a> · <a href='/base/skripty_v3'>скрипты</a> · <a href='/base'>вся база</a></div>
 <h2 style='margin-top:26px'>Справочные списки — для Бориса и на потом</h2>
 <p style='margin:-4px 0 10px;color:#6c6a86;font-size:13.5px'>Админам сюда ходить не нужно: всё, что нужно сделать сегодня, уже стоит в колонке выше.</p>
 {_safe(_nikogda_ne_zvonili, day, imya='кому не звонили')}
@@ -1108,51 +1104,3 @@ function pultMiss(kind, id){{
 }}
 </script><script>(function(){{var off={int(now_msk.utcoffset().total_seconds())}*1000;function t(){{var d=new Date(Date.now()+off);document.getElementById('clock').textContent=('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)}};t();setInterval(t,15000)}})();</script>
 </div></body></html>"""
-
-
-def promises_page(day: str, who: str) -> str:
-    """/obeshchaniya?who=Лиза — обещания клиентам одного человека, крупно, под телефон.
-    08.09: Лиза живёт в Wazzup и колонку пульта не открывает; ей нужен список
-    длиной в экран с галочкой и кнопкой позвонить/написать."""
-    day = day or today()
-    with db.get_conn() as conn:
-        rows = conn.execute("SELECT id, ts, who, text, phone, source, done FROM plan_inbox WHERE day=? AND who=? ORDER BY done, id",
-                            (day, who)).fetchall()
-    c = COLOR.get(who, "#312783")
-    lis = []
-    for r in rows:
-        ph = "".join(ch for ch in (r["phone"] or "") if ch.isdigit())
-        links = ""
-        if len(ph) >= 10:
-            _t = _tel(ph)
-            links = ((f" <a href='tel:+{_t}' style='color:{c};font-weight:700;white-space:nowrap'>📞 +{_t}</a>"
-                      f" <a href='https://wa.me/{_t}' style='color:#25D366;font-weight:700'>WA</a>"
-                      f" <a href='/liniya?phone={_t}' style='color:#6c6a86;font-weight:700'>Линия</a>")
-                     if _t else "")
-        txt = html.escape(r["text"] or "")
-        head, sep, tail = txt.partition(" — ")
-        if not sep or len(head) > 120:
-            head, tail = txt[:110], txt[110:]
-        body = f"<b>{head}</b>" + (f"<details style='display:inline'><summary style='display:inline;cursor:pointer;color:#6c6a86'> …</summary><span> {tail}</span></details>" if tail else "")
-        lis.append(f"<li style='margin:10px 0;padding:10px 12px;background:#fff;border:1px solid #e4e2f0;border-radius:12px;{'opacity:.45;text-decoration:line-through' if r['done'] else ''}'>"
-                   f"<label style='display:flex;gap:10px;align-items:flex-start'><input type='checkbox' {'checked' if r['done'] else ''} style='width:22px;height:22px;flex:none;margin-top:2px' "
-                   f"onchange=\"inboxDone(this,{r['id']})\">"
-                   f"<span><span style='color:#6c6a86;font-size:12px'>{html.escape((r['source'] or '')[:24])} · {html.escape((r['ts'] or '')[11:16])}</span><br>{body}{links}</span></label></li>")
-    open_n = sum(1 for r in rows if not r["done"])
-    status = (f"Не закрыто: <b style='color:#E30613'>{open_n}</b>. Сверху вниз, галочка сразу после действия." if open_n
-              else "<b style='color:#4e8a12'>Всё закрыто</b> — спасибо.")
-    body_ul = "".join(lis) or "<li style='color:#6c6a86'>пока пусто</li>"
-    return f"""<!doctype html><html lang='ru'><head><meta charset='utf-8'><title>Обещания клиентам · {html.escape(who)} · {day}</title>
-<meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='300'>
-<style>body{{margin:0;background:#f8f7fc;color:#15132e;font:17px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}}.wrap{{max-width:680px;margin:0 auto;padding:14px 12px 60px}}
-h1{{font-size:20px;margin:0 0 4px;color:{c}}}p{{margin:0 0 10px;color:#6c6a86;font-size:14px}}ul{{list-style:none;padding:0;margin:0}}a{{text-decoration:none}}</style></head><body><div class='wrap'>
-<h1>{html.escape(who)}: обещания клиентам · {day[8:]}.{day[5:7]}</h1>
-<p>{status} · <a href='/pult?who={html.escape(who)}' style='color:{c}'>моя колонка на пульте</a></p>
-<ul>{body_ul}</ul></div>
-<script>function inboxDone(b,i){{
-  fetch('/api/plan/inbox/done',{{method:'POST',headers:{{'Content-Type':'application/json'}},
-        body:JSON.stringify({{id:i,done:b.checked}})}})
-   .then(function(r){{if(!r.ok)throw 0;return r.json()}})
-   .then(function(x){{if(x&&x.ok===false){{b.checked=!b.checked;alert('Не сохранилось');return}}location.reload()}})
-   .catch(function(){{b.checked=!b.checked;alert('Не сохранилось — проверьте связь и нажмите ещё раз')}});
-}}</script></body></html>"""

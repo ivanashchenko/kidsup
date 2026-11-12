@@ -144,38 +144,12 @@ try:
 except hp.HooppyError:
     proverka("пустой список — ошибка, без запроса", len(zaprosy) == 3)
 
-print("Кнопка «Опубликовать» на /makety (app/publish.py)")
-from app import publish as pub  # noqa: E402
-nastr = {}
-pub.db.get_setting = lambda k: nastr.get(k)
-r = pub.publish(b"PNG", "Подпись", ["hooppy"])
-proverka("без набора — понятная ошибка, ничего не отправлено",
-         not r["hooppy"]["ok"] and "hooppy_nabor" in r["hooppy"]["msg"] and not otvety)
-nastr["hooppy_nabor"] = "92384"
-zaprosy.clear()
-otvety[:] = [Otvet(200, {"photo": foto}), Otvet(200, {"id": 533300})]
-r = pub.publish(b"PNG", "Свободные места", ["hooppy"])
-proverka("картинка загружается, пост уходит в набор", r["hooppy"]["ok"] and "533300" in r["hooppy"]["msg"]
-         and zaprosy[0][1].endswith("/files/media/upload") and zaprosy[1][2]["json"]["project_id"] == 92384
-         and zaprosy[1][2]["json"]["attachments"] == [{"type": "photos", "data": [foto]}])
-otvety[:] = [Otvet(403, {"message": "Tariff expired."})]
-r = pub.publish(b"PNG", "x", ["hooppy"])
-proverka("отказ Hooppy — в ответе кнопки", not r["hooppy"]["ok"] and "Tariff expired." in r["hooppy"]["msg"])
-
+# 12.11.2026: проверки кнопки «Опубликовать» на /makety (app/publish.py) сняты вместе
+# со страницей. Флаги историй остаются: ими пользуется POST /api/hooppy/post ("istoriya": true).
 print("Истории (Борис 17.10: ВК, Instagram, ТГ-канал, ТГ-аккаунт, WhatsApp)")
-zaprosy.clear()
-otvety[:] = []
-r = pub.publish(b"PNG", "", ["hooppy_story"])
-proverka("без набора историй — понятная ошибка, ничего не отправлено",
-         not r["hooppy_story"]["ok"] and "hooppy_nabor_istorii" in r["hooppy_story"]["msg"] and not zaprosy)
-nastr["hooppy_nabor_istorii"] = "92400"
-otvety[:] = [Otvet(200, {"photo": foto}), Otvet(200, {"id": 533301})]
-r = pub.publish(b"PNG", "", ["hooppy_story"])
-telo = zaprosy[1][2]["json"]
-proverka("история уходит в свой набор с флагом историй во всех сетях",
-         r["hooppy_story"]["ok"] and telo["project_id"] == 92400 and telo["texts"] == []
-         and {"type": "settings", "data": {"publish_as_story": 1,
-                                           "publish_as_story_source_ids": "1,2,7,9,10,11,22,33"}} in telo["attachments"])
+proverka("флаг историй — во всех сетях, где Hooppy это умеет",
+         hp.nastrojki_istorii() == {"publish_as_story": 1,
+                                    "publish_as_story_source_ids": "1,2,7,9,10,11,22,33"})
 proverka("в ленту история не дублируется",
          "share_stories_to_feed" not in hp.nastrojki_istorii())
 

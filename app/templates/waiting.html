@@ -42,8 +42,7 @@
     <td>{{ '🔥' if it.money else '💬' }}</td>
     <td><b>{{ it.wait_min }} мин</b><br><span class="muted small">{{ it.since[11:16] }}</span></td>
     <td>{{ it.name or '—' }}<br><span class="muted small">{{ it.phone }}{% if it.channel %} · {{ it.channel }}{% endif %}</span><br>
-      <a class="small" href="{{ it.brief }}">досье</a>
-      · <a class="small" href="/liniya?phone={{ it.phone }}">Линия</a>
+      <a class="small" href="/liniya?phone={{ it.phone }}">Линия</a>
       {% if it.crm %}· <a class="small" href="{{ it.crm }}" target="_blank">CRM ↗</a>{% endif %}</td>
     <td class="small">{{ it.text }}</td>
     <td class="small muted">{{ it.draft }}</td>

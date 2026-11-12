@@ -22,7 +22,6 @@ from fastapi.templating import Jinja2Templates
 from . import analytics, config, db, leads, sync
 from . import content as content_mod
 from . import descriptions as descr_mod
-from . import assistant as assistant_mod
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -188,6 +187,36 @@ def check_owner(credentials: HTTPBasicCredentials | None = Depends(_security)):
 
 
 OWNER_AUTH = [Depends(check_owner)]
+
+
+# 12.11.2026, Борис: «скрой не нужные / не актуальные / старые страницы». Страницы убраны,
+# но их адреса остались в чатах, закладках и старых методичках — вместо 404 ведём на
+# страницу-замену. Цели — только страницы под общим входом: документ владельца админу
+# не откроется. Параметры запроса не переносим нарочно: у /perepiska был ?send=1,
+# который обычным открытием ссылки отправлял сообщения клиентам.
+UBRANO = {
+    "/groups": "/mesta", "/zapolnyaemost": "/mesta", "/plan311": "/mesta",
+    "/callaudit": "/obzvon-dnya", "/vozvrat": "/obzvon-dnya", "/nedozvony": "/obzvon-dnya",
+    "/suggest": "/waiting", "/perepiska": "/waiting",
+    "/bez-oplaty": "/voronka", "/ne-oplatili": "/voronka",
+    "/zadachi-lizy": "/pult?who=Лиза", "/ochered": "/pult", "/mesta/sostav": "/blank-grupp",
+    "/ask": "/", "/makety": "/",          # замены нет — на стартовую страницу роли
+}
+
+
+def _perehod(kuda: str):
+    """Обработчик убранного адреса: 303 на замену. Именно 303 и именно RedirectResponse:
+    301 и 308 браузер запомнит навсегда, а Location с кириллицей (/pult?who=Лиза),
+    собранный руками, упадёт."""
+    def perehod():
+        return RedirectResponse(kuda, status_code=303)
+    return perehod
+
+
+# Под тем же входом, что был у страниц: этими же маршрутами отвечает и публичный
+# kidsup.ru, без входа старый адрес по-прежнему даёт 401 и не показывает, куда ведёт.
+for _otkuda, _kuda in UBRANO.items():
+    app.get(_otkuda, dependencies=AUTH)(_perehod(_kuda))
 
 
 def render(request: Request, template: str, **ctx) -> HTMLResponse:
@@ -418,18 +447,16 @@ def api_search(q: str = ""):
                 f"SELECT id, name, phone FROM users WHERE {conds} LIMIT 5",
                 tuple(f"%{v}%" for v in variants)).fetchall()
         for r in urows:
-            url = (f"/brief?phone={r['phone']}" if r["phone"]
-                   else f"/students?q={r['name'] or digits}")
+            # 12.11.2026: досье (/brief) слито с «Линией», список учеников ушёл в архив
+            # владельца. В «Линию» ведём только с целым номером (10 цифр или 11 с 7/8):
+            # обрезок длинного номера показал бы чужую семью. Остальных — в МойКласс.
+            d = "".join(ch for ch in (r["phone"] or "") if ch.isdigit())
+            cel = len(d) == 10 or (len(d) == 11 and d[0] in "78")
+            url = (f"/liniya?phone={d[-10:]}" if cel
+                   else f"https://app.moyklass.com/client/{r['id']}")
             items.append({"type": "Клиент", "title": r["name"] or "Без имени",
                           "sub": r["phone"] or "", "url": url})
     return {"items": items[:9]}
-
-
-@app.get("/groups", response_class=HTMLResponse, dependencies=AUTH)
-def groups_page(request: Request):
-    return render(request, "groups.html", active="groups",
-                  groups=analytics.group_stats(),
-                  top_students=analytics.top_students_by_visits())
 
 
 DAY_ORDER = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
@@ -854,28 +881,6 @@ def courses_page(request: Request, c: str = ""):
                   items=items, sel=c if any(x["key"] == c for x in items) else "")
 
 
-@app.get("/ask", response_class=HTMLResponse, dependencies=AUTH)
-def ask_page(request: Request):
-    """Чат-помощник для админов: живые данные набора + Anthropic API."""
-    return render(request, "ask.html", active="ask",
-                  has_key=bool(db.get_setting("anthropic_api_key")))
-
-
-@app.post("/api/ask", dependencies=AUTH)
-async def api_ask(payload: dict):
-    msgs = payload.get("messages") or []
-    return assistant_mod.ask(msgs, _enrollment_groups())
-
-
-@app.get("/api/ask/health", dependencies=AUTH)
-async def api_ask_health():
-    """Достижимость Anthropic API с сервера + настроен ли ключ."""
-    out = assistant_mod.probe()
-    out["key_set"] = bool(db.get_setting("anthropic_api_key"))
-    out["model"] = db.get_setting("assistant_model") or assistant_mod.DEFAULT_MODEL
-    return out
-
-
 @app.get("/content", response_class=HTMLResponse, dependencies=AUTH)
 def content_page(request: Request, g: str = ""):
     """Фабрика контента: готовые тексты каналов, собранные из живых данных набора."""
@@ -885,31 +890,6 @@ def content_page(request: Request, g: str = ""):
     return render(request, "content.html", active="content",
                   blocks=blocks, gnames=gnames, sel=g if g in gnames else "",
                   f=content_mod.facts(groups))
-
-
-@app.post("/api/publish", dependencies=AUTH)
-async def api_publish(request: Request):
-    """Публикация макета: PNG рендерится в браузере и приходит сюда,
-    сервер раздаёт по каналам (ВК, ТГ-канал, все сети через Hooppy)."""
-    from . import publish as publish_mod
-    form = await request.form()
-    up = form.get("image")
-    caption = (form.get("caption") or "").strip()
-    channels = [c for c in (form.get("channels") or "").split(",") if c]
-    if up is None or not channels:
-        raise HTTPException(422, "нужны image и channels")
-    image = await up.read()
-    if len(image) > 8_000_000:
-        raise HTTPException(413, "картинка больше 8 МБ")
-    return publish_mod.publish(image, caption, channels)
-
-
-@app.get("/api/publish/health", dependencies=AUTH)
-def api_publish_health():
-    return {"vk": bool(db.get_setting("vk_token") and db.get_setting("vk_group_id")),
-            "tg": bool(db.get_setting("tg_bot_token") and db.get_setting("tg_channel")),
-            "hooppy": bool(db.get_setting("hooppy_token") and db.get_setting("hooppy_nabor")),
-            "hooppy_story": bool(db.get_setting("hooppy_token") and db.get_setting("hooppy_nabor_istorii"))}
 
 
 # 17.10.2026, Борис: «давай hooppy.ru настроим» — автопостинг в ВК, Telegram, Max и
@@ -1042,16 +1022,6 @@ def api_hooppy_raspisanie(payload: dict = Body(...)):
         raise HTTPException(502 if isinstance(e, hooppy.HooppyError) else 400, str(e)[:300])
 
 
-@app.get("/makety", response_class=HTMLResponse, dependencies=AUTH)
-def makety_page(request: Request):
-    """Готовые визуалы (SVG→PNG) на живых данных: посты, сторис, плакат, листовка."""
-    from . import makety as makety_mod
-    f = content_mod.facts(_enrollment_groups())
-    makets = makety_mod.build_makets(f)
-    return render(request, "makety.html", active="makety",
-                  makets=makets, mgroups=makety_mod.maket_groups(makets), f=f)
-
-
 def _enrollment_groups() -> list[dict]:
     """Группы 2026/27 с остатком мест и ценой — то же, что видит страница набора."""
     with db.get_conn() as conn:
@@ -1182,22 +1152,10 @@ CLIENT_STATE_NAMES = {
 
 DOC_GROUPS = [
     ("Каждый день на смене", [
-        ("__url:/zayavki", "📋 Листы заявок — кому звонить",
-         "Все открытые заявки сезона поимённо с телефонами и кнопками: "
-         "действующие курсы со скриптом записи, будущие (робототехника, "
-         "танцы, скорочтение) со скриптом-мостом. Собирается при открытии"),
         ("plan341", "🎯 План «341 к 30 сентября» — по шагам",
          "Детальный план заполнения групп: решения владельца, спринт дедлайна "
          "цен 28–31.08, конвейер праздника и ДОД, сетка под спрос, сентябрь. "
          "С чек-боксами — отмечайте сделанное"),
-        ("__url:/ochered", "☎️ Очередь на сегодня — звонить отсюда",
-         "Список задач дежурного с телефонами и кнопками итога: записан, перезвонить, не актуально, не дозвонились. Отметка закрывает задачу и пишет разговор в карточку — отдельный лист обзвона больше не нужен"),
-        ("__url:/perepiska", "💬 Переписка: что спросили и что мы ответили",
-         "Все диалоги без ответа за день. Зелёным — то, на что отвечаю сам (расписание, цены, адрес) с точными цифрами из прайса и CRM; серым — то, что уходит администратору: оплаты, переносы, жалобы. Страница ничего не отправляет, пока не нажать кнопку"),
-        ("__url:/nedozvony", "📵 Недозвоны сегодня — вечерний прозвон",
-         "Живой список: кому сегодня не дозвонились и кто не ответил на сообщение-догон. Строится в момент открытия"),
-        ("__url:/zapolnyaemost", "📊 Заполняемость групп 2026/27",
-         "Все группы сезона против плана, самые пустые сверху, горящие подсвечены. По ним собираются приоритеты обзвона"),
         ("english_standard", "🇬🇧 Английский: стандарт курса и разбор чата педагогов",
          "Три несостыковки, которые надо закрыть решением: что продано родителю против того, "
          "что поручено педагогу; Лингвитания против готовых планов; буквы. Плюс единая линейка "
@@ -1210,10 +1168,6 @@ DOC_GROUPS = [
          "Записи, дошедшие до пробного и оплаты по каждому админу с 17.08 "
          "с начислением по ставкам владельца. Пробные начинаются 31.08 — "
          "до этой даты бонус идёт только за оплаты"),
-        ("__url:/zadachi-lizy", "🗂 Задачи Лизы: проверка на актуальность",
-         "Каждая открытая задача проверена по звонкам, переписке, "
-         "комментариям и записям: что уже сделано и можно закрыть, "
-         "что проглядеть глазами, что делать. Считается при открытии"),
         ("zadachi_lizy", "🗂 Задачи Лизы: что срочно, что подождёт",
          "288 открытых задач, разложенных не по дате, а по тому, что мы "
          "теряем, если не сделать. Наверху 50 человек, которые написали "
@@ -1321,8 +1275,8 @@ DOC_GROUPS = [
          "Четыре точки, где родитель видит результат: день 1, каждое занятие, 3-я неделя, конец абонемента. Практики Kumon, EYFS, Seesaw, Cambridge и наши тренинги; роли, время, печать, метрики, решения Бориса"),
         ("__url:/karta", "🗺 Карта развития — после первого занятия",
          "Выбрать ребёнка с сегодняшнего первого занятия, вписать три строки педагога (что умеет, куда идём, с чего начнём) — и отправить маме готовую карту в WhatsApp вместе со ссылкой на оплату"),
-        ("__url:/spiski", "📋 СПИСКИ ПО ГРУППАМ — живые, обновляются каждые 5 минут, печатаются",
-         "Для стойки: по каждой группе — кто записан, кто оплатил (зелёным), кто на пробном и когда (жёлтым), кого дожать (красным), телефоны, пустые строки под ручку. Фильтр по дню недели и предмету, кнопка печати"),
+        ("__url:/blank-grupp", "📋 БЛАНКИ ГРУПП — кто записан, оплатил, на пробном; ведут админы",
+         "Для стойки: по каждой группе — состав, оплата за месяц, пробные и лист ожидания. Правится прямо на странице, печатается"),
         ("plan_05sen", "🎯 СУББОТА 05.09 — тактика Ане и Ире 10:00–18:00: дожим 118 неоплативших, окно базы, явка",
          "Аня — деньги: оплаты на выходе утренних групп, 16 «были и не оплатили» + 50 «занятие в пн-ср без оплаты», подтверждение воскресенья. Ира — явка, 25 хвостов инбокса, робототехника, окно базы 40 наборов (семьи 81–120). Цели дня в цифрах"),
         ("plan_06sen", "🎯 ВОСКРЕСЕНЬЕ 06.09 — тактика Ане и Ире: первые занятия МА и РР, подтверждение 13 первых занятий понедельника, экскурсии в сад",
@@ -1456,8 +1410,6 @@ DOC_GROUPS = [
          "Все 500 заказов с типом unused — статусы МойКласса не сопоставлены с типами Roistat. Пошагово по экранам кабинета, таблица «наш статус → тип», что появится в отчёте и что такое nosource-crm."),
         ("dubli_plan", "🧹 Дубли карточек: 152 удалить автоматически, 83 склеить в интерфейсе",
          "Разбор всей базы 06.09: кто дубль, кого оставить, история каждой карточки, ссылки в CRM"),
-        ("__url:/boris", "🎯 БОРИСУ — живой список решений: важно × срочно, польза в деньгах, статусы «сделано / ждём»",
-         "Клод обновляет пункты и приоритеты, вы ставите статус; сверху прогресс к 311 оплаченным и цифры дня"),
         ("boris_itog", "🎯 БОРИСУ: что сделать для полных групп и максимальной прибыли — итог 1.08–6.09",
          "26 пунктов по шести рычагам прибыли: что, сколько минут, какая польза в деньгах, срок; что уже сделано и работает без вас; что подтвердить"),
         ("it_zadachi_borisa", "🔑 ИТ-задачи владельца: доступы и решения",
@@ -1660,7 +1612,7 @@ def base_page(request: Request):
         rows = []
         for slug, name, note in items:
             # «__url:/путь» — не методичка, а живая страница портала:
-            # очередь дня собирается из задач и файла в docs не имеет
+            # пульт и бланки групп собираются из живых данных, файла в docs у них нет
             if slug.startswith("__url:"):
                 rows.append({"slug": slug, "href": slug[6:], "name": name,
                              "note": note, "size": 0})
@@ -1676,8 +1628,8 @@ def base_page(request: Request):
 
 
 def _page_cache(key: str, ttl_min: int, builder, fresh: bool = False) -> str:
-    """Кэш тяжёлых страниц (/nedozvony, /zayavki собираются 30-60 сек:
-    Mango и МойКласс медленные). Свежий кэш отдаётся мгновенно; протухший
+    """Кэш тяжёлых страниц (/zayavki собирается 30-60 сек:
+    МойКласс медленный). Свежий кэш отдаётся мгновенно; протухший
     пересобирается в этом же запросе (первый посетитель ждёт, остальные нет).
     ?fresh=1 — пересобрать принудительно."""
     import json as _j
@@ -1702,122 +1654,16 @@ def _page_cache(key: str, ttl_min: int, builder, fresh: bool = False) -> str:
     return html_text.replace("<!--cache-note-->", "")
 
 
-@app.get("/nedozvony", response_class=HTMLResponse, dependencies=AUTH)
-def nedozvony_page(fresh: int = 0):
-    def _build():
-        r = _nedozvony_build()
-        return r.body.decode() if hasattr(r, "body") else str(r)
-    return HTMLResponse(_page_cache("nedozvony", 10, _build, fresh=bool(fresh)))
-
-
-def _nedozvony_build():
-    """Живой список сегодняшних недозвонов для вечернего прозвона.
-
-    Бумажный лист устаревает за день (24.08 семья получила третий звонок,
-    потому что люберецкий лист печатался накануне). Эта страница строится
-    в момент открытия: те, кому не дозвонились сегодня, МИНУС те, кто уже
-    ответил на сообщение-догон, минус отказы и «не писать»."""
-    import html as _h
-    from . import mango
-    try:
-        missed = mango.missed()
-    except Exception as e:
-        return HTMLResponse(f"<p>Манго недоступен: {_h.escape(str(e)[:120])}</p>")
-    replied = set()
-    with db.get_conn() as conn:
-        try:
-            for (ph,) in conn.execute(
-                    "SELECT DISTINCT substr(phone,-10) FROM wazzup_inbox "
-                    "WHERE date(ts)=date('now') AND chat_type!='manual'"):
-                replied.add(ph)
-        except Exception:
-            pass
-        names, states = {}, {}
-        for uid, nm, phone, st in conn.execute(
-                "SELECT id, name, phone, client_state_id FROM users WHERE phone IS NOT NULL"):
-            p10 = "".join(ch for ch in str(phone) if ch.isdigit())[-10:]
-            if len(p10) == 10 and p10 not in names:
-                names[p10], states[p10] = (nm or ""), st
-    rows = []
-    for m in sorted(missed, key=lambda x: -x["attempts"]):
-        p = m["phone"][-10:]
-        if p in replied or states.get(p) in (125957, 146328, 125954):
-            continue
-        rows.append(f"<tr><td>{_h.escape((names.get(p) or '—')[:34])}</td>"
-                    f"<td class=ph>+7{p}</td><td class=at>{m['attempts']}</td>"
-                    f"<td class=res></td></tr>")
-    body = f"""<style>
-    body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:14px;color:#222}}
-    h1{{font-size:19px;margin:0 0 4px}} .sub{{color:#666;font-size:13px;margin-bottom:10px}}
-    table{{border-collapse:collapse;width:100%}}
-    th{{background:#312783;color:#fff;font-size:12px;padding:6px;text-align:left}}
-    td{{border-bottom:1px solid #ddd;padding:7px 6px;font-size:14px}}
-    .ph{{font-weight:600;white-space:nowrap}} .at{{text-align:center}}
-    .res{{width:200px;border-bottom:1px solid #999}}</style>
-    <h1>Вечерний прозвон: сегодняшние недозвоны</h1>
-    <div class=sub>{len(rows)} номеров. Кто уже ответил на сообщение-догон,
-    отказники и «не писать» — убраны. Страница живая: обновите перед звонками.
-    Больше всего попыток — сверху.</div>
-    <table><tr><th>Кто</th><th>Телефон</th><th>Попыток</th><th>Итог</th></tr>
-    {''.join(rows)}</table>"""
-    return HTMLResponse(body)
-
-
 @app.get("/api/perepiska", dependencies=AUTH)
-def perepiska_report(day: str | None = None, send: int = 0):
-    """Отчёт по переписке машинным форматом. Человеку — /perepiska."""
+def perepiska_report(day: str | None = None):
+    """Отчёт по переписке машинным форматом — только чтение.
+
+    12.11.2026: параметра ?send=1 больше нет ни здесь, ни у убранной страницы
+    /perepiska. С ним обычное открытие ссылки отправляло ответы клиентам и писало
+    комментарии в МойКласс. Отправляет автопилот: он зовёт perepiska.run(dry=False)
+    сам, без HTTP, и только в рабочие часы."""
     from . import perepiska as P
-    return P.run(day=day, dry=not send)
-
-
-@app.get("/perepiska", response_class=HTMLResponse, dependencies=AUTH)
-def perepiska_page(request: Request, day: str | None = None, send: int = 0):
-    """Что спросили в переписке и что мы ответили — читаемой страницей.
-
-    Открывается без параметров и НИЧЕГО не отправляет: сначала владелец
-    смотрит тексты, и только ссылка «отправить» пускает их клиентам."""
-    from . import perepiska as P
-    import html as _h
-    r = P.run(day=day, dry=not send)
-    rows = []
-    for x in r["строки"]:
-        mine = x["action"] != "человеку"
-        rows.append(
-            f"<tr class='{'mine' if mine else 'human'}'>"
-            f"<td><b>{_h.escape(x['name'][:28] or '—')}</b><br>"
-            f"<span class=ph>+7{x['phone']}</span></td>"
-            f"<td>{_h.escape(x['topic'] or '—')}"
-            f"{'<br><i>' + _h.escape(x['subject']) + '</i>' if x.get('subject') else ''}</td>"
-            f"<td class=q>{_h.escape(x['text'][:400])}</td>"
-            f"<td class=a>{_h.escape(x.get('answer') or '') or '<i>пишет администратор</i>'}"
-            f"{'<div class=bk>запись: ' + _h.escape(x['booked']) + '</div>' if x.get('booked') else ''}</td>"
-            f"<td>{_h.escape(x['action'])}</td></tr>")
-    night = ("<div class=warn>Сейчас вне рабочих часов центра (9:00–20:00 МСК) — "
-             "отправка отложена до утра.</div>" if r["ночь"] else "")
-    body = f"""<style>
-    body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:16px;color:#222}}
-    h1{{font-size:20px;margin:0 0 4px}} .sub{{color:#666;font-size:13px;margin-bottom:10px}}
-    table{{border-collapse:collapse;width:100%}}
-    th{{background:#312783;color:#fff;font-size:12px;padding:6px;text-align:left}}
-    td{{border-bottom:1px solid #e3e3e3;padding:8px 6px;font-size:13px;vertical-align:top}}
-    .q{{max-width:340px;color:#444}} .a{{max-width:430px;white-space:pre-wrap}}
-    .ph{{color:#666;font-size:12px}} .bk{{color:#5C8C1E;font-weight:600;margin-top:4px}}
-    tr.mine td{{background:#F4F9EF}} tr.human td{{background:#fff;color:#777}}
-    .warn{{background:#FFF4E0;border-left:4px solid #F59C00;padding:8px 10px;
-          margin-bottom:10px;font-size:13px}}
-    .go{{display:inline-block;background:#7DB928;color:#fff;padding:8px 14px;
-        border-radius:6px;text-decoration:none;font-weight:600;margin-bottom:12px}}
-    </style>
-    <h1>Переписка: что спросили и что мы ответили</h1>
-    <div class=sub>Диалогов без ответа {r['всего']} · отвечаю сам {r['ответили']} ·
-    пишет администратор {r['человеку']}. Зелёные строки — мои ответы,
-    серые уходят человеку.</div>
-    {night}
-    {'<a class=go href="/perepiska?send=1">Отправить мои ответы клиентам</a>'
-     if not send else '<div class=warn>Отправлено.</div>'}
-    <table><tr><th>Клиент</th><th>Тема</th><th>Спросили</th>
-    <th>Наш ответ</th><th>Что сделано</th></tr>{''.join(rows)}</table>"""
-    return HTMLResponse(body)
+    return P.run(day=day, dry=True)
 
 
 @app.get("/base/{slug}", response_class=HTMLResponse, dependencies=AUTH)
@@ -1864,79 +1710,6 @@ def base_doc(slug: str):
                                '<span style="color:#6B7A91;font-weight:500">KidsUP · план дня · страница обновляется сама каждые 5 минут, '
                                + f'открыта в {(datetime.utcnow() + timedelta(hours=3)).strftime("%H:%M")}</span>'))
     return HTMLResponse(back + page)
-
-
-@app.get("/callaudit", response_class=HTMLResponse, dependencies=AUTH)
-def callaudit_page(request: Request):
-    """Учёт обзвона: по каждой семье — была ли задача, закрыта ли она,
-    был ли звонок или сообщение, какой статус и записан ли ребёнок на 26/27.
-    Отвечает на вопрос «кому позвонили и кого записали», а не «сколько задач»."""
-    from . import sla
-    mk = autopilot._client()
-    try:
-        tasks = sla._open_tasks(mk)
-        done = mk.get("/v1/company/tasks", {"isComplete": "true", "limit": 100})
-        tasks += (done.get("tasks") if isinstance(done, dict) else done) or []
-    finally:
-        mk.close()
-    call_cats = {sla.CAT_CALL, sla.CAT_PUSH}
-    by_user: dict[int, dict] = {}
-    for t in tasks:
-        uid = t.get("userId")
-        if not uid or t.get("categoryId") not in call_cats:
-            continue
-        cur = by_user.get(uid)
-        if cur and cur["date"] <= (t.get("beginDate") or ""):
-            continue
-        by_user[uid] = {"date": (t.get("beginDate") or "")[:10],
-                        "manager": (t.get("managerIds") or [None])[0],
-                        "done": bool(t.get("isComplete"))}
-    # 12.10.2026: _admins() не отдаёт уволенных — для подписей старых задач берём всех
-    names = {a["managerId"]: a["name"] for a in autopilot._admins(vse=True)}
-    names[84116] = "Борис"
-    names[154181] = "Лиза"
-    rows = []
-    with db.get_conn() as conn:
-        conn.execute("""CREATE TABLE IF NOT EXISTS mango_calls (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
-            direction TEXT, state TEXT)""")
-        for uid, info in by_user.items():
-            u = conn.execute("SELECT name, phone, raw FROM users WHERE id=?", (uid,)).fetchone()
-            if not u:
-                continue
-            p = "".join(ch for ch in (u["phone"] or "") if ch.isdigit())[-10:]
-            called = msg = False
-            if len(p) == 10:
-                called = bool(conn.execute(
-                    "SELECT 1 FROM mango_calls WHERE substr(phone,-10)=? AND direction='out' "
-                    "AND ts>=? LIMIT 1", (p, info["date"])).fetchone())
-                try:
-                    msg = bool(conn.execute(
-                        "SELECT 1 FROM wazzup_outbox WHERE substr(phone,-10)=? AND ts>=? LIMIT 1",
-                        (p, info["date"])).fetchone())
-                except Exception:
-                    msg = False
-            enrolled = conn.execute(
-                "SELECT COUNT(*) FROM joins j JOIN classes cl ON cl.id=j.class_id "
-                "WHERE j.user_id=? AND cl.name LIKE '2627%'", (uid,)).fetchone()[0]
-            try:
-                state = json.loads(u["raw"] or "{}").get("clientStateId")
-            except ValueError:
-                state = None
-            rows.append({"uid": uid, "name": u["name"], "phone": u["phone"],
-                         "date": info["date"], "manager": names.get(info["manager"], "—"),
-                         "done": info["done"], "called": called, "msg": msg,
-                         "enrolled": enrolled, "state": CLIENT_STATE_NAMES.get(state, "—")})
-    rows.sort(key=lambda r: (r["date"], r["name"] or ""))
-    total = len(rows)
-    stat = {
-        "total": total,
-        "done": sum(1 for r in rows if r["done"]),
-        "touched": sum(1 for r in rows if r["called"] or r["msg"]),
-        "enrolled": sum(1 for r in rows if r["enrolled"]),
-        "ghost": sum(1 for r in rows if r["done"] and not (r["called"] or r["msg"])),
-    }
-    return render(request, "callaudit.html", active="callaudit", rows=rows, stat=stat)
 
 
 @app.get("/journal", response_class=HTMLResponse, dependencies=AUTH)
@@ -2262,7 +2035,7 @@ DRAFT_RULES = [
      "Ответить цену по нужному предмету + позвать на условно-бесплатное первое занятие: "
      "«Абонемент 8 занятий — X ₽ с 1 сентября. Первое занятие условно-бесплатное (не понравится — платить не нужно, понравится — войдёт в абонемент) — на какой день записать?»"),
     (r"расписан|какие\s+есть\s+заняти|\bвремя\b",
-     "Прислать расписание по возрасту (кнопка «скопировать расписание» на странице подсказки) "
+     "Прислать расписание по возрасту (кнопка «скопировать расписание» на странице «Подбор группы») "
      "и закрыть вопросом: «Какое время удобнее — будни вечером или суббота?»"),
     (r"запиш|записать|\bхотим\b|давайте",
      "Оформить запись в CRM сразу, затем подтвердить: группа, день, время, адрес, что взять с собой."),
@@ -2297,45 +2070,6 @@ def _draft_for(text: str) -> str:
             "или ближайшее событие. Сообщение должно заканчиваться вопросом.")
 
 
-@app.get("/suggest", dependencies=AUTH)
-def suggest_redirect():
-    """Страница «Ответы» объединена с «Кто ждёт ответа» (/waiting)."""
-    return RedirectResponse("/waiting", status_code=307)
-
-
-def _suggest_page_legacy(request: Request, hours: int = 24):
-    """Клиенты, которые написали и ждут ответа: что они спросили, что известно
-    о клиенте и что ответить. Черновик проверяет админ, а не робот."""
-    from . import autopilot
-    since = (autopilot._now() - timedelta(hours=max(1, min(72, hours)))).isoformat(timespec="seconds")
-    items = []
-    with db.get_conn() as conn:
-        try:
-            inbox = conn.execute(
-                "SELECT phone, MAX(ts) t, text FROM wazzup_inbox WHERE ts >= ? AND chat_type != 'manual' "
-                "GROUP BY substr(phone,-10) ORDER BY t DESC", (since,)).fetchall()
-            outbox = dict(conn.execute(
-                "SELECT substr(phone,-10), MAX(ts) FROM wazzup_outbox GROUP BY substr(phone,-10)").fetchall())
-        except Exception:
-            inbox, outbox = [], {}
-        for phone, ts, text in inbox:
-            key = phone[-10:]
-            answered = outbox.get(key, "") > ts
-            row = conn.execute("SELECT id, name, raw FROM users WHERE substr(phone,-10)=? LIMIT 1",
-                               (key,)).fetchone()
-            uid, name, raw = row if row else (None, "", "")
-            items.append({"phone": key, "name": name or "нет в CRM", "ts": ts,
-                          "text": text or "", "answered": answered,
-                          "age": _age_from_raw(raw) if raw else None,
-                          "draft": _draft_for(text),
-                          "brief": f"/brief?phone={key}",
-                          "crm": f"https://app.moyklass.com/client/{uid}" if uid else ""})
-    items.sort(key=lambda x: (x["answered"], x["ts"]), reverse=False)
-    items.sort(key=lambda x: x["answered"])
-    return render(request, "suggest.html", active="suggest", items=items, hours=hours,
-                  waiting=len([x for x in items if not x["answered"]]))
-
-
 # --- Mango: событие о звонке → мгновенная подсказка админу ------------------
 
 def _mango_sign_ok(key: str, js: str, sign: str) -> bool:
@@ -2352,7 +2086,7 @@ def _brief_text(phone: str) -> str:
                            (digits,)).fetchone()
         if not row:
             return (f"📞 Звонит +{phone} — в CRM карточки нет. Новый контакт: спросите имя "
-                    f"и возраст ребёнка, заведите карточку.\napp.kidsup.ru/brief?phone={digits}")
+                    f"и возраст ребёнка, заведите карточку.\napp.kidsup.ru/liniya?phone={digits}")
         uid, name, raw = row
         age = _age_from_raw(raw)
         last = conn.execute("""SELECT co.name, MAX(l.date) FROM lesson_records lr
@@ -2368,7 +2102,7 @@ def _brief_text(phone: str) -> str:
     if last and last[0]:
         parts.append(f"Посещал: {last[0]}, последнее занятие {last[1]}")
     parts.append("На 26/27: записан ✅" if enrolled else "На 26/27 НЕ записан — предложить место")
-    parts.append(f"Подсказка: app.kidsup.ru/brief?phone={digits}")
+    parts.append(f"Подсказка: app.kidsup.ru/liniya?phone={digits}")
     return "\n".join(parts)
 
 
@@ -2450,7 +2184,8 @@ async def mango_events(request: Request, rest: str = ""):
 
 def _brief_history(conn, uid: int) -> list[dict]:
     """Что ребёнок посещал: предмет, последнее занятие, сколько раз (до шести
-    предметов, свежие сверху). Общее для /brief и «Линии» (app/liniya.py)."""
+    предметов, свежие сверху). Зовёт «Линия» (app/liniya.py); страница /brief,
+    для которой это писалось, слита с ней."""
     return [{"course": r[0], "last": r[1], "visits": r[2]} for r in conn.execute(
         """SELECT co.name, MAX(l.date), COUNT(*) FROM lesson_records lr
            JOIN lessons l ON l.id = lr.lesson_id
@@ -2460,69 +2195,14 @@ def _brief_history(conn, uid: int) -> list[dict]:
            GROUP BY co.name ORDER BY MAX(l.date) DESC LIMIT 6""", (uid,))]
 
 
-@app.get("/brief", response_class=HTMLResponse, dependencies=AUTH)
-def brief_page(request: Request, phone: str = ""):
-    """Всё о клиенте на одном экране: кто это, что было, что предложить,
-    какие группы свободны и что написать. Открывается по номеру телефона —
-    перед звонком и во время переписки."""
-    digits = "".join(ch for ch in phone if ch.isdigit())[-10:]
-    client, history, dialog = None, [], []
-    if digits:
-        with db.get_conn() as conn:
-            row = conn.execute(
-                "SELECT id, name, phone, client_state_id, raw FROM users "
-                "WHERE substr(phone,-10)=? LIMIT 1", (digits,)).fetchone()
-            if row:
-                uid, name, ph, state, raw = row
-                age = _age_from_raw(raw)
-                history = _brief_history(conn, uid)
-                enrolled = conn.execute(
-                    "SELECT COUNT(*) FROM joins j JOIN classes cl ON cl.id=j.class_id "
-                    "WHERE j.user_id=? AND cl.name LIKE '2627%'", (uid,)).fetchone()[0]
-                st = conn.execute("SELECT name FROM client_statuses WHERE id=?",
-                                  (state,)).fetchone()
-                client = {"id": uid, "name": name, "phone": ph, "age": age,
-                          "status": st[0] if st else "—", "enrolled": enrolled,
-                          "crm": f"https://app.moyklass.com/client/{uid}",
-                          "suggest": _suggest_by_age(age)}
-                try:
-                    dialog = [{"ts": r[0], "dir": "in", "text": r[2]} for r in conn.execute(
-                        "SELECT ts, phone, text FROM wazzup_inbox WHERE substr(phone,-10)=? "
-                        "ORDER BY id DESC LIMIT 5", (digits,))]
-                except Exception:
-                    dialog = []
-    # свободные группы под возраст
-    groups = []
-    if client and client["age"]:
-        with db.get_conn() as conn:
-            rows = conn.execute("""
-                SELECT cl.id, cl.name, cl.max_students, co.name course,
-                       COUNT(DISTINCT j.user_id) enrolled
-                FROM classes cl LEFT JOIN courses co ON co.id = cl.course_id
-                LEFT JOIN joins j ON j.class_id = cl.id AND j.status_id NOT IN (1, 4)
-                WHERE cl.name LIKE '2627%' AND cl.name NOT LIKE '%аявк%'
-                GROUP BY cl.id""").fetchall()
-        for r in rows:
-            lo, hi = _group_ages(r["name"])
-            if lo is None or not (lo - 0.5 <= client["age"] <= hi + 0.5):
-                continue
-            cap, en = (r["max_students"] or 8), (r["enrolled"] or 0)
-            if cap - en <= 0:
-                continue
-            pr = PRICES.get(r["course"] or "")
-            groups.append({"name": r["name"], "course": r["course"],
-                           "day": " · ".join(DAY_LABEL[d] for d in _name_days(r["name"])) or "—",
-                           "time": " · ".join(_TIME_RE.findall(r["name"])[:2]) or "—",
-                           "free": cap - en,
-                           "price": pr["lines"][0][2] if pr else 0})
-        groups.sort(key=lambda g: (g["course"], g["time"]))
-    pitch = {}
-    for g in groups[:3]:
-        if g["course"] in PITCH and g["course"] not in pitch:
-            pitch[g["course"]] = PITCH[g["course"]]
-    return render(request, "brief.html", active="brief", phone=phone,
-                  client=client, history=history, groups=groups[:12],
-                  pitch=pitch, dialog=dialog)
+@app.get("/brief", dependencies=AUTH)
+def brief_perehod(phone: str = ""):
+    """Досье слито с «Линией» (15.10.2026), страница убрана 12.11.2026. Адрес живёт:
+    он в WhatsApp-подсказках при входящем звонке и в закладках. Номер переносим —
+    иначе админ посреди разговора откроет пустую «Линию»; берём последние 10 цифр:
+    сюда приходит сырой номер из карточки, а «Линия» на 12 цифрах отвечает ошибкой."""
+    p = "".join(ch for ch in phone if ch.isdigit())[-10:]
+    return RedirectResponse(f"/liniya?phone={p}" if p else "/liniya", status_code=303)
 
 
 @app.get("/liniya", response_class=HTMLResponse, dependencies=AUTH)
@@ -2693,11 +2373,13 @@ def api_pedagog_save(payload: dict = Body(...)):
     return pedagog.save(payload or {})
 
 
-@app.get("/boris", response_class=HTMLResponse, dependencies=AUTH)
-def boris_page():
-    """Живой список решений владельца: важность × срочность, статусы, польза (06.09)."""
-    from . import boris
-    return HTMLResponse(boris.page())
+@app.get("/boris")
+def boris_perehod(credentials: HTTPBasicCredentials | None = Depends(_security)):
+    """Список решений владельца (06.09) переехал в его документы и в колонку «Борис»
+    на пульте; страница убрана 12.11.2026. Цель — по роли: /boris/docs закрыт паролем
+    владельца, админ с закладкой получил бы окно пароля вместо страницы."""
+    check_auth(credentials)
+    return RedirectResponse("/boris/docs" if _is_owner(credentials) else "/pult", status_code=303)
 
 
 _DOC_HEADERS = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"}
@@ -2823,20 +2505,23 @@ def api_admin_docs_remove(payload: dict = Body(...)):
     return {"ok": boris_docs.ADMIN.remove(str(payload.get("slug") or ""))}
 
 
-@app.get("/api/boris/tasks", dependencies=AUTH)
+# 12.11.2026: /api/boris/* звала только убранная страница /boris — под общим входом
+# админ мог менять статусы решений владельца. Теперь только владельцу. Модуль boris
+# и таблица boris_tasks остаются: на сервере есть открытые пункты (перенос — шаг 2).
+@app.get("/api/boris/tasks", dependencies=OWNER_AUTH)
 def api_boris_tasks():
     from . import boris
     return boris.tasks()
 
 
-@app.post("/api/boris/tasks", dependencies=AUTH)
+@app.post("/api/boris/tasks", dependencies=OWNER_AUTH)
 def api_boris_tasks_set(payload: dict = Body(...)):
     """{"items": [{key,title,detail,lever,imp,urg,deadline,minutes,benefit,why}]} — upsert по key."""
     from . import boris
     return {"ok": True, "задач": boris.upsert(payload.get("items") or [])}
 
 
-@app.post("/api/boris/status", dependencies=AUTH)
+@app.post("/api/boris/status", dependencies=OWNER_AUTH)
 def api_boris_status(payload: dict = Body(...)):
     from . import boris
     return {"ok": boris.set_status(int(payload.get("id") or 0), str(payload.get("status") or ""), str(payload.get("note") or ""))}
@@ -2849,11 +2534,13 @@ def pult_page(day: str = "", who: str = ""):
     return HTMLResponse(pult.page(day, who))
 
 
-@app.get("/obeshchaniya", response_class=HTMLResponse, dependencies=AUTH)
-def obeshchaniya_page(day: str = "", who: str = "Лиза"):
-    """Обещания клиентам одного человека — страница под телефон (08.09)."""
-    from . import pult
-    return HTMLResponse(pult.promises_page(day, who))
+@app.get("/obeshchaniya", dependencies=AUTH)
+def obeshchaniya_perehod(day: str = "", who: str = "Лиза"):
+    """Обещания клиентам одного человека теперь в его колонке пульта (решение 08.09:
+    «всё на одной странице»); отдельная страница убрана 12.11.2026. Имя и день
+    переносим — без них человек попал бы на общий пульт."""
+    return RedirectResponse(f"/pult?who={quote(who)}" + (f"&day={quote(day)}" if day else ""),
+                            status_code=303)
 
 
 @app.get("/api/pult/tasks", dependencies=AUTH)
@@ -3954,149 +3641,6 @@ def api_istochniki_spravochnik():
     return istochniki.obnovit_spravochnik()
 
 
-@app.get("/plan311", response_class=HTMLResponse, dependencies=AUTH)
-def plan311_page(request: Request, day: str = ""):
-    """Итог анализа набора до 311: картина, откуда взять детей, какие группы
-    чем заполнять, решения владельца, задачи админам, пульт, риски, прогноз.
-    Данные — docs/rabota/plan/311_<дата>.json, результат многоагентного разбора.
-
-    23.09.2026: страница была прибита к разбору 21.09 (day по умолчанию), и
-    новый разбор не появился бы, пока кто-то не поправит ссылку. Без даты
-    открываем самый свежий файл."""
-    import re as _re
-    from pathlib import Path as _P
-    papka = _P(__file__).resolve().parent.parent / "docs" / "rabota" / "plan"
-    if not day:
-        vse = sorted(papka.glob("311_*.json"))
-        if not vse:
-            raise HTTPException(404, "плана нет")
-        day = vse[-1].stem[4:]
-    f = papka / f"311_{day}.json"
-    if not f.exists():
-        raise HTTPException(404, "плана на эту дату нет")
-    d = json.loads(f.read_text(encoding="utf-8"))
-    d["дата"] = day
-    # картина — по предложениям
-    kartina = [x.strip() for x in _re.split(r"(?<=[.!?])\s+(?=[А-ЯA-Z0-9«])", d["kartina"]) if x.strip()]
-    # математика: «(1) …; (2) …» → карточки; хвост про деньги — отдельно.
-    # С 23.09 источники приходят списком (istochniki) — тогда разбор текста не нужен.
-    parts = _re.split(r"\s\((\d)\)\s", d.get("matematika") or "")
-    istochniki, dengi = [], []
-    for i in range(1, len(parts) - 1, 2):
-        txt = parts[i + 1].strip().rstrip(";.")
-        tail = ""
-        if "Итого" in txt:
-            txt, tail = txt.split("Итого", 1)
-            tail = "Итого" + tail
-        m = _re.search(r"→\s*\+?([\d–\-]+)", txt)
-        istochniki.append({"g": ("+" + m.group(1)) if m else "—", "t": txt.strip().rstrip(";.")})
-        if tail:
-            dengi += [x.strip() for x in _re.split(r"(?<=[.;])\s+(?=[А-ЯA-Z0-9])", tail) if x.strip()]
-    if not dengi:
-        dengi = [x.strip() for x in _re.split(r"(?<=[.;])\s+", parts[-1]) if "Деньги" in x or "₽" in x]
-    k = {"paid": 205, "gap": 106, "per_day": "11,8", "pace": "5–6", "trials": 50,
-         "show": 66, "buy": 83, "forecast": "225–243", "date311": "12–20 октября"}
-    if isinstance(d.get("istochniki"), list):          # разбор с 23.09
-        istochniki_new = d["istochniki"]
-        k.update(pace=d.get("temp") or k["pace"], forecast=d.get("rubezh_30") or k["forecast"],
-                 date311=d.get("data_311") or k["date311"], show=None, buy=None,
-                 nuzhno=d.get("nuzhno_v_den") or "")
-    else:
-        istochniki_new = []
-    # Счётчик оплаченных и ресурс пробных берём живыми: 21.09 Борис спросил,
-    # согласованы ли /pult и эта страница. Статичный снимок расходится с
-    # пультом в тот же день, а две разные цифры на двух страницах — хуже,
-    # чем одна неточная.
-    try:
-        v = api_mesta_voronka()
-        k["paid"] = v.get("оплачено_в_группах_сезона", k["paid"])
-        k["gap"] = max(0, 311 - k["paid"])
-        k["trials"] = v.get("ждём_на_пробное", k["trials"])
-        # 22.09.2026, аудит. Подпись гласила «записаны на пробное с датой до
-        # 29.09», а в числе сидели дети с пробным на 01.10, 04.10 и даже
-        # 07.11 — владелец планировал донабор из ресурса, которого до конца
-        # сентября не будет. Считаем отдельно тех, кто успевает до срока.
-        # 10.10.2026: срок был прибит к 30.09, и с октября карточка писала
-        # «63 оплаты в день на 1 дн. до 30.09». Рубеж теперь 31.10, сегодня
-        # считается — сегодняшние оплаты ещё впереди. «ждём» с октября лежит
-        # в корне ответа воронки, а не в «списки».
-        srok_d = date(2026, 10, 31)
-        srok = srok_d.isoformat()
-        zhdem = v.get("ждём") or (v.get("списки") or {}).get("ждём", [])
-        uspeut = [r for r in zhdem
-                  if ((r.get("пробное") or {}).get("дата") or "") <= srok]
-        if uspeut:
-            k["trials_do_sroka"] = len(uspeut)
-            k["trials_pozzhe"] = max(0, k["trials"] - len(uspeut))
-        left = max(1, (srok_d - date.today()).days + 1)
-        k["days_left"] = left
-        k["per_day"] = str(round(k["gap"] / left, 1)).replace(".", ",")
-    except Exception:
-        pass
-    WD = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
-    pult_days = []
-    from . import pult as _pult
-    # пульт на три дня: по разбору 21.09 — его дни; в новых разборах пульта
-    # в файле нет, показываем живой пульт сегодня, завтра и послезавтра.
-    # 03.10: в новых разборах pult — список строк «04.10 Аня: единый список…»
-    # (план по сменам словами), а не задачи по дням; строки показываем как
-    # есть, дни берём из живого пульта
-    pult_plan = [x for x in (d.get("pult") or []) if isinstance(x, str)]
-    dni = sorted({r["day"] for r in d.get("pult") or [] if isinstance(r, dict) and r.get("day")})
-    if not dni:
-        _t0 = date.fromisoformat(_pult.today())
-        dni = [(_t0 + timedelta(days=i)).isoformat() for i in range(3)]
-    for dd in dni:
-        # Задачи — живые из пульта, а не из снимка анализа: пульт меняется в
-        # течение дня (наряд, отмены, новые заявки), и страница обязана это
-        # показывать, иначе админ видит одно, а владелец — другое.
-        try:
-            live = _pult.tasks(dd)
-        except Exception:
-            live = {}
-        # Инбокс того же дня: обещания клиентам и наряд. На пульте это
-        # отдельный блок под колонками, и без него счёт работы не сходится.
-        try:
-            with db.get_conn() as _c:
-                # 22.09.2026, аудит: здесь done считался как truthy, а
-                # done=2 означает «перенесено на завтра» — перенос попадал
-                # в «сделано». И колонок было жёстко четыре: работа Иры на
-                # этой странице не появлялась никогда.
-                inb = {w: (n, d) for w, n, d in _c.execute(
-                    "SELECT who, COUNT(*), SUM(CASE WHEN done=1 THEN 1 ELSE 0 END) "
-                    "FROM plan_inbox WHERE day=? GROUP BY who", (dd,)).fetchall()}
-        except Exception:
-            inb = {}
-        rows, by = [], []
-        kolonki = list(_pult.duty(dd)) + [w for w in ("Лиза", "Борис")
-                                          if w not in _pult.duty(dd)]
-        kolonki += [w for w in (set(live) | set(inb)) if w not in kolonki]
-        for who in kolonki:
-            rs = [{"t": x["t"], "text": x["text"], "done": x["done"]}
-                  for x in sorted(live.get(who, []), key=lambda x: x["t"])]
-            if not rs:                       # день ещё не собран — показываем план
-                rs = sorted(({"t": r["t"], "text": r["text"], "done": 0}
-                             for r in d.get("pult") or []
-                             if isinstance(r, dict) and r.get("day") == dd and r.get("who") == who),
-                            key=lambda r: r["t"])
-            if rs:
-                n_in, d_in = inb.get(who, (0, 0))
-                by.append((who, rs, n_in))
-                rows += rs + [{"done": 1}] * int(d_in or 0) + [{"done": 0}] * (n_in - int(d_in or 0))
-        dt = datetime.fromisoformat(dd)
-        pult_days.append({"title": f"{WD[dt.weekday()]} {dt.day:02d}.{dt.month:02d}",
-                          "n": len(rows), "by_who": by,
-                          "inbox": sum(n for n, _ in inb.values()),
-                          "done": sum(1 for r in rows if r.get("done") == 1)})
-    gruppy = d.get("gruppy") or []
-    PORYADOK = {"почти полная": 0, "есть места": 1, "слабая": 2, "переполнена": 3, "полная": 4}
-    gruppy = sorted(gruppy, key=lambda g: (PORYADOK.get(g.get("sostoyanie"), 9), -(g.get("svobodno") or 0)))
-    return render(request, "plan311.html", active="plan311", d=d, k=k, kartina=kartina,
-                  istochniki=istochniki, dengi=dengi, pult_days=pult_days, pult_plan=pult_plan,
-                  istochniki_new=istochniki_new, gruppy=gruppy,
-                  svobodno=sum(int(g.get("svobodno") or 0) for g in gruppy))
-
-
 @app.get("/obzvon", response_class=HTMLResponse, dependencies=AUTH)
 def obzvon_page(request: Request):
     """Кто ходил в прошлом сезоне и летом, ушёл, и кому мы не звонили."""
@@ -4461,31 +4005,6 @@ def kadry_file(day: str, name: str):
     return Response(p.read_bytes(), media_type="image/png")
 
 
-@app.get("/bez-oplaty", response_class=HTMLResponse, dependencies=AUTH)
-def bez_oplaty_page():
-    """Дети, которые ходят без оплаченного абонемента на текущий месяц
-    (06.10.2026, Борис: «ходят без оплаты — 91 — дай полный список на отдельной
-    странице»). Файл собирается разбором по выгрузке МойКласса и выкладывается
-    вместе с docs/ — страница статическая, дата данных указана в шапке."""
-    p = Path(__file__).resolve().parent.parent / "docs" / "rabota" / "kontrol" / "bez_oplaty.html"
-    if not p.exists():
-        raise HTTPException(404, "список ещё не собран")
-    return HTMLResponse(p.read_text(encoding="utf-8"))
-
-
-@app.get("/ne-oplatili", response_class=HTMLResponse, dependencies=AUTH)
-def ne_oplatili_page():
-    """Отдельная таблица «кто ещё не оплатил за октябрь и почему» (Борис, 13.10 01:30):
-    дети в группах без оплаченного абонемента на остаток месяца, причина и действие на день,
-    логопед отдельно (платят за занятие). Статическая страница из docs/, пересборка —
-    okt/ne_oplatili_page.py по выгрузке МойКласса; статусы админов — /api/bez-oplaty/status
-    с тем же ключом uid:class_id, что и на /bez-oplaty."""
-    p = Path(__file__).resolve().parent.parent / "docs" / "rabota" / "kontrol" / "ne_oplatili_oktyabr.html"
-    if not p.exists():
-        raise HTTPException(404, "таблица ещё не собрана")
-    return HTMLResponse(p.read_text(encoding="utf-8"))
-
-
 def _bez_oplaty_status_init(conn) -> None:
     conn.execute("CREATE TABLE IF NOT EXISTS bez_oplaty_status (key TEXT PRIMARY KEY, text TEXT, who TEXT, ts TEXT)")
 
@@ -4579,15 +4098,14 @@ def sverka_chestnosti_page(day: str = ""):
     return HTMLResponse(sverka_chestnosti.html(_sverka_den(day, 404)))
 
 
-@app.get("/sverka", response_class=HTMLResponse, dependencies=OWNER_AUTH)
-def sverka_page():
-    """Сверка денег (тетрадь ↔ МойКласс ↔ КОМТЕТ ↔ банк + долги) — только владелец.
-    Страницу собирает docs/rabota/sverka_dengi.py."""
-    from pathlib import Path as _P
-    f = _P(__file__).resolve().parent.parent / "docs" / "rabota" / "kontrol" / "sverka.html"
-    if not f.exists():
-        raise HTTPException(404, "сверка ещё не собрана")
-    return HTMLResponse(f.read_text(encoding="utf-8"))
+@app.get("/sverka", dependencies=OWNER_AUTH)
+def sverka_perehod():
+    """Разовый снимок «Сверка денег 10.08–04.10» убран 12.11.2026: его заменила
+    ежедневная сверка оплат в документах владельца. Документ выкладывает рутина —
+    если его нет, ведём на список документов, а не на 404."""
+    from . import boris_docs
+    est = (boris_docs.BORIS.dir / "sverka-oplat.html").exists()
+    return RedirectResponse("/boris/docs/sverka-oplat" if est else "/boris/docs", status_code=303)
 
 
 @app.get("/yavka", response_class=HTMLResponse, dependencies=AUTH)
@@ -4656,13 +4174,6 @@ def api_gruppy_otvet(payload: dict = Body(...)):
         return gruppy_chaty.send(chat_id, text, str(payload.get("chat_type") or "telegroup"))
     except RuntimeError as e:
         raise HTTPException(400, str(e))
-
-
-@app.get("/vozvrat", response_class=HTMLResponse, dependencies=AUTH)
-def vozvrat_page(request: Request):
-    """Вернуть и дожать: «думает», «недозвон», база 2024/25 — очередь и предложения."""
-    from . import vozvrat
-    return render(request, "vozvrat.html", active="obzvon", d=vozvrat.spiski())
 
 
 @app.get("/api/vozvrat/spiski", dependencies=AUTH)
@@ -4986,7 +4497,9 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
             "cam_password", "cam_embeds", "cam_okna", "tbank_token", "tbank_inn", "ivideon_login", "ivideon_password", "komtet_login", "komtet_password", "komtet_imap_password", "pochta_password", "komtet_code", "ivideon_code", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
             "hooppy_token", "tbank_terminal", "tbank_terminal_password", "zenmoney_token", "green_api_instance", "green_api_token",
-            # набор страниц Hooppy для кнопки «Опубликовать» на /makety (app/publish.py)
+            # наборы страниц Hooppy. Кнопку «Опубликовать» на /makety убрали 12.11.2026,
+            # ключи остаются: в настройках лежат id наборов, и этот же список — то,
+            # что отдаёт GET /api/settings
             "hooppy_nabor",
             "hooppy_nabor_istorii",
             # id утверждённого WABA-шаблона: без него массовая отправка через
@@ -6577,36 +6090,6 @@ a.wa{background:#25D366}a.crm{background:#1DA7E0}
     return HTMLResponse("".join(out))
 
 
-@app.get("/zapolnyaemost", response_class=HTMLResponse, dependencies=AUTH)
-def zapolnyaemost_page():
-    """Заполняемость групп нового сезона — самые пустые сверху."""
-    import html as _h
-    from . import autopilot
-    mk = autopilot._client()
-    try:
-        fills = autopilot.group_fill(mk)
-    finally:
-        mk.close()
-    rows = []
-    for f in fills:
-        bar = "█" * f["got"] + "░" * f["free"]
-        hot = ' style="background:#FFF4E0"' if f["got"] * 2 < f["target"] else ""
-        rows.append(f"<tr{hot}><td>{_h.escape(autopilot._join_title(f['name'])[:64])}</td>"
-                    f"<td class=n>{f['got']}/{f['target']}</td>"
-                    f"<td class=b>{bar}</td></tr>")
-    return HTMLResponse(f"""<style>
-    body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:14px;color:#222}}
-    h1{{font-size:19px;margin:0 0 4px}} .sub{{color:#666;font-size:13px;margin-bottom:10px}}
-    table{{border-collapse:collapse;width:100%}}
-    th{{background:#312783;color:#fff;font-size:12px;padding:6px;text-align:left}}
-    td{{border-bottom:1px solid #ddd;padding:6px;font-size:14px}}
-    .n{{white-space:nowrap;font-weight:600}} .b{{font-family:monospace;letter-spacing:1px}}</style>
-    <h1>Заполняемость групп 2026/27</h1>
-    <div class=sub>Самые пустые сверху. Жёлтым — занято меньше половины плана:
-    эти группы в приоритете обзвона. Живая страница.</div>
-    <table><tr><th>Группа</th><th>Занято</th><th></th></tr>{''.join(rows)}</table>""")
-
-
 @app.post("/api/autopilot/confirm-now", dependencies=AUTH)
 def autopilot_confirm_now():
     """Подтверждения записей немедленно + текст ошибки, если падает."""
@@ -6644,16 +6127,6 @@ def lizacheck_close(dry: bool = True):
     """Закрыть задачи Лизы, по которым работа уже сделана."""
     from . import lizacheck
     return lizacheck.close_done(dry=dry)
-
-
-@app.get("/zadachi-lizy", response_class=HTMLResponse, dependencies=AUTH)
-def zadachi_lizy_live():
-    """Задачи Лизы с проверкой актуальности — считается в момент открытия.
-
-    Живая страница, а не файл: журнал переписки лежит в базе сервера,
-    собрать её где-то ещё нельзя, а данные меняются каждый час."""
-    from . import lizacheck
-    return HTMLResponse(lizacheck.page(lizacheck.check()))
 
 
 @app.get("/api/guard", dependencies=AUTH)
@@ -6848,140 +6321,6 @@ def api_otkazy_release(chat: str):
     from . import otkaz
     otkaz.release(chat)
     return {"ok": True, "чат": chat, "статус": "снят со стоп-листа"}
-
-
-@app.get("/spiski", response_class=HTMLResponse, dependencies=AUTH)
-def spiski_page():
-    """Три списка обзвона одной страницей — короткий адрес для админов.
-
-    Сами списки лежат в базе знаний под /base/spisok_a|b|c, и это тот
-    адрес, который никто не помнит. 26.08 задачи первичного обзвона были
-    закрыты с отсылкой на app.kidsup.ru/spiski — адреса, которого не
-    существовало, и администраторы упёрлись в 404 в разгар набора.
-
-    Пересчёт трёх списков занимает полторы минуты: он поднимает всю базу
-    клиентов, платежи и звонки. Телефон администратора столько не ждёт —
-    в тот же день Аня увидела вместо страницы «сайт недоступен». Поэтому
-    результат живёт в настройке, а не в памяти процесса: перезапуск не
-    обнуляет его, и утренний заход в смену не упирается в полторы минуты
-    ожидания. Протухший кэш отдаём сразу, а считаем следом — за четверть
-    часа список меняется на единицы строк, и показать их минутой позже
-    безопаснее, чем не показать вовсе."""
-    from . import spiski as S
-    import json as _j
-    import threading
-    import time as _t
-    now = _t.time()
-    raw = db.get_setting("spiski_cache", "") or ""
-    stamp, data = 0.0, None
-    if raw:
-        try:
-            box = _j.loads(raw)
-            stamp, data = float(box.get("ts") or 0), box.get("data")
-        except Exception:
-            stamp, data = 0.0, None
-    age = now - stamp
-    if data and age < 900:
-        return _spiski_html(S, data, int(age / 60))
-    if data:
-        threading.Thread(target=_spiski_refresh, daemon=True).start()
-        return _spiski_html(S, data, int(age / 60))
-    try:
-        data = _spiski_refresh()
-    except Exception as e:
-        return HTMLResponse(
-            f"<meta charset=utf-8><p style='font:16px system-ui;margin:40px'>"
-            f"Списки не собрались: {html.escape(str(e)[:200])}<br><br>"
-            f"Откройте напрямую: <a href='/base/spisok_a'>A</a> · "
-            f"<a href='/base/spisok_b'>B</a> · <a href='/base/spisok_c'>C</a></p>",
-            status_code=200)
-    return _spiski_html(S, data, 0)
-
-
-def _spiski_refresh() -> dict:
-    """Пересчитать списки и положить в настройку. Зовётся и из фона."""
-    import json as _j
-    import time as _t
-    from . import spiski as S
-    data = S.collect()
-    db.set_setting("spiski_cache",
-                   _j.dumps({"ts": _t.time(), "data": data}, ensure_ascii=False))
-    # Заодно перекладываем сами списки: счётчик на /spiski и строки в
-    # /base/spisok_* обязаны сходиться. Пока файлы собирались отдельной
-    # командой, на витрине стояло 82, а внутри лежало 78 — и администратор
-    # не знает, какой цифре верить.
-    try:
-        for k in ("A", "B", "C"):
-            (BASE.parent / "docs" / f"spisok_{k.lower()}.html").write_text(
-                S.page(k, data[k]), encoding="utf-8")
-        # Список B делится пополам между Леной и Ирой (решение владельца
-        # 27.08): чёт/нечёт вместо «сверху и снизу» — так деление не
-        # плывёт при пересчёте и никто не звонит по чужой половине.
-        rows_a = data.get("A") or []
-        rows_b = data.get("B") or []
-        (BASE.parent / "docs" / "spisok_b_lena.html").write_text(
-            S.page("B", rows_b[0::2]), encoding="utf-8")
-        (BASE.parent / "docs" / "spisok_b_ira.html").write_text(
-            S.page("B", rows_b[1::2]), encoding="utf-8")
-        # Личные листы на день (владелец 27.08): одна ссылка на человека,
-        # внутри сначала её доля A (тёплые), затем её доля B.
-        # Схема владельца 27.08: лагерь-2026 (A) целиком у Иры, учебный
-        # год (B) пополам — Лене чёт, Ире нечет.
-        (BASE.parent / "docs" / "spisok_lena.html").write_text(
-            S.personal("Лена", [], rows_b[0::2]), encoding="utf-8")
-        (BASE.parent / "docs" / "spisok_ira.html").write_text(
-            S.personal("Ира", rows_a, rows_b[1::2]), encoding="utf-8")
-    except Exception as e:
-        logging.getLogger("kidsup").warning("списки не перезаписались: %s", str(e)[:90])
-    return data
-
-
-def _spiski_html(S, data: dict, age_min: int) -> "HTMLResponse":
-    """Разметка страницы списков. Вынесена, чтобы отдавать и свежий
-    расчёт, и кэш одним и тем же кодом."""
-    cards = []
-    for k in ("A", "B", "C"):
-        title, sub = S.TITLES[k]
-        n = len(data.get(k) or [])
-        cards.append(
-            f"<a class=card href='/base/spisok_{k.lower()}'>"
-            f"<div class=n>{n}</div><div class=t>{html.escape(title)}</div>"
-            f"<div class=s>{html.escape(sub)}</div></a>")
-    return f"""<!doctype html><meta charset=utf-8>
-<meta name=viewport content="width=device-width, initial-scale=1">
-<title>Списки обзвона — KidsUP</title>
-<style>
-body{{font:16px/1.5 system-ui,sans-serif;margin:0;padding:20px;color:#312783;
-     background:#fff;max-width:760px}}
-h1{{font-size:21px;margin:0 0 6px}}
-.sub{{color:#666;font-size:14px;margin-bottom:20px}}
-.card{{display:block;text-decoration:none;color:inherit;border:1px solid #e6e6ef;
-      border-radius:14px;padding:16px 18px;margin-bottom:12px}}
-.card:active{{background:#f6f6fb}}
-.n{{font-size:30px;font-weight:700;color:#1DA7E0;line-height:1}}
-.t{{font-weight:600;margin-top:6px}}
-.s{{color:#666;font-size:14px;margin-top:2px}}
-.foot{{color:#666;font-size:14px;margin-top:22px;border-top:1px solid #e6e6ef;
-      padding-top:14px}}
-a.plain{{color:#1DA7E0}}
-</style>
-<h1>Списки обзвона</h1>
-<div class=sub>Кому за август не звонили ни разу. {"Посчитано только что"
-if not age_min else f"Данные {age_min} мин назад"}: позвонили — человек
-из списка уходит сам.</div>
-<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-  <a class=card style="flex:1;min-width:220px;border-color:#1DA7E0" href="/base/spisok_lena">
-    <div class=t>📞 Лена — на сегодня</div>
-    <div class=s>Её половины списков A и B одной страницей</div></a>
-  <a class=card style="flex:1;min-width:220px;border-color:#1DA7E0" href="/base/spisok_ira">
-    <div class=t>📞 Ира — на сегодня</div>
-    <div class=s>Её половины списков A и B одной страницей</div></a>
-</div>
-{''.join(cards)}
-<div class=foot>Личный лист — главная ссылка дня: внутри сначала тёплые
-(лето-2026), затем прошлый учебный год. Общие A/B/C выше — для сверки.<br><br>
-Очередь дня и задачи — <a class=plain href="/ochered">app.kidsup.ru/ochered</a><br>
-Кому не пишем — <a class=plain href="/otkazy">app.kidsup.ru/otkazy</a></div>"""
 
 
 @app.get("/otkazy", response_class=HTMLResponse, dependencies=AUTH)
@@ -9979,13 +9318,6 @@ def api_mesta_voronka_refresh(bg: int = 1):
         mk.close()
 
 
-@app.get("/mesta/sostav", response_class=HTMLResponse, dependencies=AUTH)
-def mesta_sostav_page(request: Request):
-    """Поимённо по каждой группе и логопеду: ходит (абонемент) — пробное с датой — мест всего."""
-    from . import mesta
-    return render(request, "sostav.html", active="mesta", r=mesta.razrez())
-
-
 @app.get("/api/mesta/razrez", dependencies=AUTH)
 def api_mesta_razrez():
     from . import mesta
@@ -10506,52 +9838,6 @@ async def api_wazzup_raw(limit: int = 40, kind: str = ""):
                 pass
         return {"count": len(events), "top_keys": cnt.most_common()}
     return {"count": len(events), "events": events}
-
-
-@app.get("/ochered", response_class=HTMLResponse, dependencies=AUTH)
-async def ochered_page(manager: int = 0):
-    """Очередь дня — та же, что в CRM. Строка страницы и есть задача.
-
-    Заменяет прежние листы обзвона, которые жили рядом с задачами и не были
-    с ними связаны: администратор звонил по листу, а задачи закрывал отдельно,
-    и в CRM оставалось «закрыто без касания»."""
-    from . import autopilot, callqueue
-    mid = manager
-    if not mid:
-        # Кто сегодня звонит — из графика смен; тот же источник, что у /api/duty,
-        # иначе очередь покажется человеку, который сегодня отдыхает.
-        try:
-            sched = json.loads(db.get_setting("admin_schedule") or "{}")
-            v = sched.get(autopilot._today().isoformat())
-            mid = (v[0] if isinstance(v, list) else v) or 0
-        except Exception:
-            mid = 0
-        # 12.10.2026: Аня (232805) уволена — если она осталась в графике,
-        # очередь берём у дежурной по autopilot (уволенных он пропускает)
-        if mid in autopilot.UVOLENY:
-            mid = autopilot._duty_manager()
-    mid = mid or 202856      # 12.10.2026: Аня (232805) уволена — запасная Лена
-    try:
-        rows = callqueue.collect(mid)
-    except Exception as e:
-        raise HTTPException(502, f"МойКласс недоступен: {e}")
-    return HTMLResponse(callqueue.page(mid, rows))
-
-
-@app.post("/api/queue/result", dependencies=AUTH)
-async def api_queue_result(payload: dict = Body(...)):
-    """Итог звонка со страницы очереди: закрыть задачу или перенести."""
-    from . import callqueue
-    try:
-        return callqueue.apply_result(
-            int(payload.get("task_id") or 0),
-            str(payload.get("result") or ""),
-            str(payload.get("note") or "")[:400],
-            int(payload.get("manager_id") or 0))
-    except ValueError as e:
-        raise HTTPException(422, str(e))
-    except Exception as e:
-        raise HTTPException(502, f"не удалось записать итог: {e}")
 
 
 @app.get("/vstrechi", response_class=HTMLResponse)
@@ -11410,7 +10696,9 @@ async def api_waiting(min_minutes: int = 15):
                         "wait_min": wait_min, "text": text, "money": money,
                         "draft": _draft_for(text),
                         "channel": CHAT_LABEL.get(last["ct"], "") if last["ct"] != "whatsapp" else "",
-                        "brief": f"/brief?phone={p}",
+                        # ключ оставлен ради тех, кто читает /api/waiting программой;
+                        # ведёт на «Линию» — досье (/brief) слито с ней
+                        "brief": f"/liniya?phone={p}",
                         "crm": f"https://app.moyklass.com/client/{uid}" if uid else ""})
     waiting.sort(key=lambda w: (not w["money"], -w["wait_min"]))
     try:
