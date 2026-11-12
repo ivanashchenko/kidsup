@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import base64
 import importlib
+import json
 import importlib.util
 import logging
 import os
@@ -536,9 +537,12 @@ def test_podpis():
     proverka("роль меню: владелец и ключ выкладки — owner, остальные — admin",
              [m.vhod.rol_menyu(k) for k in (lena, klod, vykl, avto, staryy)] == ["admin", "admin", "owner", "admin", "admin"])
     vl = {**lena, "login": "boris", "rol": "owner"}
-    proverka("заготовка mozhno_vladelcu: владелец и оба ключа — да, админ и автоматика — нет",
-             [m.vhod.mozhno_vladelcu(k) for k in (vl, klod, vykl, lena, avto, staryy, None)]
+    mv = m.vhod.mozhno_vladelcu
+    proverka("mozhno_vladelcu на /api/boris-docs: владелец и оба ключа — да, админ, автоматика и общий вход — нет",
+             [mv(k, "GET", "/api/boris-docs") for k in (vl, klod, vykl, lena, avto, staryy, None)]
              == [True, True, True, False, False, False, False])
+    proverka("…без адреса (прямой вызов по-старому): владелец — да, служебным ключам — нет",
+             [mv(k) for k in (vl, klod, vykl, lena)] == [True, False, False, False])
 
 
 def _posl_zhurnal(put):
@@ -1493,6 +1497,620 @@ def test_sledy(klyuch, work):
              oct(os.stat(m.config.VHODY_DB).st_mode & 0o777) == "0o600")
 
 
+
+# --- группа В (план, 9.3): права и «кто вошёл» --------------------------------------------------
+
+# Опись адресов, которые зовут рутины и помощники ассистента (12.11.2026): scratchpad-помощники,
+# docs/rabota/*.py, опись рутин из nav_testy.RUTINY_VHOD и таблица 5.3 плана. Ключ рутин обязан
+# проходить их все. Адреса выкладки (/api/deploy, /api/backup/db, /api/settings) сюда не входят:
+# они переезжают в окружение «KidsUP выкладка» под ключ выкладки.
+OPIS_RUTIN = """
+GET /api/plan/inbox · POST /api/plan/inbox · POST /api/plan/inbox/done · GET /api/promo/grafik · GET /api/calls/list
+GET /api/calls/recording · POST /api/gruppy/otvet · GET /api/gruppy/soobsheniya · GET /export/raw/{table}.json
+GET /api/sync/status · GET /api/day/firsts · GET /api/mesta · GET /api/mesta/razrez · GET /api/oplata/plan
+GET /api/waiting · GET /api/yavka · POST /api/crm/comment · GET /api/crm/user · GET /api/crm/poisk
+GET /api/pult/tasks · POST /api/pult/tasks · POST /api/pult/done · GET /api/obzvon-dnya · GET /api/kadry
+POST /api/kadry/ocenka · GET /kadry/file/{day}/{name} · POST /api/crm/roistat-merge · POST /api/roistat/auto-cards
+GET /api/duty · GET /api/dialogs · GET /api/zayavki · GET /api/dolgi · GET /api/blank-grupp
+POST /api/blank-grupp/edit · GET /api/perepiska/kto · GET /api/wazzup/raw · GET /api/wazzup/channels-map
+GET /base/{slug} · GET /api/kto · GET /api/vhod/sostoyanie
+POST /api/boris-docs · GET /api/boris-docs · POST /api/boris-docs/remove · GET /boris/docs · GET /boris/docs/{slug}
+GET /api/admin-docs · POST /api/admin-docs · POST /api/admin-docs/remove
+GET /api/doc-state/{doc} · POST /api/doc-state/{doc} · GET /api/doc-state/{doc}/log
+GET /api/tbank/get · GET /api/komtet/cheki · POST /api/ads/vk · POST /api/ads/direct
+GET /api/mkweb/history · POST /api/mkweb/history/start · GET /api/mkweb/history/result
+POST /api/hooppy/post · GET /api/hooppy/posty · POST /api/hooppy/udalit · GET /api/crm/raw-user · GET /api/istochniki
+"""
+# Список 5.2 плана: что 12.11.2026 переведено с общего входа на вход владельца (и что уже перевёл шаг 1).
+SPISOK_52 = """
+GET /export/leads.csv · GET /export/students.csv · GET /export/payments.csv · GET /export/lessons.csv
+GET /export/attendance.csv · GET /export/raw/{table}.json · GET /journal · GET /audit · GET /api/audit
+POST /api/audit/run · GET /sverka-chestnosti · GET /api/sverka-chestnosti · GET /api/nabor/analiz · GET /clicks
+GET /api/clicks/summary · GET /kadry/file/{day}/{name} · GET /istochniki · GET /api/istochniki
+POST /api/istochniki/spravochnik · GET /api/boris/tasks · POST /api/boris/tasks · POST /api/boris/status
+POST /api/chaty/send
+"""
+# Остались под общим входом вопреки списку 5.2 — каждое с причиной (см. отчёт исполнителя В).
+OSTALIS_ADMINAM = {
+    "POST /api/audit/resolve": "кнопки «принято / исправлено» жмут админы на /pravila-kontrol",
+    "GET /promo": "решение Бориса 28.10 «промоутерами управляют админы», ссылка с /promo/grafik",
+}
+VYKLADKA4 = ("/api/deploy", "/api/restart", "/api/backup/db", "/api/settings")
+
+
+def _spisok(tekst: str) -> list:
+    return [tuple(x.strip().split(" ", 1)) for x in tekst.replace("\n", " · ").split(" · ") if x.strip()]
+
+
+def vhod_marshrutov() -> dict:
+    """«МЕТОД путь» → какая проверка входа стоит: owner, auth, pauth или ''."""
+    out = {}
+    for r in m.app.routes:
+        if not hasattr(r, "dependant"):
+            continue
+        calls = {d.call for d in r.dependant.dependencies}
+        vid = ("owner" if m.check_owner in calls else "auth" if m.check_auth in calls
+               else "pauth" if m.check_pedagog_or_admin in calls else "")
+        for met in sorted(r.methods - {"HEAD"}):
+            out[f"{met} {r.path}"] = vid
+    return out
+
+
+def vladelcheskie() -> list:
+    return sorted(tuple(x.split(" ", 1)) for x, v in vhod_marshrutov().items() if v == "owner")
+
+
+def dopusk(metod, put, hdr=None, auth=None, metka=None, chem="owner"):
+    """Только проверка входа, без самого обработчика (выкладку, рассылку и перезапуск тест не
+    запускает): 200 — пускает; "403в" — «Только для владельца»; иначе код отказа."""
+    from fastapi import HTTPException
+    from starlette.requests import Request
+    put = adres_puti(put)
+    h = {"host": "app.kidsup.ru", **(hdr or {})}
+    if metka:
+        h["cookie"] = f"{m.vhod.COOKIE}={metka}"
+    scope = {"type": "http", "http_version": "1.1", "method": metod, "scheme": "https", "path": put,
+             "raw_path": put.encode(), "query_string": b"", "client": ("203.0.113.77", 40000),
+             "server": ("app.kidsup.ru", 443), "state": {},
+             "headers": [(k.lower().encode(), str(v).encode()) for k, v in h.items()]}
+    try:
+        (m.check_owner if chem == "owner" else m.check_auth)(_cred(*auth) if auth else None, Request(scope))
+    except m.TolkoVladelcu:
+        return "403в"
+    except m.vhod.NuzhenVhod:
+        return 303
+    except HTTPException as e:
+        return e.status_code
+    return 200
+
+
+def po_vsem(adresa, **kw) -> dict:
+    """Итоги dopusk по списку адресов: {итог: [адреса]}."""
+    out: dict = {}
+    for met, put in adresa:
+        hdr = dict(kw.get("hdr") or {})
+        if kw.get("metka") and met not in ("GET", "HEAD", "OPTIONS"):
+            hdr.update(SVOI)                           # изменяющий запрос человека — со своей страницы
+        out.setdefault(dopusk(met, put, **{**kw, "hdr": hdr}), []).append(f"{met} {put}")
+    return out
+
+
+def metka(c) -> str:
+    return c.cookies.get(m.vhod.COOKIE)
+
+
+class _BezPerezapuska:
+    """Выкладка и перезапуск на стенде: архив не распаковывается, служба не перезапускается."""
+
+    def __enter__(self):
+        import subprocess
+        import tarfile
+        self.bylo = (tarfile.TarFile.extractall, threading.Timer, subprocess.Popen)
+        self.zvali = []
+        tarfile.TarFile.extractall = lambda *a, **k: self.zvali.append("extractall")
+
+        class _Timer:
+            def __init__(s_, *a, **k):
+                pass
+
+            def start(s_):
+                self.zvali.append("timer")
+        threading.Timer = _Timer
+        subprocess.Popen = lambda *a, **k: self.zvali.append("popen")
+        return self
+
+    def __exit__(self, *a):
+        import subprocess
+        import tarfile
+        tarfile.TarFile.extractall, threading.Timer, subprocess.Popen = self.bylo
+
+
+def _arhiv() -> bytes:
+    """Архив для /api/deploy: один файл docs/…, больше 1000 байт (случайное содержимое не сжимается)."""
+    import io
+    import tarfile
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as t:
+        data = secrets.token_bytes(3000)
+        ti = tarfile.TarInfo("docs/rabota/_stend_vykladka.bin")
+        ti.size = len(data)
+        t.addfile(ti, io.BytesIO(data))
+    return buf.getvalue()
+
+
+def vazhnoe() -> list:
+    with osnovnaya() as o:
+        return [r["chto"] for r in o.execute("SELECT chto FROM deystviya WHERE vazhnoe=1 ORDER BY id")]
+
+
+def test_prava_v_den_vykladki():
+    """Главное требование выкатки: пока владелец не завёл входы, для общего admin и прежнего
+    boris ничего не меняется — в том числе на адресах, которые закрываются от админов."""
+    print("В. День выкладки: входы не заведены — права общего admin и прежнего boris прежние")
+    vm = vhod_marshrutov()
+    vl = vladelcheskie()
+    proverka("адресов под входом владельца не меньше 140", len(vl) >= 140, len(vl))
+    sp = _spisok(SPISOK_52)
+    proverka("34. каждый адрес списка 5.2 существует и стоит под входом владельца",
+             all(vm.get(f"{a} {b}") == "owner" for a, b in sp), [x for x in sp if vm.get(f"{x[0]} {x[1]}") != "owner"])
+    proverka("…два адреса остались админам — названы поимённо, с причиной",
+             all(vm.get(x) == "auth" for x in OSTALIS_ADMINAM), {x: vm.get(x) for x in OSTALIS_ADMINAM})
+    V = m.vhod
+    perehod = [(a, b) for a, b in vl if V._v_spiske(adres_puti(b), V.PEREHOD_ADMIN, V.PEREHOD_PREFIKS)]
+    proverka("каждая запись PEREHOD_ADMIN и PEREHOD_PREFIKS — существующий адрес под входом владельца",
+             all(any(adres_puti(b) == x for _, b in vl) for x in V.PEREHOD_ADMIN)
+             and all(any(adres_puti(b).startswith(x + "/") for _, b in vl) for x in V.PEREHOD_PREFIKS))
+    r = po_vsem(perehod, auth=OBSHCHIY)
+    proverka(f"общий admin проходит все {len(perehod)} вновь закрытых адресов, как до 12.11", set(r) == {200}, r)
+    ostalnye = [x for x in vl if x not in perehod]
+    r = po_vsem(ostalnye, auth=OBSHCHIY)
+    proverka(f"…а на остальных {len(ostalnye)} адресах владельца — 401 с окном пароля, как раньше", set(r) == {401},
+             {k_: v[:5] for k_, v in r.items() if k_ != 401})
+    r = po_vsem(vl, auth=STARYY_VLADELCA)
+    proverka(f"прежний boris проходит все {len(vl)} адресов владельца, включая выкладку и /owner", set(r) == {200},
+             {k_: v[:5] for k_, v in r.items() if k_ != 200})
+    c = kl()
+    r = c.get("/export/raw/rooms.json", auth=OBSHCHIY)
+    proverka("общий admin: /export/raw/rooms.json → 200 (рутины под общим входом не ломаются)", r.status_code == 200,
+             r.status_code)
+    proverka("прежний boris: /api/deploy с пустым телом → 400, общий admin → 401",
+             (c.post("/api/deploy", content=b"", auth=STARYY_VLADELCA).status_code,
+              c.post("/api/deploy", content=b"", auth=OBSHCHIY).status_code) == (400, 401))
+    do = len(vazhnoe())
+    with _BezPerezapuska() as bp:
+        r = c.post("/api/deploy", content=_arhiv(), auth=STARYY_VLADELCA)
+        r2 = c.post("/api/restart", auth=STARYY_VLADELCA)
+    r3 = c.get("/api/backup/db", auth=STARYY_VLADELCA)
+    vz = vazhnoe()[do:]
+    proverka("40. выкладка, перезапуск и копия базы прежним boris проходят и оставляют строки «Важное»",
+             (r.status_code, r2.status_code, r3.status_code) == (200, 200, 200) and len(vz) == 3
+             and vz[0].startswith("выкладка кода: 1 файлов") and vz[1].startswith("перезапуск службы")
+             and vz[2].startswith("копия базы выгружена") and all("Борис (прежний пароль)" in x for x in vz),
+             (r.status_code, r2.status_code, r3.status_code, vz))
+    proverka("…архив на стенде не распакован, служба не перезапущена", bp.zvali == ["extractall", "timer", "timer"], bp.zvali)
+
+    print("35. X-Kak: admin — проверка «как админ» без паролей админов")
+    KAK = {"x-kak": "admin"}
+    r = po_vsem(vl, auth=STARYY_VLADELCA, hdr=KAK)
+    proverka(f"прежний boris с X-Kak: admin — все {len(vl)} адресов владельца → 403, ни одного 401 и 200",
+             set(r) == {"403в"}, {k_: v[:5] for k_, v in r.items() if k_ != "403в"})
+    r = po_vsem(vl, auth=OBSHCHIY, hdr=KAK)
+    proverka("общий admin с X-Kak: admin — тоже везде 403: переходная поблажка на него не действует",
+             set(r) == {"403в"}, {k_: v[:5] for k_, v in r.items() if k_ != "403в"})
+    kody = [c.get(a, auth=STARYY_VLADELCA, headers={**STR, **KAK}).status_code
+            for a in ("/owner", "/settings", "/journal", "/istochniki", "/audit")]
+    proverka("пять страниц владельца с X-Kak: admin → 403 (проверка шага 1 выкладки)", kody == [403] * 5, kody)
+    r = c.get("/journal", auth=STARYY_VLADELCA, headers={**STR, **KAK})
+    proverka("странице — «Только для владельца · ← На пульт», без окна пароля и без кеша",
+             r.status_code == 403 and "Только для владельца" in r.text and "href='/pult'" in r.text
+             and "На пульт" in r.text and "/static/vhod.js" in r.text and not r.headers.get("www-authenticate")
+             and r.headers.get("cache-control") == "no-store", r.status_code)
+    r = c.get("/api/settings", auth=STARYY_VLADELCA, headers=KAK)
+    proverka("запросу /api/… — JSON с кодом 403",
+             r.status_code == 403 and r.headers["content-type"].startswith("application/json")
+             and "Только для владельца" in r.json()["detail"], r.status_code)
+    proverka("с X-Kak: admin рабочие адреса открыты, а /api/kto показывает права админа",
+             c.get("/api/pult/tasks", auth=STARYY_VLADELCA, headers=KAK).status_code == 200
+             and kto(c, auth=STARYY_VLADELCA, headers=KAK) == {"login": "boris", "imya": "Борис", "rol": "admin",
+                                                                "sposob": "staryy"})
+    proverka("…корень с X-Kak ведёт на пульт, а не на страницу владельца",
+             c.get("/", auth=STARYY_VLADELCA, headers=KAK).headers.get("location") == "/pult")
+    proverka("другое значение заголовка ничего не меняет: X-Kak: owner под общим admin — по-прежнему 401",
+             c.get("/api/settings", auth=OBSHCHIY, headers={"x-kak": "owner"}).status_code == 401
+             and kto(c, auth=OBSHCHIY, headers={"x-kak": "owner"})["rol"] == "admin")
+
+    print("38. Пульт и шапка в день выкладки — без изменений")
+    t = c.get("/pult", auth=OBSHCHIY, headers=STR).text
+    proverka("пульт под общим admin: ни жёлтой полосы, ни «Вы: …», ни «ваша колонка»",
+             "kto-polosa" not in t and "Вы под общим входом" not in t and "ваша колонка" not in t
+             and "сейчас в системе" not in t)
+    t = c.get("/leads", auth=OBSHCHIY, headers=STR).text
+    proverka("страница с общей шапкой под общим admin: полосы нет", "kto-polosa" not in t and "<header" in t)
+    proverka("/obeshchaniya под общим входом ведёт в колонку Лизы, как раньше; who из адреса остаётся",
+             unquote(c.get("/obeshchaniya", auth=OBSHCHIY).headers["location"]) == "/pult?who=Лиза"
+             and unquote(c.get("/obeshchaniya?who=Ира&day=2026-11-10", auth=OBSHCHIY).headers["location"])
+             == "/pult?who=Ира&day=2026-11-10")
+
+
+def test_prava_lyudey():
+    """31, 32, 34, 35 — люди. Пароли заданы, ключей ещё нет: общий admin и прежний boris работают."""
+    print("31. Все адреса владельца: личный админ — 403 и ни одного 401; владелец через форму — всё, кроме выкладки")
+    vl = vladelcheskie()
+    lena, boris = kl(), kl()
+    proverka("Лена и владелец входят через форму",
+             (voyti(lena, "lena", P["lena"]).status_code, voyti(boris, "boris", P["boris"]).status_code) == (303, 303))
+    r = po_vsem(vl, metka=metka(lena))
+    proverka(f"Лена: все {len(vl)} адресов владельца → 403 «Только для владельца», ни одного 401 и 200",
+             set(r) == {"403в"}, {k_: v[:5] for k_, v in r.items() if k_ != "403в"})
+    r = po_vsem(vl, metka=metka(boris))
+    zakryto = sorted(r.get("403в", []))
+    proverka("владелец через форму: проходит всё, кроме четырёх адресов выкладки (там 403)",
+             set(r) == {200, "403в"} and {x.split(" ", 1)[1] for x in zakryto} == set(VYKLADKA4)
+             and len(r[200]) == len(vl) - len(zakryto), (zakryto, {k_: v[:5] for k_, v in r.items() if k_ not in (200, "403в")}))
+    kody = [lena.get(a, headers=STR).status_code for a in ("/owner", "/settings", "/journal", "/istochniki", "/audit",
+                                                           "/sverka-chestnosti", "/clicks", "/boris/docs")]
+    proverka("Лена открывает страницы владельца в браузере → 403 со страницей, а не окно пароля и не форма",
+             kody == [403] * 8, kody)
+    r = lena.get("/audit", headers=STR)
+    proverka("…на странице отказа — её имя и ссылка на пульт",
+             "Вы вошли как Лена" in r.text and "href='/pult'" in r.text and not r.headers.get("www-authenticate"))
+    r = lena.get("/api/audit", headers=FETCH)
+    proverka("…запрос со страницы — JSON 403, без X-Vhod (вход-то есть)",
+             r.status_code == 403 and "detail" in r.json() and not r.headers.get("x-vhod"), r.status_code)
+
+    print("34. У закрытой страницы закрыт и её /api/…-двойник")
+    pary = (("/sverka-chestnosti", "/api/sverka-chestnosti"), ("/audit", "/api/audit"), ("/clicks", "/api/clicks/summary"),
+            ("/istochniki", "/api/istochniki"), ("/journal", "/export/raw/users.json"),
+            ("/students", "/export/students.csv"), ("/leads", "/export/leads.csv"))
+    plohie = [(a, b, lena.get(b).status_code) for a, b in pary if lena.get(b).status_code != 403]
+    proverka("Лена: API и выгрузки закрытых страниц → 403", not plohie, plohie)
+    proverka("…а её рабочие адреса открыты: пульт, линия, API пульта, разбор правил, итоги промоутеров",
+             [lena.get(a, headers=STR).status_code for a in ("/pult", "/liniya", "/api/pult/tasks", "/promo")] == [200] * 4
+             and lena.post("/api/audit/resolve?flag_id=0&status=ok", headers=SVOI).status_code != 403)
+    proverka("владелец через форму открывает свои страницы и выгрузки",
+             [boris.get(a, headers=STR).status_code for a in ("/owner", "/journal", "/export/raw/rooms.json",
+                                                              "/api/vhod/sostoyanie")] == [200] * 4)
+
+    print("32. Выкладка, перезапуск, копия базы, настройки — люди")
+    proverka("/api/deploy с пустым телом: прежний boris → 400; владелец через форму → 403; админ → 403",
+             (kl().post("/api/deploy", content=b"", auth=STARYY_VLADELCA).status_code,
+              boris.post("/api/deploy", content=b"", headers=SVOI).status_code,
+              lena.post("/api/deploy", content=b"", headers=SVOI).status_code) == (400, 403, 403))
+    ad4 = [("POST", "/api/deploy"), ("POST", "/api/restart"), ("GET", "/api/backup/db"), ("GET", "/api/settings"),
+           ("POST", "/api/settings")]
+    proverka("…то же для перезапуска, копии базы и настроек: прежний boris — да, владелец через форму и админ — 403",
+             (set(po_vsem(ad4, auth=STARYY_VLADELCA)), set(po_vsem(ad4, metka=metka(boris))),
+              set(po_vsem(ad4, metka=metka(lena)))) == ({200}, {"403в"}, {"403в"}))
+    r = boris.get("/api/settings", headers=FETCH)
+    proverka("владельцу через форму сказано словами, почему закрыто", r.status_code == 403 and "ключом выкладки" in r.json()["detail"])
+
+    print("Переход: пароли заданы, ключ рутин ещё не работал — общий admin ходит по-прежнему")
+    V = m.vhod
+    perehod = [(a, b) for a, b in vl if V._v_spiske(adres_puti(b), V.PEREHOD_ADMIN, V.PEREHOD_PREFIKS)]
+    proverka("общий admin проходит вновь закрытые адреса и после того, как владелец задал пароли",
+             V.zavedeny() and set(po_vsem(perehod, auth=OBSHCHIY)) == {200}
+             and kl().get("/export/raw/rooms.json", auth=OBSHCHIY).status_code == 200)
+
+    print("35. X-Kak: admin понижает владельца, админа не повышает")
+    KAK = {"x-kak": "admin"}
+    r = po_vsem(vl, metka=metka(boris), hdr=KAK)
+    proverka("владелец через форму с X-Kak: admin — все адреса владельца → 403", set(r) == {"403в"},
+             {k_: v[:5] for k_, v in r.items() if k_ != "403в"})
+    proverka("…/api/kto → права админа; блок «Входы» и /owner/vhody закрыты",
+             kto(boris, headers=KAK)["rol"] == "admin" and boris.get("/owner", headers={**STR, **KAK}).status_code == 403
+             and boris.post("/owner/vhody", data={"deystvie": "klyuch:klod", "moy_parol": P["boris"]},
+                            headers={**SVOI, **KAK}).status_code == 403 and not heshi()["klod"])
+    proverka("админа заголовок не повышает: Лена с X-Kak: admin и X-Kak: owner — те же 403 и та же Лена",
+             set(po_vsem(vl, metka=metka(lena), hdr=KAK)) == {"403в"}
+             and lena.get("/api/settings", headers={"x-kak": "owner"}).status_code == 403
+             and kto(lena, headers={"x-kak": "owner"})["rol"] == "admin" and login_kto(lena, headers=KAK) == "lena")
+    proverka("общий admin с X-Kak: admin на вновь закрытом адресе → 403 (без заголовка — 200)",
+             kl().get("/export/raw/rooms.json", auth=OBSHCHIY, headers=KAK).status_code == 403)
+
+
+def test_kto_voshel():
+    """37–39: имя с сервера, своя колонка пульта, журнал."""
+    print("37. Имя ставит сервер: галочки, заметки, «не дозвонилась»")
+    pult = importlib.import_module("app.pult")
+    day = pult.today()
+    lena, ira = kl(), kl()
+    voyti(lena, "lena", P["lena"])
+    voyti(ira, "ira", P["ira"])
+    J = {**SVOI, "content-type": "application/json"}
+    pult.set_tasks(day, "Лена", [{"t": "10:00", "text": "стенд В: задача с галочкой"},
+                                 {"t": "11:00", "text": "стенд В: позвонить 79990001122"},
+                                 {"t": "12:00", "text": "стенд В: задача общего входа"}])
+
+    def zadacha(tekst):
+        with osnovnaya() as o:
+            return dict(o.execute("SELECT * FROM pult_tasks WHERE day=? AND text LIKE ?", (day, f"%{tekst}%")).fetchone())
+
+    def punkt(iid):
+        with osnovnaya() as o:
+            return dict(o.execute("SELECT * FROM plan_inbox WHERE id=?", (iid,)).fetchone())
+    t1, t2, t3 = (zadacha(x)["id"] for x in ("с галочкой", "позвонить", "общего входа"))
+    slovo = "tayna-" + secrets.token_hex(6)                    # текст заметки — в журнал попасть не должен
+    r = lena.post("/api/pult/done", json={"id": t1, "state": 1, "who": "Ира", "note": slovo}, headers=J)
+    z = zadacha("с галочкой")
+    proverka("галочка Лены пишет done_by = Лена при who: Ира в запросе, и время",
+             r.status_code == 200 and (z["done"], z["done_by"]) == (1, "Лена") and re.match(r"\d{4}-\d\d-\d\dT\d\d:\d\d", z["done_ts"] or ""),
+             (r.status_code, z["done_by"], z["done_ts"]))
+    zh = _posl_zhurnal("/api/pult/done")
+    proverka("39. журнал: логин, способ входа, код и «что»; тела запроса (заметки) в строке нет",
+             zh[:5] == ("lena", "Лена", "forma", "POST", 200) and zh[5] == f"пункт смены {t1}: сделано" and slovo not in str(zh), zh)
+    with osnovnaya() as o:
+        adr = o.execute("SELECT adres, put FROM deystviya WHERE put='/api/pult/done' ORDER BY id DESC LIMIT 1").fetchone()
+        vse = " ".join(str(x) for r_ in o.execute("SELECT * FROM deystviya") for x in tuple(r_))
+    proverka("…в строке есть адрес посетителя и путь без запроса; заметки нет во всём журнале",
+             bool(adr["adres"]) and adr["put"] == "/api/pult/done" and slovo not in vse, tuple(adr))
+    lena.post("/api/pult/done", json={"id": t1, "state": 0}, headers=J)
+    z = zadacha("с галочкой")
+    proverka("снятая галочка стирает автора", (z["done"], z["done_by"], z["done_ts"]) == (0, None, None), z["done_by"])
+    kl().post("/api/pult/done", json={"id": t3, "state": 1, "who": "Ира"}, auth=OBSHCHIY)
+    kl().post("/api/pult/done", json={"id": t1, "state": 1}, auth=OBSHCHIY)
+    proverka("общий вход: имя — из запроса, как раньше; без имени — галочка без автора",
+             (zadacha("общего входа")["done_by"], zadacha("с галочкой")["done_by"]) == ("Ира", None))
+    r1 = ira.post("/api/pult/nedozvon", json={"kind": "task", "id": t2, "who": "Лена"}, headers=J).json()
+    r2 = lena.post("/api/pult/nedozvon", json={"kind": "task", "id": t2}, headers=J).json()
+    note = zadacha("позвонить")["note"]
+    proverka("«не дозвонилась (Ира ЧЧ:ММ)», потом «(Лена ЧЧ:ММ)»; счётчик попыток прежний: 1, 2",
+             (r1["попыток"], r2["попыток"]) == (1, 2) and re.search(r"не дозвонилась \(Ира \d\d:\d\d\) не дозвонилась \(Лена \d\d:\d\d\)", note)
+             and note.count("не дозвонилась") == 2, (r1, r2, note))
+    lena.post("/api/plan/inbox", json={"who": "Лена", "text": "стенд В: обещание 79990003344", "phone": "79990003344"}, headers=J)
+    lena.post("/api/plan/inbox", json={"who": "Лена", "text": "стенд В: второе обещание"}, headers=J)
+    with osnovnaya() as o:
+        i1, i2 = (o.execute("SELECT id FROM plan_inbox WHERE text LIKE ?", (f"%{x}%",)).fetchone()[0]
+                  for x in ("обещание 79990003344", "второе обещание"))
+    r = ira.post("/api/pult/nedozvon", json={"kind": "inbox", "id": i1}, headers=J).json()
+    proverka("пункт инбокса: попытка считается как раньше, рядом — кто набирал",
+             r["попыток"] == 1 and punkt(i1)["tries"] == 1 and re.match(r"Ира \d\d:\d\d$", punkt(i1)["tries_kto"] or ""), punkt(i1)["tries_kto"])
+    r = lena.post("/api/plan/inbox/note", json={"id": i1, "note": "договорились на четверг", "who": "Ира"}, headers=J)
+    proverka("заметка со штампом «✎ Лена ДД.ММ ЧЧ:ММ: …»",
+             r.status_code == 200 and re.search(r" · ✎ Лена \d\d\.\d\d \d\d:\d\d: договорились на четверг$", punkt(i1)["text"]),
+             punkt(i1)["text"][-60:])
+    r = ira.post("/api/plan/inbox/done", json={"id": i1, "done": True, "note": "записала", "who": "Лена"}, headers=J)
+    p_ = punkt(i1)
+    proverka("галочка Иры на пункте: done_by = Ира, время, заметка с её именем",
+             r.status_code == 200 and (p_["done"], p_["done_by"]) == (1, "Ира") and p_["done_ts"] and p_["text"].endswith(" — Ира: записала"),
+             (p_["done_by"], p_["text"][-30:]))
+    kl().post("/api/plan/inbox/note", json={"id": i2, "note": "без имени"}, auth=OBSHCHIY)
+    kl().post("/api/plan/inbox/done", json={"id": i2, "done": True, "note": "как раньше"}, auth=OBSHCHIY)
+    p_ = punkt(i2)
+    proverka("общий вход на пункте: штамп и заметка без имени, как раньше",
+             re.search(r" · ✎ \d\d\.\d\d \d\d:\d\d: без имени — как раньше$", p_["text"]) and p_["done_by"] is None, p_["text"][-50:])
+    ira.post("/api/plan/inbox/done", json={"id": i1, "done": False}, headers=J)
+    proverka("снятая галочка на пункте стирает автора", (punkt(i1)["done"], punkt(i1)["done_by"]) == (0, None))
+    ira.post("/api/plan/inbox/done", json={"id": i1, "done": True}, headers=J)
+    lena.post("/api/pult/done", json={"id": t1, "state": 1}, headers=J)
+
+    print("38. Пульт: своя колонка первой, имя в шапке, жёлтая полоса общего входа")
+
+    def kolonki(t):
+        return re.findall(r"<div class='nm'>([^<]+?)[ <]", t)
+    on = pult.duty(day)
+    t = ira.get("/pult", headers=STR).text
+    ko = kolonki(t)
+    proverka("Ира не в смене — её колонка всё равно первая, с пометкой «ваша колонка» и «не в смене»",
+             "Ира" not in on and ko[:1] == ["Ира"] and ko.count("Ира") == 1
+             and "ваша колонка</span> <span style='font-size:11px;color:#6c6a86;font-weight:500'>не в смене" in t, (on, ko))
+    t_l = lena.get("/pult", headers=STR).text
+    bez_formy = kolonki(kl().get("/pult", auth=STARYY_VLADELCA, headers=STR).text)
+    proverka("у Лены первой стоит её колонка; у пульта без входа через форму порядок прежний: смена, Лиза, Борис",
+             kolonki(t_l)[:1] == ["Лена"] and bez_formy[:len(on) + 2] == on + ["Лиза", "Борис"], (kolonki(t_l)[:3], bez_formy))
+    proverka("?who=Лена у Иры работает как раньше: одна колонка Лены",
+             kolonki(ira.get("/pult?who=Лена", headers=STR).text) == ["Лена"])
+    proverka("в шапке пульта: «Вы: Ира», её цвет, настоящая кнопка «Выйти / сменить» с возвратом на пульт",
+             "Вы: <b style='color:#E30613'>Ира</b>" in t and "action='/vyhod'" in t and "Выйти / сменить" in t
+             and "name='next' value='/pult'" in t)
+    proverka("…и «По графику: … · сейчас в системе: …» с теми, кто заходил",
+             "сейчас в системе:" in t and "По графику:" in t and "Лена (" in t.split("сейчас в системе:")[1][:200],
+             t.split("сейчас в системе:")[1][:120] if "сейчас в системе:" in t else "нет строки")
+    proverka("рядом со сделанным пунктом — «✓ Лена ЧЧ:ММ» и «✓ Ира ЧЧ:ММ»",
+             re.search(r"✓ Лена \d\d:\d\d", t_l) and re.search(r"✓ Ира \d\d:\d\d", t_l), re.findall(r"✓ [^<]{1,20}", t_l)[:5])
+    proverka("…а у задачи с попытками — кто набирал последним", re.search(r"не дозвонилась 2&nbsp;раза · Лена \d\d:\d\d", t_l))
+    t = kl().get("/pult", auth=OBSHCHIY, headers=STR).text
+    do = datetime.fromtimestamp(m.vhod._iz_iso(m.db.get_setting("vhod_starye_do")), m.vhod.MSK)
+    proverka("под общим входом, когда личные входы заведены, — жёлтая полоса с датой и ссылкой на /vhod",
+             f"Вы под общим входом. Он отключится {do.day:02d}.{do.month:02d}" in t and "войдите под своим именем" in t
+             and "href='/vhod?next=/pult'" in t and "ваша колонка" not in t, t[t.find("kto-polosa"):][:200] if "kto-polosa" in t else "нет")
+    t = lena.get("/leads", headers=STR).text
+    proverka("общая шапка (base.html): «Вы: Лена», кнопка выхода — над меню",
+             "Вы: <b style='color:#7DB928'>Лена</b>" in t and "action='/vyhod'" in t and t.index("kto-polosa") < t.index("<header"))
+    t = kl().get("/leads", auth=OBSHCHIY, headers=STR).text
+    proverka("…под общим входом — жёлтая полоса", "Вы под общим входом" in t and "kto-polosa obshchiy" in t)
+    r = vyyti_s_next(lena, "/pult")
+    proverka("«Выйти / сменить» из шапки: сеанс закрыт, форма входа вернёт на пульт",
+             r.status_code == 303 and r.headers["location"] == "/vhod?next=/pult" and lena.get("/api/kto").status_code == 401,
+             (r.status_code, r.headers.get("location")))
+    proverka("/obeshchaniya: вошедшая Ира попадает в свою колонку; who из адреса сильнее",
+             unquote(ira.get("/obeshchaniya").headers["location"]) == "/pult?who=Ира"
+             and unquote(ira.get("/obeshchaniya?who=Лена").headers["location"]) == "/pult?who=Лена")
+
+
+def vyyti_s_next(c, nxt):
+    return c.post("/vyhod", data={"next": nxt}, headers=SVOI)
+
+
+def test_perehod_konchilsya():
+    print("25. После первого запроса ключом рутин общий admin на вновь закрытых адресах → 403")
+    V = m.vhod
+    vl = vladelcheskie()
+    perehod = [(a, b) for a, b in vl if V._v_spiske(adres_puti(b), V.PEREHOD_ADMIN, V.PEREHOD_PREFIKS)]
+    with baza_vhodov() as b:
+        pz = b.execute("SELECT posl_zapros FROM vhody WHERE login='klod'").fetchone()[0]
+    r = po_vsem(perehod, auth=OBSHCHIY)
+    proverka("ключ рутин сработал — общий admin на всех вновь закрытых адресах получает 403, а не окно пароля",
+             bool(pz) and set(r) == {"403в"}, (pz, {k_: v[:4] for k_, v in r.items() if k_ != "403в"}))
+    r = kl().get("/export/raw/rooms.json", auth=OBSHCHIY)
+    proverka("общий admin: /export/raw/rooms.json → 403 JSON без WWW-Authenticate",
+             r.status_code == 403 and not r.headers.get("www-authenticate") and "detail" in r.json(), r.status_code)
+    proverka("…на адресах, закрытых и раньше, — по-прежнему 401 с окном; рабочие адреса открыты",
+             kl().get("/api/settings", auth=OBSHCHIY).status_code == 401
+             and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200
+             and kl().post("/api/audit/resolve?flag_id=0&status=ok", auth=OBSHCHIY).status_code != 403)
+
+
+def test_prava_klyuchey(klyuchi):
+    """32, 33, 35, 36, 39, 40 — служебные ключи. Старые входы к этому времени выключены."""
+    chasy(None)
+    kv, k_rutin = klyuchi[0], klyuchi[-1]
+    KV, KR = bear(kv), bear(k_rutin)
+    V = m.vhod
+    vm = vhod_marshrutov()
+    vl = vladelcheskie()
+    m.db.set_setting("vhod_okno_vykladki_do", V._iso(time.time() - 60))      # аварийное окно закрыто
+    print("33. Ключ рутин: только свой список")
+    proverka("оба ключа рабочие", (login_kto(kl(), headers=KR), login_kto(kl(), headers=KV)) == ("klod", "klod-vykladka"))
+    puti_vl = {adres_puti(b) for _, b in vl}
+    proverka("каждый путь из SLUZH_TOCHNO есть среди маршрутов под входом владельца",
+             V.SLUZH_TOCHNO <= puti_vl, sorted(V.SLUZH_TOCHNO - puti_vl))
+    proverka("каждое начало из SLUZH_PREFIKS — тоже",
+             all(any(p_ == x or p_.startswith(x + "/") for p_ in puti_vl) for x in V.SLUZH_PREFIKS))
+    razresh = [(a, b) for a, b in vl if V._v_spiske(adres_puti(b), V.SLUZH_TOCHNO, V.SLUZH_PREFIKS)]
+    r = po_vsem(razresh, hdr=KR)
+    proverka(f"ключ рутин проходит все {len(razresh)} адресов своего списка: не 401 и не 403", set(r) == {200},
+             {k_: v for k_, v in r.items() if k_ != 200})
+    ostalnye = [x for x in vl if x not in razresh]
+    r = po_vsem(ostalnye, hdr=KR)
+    proverka(f"…а на остальных {len(ostalnye)} адресах владельца — 403", set(r) == {"403в"},
+             {k_: v[:5] for k_, v in r.items() if k_ != "403в"})
+    zakr = [("POST", "/api/ads/vk-users-list"), ("POST", "/api/ads/vk/image"), ("POST", "/api/mkweb/open"),
+            ("GET", "/owner"), ("POST", "/owner"), ("POST", "/owner/vhody"), ("GET", "/settings"), ("POST", "/settings/test"),
+            ("POST", "/api/boris-docs/arhiv"), ("GET", "/api/bonusy"), ("POST", "/api/chaty/send"),
+            ("POST", "/api/istochniki/spravochnik"), ("POST", "/api/audit/run")]
+    proverka("поимённо: /api/ads/vk-users-list, /api/ads/vk/image, /api/mkweb/open, /owner, /settings и другие → 403",
+             all(f"{a} {b}" in vm for a, b in zakr) and set(po_vsem(zakr, hdr=KR)) == {"403в"}, po_vsem(zakr, hdr=KR))
+    opis = _spisok(OPIS_RUTIN)
+    net = [x for x in opis if f"{x[0]} {x[1]}" not in vm]
+    proverka(f"опись рутин: все {len(opis)} адресов существуют", not net, net)
+    plohie = [(a, b, dopusk(a, b, hdr=KR, chem=vm[f"{a} {b}"] if vm[f"{a} {b}"] == "owner" else "auth"))
+              for a, b in opis if f"{a} {b}" in vm]
+    plohie = [x for x in plohie if x[2] != 200]
+    proverka("каждый адрес из описи рутин ключу рутин доступен", not plohie, plohie)
+    kody = [kl().get(a, headers=KR).status_code for a in ("/export/raw/rooms.json", "/api/vhod/sostoyanie",
+                                                          "/api/boris-docs", "/boris/docs", "/api/pult/tasks")]
+    proverka("…и настоящими запросами: /export/raw/rooms.json, состояние входов, документы владельца, пульт → 200",
+             kody == [200] * 5, kody)
+    proverka("ключ рутин с Basic klod:<ключ> — те же права",
+             kl().get("/export/raw/rooms.json", auth=("klod", k_rutin)).status_code == 200
+             and kl().get("/api/settings", auth=("klod", k_rutin)).status_code == 403)
+
+    print("32. Выкладка, перезапуск, копия базы, настройки — ключи")
+    ad4 = [("POST", "/api/deploy"), ("POST", "/api/restart"), ("GET", "/api/backup/db"), ("GET", "/api/settings"),
+           ("POST", "/api/settings")]
+    boris, lena = kl(), kl()
+    voyti(boris, "boris", P["boris"])
+    voyti(lena, "lena", P["lena"])
+    proverka("/api/deploy с пустым телом: ключ выкладки → 400; ключ рутин → 403; владелец через форму → 403; админ → 403",
+             (kl().post("/api/deploy", content=b"", headers=KV).status_code,
+              kl().post("/api/deploy", content=b"", headers=KR).status_code,
+              boris.post("/api/deploy", content=b"", headers=SVOI).status_code,
+              lena.post("/api/deploy", content=b"", headers=SVOI).status_code) == (400, 403, 403, 403))
+    proverka("…то же для перезапуска, копии базы и настроек: ключ выкладки — да, остальные — 403",
+             (set(po_vsem(ad4, hdr=KV)), set(po_vsem(ad4, hdr=KR)), set(po_vsem(ad4, metka=metka(boris))),
+              set(po_vsem(ad4, metka=metka(lena)))) == ({200}, {"403в"}, {"403в"}, {"403в"}))
+    proverka("прежний пароль владельца и общий admin уже не действуют нигде",
+             (set(po_vsem(ad4, auth=STARYY_VLADELCA)), set(po_vsem(ad4, auth=OBSHCHIY))) == ({401}, {401}))
+    r = po_vsem(vl, hdr=KV)
+    zakryto = {x.split(" ", 1)[1] for x in r.get("403в", [])}
+    proverka("ключ выкладки проходит весь API владельца; страницы /owner, /owner/vhody, /settings, /settings/test — 403",
+             set(r) == {200, "403в"} and zakryto == set(V.TOLKO_CHELOVEK), (sorted(zakryto), [k_ for k_ in r if k_ not in (200, "403в")]))
+    proverka("…настоящим запросом: настройки читает, /owner — 403",
+             kl().get("/api/settings", headers=KV).status_code == 200 and kl().get("/owner", headers=KV).status_code == 403)
+
+    print("35. X-Kak: admin понижает оба ключа")
+    KAK = {"x-kak": "admin"}
+    proverka("ключ выкладки и ключ рутин с X-Kak: admin — все адреса владельца → 403",
+             set(po_vsem(vl, hdr={**KV, **KAK})) == {"403в"} and set(po_vsem(vl, hdr={**KR, **KAK})) == {"403в"})
+    proverka("…пять страниц владельца ключом выкладки с X-Kak → 403; рабочие адреса открыты; /api/kto → права админа",
+             [kl().get(a, headers={**KV, **KAK, **STR}).status_code for a in ("/owner", "/settings", "/journal", "/istochniki", "/audit")]
+             == [403] * 5 and kl().get("/api/pult/tasks", headers={**KV, **KAK}).status_code == 200
+             and kto(kl(), headers={**KV, **KAK}) == {"login": "klod-vykladka", "imya": "Клод (выкладка)", "rol": "admin",
+                                                     "sposob": "klyuch"})
+    proverka("…выкладка с X-Kak: admin не проходит даже ключом выкладки",
+             kl().post("/api/deploy", content=b"", headers={**KV, **KAK}).status_code == 403)
+
+    print("39. Отказ ключу рутин виден владельцу")
+    def otkazov(put):
+        with osnovnaya() as o:
+            return o.execute("SELECT COUNT(*) FROM deystviya WHERE login='klod' AND kod=403 AND put=?", (put,)).fetchone()[0]
+    do = (otkazov("/api/bonusy"), otkazov("/api/chaty/send"))
+    kl().get("/api/bonusy", headers=KR)
+    kl().get("/api/bonusy", headers=KR)
+    kl().post("/api/chaty/send", headers=KR)
+    kl().get("/api/bonusy", headers={**KR, **KAK})          # проверка «как админ» в отказы Клоду не идёт
+    posle = (otkazov("/api/bonusy"), otkazov("/api/chaty/send"))
+    proverka("отказы ключу рутин в журнале: /api/bonusy — 2 раза, /api/chaty/send — 1 раз (чтение и запись — по одной строке)",
+             (posle[0] - do[0], posle[1] - do[1]) == (2, 1), (do, posle))
+    sost = {x["put"]: x["n"] for x in boris.get("/api/vhod/sostoyanie").json()["klodu_otkazano"]}
+    proverka("«Клоду отказано» в состоянии входов: /api/bonusy с тем же числом", sost.get("/api/bonusy") == posle[0], sost.get("/api/bonusy"))
+    proverka("…и на странице /owner", "/api/bonusy" in boris.get("/owner", headers=STR).text)
+    zh = _posl_zhurnal("/api/chaty/send")
+    proverka("…в журнале: Клод, ключ, 403, «отказ: адрес закрыт ключу рутин»",
+             zh == ("klod", "Клод", "klyuch", "POST", 403, "отказ: адрес закрыт ключу рутин"), zh)
+
+    print("37. Отметка ключом рутин")
+    pult = importlib.import_module("app.pult")
+    day = pult.today()
+    pult.set_tasks(day, "Ира", [{"t": "13:00", "text": "стенд В: задача для Клода"}], replace=False)
+    with osnovnaya() as o:
+        tid = o.execute("SELECT id FROM pult_tasks WHERE text LIKE '%задача для Клода%'").fetchone()[0]
+    kl().post("/api/pult/done", json={"id": tid, "state": 1, "who": "Лена"}, headers={**KR, "x-rutina": "bystraya-proverka"})
+    with osnovnaya() as o:
+        by = o.execute("SELECT done_by FROM pult_tasks WHERE id=?", (tid,)).fetchone()[0]
+        rut = o.execute("SELECT imya, rutina FROM deystviya WHERE put='/api/pult/done' ORDER BY id DESC LIMIT 1").fetchone()
+    proverka("отметка ключом рутин с who: Лена — «Клод за Лену»; в журнале — Клод и рутина из X-Rutina",
+             by == "Клод за Лену" and tuple(rut) == ("Клод", "bystraya-proverka"), (by, tuple(rut)))
+    kl().post("/api/pult/done", json={"id": tid, "state": 1}, headers=KR)
+    with osnovnaya() as o:
+        by = o.execute("SELECT done_by FROM pult_tasks WHERE id=?", (tid,)).fetchone()[0]
+    proverka("…без имени в запросе — «Клод»", by == "Клод", by)
+
+    print("36. Аварийное окно выкладки")
+    try:
+        m.db.set_setting("vhod_okno_vykladki_do", V._iso(time.time() + 3600))
+        proverka("в окне: ключ рутин на /api/deploy с пустым телом → 400 (вход есть, архива нет)",
+                 kl().post("/api/deploy", content=b"", headers=KR).status_code == 400)
+        proverka("…перезапуск — можно; копия базы и настройки — 403 всегда",
+                 [dopusk(a, b, hdr=KR) for a, b in ad4] == [200, 200, "403в", "403в", "403в"],
+                 [dopusk(a, b, hdr=KR) for a, b in ad4])
+        proverka("…окно не открывает выкладку админу и владельцу через форму",
+                 (dopusk("POST", "/api/deploy", metka=metka(lena), hdr=SVOI), dopusk("POST", "/api/deploy", metka=metka(boris), hdr=SVOI))
+                 == ("403в", "403в"))
+        do = len(vazhnoe())
+        with _BezPerezapuska() as bp:
+            r = kl().post("/api/deploy", content=_arhiv(), headers=KR)
+        vz = vazhnoe()[do:]
+        proverka("40. выкладка ключом рутин в окне проходит и оставляет «Важное»: чем и что",
+                 r.status_code == 200 and len(vz) == 1 and "выкладка кода: 1 файлов" in vz[0]
+                 and "ключ рутин, аварийное окно" in vz[0] and bp.zvali == ["extractall", "timer"], (r.status_code, vz, bp.zvali))
+        chasy(time.time() + 3700)
+        proverka("после окна: ключ рутин на /api/deploy → 403", kl().post("/api/deploy", content=b"", headers=KR).status_code == 403)
+    finally:
+        chasy(None)
+        m.db.set_setting("vhod_okno_vykladki_do", V._iso(time.time() - 60))
+
+    print("40. Выкладка и копия базы оставляют строку «Важное»")
+    do = len(vazhnoe())
+    with _BezPerezapuska() as bp:
+        r = kl().post("/api/deploy", content=_arhiv(), headers=KV)
+        r2 = kl().post("/api/restart", headers=KV)
+    r3 = kl().get("/api/backup/db", headers=KV)
+    r4 = kl().get("/api/backup/db", headers=KV)
+    vz = vazhnoe()[do:]
+    proverka("ключ выкладки: выкладка, перезапуск, две копии базы — четыре строки «Важное»",
+             (r.status_code, r2.status_code, r3.status_code, r4.status_code) == (200,) * 4 and len(vz) == 4
+             and "выкладка кода: 1 файлов" in vz[0] and "перезапуск службы" in vz[1] and "копия базы выгружена" in vz[2]
+             and "вторая за сутки" in vz[3] and all("Клод (выкладка)" in x and "адрес " in x for x in vz), vz)
+    proverka("…строки видны владельцу на /owner и в состоянии входов",
+             "выкладка кода" in boris.get("/owner", headers=STR).text
+             and any("копия базы" in x["chto"] for x in boris.get("/api/vhod/sostoyanie").json()["vazhnoe"]))
+    with osnovnaya() as o:
+        zh = o.execute("SELECT login, kod, chto FROM deystviya WHERE put='/api/deploy' AND kod=200 ORDER BY id DESC LIMIT 1").fetchone()
+    proverka("…а сама выкладка — в журнале действий: кто и сколько файлов",
+             tuple(zh) == ("klod-vykladka", 200, "выкладка: 1 файлов"), tuple(zh))
+
+
 def _lovushki_na_vse():
     import app
     for mod in pkgutil.iter_modules(app.__path__):
@@ -1521,6 +2139,7 @@ def main():
     logging.getLogger().addHandler(_zh)           # и всё, что сервер пишет в свой журнал
     test_kak_segodnya()
     test_obhod()
+    test_prava_v_den_vykladki()     # группа В: пока входы не заведены, права прежние
     test_vladelec_paroli()          # пароли задаёт сам владелец на /owner (действие 1 из 7.2)
     for lg in ("lena", "ira", "liza", "boris"):
         proverka(f"пароль задан: {lg}", bool(P.get(lg)) and heshi()[lg].startswith("pbkdf2_sha256$"))
@@ -1530,6 +2149,8 @@ def main():
     proverka("старые входы после заведения работают по-прежнему",
              (kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code,
               kl().get("/api/settings", auth=STARYY_VLADELCA).status_code) == (200, 200))
+    test_prava_lyudey()             # группа В: 31, 32, 34, 35 — люди; ключей ещё нет
+    test_kto_voshel()               # группа В: 37–39 — имя с сервера, своя колонка, журнал
     test_stranica()
     test_bez_vhoda()
     test_metka()
@@ -1540,6 +2161,7 @@ def main():
     test_metka_i_staryy()
     test_podpis()
     klyuch = test_chuzhoy()
+    test_perehod_konchilsya()       # 25, вторая половина: ключ рутин сработал — общему admin закрыто
     test_perebor(klyuch)
     test_raskladka()
     test_next()
@@ -1550,7 +2172,8 @@ def main():
     test_vhod_js()
     test_avtomatika()
     test_sboy(work)
-    test_upravlenie(klyuch, work)
+    klyuchi = test_upravlenie(klyuch, work)
+    test_prava_klyuchey(klyuchi)    # группа В: 32, 33, 35, 36, 39, 40 — служебные ключи
     test_sledy(klyuch, work)
     test_hranenie(work)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)

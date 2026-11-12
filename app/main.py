@@ -194,6 +194,24 @@ async def _na_formu_vhoda(request: Request, exc: vhod.NuzhenVhod):
     return RedirectResponse(exc.kuda, status_code=303)
 
 
+class TolkoVladelcu(Exception):
+    """Вход есть, но адрес владельца этому вошедшему закрыт (check_owner) → 403."""
+
+    def __init__(self, detail: str = "Только для владельца"):
+        self.detail = detail
+
+
+@app.exception_handler(TolkoVladelcu)
+async def _tolko_vladelcu(request: Request, exc: TolkoVladelcu):
+    """Админ на адресе владельца видит страницу «Только для владельца · ← На пульт», а не
+    окно пароля: окно на знакомом адресе читается как «сайт сломался». Запросу со страницы
+    и скрипту — JSON с тем же кодом 403."""
+    if request.method in ("GET", "HEAD") and "text/html" in (request.headers.get("accept") or ""):
+        return HTMLResponse(vhod.stranica_otkaza(vhod.iz(request)), status_code=403,
+                            headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY"})
+    return JSONResponse({"detail": exc.detail}, status_code=403)
+
+
 def _zapomnit(request: Request | None, rol: str) -> None:
     """Проверка входа оставляет роль в запросе: меню и стартовая страница читают её
     оттуда и пароль второй раз не сверяют. Прямой вызов без request — как раньше."""
@@ -250,8 +268,11 @@ def check_owner(credentials: HTTPBasicCredentials | None = Depends(_security),
     admin знают все админы, поэтому настройки с ключами банка, кассы и МойКласса,
     браузер МойКласса и деплой закрыты отдельным паролем.
 
-    12.11.2026, личные входы: вход — как в check_auth, затем vhod.mozhno_vladelcu().
-    Нельзя — 403 «Только для владельца». Исключение: общий admin в сером окне получает 401
+    12.11.2026, личные входы: вход — как в check_auth, затем vhod.mozhno_vladelcu() (права
+    по разделу 5 плана: владелец, ключ выкладки, ключ рутин по списку, общий admin по списку
+    вновь закрытых адресов, пока ключ рутин ни разу не сработал).
+    Нельзя — 403: странице — «Только для владельца · ← На пульт», запросу — JSON (_tolko_vladelcu).
+    Исключение: общий admin в сером окне на адресах, закрытых и до 12.11, получает 401
     с окном пароля, как раньше, — так владелец привычно переключается на boris.
     Пока пароль владельца не задан и входы не заводились, общий admin — владелец (как раньше)."""
     if request is None:
@@ -265,10 +286,23 @@ def check_owner(credentials: HTTPBasicCredentials | None = Depends(_security),
         vhod.otkaz(request)
     request.state.kto = k
     if not vhod.mozhno_vladelcu(k, request.method, request.url.path):
-        if k["sposob"] == "staryy" and k["login"] == "admin":
+        put = request.url.path
+        if (k["sposob"] == "staryy" and k["login"] == "admin" and not k.get("kak")
+                and not vhod._v_spiske(vhod._put_norm(put), vhod.PEREHOD_ADMIN, vhod.PEREHOD_PREFIKS)):
             raise HTTPException(status_code=401, detail="Только для владельца",
                                 headers={"WWW-Authenticate": "Basic"})
-        raise HTTPException(status_code=403, detail="Только для владельца")
+        _zapomnit(request, vhod.rol_menyu(k))
+        if k["rol"] == "sluzh":
+            # Отказ ключу рутин виден владельцу на /owner строкой «Клоду отказано»: по ней в
+            # первые дни понятно, какого адреса не хватает в списке. Изменяющий запрос запишет
+            # слой _vhod_sloy, чтение — пишем здесь.
+            request.state.chto = "отказ: адрес закрыт ключу рутин"
+            if request.method.upper() in vhod.BEZOPASNYE:
+                try:
+                    vhod.sled(request, request.state.chto, kod=403)
+                except Exception:  # noqa: BLE001
+                    logging.getLogger("kidsup.vhod").exception("отказ ключу рутин не записан")
+        raise TolkoVladelcu(vhod.tekst_otkaza(k))
     _zapomnit(request, vhod.rol_menyu(k))
 
 
@@ -325,6 +359,18 @@ def _vladelcu(request: Request):
         return RedirectResponse("/pult", status_code=303)
 
 
+def _kto_shapka(request: Request):
+    from markupsafe import Markup
+    try:
+        from .pult import COLOR
+        k = vhod.iz(request)
+        q = request.url.query
+        return Markup(vhod.shapka(k, request.url.path + ("?" + q if q else ""), COLOR.get(k.get("imya") or "", "#312783")))
+    except Exception:  # noqa: BLE001 — шапка страницу не ломает
+        logging.getLogger("kidsup.vhod").exception("шапка «кто вошёл»")
+        return Markup("")
+
+
 def render(request: Request, template: str, **ctx) -> HTMLResponse:
     counts = db.table_counts()
     rol = _rol(request)
@@ -339,6 +385,8 @@ def render(request: Request, template: str, **ctx) -> HTMLResponse:
         "menu": nav.menu(rol),
         # 12.11.2026, личные входы: кто вошёл — для имени в шапке
         "kto": vhod.iz(request),
+        # полоска «Вы: Лена · Выйти / сменить» или жёлтая «Вы под общим входом» (vhod.shapka)
+        "kto_shapka": _kto_shapka(request),
     })
     return templates.TemplateResponse(request, template, ctx)
 
@@ -2831,14 +2879,17 @@ def api_boris_status(payload: dict = Body(...)):
 def pult_page(request: Request, day: str = "", who: str = ""):
     """Пульт смены: задачи по тем, кто сегодня работает, + Лиза и Борис, живые блоки (06.09)."""
     from . import pult
-    return HTMLResponse(pult.page(day, who, rol=_rol(request)))
+    return HTMLResponse(pult.page(day, who, rol=_rol(request), kto=vhod.iz(request)))
 
 
 @app.get("/obeshchaniya", dependencies=AUTH)
-def obeshchaniya_perehod(day: str = "", who: str = "Лиза"):
+def obeshchaniya_perehod(request: Request, day: str = "", who: str = ""):
     """Обещания клиентам одного человека теперь в его колонке пульта (решение 08.09:
     «всё на одной странице»); отдельная страница убрана 12.11.2026. Имя и день
-    переносим — без них человек попал бы на общий пульт."""
+    переносим — без них человек попал бы на общий пульт.
+    Личные входы: без who в адресе — колонка вошедшего; под общим входом — Лиза, как раньше."""
+    k = vhod.iz(request)
+    who = who or (k["imya"] if k.get("sposob") == "forma" and k.get("imya") in KOLONKI_PULTA else "") or "Лиза"
     return RedirectResponse(f"/pult?who={quote(who)}" + (f"&day={quote(day)}" if day else ""),
                             status_code=303)
 
@@ -3013,7 +3064,7 @@ def api_pult_tasks_set(payload: dict = Body(...)):
 
 
 @app.post("/api/pult/done", dependencies=AUTH)
-def api_pult_done(payload: dict = Body(...)):
+def api_pult_done(request: Request, payload: dict = Body(...)):
     """Галочка на деле смены. Если дело про один конкретный телефон, галочка
     должна за чем-то стоять: разговор от 30 секунд, отправленное сообщение
     или заметка своими словами. То же правило, что владелец принял 21.09 для
@@ -3029,14 +3080,19 @@ def api_pult_done(payload: dict = Body(...)):
     # возврата на весь пульт по своей инициативе — и она стала мешать: дело,
     # сделанное вчера или закрытое звонком не с нашего номера, отказывалось
     # закрываться. Решение владельца касалось обзвона бывших, там она и живёт.
-    return {"ok": pult.mark(tid, state, note)}
+    # Личные входы: кто поставил галочку, решает сервер — человеку всегда его имя, что бы ни
+    # стояло в запросе; ключу рутин — «Клод» или «Клод за Лену»; общему входу — как прислано.
+    request.state.chto = f"пункт смены {tid}: " + {0: "снята галочка", 1: "сделано", 2: "перенос на завтра"}.get(state, str(state))
+    return {"ok": pult.mark(tid, state, note, kto=vhod.podpis(request, str(payload.get("who") or "")))}
 
 
 @app.post("/api/pult/nedozvon", dependencies=AUTH)
-def api_pult_nedozvon(payload: dict = Body(...)):
+def api_pult_nedozvon(request: Request, payload: dict = Body(...)):
     """Исход «набрала — не дозвонилась»: {"kind": "task|inbox", "id": 123}."""
     from . import pult
-    return pult.nedozvon(str(payload.get("kind") or "inbox"), int(payload.get("id") or 0))
+    request.state.chto = f"не дозвонилась: {payload.get('kind') or 'inbox'} {payload.get('id') or 0}"
+    return pult.nedozvon(str(payload.get("kind") or "inbox"), int(payload.get("id") or 0),
+                         kto=vhod.podpis(request, str(payload.get("who") or "")))
 
 
 @app.get("/karta", response_class=HTMLResponse, dependencies=AUTH)
@@ -3074,6 +3130,8 @@ def grid_page(request: Request, course: int = 0, all: int = 0):
                   course=course, show_all=bool(all))
 
 
+# Остаётся под общим входом: решение Бориса 28.10 «промоутерами управляют админы» —
+# на страницу ведёт ссылка «← Эффективность промоутеров» с их графика /promo/grafik.
 @app.get("/promo", response_class=HTMLResponse, dependencies=AUTH)
 def promo_page(request: Request):
     from . import promo
@@ -3126,7 +3184,7 @@ def leads_push(lead_id: int):
     return {"ok": ok, "message": msg}
 
 
-@app.get("/export/leads.csv", dependencies=AUTH)
+@app.get("/export/leads.csv", dependencies=OWNER_AUTH)
 def export_leads():
     rows = leads.recent(limit=10000)
     return _csv_response(
@@ -3207,7 +3265,7 @@ def export_payments(date_from: str = "", date_to: str = ""):
         [tuple(r) for r in rows])
 
 
-@app.get("/export/lessons.csv", dependencies=AUTH)
+@app.get("/export/lessons.csv", dependencies=OWNER_AUTH)
 def export_lessons():
     with db.get_conn() as conn:
         rows = conn.execute(
@@ -3224,7 +3282,7 @@ def export_lessons():
         [tuple(r) for r in rows])
 
 
-@app.get("/export/attendance.csv", dependencies=AUTH)
+@app.get("/export/attendance.csv", dependencies=OWNER_AUTH)
 def export_attendance():
     with db.get_conn() as conn:
         rows = conn.execute(
@@ -3240,7 +3298,7 @@ def export_attendance():
         [tuple(r) for r in rows])
 
 
-@app.get("/export/raw/{table}.json", dependencies=AUTH)
+@app.get("/export/raw/{table}.json", dependencies=OWNER_AUTH)
 def export_raw(table: str):
     allowed = {"users", "joins", "payments", "invoices", "classes", "courses",
                "filials", "managers", "subscriptions", "user_subscriptions",
@@ -3835,7 +3893,8 @@ def nezvonili_page(request: Request, since: str = "", until: str = ""):
 
 # 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
 # «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
-# Ни рутины, ни автопилот её не открывают; /api/istochniki остаётся под общим входом.
+# Ни рутины, ни автопилот её не открывают. 12.11.2026, личные входы: /api/istochniki тоже
+# только владельцу (и ключу рутин — для вечерней сводки); общий admin — см. vhod.PEREHOD_ADMIN.
 @app.get("/istochniki", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def istochniki_page(request: Request, since: str = "", until: str = ""):
     """Откуда заявки и что из них вышло."""
@@ -3936,14 +3995,14 @@ def api_tvoyklass_status():
     return tvoyklass.status()
 
 
-@app.get("/api/istochniki", dependencies=AUTH)
+@app.get("/api/istochniki", dependencies=OWNER_AUTH)
 def api_istochniki(since: str = "", until: str = ""):
     """Откуда пришли заявки и что из них вышло. Чтение."""
     from . import istochniki
     return istochniki.otchet(since, until)
 
 
-@app.post("/api/istochniki/spravochnik", dependencies=AUTH)
+@app.post("/api/istochniki/spravochnik", dependencies=OWNER_AUTH)
 def api_istochniki_spravochnik():
     """Подтянуть справочник источников заявок из МойКласса."""
     from . import istochniki
@@ -4307,7 +4366,7 @@ def api_kadry_ocenka(payload: dict = Body(...)):
                         None if v is None else int(v), str(payload.get("note") or ""))
 
 
-@app.get("/kadry/file/{day}/{name}", dependencies=AUTH)
+@app.get("/kadry/file/{day}/{name}", dependencies=OWNER_AUTH)
 def kadry_file(day: str, name: str):
     from . import kadry
     if not re.fullmatch(r"\d{4}-\d\d-\d\d", day) or not re.fullmatch(r"[\w.-]+\.png", name):
@@ -4384,7 +4443,7 @@ def _sverka_den(day: str, code: int) -> str | None:
         raise HTTPException(code, "нет такого дня" if code == 404 else "day: нужна дата ГГГГ-ММ-ДД")
 
 
-@app.get("/api/sverka-chestnosti", dependencies=AUTH)
+@app.get("/api/sverka-chestnosti", dependencies=OWNER_AUTH)
 def api_sverka_chestnosti(day: str = ""):
     from . import sverka_chestnosti
     return sverka_chestnosti.load(_sverka_den(day, 404))
@@ -4407,7 +4466,8 @@ def api_sverka_chestnosti_run(day: str = "", dry: int = 1):
 
 # 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
 # «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
-# Ни рутины, ни автопилот её не открывают; /api/sverka-chestnosti остаётся под общим входом.
+# Ни рутины, ни автопилот её не открывают. 12.11.2026, личные входы: /api/sverka-chestnosti
+# тоже только владельцу; общий admin — см. vhod.PEREHOD_ADMIN.
 @app.get("/sverka-chestnosti", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def sverka_chestnosti_page(day: str = ""):
     from . import sverka_chestnosti
@@ -4662,7 +4722,7 @@ async def go_messenger(channel: str, request: Request):
     return RedirectResponse(target, status_code=302)
 
 
-@app.get("/clicks", response_class=HTMLResponse, dependencies=AUTH)
+@app.get("/clicks", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def clicks_page(request: Request):
     """Клики по кнопкам мессенджеров и то, с каким обращением они склеились."""
     with db.get_conn() as conn:
@@ -4961,6 +5021,29 @@ async def api_ai_dialog(payload: dict):
     return {"разбор": brain.read_dialog(ms)}
 
 
+_POSL_VYKLADKA = [0.0]      # когда была последняя выкладка — чтобы перезапуск следом не слал второе сообщение
+
+
+def _vazhnoe_servera(request: Request, chto: str, soobshchit: bool = True) -> None:
+    """Выкладка, перезапуск, копия базы оставляют строку «Важное» (её видно на /owner):
+    что сделано, каким входом, с какого адреса. Сообщение владельцу — когда действие сделано
+    служебным ключом (после перехода — всегда; украденный ключ не поменяет код молча).
+    Прежним паролем владельца — только строка: в день выкладки для него ничего не меняется.
+    Сбой записи самому действию не мешает."""
+    try:
+        k = vhod.iz(request)
+        kem = vhod.imya_v_zhurnal(k) or "неизвестно кто"
+        if k.get("rol") == "sluzh":
+            kem += " (ключ рутин, аварийное окно)"
+        tekst = f"{chto} · {kem} · адрес {vhod.adres(request)}"
+        if soobshchit and k.get("sposob") == "klyuch":
+            vhod.soobshchit_borisu("app.kidsup.ru: " + tekst, tekst)
+        else:
+            vhod.otmetit_vazhnoe(tekst, imya=kem)
+    except Exception:  # noqa: BLE001
+        logging.getLogger("kidsup.vhod").exception("строка «Важное» не записана")
+
+
 @app.post("/api/deploy", dependencies=OWNER_AUTH)
 async def api_deploy(request: Request):
     """Самообновление: тело запроса — tar.gz с app/ и requirements.txt.
@@ -4985,6 +5068,9 @@ async def api_deploy(request: Request):
                      or n.startswith("app/") or n.startswith("docs/")):
             raise HTTPException(400, f"недопустимый путь в архиве: {n}")
     tar.extractall(root)  # noqa: S202 — пути проверены выше
+    _POSL_VYKLADKA[0] = time.time()
+    request.state.chto = f"выкладка: {len(names)} файлов"
+    _vazhnoe_servera(request, f"выкладка кода: {len(names)} файлов, перезапуск")
     threading.Timer(2.0, lambda: subprocess.Popen(
         ["systemctl", "restart", "kidsup"])).start()
     logging.getLogger("kidsup.deploy").info(
@@ -4994,17 +5080,20 @@ async def api_deploy(request: Request):
 
 
 @app.post("/api/restart", dependencies=OWNER_AUTH)
-async def api_restart():
+async def api_restart(request: Request):
     """Перезапуск службы (после deploy или при зависании фоновых потоков)."""
     import threading
     import subprocess
+    request.state.chto = "перезапуск службы"
+    # перезапуск в первые 10 минут после выкладки — её часть: строка есть, второго сообщения нет
+    _vazhnoe_servera(request, "перезапуск службы", soobshchit=time.time() - _POSL_VYKLADKA[0] > 600)
     threading.Timer(1.0, lambda: subprocess.Popen(
         ["systemctl", "restart", "kidsup"])).start()
     return {"ok": True, "restarting": True}
 
 
 @app.get("/api/backup/db", dependencies=OWNER_AUTH)
-def api_backup_db():
+def api_backup_db(request: Request):
     """Полная копия базы сервера (пульт, звонки, кадры, настройки, зеркало МойКласса)
     одним .db.gz — для хранения вне дата-центра.
 
@@ -5025,6 +5114,18 @@ def api_backup_db():
             dst.close()
             src.close()
         data = gzip.compress(kopiya.read_bytes(), compresslevel=6)
+    # Строка «Важное» — всегда. Сообщение владельцу — со второй выгрузки за сутки
+    # (первая — плановая ночная) и только когда копию снял служебный ключ.
+    vtoraya = False
+    try:
+        with db.get_conn() as c:
+            vhod._zhurnal_init(c)
+            vtoraya = c.execute("SELECT 1 FROM deystviya WHERE vazhnoe=1 AND chto LIKE 'копия базы%' AND ts>? LIMIT 1",
+                                (vhod._iso(vhod.seychas() - 86400),)).fetchone() is not None
+    except Exception:  # noqa: BLE001
+        logging.getLogger("kidsup.vhod").exception("прошлые копии базы не прочитаны")
+    _vazhnoe_servera(request, f"копия базы выгружена: {len(data) // 1024} КБ"
+                              + (" — вторая за сутки" if vtoraya else ""), soobshchit=vtoraya)
     imya = f"kidsup_db_{datetime.now().strftime('%Y-%m-%d_%H%M')}.db.gz"
     return Response(content=data, media_type="application/gzip",
                     headers={"Content-Disposition": f'attachment; filename="{imya}"'})
@@ -6906,10 +7007,20 @@ def _days_param(days: str) -> list[str] | None:
 KOLONKI_PULTA = {"Аня", "Лена", "Ира", "Лиза", "Борис"}
 
 
+_INBOX_KOLONKI: set = set()
+
+
 def _inbox_init(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS plan_inbox (
         id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT, who TEXT,
         text TEXT, phone TEXT, source TEXT, done INTEGER DEFAULT 0)""")
+    # 12.11.2026, личные входы: кто и когда поставил галочку
+    if str(config.DB_PATH) not in _INBOX_KOLONKI:
+        est = {r[1] for r in conn.execute("PRAGMA table_info(plan_inbox)")}
+        for col in ("done_by", "done_ts"):
+            if col not in est:
+                conn.execute(f"ALTER TABLE plan_inbox ADD COLUMN {col} TEXT")
+        _INBOX_KOLONKI.add(str(config.DB_PATH))
 
 
 @app.post("/api/plan/inbox", dependencies=AUTH)
@@ -7148,25 +7259,31 @@ def api_plan_inbox_list(day: str = ""):
 
 
 @app.post("/api/plan/inbox/done", dependencies=AUTH)
-def api_plan_inbox_done(payload: dict = Body(...)):
+def api_plan_inbox_done(request: Request, payload: dict = Body(...)):
     """Галочка на деле, прилетевшем за день. Правило то же, что у задач смены:
     если дело про один телефон — нужен разговор, сообщение или заметка."""
     from . import pult
     done = bool(payload.get("done", True))
     iid = int(payload.get("id") or 0)
     note = str(payload.get("note") or "").strip()
+    # Личные входы: автор галочки и заметки — с сервера (человеку — всегда его имя).
+    kto = (vhod.podpis(request, str(payload.get("who") or "")) or "").strip()[:60]
+    request.state.chto = f"пункт {iid}: " + ("сделано" if done else "снята галочка")
+    ts = autopilot._now().strftime("%Y-%m-%dT%H:%M") if done else None
     with db.get_conn() as conn:
         _inbox_init(conn)
         if note:
-            conn.execute("UPDATE plan_inbox SET done=?, text=text||' — '||? WHERE id=?",
-                         (1 if done else 0, note[:200], iid))
+            conn.execute("UPDATE plan_inbox SET done=?, done_by=?, done_ts=?, text=text||' — '||? WHERE id=?",
+                         (1 if done else 0, (kto or None) if done else None, ts,
+                          (f"{kto}: " if kto else "") + note[:200], iid))
         else:
-            conn.execute("UPDATE plan_inbox SET done=? WHERE id=?", (1 if done else 0, iid))
+            conn.execute("UPDATE plan_inbox SET done=?, done_by=?, done_ts=? WHERE id=?",
+                         (1 if done else 0, (kto or None) if done else None, ts, iid))
     return {"ok": True}
 
 
 @app.post("/api/plan/inbox/note", dependencies=AUTH)
-def api_plan_inbox_note(payload: dict = Body(...)):
+def api_plan_inbox_note(request: Request, payload: dict = Body(...)):
     """Дописать в пункт пульта причину или что сделано, не закрывая его: {id, note}.
     10.11, Лиза: причины правок — в пункте, а не в карточке клиента."""
     iid = int(payload.get("id") or 0)
@@ -7174,10 +7291,13 @@ def api_plan_inbox_note(payload: dict = Body(...)):
     if not iid or not note:
         raise HTTPException(400, "нужны id и note")
     stamp = autopilot._now().strftime("%d.%m %H:%M")
+    # Личные входы: «✎ Лена 12.11 14:05: …» — имя с сервера; под общим входом — как раньше, без имени.
+    kto = vhod.podpis(request, str(payload.get("who") or ""))
+    request.state.chto = f"пункт {iid}: комментарий"
     with db.get_conn() as conn:
         _inbox_init(conn)
         n = conn.execute("UPDATE plan_inbox SET text=text||? WHERE id=?",
-                         (f" · ✎ {stamp}: {note}", iid)).rowcount
+                         (f" · ✎ {(kto + ' ') if kto else ''}{stamp}: {note}", iid)).rowcount
     if not n:
         raise HTTPException(404, "пункт не найден")
     return {"ok": True, "id": iid}
@@ -8475,7 +8595,7 @@ def api_roistat_visits(days: int = 14):
             "визиты": [{"phone": p, "visit": v, "source": s, "ts": t} for p, v, s, t in rows]}
 
 
-@app.get("/api/clicks/summary", dependencies=AUTH)
+@app.get("/api/clicks/summary", dependencies=OWNER_AUTH)
 def api_clicks_summary(days: int = 7):
     """Клики по кнопкам мессенджеров на сайте за N дней: канал, источник
     (utm/roistat), сколько из них дошло до переписки."""
@@ -9928,7 +10048,7 @@ def api_nabor_diag():
     return nabor.diag_zanyatiy()
 
 
-@app.get("/api/nabor/analiz", dependencies=AUTH)
+@app.get("/api/nabor/analiz", dependencies=OWNER_AUTH)
 def api_nabor_analiz():
     """Где рвётся набор: воронка по предметам и тёплые списки (см. app/nabor.py)."""
     from . import nabor
@@ -10386,7 +10506,7 @@ async def api_roistat_push(since: str = "", dry_run: int = 1, collect: int = 1):
     return {**result, **out}
 
 
-@app.get("/api/audit", dependencies=AUTH)
+@app.get("/api/audit", dependencies=OWNER_AUTH)
 async def api_audit(status: str = "new", limit: int = 200):
     """Лента аномалий: деньги без подписи, возвраты, скидки вне правил,
     стоп-слова в разговорах и переписке."""
@@ -10394,13 +10514,14 @@ async def api_audit(status: str = "new", limit: int = 200):
     return {"summary": audit.summary(), "flags": audit.feed(status, limit)}
 
 
-@app.post("/api/audit/run", dependencies=AUTH)
+@app.post("/api/audit/run", dependencies=OWNER_AUTH)
 async def api_audit_run(day: str = ""):
     from . import audit
     r = audit.daily_audit(day or None)
     return {k: (len(v) if isinstance(v, list) else v) for k, v in r.items()}
 
 
+# Остаётся под общим входом: кнопки «принято / исправлено» жмут админы на /pravila-kontrol.
 @app.post("/api/audit/resolve", dependencies=AUTH)
 async def api_audit_resolve(flag_id: int, status: str = "ok"):
     from . import audit
@@ -10411,7 +10532,8 @@ async def api_audit_resolve(flag_id: int, status: str = "ok"):
 
 # 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
 # «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
-# Ни рутины, ни автопилот её не открывают; /api/audit остаётся под общим входом.
+# Ни рутины, ни автопилот её не открывают. 12.11.2026, личные входы: /api/audit и его
+# запуск тоже только владельцу; общий admin — см. vhod.PEREHOD_ADMIN.
 @app.get("/audit", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 async def audit_page():
     """Лента аномалий человеческим лицом: красное сверху, кнопки разбора."""

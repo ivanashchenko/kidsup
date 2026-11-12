@@ -603,14 +603,19 @@ NACHALA = ("/api/plan/inbox", "/api/pult/", "/api/waiting", "/api/gruppy/", "/ap
 RUTINY_VHOD = {
     "check_auth": """
 GET /api/plan/inbox · POST /api/plan/inbox · POST /api/plan/inbox/done · GET /api/promo/grafik · GET /api/calls/list
-GET /api/calls/recording · POST /api/gruppy/otvet · GET /api/gruppy/soobsheniya · GET /export/raw/{table}.json
+GET /api/calls/recording · POST /api/gruppy/otvet · GET /api/gruppy/soobsheniya
 GET /api/sync/status · GET /api/day/firsts · GET /api/mesta · GET /api/oplata/plan · GET /api/waiting · GET /api/yavka
 POST /api/crm/comment · GET /api/crm/user · GET /api/pult/tasks · POST /api/pult/tasks · POST /api/pult/done
-GET /api/obzvon-dnya · GET /api/kadry · POST /api/kadry/ocenka · GET /kadry/file/{day}/{name}
+GET /api/obzvon-dnya · GET /api/kadry · POST /api/kadry/ocenka
 POST /api/crm/roistat-merge · POST /api/roistat/auto-cards · GET /api/duty · GET /api/dialogs · GET /api/zayavki
-GET /api/dolgi · GET /api/blank-grupp · POST /api/blank-grupp/edit · GET /api/perepiska/kto
-GET /api/sverka-chestnosti · GET /api/audit · GET /api/istochniki""",
+GET /api/dolgi · GET /api/blank-grupp · POST /api/blank-grupp/edit · GET /api/perepiska/kto""",
+    # 12.11.2026, личные входы (план, 5.2): пять адресов из строки выше переведены на вход
+    # владельца. Рутинам они остаются открыты служебным ключом (vhod.SLUZH_TOCHNO и
+    # SLUZH_PREFIKS — /export/raw, /kadry/file, /api/istochniki), общему admin — пока ключ
+    # рутин ни разу не сработал (vhod.PEREHOD_ADMIN); это проверяет vhod_testy.py, группа В.
     "check_owner": """
+GET /export/raw/{table}.json · GET /kadry/file/{day}/{name} · GET /api/sverka-chestnosti · GET /api/audit
+GET /api/istochniki
 POST /api/boris-docs · GET /api/boris-docs · GET /api/admin-docs · POST /api/admin-docs · GET /api/doc-state/{doc}
 POST /api/doc-state/{doc} · POST /api/deploy · GET /api/tbank/get · GET /api/komtet/cheki · POST /api/ads/vk
 POST /api/ads/direct · GET /api/mkweb/history · GET /api/backup/db · POST /api/hooppy/post · GET /api/hooppy/posty

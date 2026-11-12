@@ -23,6 +23,7 @@ from __future__ import annotations
 import html
 import json
 import logging
+import re
 from datetime import datetime
 
 from . import db
@@ -48,11 +49,29 @@ def _init(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS pult_tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, who TEXT, t TEXT, text TEXT,
         done INTEGER DEFAULT 0, ord INTEGER DEFAULT 0, ts TEXT)""")
-    for col in ("note TEXT", "prio INTEGER"):
+    # done_by, done_ts — 12.11.2026, личные входы: кто и когда поставил галочку
+    for col in ("note TEXT", "prio INTEGER", "done_by TEXT", "done_ts TEXT"):
         try:
             conn.execute("ALTER TABLE pult_tasks ADD COLUMN " + col)
         except Exception:
             pass
+
+
+def _seychas_iso() -> str:
+    from . import autopilot
+    return autopilot._now().strftime("%Y-%m-%dT%H:%M")
+
+
+def _kem(done_by, done_ts, day: str = "") -> str:
+    """«✓ Лена 14:05» рядом со сделанным пунктом; галочка другого дня — с датой."""
+    if not done_by:
+        return ""
+    ts = str(done_ts or "")
+    kogda = ts[11:16]
+    if ts[:10] and day and ts[:10] != day:
+        kogda = f"{ts[8:10]}.{ts[5:7]} {kogda}"
+    return (f" <span class='kem' style='display:inline-block;color:#3f6f0f;font-size:12px;font-weight:700;"
+            f"white-space:nowrap;text-decoration:none'>✓ {html.escape(str(done_by))} {kogda}</span>")
 
 
 def today() -> str:
@@ -79,7 +98,7 @@ def duty(day: str) -> list[str]:
 def tasks(day: str) -> dict[str, list[dict]]:
     with db.get_conn() as conn:
         _init(conn)
-        rows = conn.execute("SELECT id, who, t, text, done, note, prio FROM pult_tasks WHERE day=? ORDER BY who, ord, id",
+        rows = conn.execute("SELECT id, who, t, text, done, note, prio, done_by, done_ts FROM pult_tasks WHERE day=? ORDER BY who, ord, id",
                             (day,)).fetchall()
     out: dict[str, list[dict]] = {}
     for r in rows:
@@ -125,8 +144,10 @@ def set_tasks(day: str, who: str, items: list[dict], replace: bool = True) -> in
         return n
 
 
-def mark(task_id: int, state: int, note: str = "") -> bool:
+def mark(task_id: int, state: int, note: str = "", kto: str = "") -> bool:
     """state: 0 — не сделано, 1 — сделано, 2 — «перенести на завтра».
+    kto — кто поставил отметку (12.11.2026, личные входы: имя даёт сервер, vhod.podpis);
+    пишется в done_by и done_ts, при снятии галочки стирается.
 
     08.09: кнопку «не успела» с вопросом «почему» за три дня не нажали ни разу —
     пункты просто висели. Теперь одна кнопка без вопросов: пункт помечается
@@ -146,12 +167,14 @@ def mark(task_id: int, state: int, note: str = "") -> bool:
         # 22.09.2026, аудит: заметка перетиралась пустой при каждом нажатии
         # галочки, и счётчик попыток дозвона («не дозвонилась ☎») обнулялся.
         # Пустую заметку не пишем — состояние и комментарий живут отдельно.
+        by = (kto or "").strip()[:60] or None
+        by, ts = (by, _seychas_iso()) if int(state) else (None, None)
         if (note or "").strip():
-            cur = conn.execute("UPDATE pult_tasks SET done=?, note=? WHERE id=?",
-                               (int(state), (note or "")[:200], int(task_id)))
+            cur = conn.execute("UPDATE pult_tasks SET done=?, note=?, done_by=?, done_ts=? WHERE id=?",
+                               (int(state), (note or "")[:200], by, ts, int(task_id)))
         else:
-            cur = conn.execute("UPDATE pult_tasks SET done=? WHERE id=?",
-                               (int(state), int(task_id)))
+            cur = conn.execute("UPDATE pult_tasks SET done=?, done_by=?, done_ts=? WHERE id=?",
+                               (int(state), by, ts, int(task_id)))
         if int(state) == 2 and row:
             nxt = (date.fromisoformat(row["day"]) + timedelta(days=1)).isoformat()
             who, frm = row["who"], ""
@@ -169,8 +192,10 @@ def mark(task_id: int, state: int, note: str = "") -> bool:
         return cur.rowcount > 0
 
 
-def nedozvon(kind: str, item_id: int) -> dict:
+def nedozvon(kind: str, item_id: int, kto: str = "") -> dict:
     """Исход «набрала — не дозвонилась». Дело остаётся, попытка считается.
+    kto — кто набирал (12.11.2026, личные входы): «не дозвонилась (Ира 14:05)»; счётчик
+    попыток считает как раньше — по словам «не дозвонилась» в заметке и по полю tries.
 
     21.09.2026. До сегодня у дела был один исход — галочка. Админ звонит,
     никто не берёт, и дальше два пути: соврать галочкой или оставить строку
@@ -179,6 +204,9 @@ def nedozvon(kind: str, item_id: int) -> dict:
     уходит чуть ниже, на третьей попытке подсказываем перейти в мессенджер.
     """
     kind = "task" if str(kind) == "task" else "inbox"
+    kto = (kto or "").strip()[:60]
+    hm = _seychas_iso()[11:16]
+    podp = f" ({kto} {hm})" if kto else ""
     with db.get_conn() as conn:
         _init(conn)
         _inbox_tries(conn)
@@ -187,15 +215,21 @@ def nedozvon(kind: str, item_id: int) -> dict:
             if not row:
                 return {"ok": False}
             n = (row["note"] or "").count("не дозвонилась") + 1
-            conn.execute("UPDATE pult_tasks SET note=? WHERE id=?",
-                         (f"{(row['note'] or '').strip()} не дозвонилась".strip()[:200], int(item_id)))
+            # с именем запись длиннее: если в 200 знаков не входит — пишем без имени, чтобы
+            # попытка не потерялась (счётчик идёт по словам «не дозвонилась» в заметке)
+            prezhde = (row["note"] or "").strip()
+            zapis = f"{prezhde} не дозвонилась{podp}".strip()
+            if len(zapis) > 200:
+                zapis = f"{prezhde} не дозвонилась".strip()
+            conn.execute("UPDATE pult_tasks SET note=? WHERE id=?", (zapis[:200], int(item_id)))
         else:
             row = conn.execute("SELECT COALESCE(tries,0) FROM plan_inbox WHERE id=?",
                                (int(item_id),)).fetchone()
             if not row:
                 return {"ok": False}
             n = int(row[0]) + 1
-            conn.execute("UPDATE plan_inbox SET tries=? WHERE id=?", (n, int(item_id)))
+            conn.execute("UPDATE plan_inbox SET tries=?, tries_kto=? WHERE id=?",
+                         (n, f"{kto} {hm}" if kto else None, int(item_id)))
     sovet = ("Третья попытка — дальше телефоном не возьмёшь: напиши в мессенджер "
              "и поставь статус «2. Нет ответа»." if n >= 3 else
              "Попытка записана. Дело осталось в колонке — набери ещё раз через час.")
@@ -471,7 +505,9 @@ def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
         out.append({"kind": "task", "id": it["id"], "t": it["t"], "text": it["text"],
                     "done": it["done"], "note": it.get("note"), "tag": "", "phone": "",
                     "tries": (it.get("note") or "").lower().count("не дозвонил"),
-                    "prio": it.get("prio")})
+                    "prio": it.get("prio"), "done_by": it.get("done_by"), "done_ts": it.get("done_ts"),
+                    # кто набирал последним: «… не дозвонилась (Ира 14:05)» в конце заметки
+                    "tries_kto": (re.findall(r"не дозвонилась \(([^)]{1,70})\)", it.get("note") or "") or [""])[-1]})
     try:
         with db.get_conn() as conn:
             _inbox_tries(conn)
@@ -483,7 +519,8 @@ def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
             # помечая, с какого числа он висит: дата обещания важнее, чем
             # аккуратный список.
             rows = conn.execute(
-                "SELECT id, ts, day, text, phone, source, done, COALESCE(tries,0) AS tries, prio "
+                "SELECT id, ts, day, text, phone, source, done, COALESCE(tries,0) AS tries, prio, "
+                "tries_kto, done_by, done_ts "
                 "FROM plan_inbox WHERE who=? AND (day=? OR (day<? AND done=0)) "
                 "ORDER BY day, id", (who, day, day)).fetchall()
     except Exception:
@@ -502,7 +539,8 @@ def _lenta(day: str, who: str, items: list[dict]) -> list[dict]:
                     "tag": "наряд" if src.startswith("наряд")
                            else "возврат" if src.startswith("возврат") else "обещание",
                     "phone": "".join(c for c in (r["phone"] or "") if c.isdigit()),
-                    "tries": int(r["tries"] or 0), "prio": r["prio"]})
+                    "tries": int(r["tries"] or 0), "prio": r["prio"], "tries_kto": r["tries_kto"],
+                    "done_by": r["done_by"], "done_ts": r["done_ts"]})
     for x in out:
         x["ves"] = _ves(x)
     # 24.09.2026, Борис: «упорядочи по срочности и важности для набора полных
@@ -642,14 +680,15 @@ def _blok(it: dict) -> str:
 def _inbox_tries(conn) -> None:
     """Колонка попыток дозвона у дел инбокса — появилась 21.09 вместе с
     исходом «не дозвонилась»."""
-    for col in ("tries INTEGER DEFAULT 0", "prio INTEGER"):
+    # tries_kto, done_by, done_ts — 12.11.2026, личные входы: кто набирал и кто поставил галочку
+    for col in ("tries INTEGER DEFAULT 0", "prio INTEGER", "tries_kto TEXT", "done_by TEXT", "done_ts TEXT"):
         try:
             conn.execute("ALTER TABLE plan_inbox ADD COLUMN " + col)
         except Exception:
             pass
 
 
-def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str = "") -> str:
+def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str = "", svoya: bool = False) -> str:
     """Метка СЕЙЧАС идёт за часами: текущий — несделанный пункт с самым поздним временем,
     которое уже наступило (мы внутри его окна). Несделанные пункты с более ранним временем —
     «время прошло»: делаются сразу после текущего. Пункты без времени («весь день»,
@@ -750,7 +789,8 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             n = int(it["tries"])
             badge += (f"<span style='display:inline-block;font-size:11px;font-weight:700;color:#8a5a00;background:#fff1d6;"
                       f"border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle'>"
-                      f"не дозвонилась {n}&nbsp;раз{'а' if 2 <= n <= 4 else ''}</span>")
+                      f"не дозвонилась {n}&nbsp;раз{'а' if 2 <= n <= 4 else ''}"
+                      + (f" · {html.escape(str(it['tries_kto']))}" if it.get("tries_kto") else "") + "</span>")
         ctrl, tel = "", ""
         if it["kind"] == "task":
             if not it["done"]:
@@ -820,7 +860,9 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             f"onchange=\"{done_js}\">"
             f"<span>{badge}"
             + (f"<b>{html.escape(it['t'])}</b> — " if it["t"] and it["kind"] == "task" else "")
-            + f"{text_html}{tel}{extra}{ctrl}</span></label></li>", it))
+            + f"{text_html}{tel}{extra}{ctrl}"
+            + (_kem(it.get("done_by"), it.get("done_ts"), day) if it["done"] == 1 else "")
+            + "</span></label></li>", it))
     done_html = "".join(h for d_, o_, st_, h, _ in lis if d_)
     # 22.09.2026. Незакрытые дела прошлых дней раньше просто исчезали в
     # полночь — так пропало 261 обещание семьям. Теперь они видны, но не в
@@ -870,6 +912,10 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
         body += f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#4e8a12;font-size:13px'>сделано {done_n} ✓</summary><ol style='list-style:none;padding:0;margin:0'>{done_html}</ol></details>"
     body = body or "<li style='color:#6c6a86'>задач пока нет — Клод положит к началу смены</li>"
     nb = "" if onduty else " <span style='font-size:11px;color:#6c6a86;font-weight:500'>не в смене</span>"
+    if svoya:
+        # 12.11.2026, личные входы: колонка вошедшего — первой, с пометкой
+        nb = (f" <span style='font-size:11px;color:#fff;background:{c};border-radius:6px;padding:1px 7px;"
+              f"font-weight:700;vertical-align:middle'>ваша колонка</span>") + nb
     # «Дел на сегодня» — именно на сегодня: хвост прошлых дней считаем
     # отдельно, иначе цифра в шапке колонки пугает и перестаёт быть планом.
     open_n = sum(1 for i in items if not i["done"] and not i.get("staryj"))
@@ -974,9 +1020,38 @@ def _safe(fn, *a, imya: str = "", **kw) -> str:
                 f"Остальной пульт работает. Клод увидит это в логе и починит.</div>")
 
 
-def page(day: str = "", who: str = "", rol: str = "admin") -> str:
+def _shapka_vhoda(kto: dict | None, day: str, who: str, on: list) -> tuple[str, str, str]:
+    """Личные входы → (полоска «кто вошёл» над пультом, строка «сейчас в системе», имя вошедшего).
+    Имя — только у человека, вошедшего через форму; под общим входом, ключом и без входа — пусто."""
+    try:
+        from urllib.parse import quote
+        from . import vhod
+        k = kto or {}
+        ya = (k.get("imya") or "") if k.get("sposob") == "forma" else ""
+        put = "/pult" + ("?" + "&".join(x for x in (f"who={quote(who)}" if who else "",
+                                                     f"day={quote(day)}" if day != today() else "") if x)
+                         if (who or day != today()) else "")
+        polosa = vhod.shapka(k, put, COLOR.get(ya, "#312783"))
+        v_sist = vhod.v_sisteme() if (ya or polosa) else []
+        stroka = ""
+        if v_sist:
+            def davno(m):
+                return "только что" if m < 1 else f"{m} мин назад"
+            stroka = ("<p style='margin-top:4px'>По графику: " + html.escape(", ".join(on) if on else "смена не задана")
+                      + " · сейчас в системе: "
+                      + html.escape(", ".join(f"{i} ({davno(m)})" for i, m in v_sist)) + "</p>")
+        return polosa, stroka, ya
+    except Exception:  # noqa: BLE001 — шапка пульт не ломает
+        logging.getLogger("kidsup.pult").exception("шапка «кто вошёл» на пульте")
+        return "", "", ""
+
+
+def page(day: str = "", who: str = "", rol: str = "admin", kto: dict | None = None) -> str:
     """rol — кто открыл пульт ("admin" или "owner"): от роли зависит блок «Разделы»,
-    раздел владельца админу не рисуется."""
+    раздел владельца админу не рисуется.
+    kto — кто вошёл (vhod.iz(request), 12.11.2026): колонка вошедшего через форму стоит первой
+    и развёрнута, даже если он сегодня не в смене; сверху — «Вы: Лена · Выйти / сменить», под
+    общим входом (когда личные входы уже заведены) — жёлтая полоса. ?who= работает как раньше."""
     from . import zayavki, mesta, nav
     from .main import _inbox_block
     day = day or today()
@@ -1001,13 +1076,18 @@ def page(day: str = "", who: str = "", rol: str = "admin") -> str:
     except Exception:
         pass
     extra = [w for w in sorted(komu) if w not in order]  # не в смене — показываем свёрнуто внизу
+    polosa, v_sisteme, ya = _shapka_vhoda(kto, day, who, on)
+    if ya and not who and ya in COLOR and ya not in UVOLENY:
+        # своя колонка — первой, даже если человек не в смене и дел у него нет
+        order = [ya] + [w for w in order if w != ya]
+        extra = [w for w in extra if w != ya]
     if who:
         order = [w for w in order + extra if w == who] or [who]
         extra = []
     from . import autopilot
     now_msk = autopilot._now()
     now_hm = now_msk.strftime("%H:%M") if day == today() else ""
-    cols = "".join(_col(w, tk.get(w, []), w in on or w in ("Лиза", "Борис"), day, now_hm) for w in order)
+    cols = "".join(_col(w, tk.get(w, []), w in on or w in ("Лиза", "Борис"), day, now_hm, svoya=(w == ya)) for w in order)
     if extra:
         cols += "".join(_col(w, tk.get(w, []), False, day, now_hm) for w in extra)
     # 12.11.2026, Борис: «скрой не нужные / не актуальные / старые страницы». Из блока
@@ -1057,10 +1137,10 @@ th{{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em
 td{{padding:6px;border-bottom:1px solid var(--line);vertical-align:top}}.num{{text-align:right;white-space:nowrap}}.scroll{{overflow-x:auto}}
 .links a{{display:inline-block;margin:4px 10px 4px 0;font-size:14px}}
 h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
-</style></head><body><div class='wrap'>
+</style></head><body>{polosa}<div class='wrap'>
 <div class='hero'><h1>Пульт · {wd}, {d.day:02d}.{d.month:02d} · в смене: {html.escape(hero_who)} · <span id='clock'>{now_msk.strftime('%H:%M')}</span> МСК</h1>
 <p>Одна ссылка для всех: задачи по колонкам — только тем, кто сегодня работает, плюс Лиза и Борис. Галочка видна всем. Обновляется сама каждые 5 минут. Своя колонка: {filt}
-{"<a href='/pult'>все</a>" if who else ""} · <a href='#razdely'>☰ Разделы</a></p></div>
+{"<a href='/pult'>все</a>" if who else ""} · <a href='#razdely'>☰ Разделы</a></p>{v_sisteme}</div>
 <div class='kpis'>{kpi_html}</div>
 {HOWTO}
 <div class='who'>{cols}</div>

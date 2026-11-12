@@ -30,8 +30,11 @@ kidsup.db. Рядом сервер держит vhody.kopiya.db — только
 deystvie_vladelca): каждое действие подтверждается его паролем. Запасной путь владельца —
 консольная команда на сервере: python3 -m app.vhod parol boris.
 
-Что делает исполнитель В плана: права страниц владельца (mozhno_vladelcu целиком, списки
-SLUZH_*, PEREHOD_ADMIN, X-Kak).
+Права страниц владельца (раздел 5 плана) — mozhno_vladelcu() и списки SLUZH_*, TOLKO_*,
+PEREHOD_ADMIN: владельцу через форму — всё, кроме выкладки; ключу рутин — только список;
+личному админу — страница «Только для владельца». Заголовок X-Kak: admin понижает вошедшего
+до личного админа (проверка после выкладки). Пока входы не заведены, для общего admin и
+прежнего boris ничего не меняется.
 """
 from __future__ import annotations
 
@@ -99,12 +102,49 @@ ZAPISI = (
 
 # Права по адресам (раздел 5 плана). Пути — строки; сравнение «равен или начинается с
 # записи + "/"». Списки заполняет исполнитель В; здесь — заготовки, чтобы имена были.
-SLUZH_TOCHNO: frozenset = frozenset({"/api/vhod/sostoyanie"})   # адреса владельца, открытые ключу рутин (точно)
-SLUZH_PREFIKS: tuple = ()                    # … и с продолжением
-TOLKO_VYKLADKA: frozenset = frozenset()      # выкладка, перезапуск, копия базы, настройки
-TOLKO_CHELOVEK: frozenset = frozenset()      # /owner, /owner/vhody, /settings — только человеку
-PEREHOD_ADMIN: frozenset = frozenset()       # вновь закрытые от админов — общему admin пока можно
-# Автоматика самого сервера (perepiska, nadezhda) ходит только сюда.
+# --- права (раздел 5 плана) -------------------------------------------------------------
+# Адреса владельца (OWNER_AUTH), открытые ключу рутин. Список собран по описи рутин и
+# помощников ассистента; всё остальное под OWNER_AUTH ключу рутин — 403, и отказ виден
+# владельцу на /owner строкой «Клоду отказано». Сравнение: путь равен записи (SLUZH_TOCHNO)
+# либо равен записи или начинается с «запись/» (SLUZH_PREFIKS) — так /api/ads/vk не
+# открывает /api/ads/vk-users-list и /api/ads/vk/image.
+SLUZH_TOCHNO: frozenset = frozenset({
+    "/api/vhod/sostoyanie",                                   # состояние входов без секретов
+    "/api/boris-docs", "/api/boris-docs/remove",              # страницы владельцу («Места в группах», «Сверка оплат»)
+    "/api/admin-docs", "/api/admin-docs/remove",              # списки-задания админам
+    "/api/hooppy/post", "/api/hooppy/posty", "/api/hooppy/udalit",   # «Посты из фото и видео педагогов»
+    "/api/mkweb/history", "/api/mkweb/history/start", "/api/mkweb/history/result",   # «Контроль работы админов в МойКлассе»
+    "/api/tbank/get", "/api/komtet/cheki",                    # «Сверка оплат»
+    "/api/ads/vk", "/api/ads/direct",                         # «Вечернее саммари»
+    "/api/crm/raw-user",                                      # разборы карточек
+    "/api/istochniki",                                        # источники заявок для вечерней сводки
+})
+SLUZH_PREFIKS: tuple = (
+    "/api/doc-state",        # состояние документов
+    "/boris/docs",           # чтение страниц владельца
+    "/export/raw",           # «Места в группах», «Сверка оплат», снимки
+    "/kadry/file",           # «Фото-явка»
+)
+SLUZH_TOLKO_CHTENIE: tuple = ("/boris/docs", "/export/raw", "/kadry/file")   # из них ключу рутин — только GET
+# Выкладка кода, перезапуск, копия базы, настройки: только ключ выкладки (и прежний пароль
+# владельца, пока он действует). Владельцу через форму — 403: из браузера код не выкладывается.
+TOLKO_VYKLADKA: frozenset = frozenset({"/api/deploy", "/api/restart", "/api/backup/db", "/api/settings"})
+OKNO_VYKLADKI: frozenset = frozenset({"/api/deploy", "/api/restart"})   # их ключ рутин получает в аварийное окно
+# Страницы настроек — только человеку-владельцу: служебным ключам 403.
+TOLKO_CHELOVEK: frozenset = frozenset({"/owner", "/owner/vhody", "/settings", "/settings/test"})
+# Вновь закрытые от админов 12.11.2026 (список 5.2). До этого дня они были открыты общему
+# входу admin, и в день выкладки для него ничего не меняется: общий admin проходит по ним,
+# пока ключ рутин ни разу не сработал (у klod пуст posl_zapros). После первого запроса ключом
+# рутин — 403. Личному админу (вход через форму) они закрыты сразу. Во втором выпуске список
+# убирается вместе со старыми входами.
+PEREHOD_ADMIN: frozenset = frozenset({
+    "/export/leads.csv", "/export/lessons.csv", "/export/attendance.csv",
+    "/api/audit", "/api/audit/run",
+    "/api/sverka-chestnosti", "/api/nabor/analiz",
+    "/clicks", "/api/clicks/summary",
+    "/api/istochniki", "/api/istochniki/spravochnik",
+})
+PEREHOD_PREFIKS: tuple = ("/export/raw", "/kadry/file")
 AVTO_PUTI = frozenset({("POST", "/api/plan/inbox"), ("GET", "/api/duty"), ("GET", "/api/dialogs")})
 
 # Публичные домены (kidsup.ru и др.): там формы нет, /vhod отвечает 404. Заполняет main.py
@@ -696,7 +736,29 @@ def _starye(request, credentials):
 
 def kto(request, credentials):
     """Кто пришёл: словарь {login, imya, rol, sposob, seans} или None.
-    Бросает только 403 на чужой запрос и 429 на паузу старого входа после промахов."""
+    Бросает только 403 на чужой запрос и 429 на паузу старого входа после промахов.
+    Заголовок X-Kak: admin понижает вошедшего до прав личного админа (см. _ponizit)."""
+    return _ponizit(request, _kto(request, credentials))
+
+
+def _ponizit(request, k):
+    """X-Kak: admin — только понижает: владелец (в том числе прежний boris в окне и режим без
+    входа) и оба служебных ключа получают права ЛИЧНОГО админа; переходная поблажка общего
+    admin (PEREHOD_ADMIN) при этом заголовке тоже не действует. Админа не повышает,
+    автоматику не трогает. Так ассистент после выкладки проверяет, что админам закрыто, не
+    зная их паролей. Логин и способ входа остаются — в журнале видно, кто проверял."""
+    try:
+        kak = (request.headers.get("x-kak") or "").strip().lower()
+    except Exception:  # noqa: BLE001
+        kak = ""
+    if not k or kak != "admin" or k.get("rol") == "avto":
+        return k
+    k = dict(k)
+    k["rol"], k["kak"] = "admin", "admin"
+    return k
+
+
+def _kto(request, credentials):
     if chuzhoy_fon(request):
         raise HTTPException(403, ZAPROS_CHUZHOY)
     if otkryto():
@@ -831,11 +893,159 @@ def rol_menyu(k: dict | None) -> str:
     return "owner" if k and k.get("rol") in ("owner", "vykladka") else "admin"
 
 
+def _put_norm(put: str) -> str:
+    p = (put or "").split("?", 1)[0]
+    return p.rstrip("/") or ("/" if p else "")
+
+
+def _v_spiske(put: str, tochno=(), prefiksy=()) -> bool:
+    """Путь равен записи из tochno; либо равен записи из prefiksy или начинается с «запись/»."""
+    return put in tochno or any(put == p or put.startswith(p + "/") for p in prefiksy)
+
+
+def okno_vykladki_otkryto() -> bool:
+    """Аварийное окно: владелец на /owner разрешил выкладку ключом рутин на 2 часа."""
+    try:
+        do = _iz_iso(_nastroyki("vhod_okno_vykladki_do").get("vhod_okno_vykladki_do"))
+        return do is not None and seychas() < do
+    except Exception:  # noqa: BLE001
+        log.exception("vhod: аварийное окно выкладки не прочитано — считаю закрытым")
+        return False
+
+
+def perehod_admina_deystvuet() -> bool:
+    """Общий admin ещё проходит по вновь закрытым адресам (PEREHOD_ADMIN): да, пока ключ рутин
+    ни разу не сработал. Сбой чтения — да, как было до 12.11.2026 (старым входам новый код не мешает)."""
+    try:
+        with _baza() as c:
+            r = c.execute("SELECT posl_zapros FROM vhody WHERE login='klod'").fetchone()
+        return not (r is not None and r["posl_zapros"])
+    except Exception:  # noqa: BLE001
+        log.exception("vhod: не проверить, работал ли ключ рутин — общий вход пускаю, как раньше")
+        return True
+
+
 def mozhno_vladelcu(k: dict | None, metod: str = "", put: str = "") -> bool:
-    """Пускать ли на адрес под OWNER_AUTH. Заготовка исполнителя А: владелец и оба служебных
-    ключа — да, остальные — нет. Правила раздела 5 (списки, четыре адреса выкладки,
-    X-Kak, аварийное окно) дописывает исполнитель В."""
-    return bool(k) and k.get("rol") in ("owner", "sluzh", "vykladka")
+    """Пускать ли на адрес под OWNER_AUTH (раздел 5 плана).
+
+    | кто                                   | что можно                                                   |
+    | владелец через форму                  | всё, кроме TOLKO_VYKLADKA (из браузера код не выкладывается) |
+    | прежний boris в окне, режим без входа | всё, как раньше                                             |
+    | ключ выкладки                         | всё, кроме TOLKO_CHELOVEK (/owner, /settings)               |
+    | ключ рутин                            | только SLUZH_TOCHNO и SLUZH_PREFIKS; выкладка и перезапуск — в аварийное окно |
+    | общий admin в окне                    | только PEREHOD_ADMIN и только пока ключ рутин ни разу не сработал |
+    | личный админ, автоматика, X-Kak: admin| ничего                                                      |
+
+    Без адреса (прямой вызов по-старому) служебным ключам — нет: списки сверять не с чем."""
+    if not k or k.get("kak"):
+        return False
+    rol, sposob = k.get("rol"), k.get("sposob")
+    p = _put_norm(put)
+    m = (metod or "GET").upper()
+    if rol == "owner":
+        return not (sposob == "forma" and p in TOLKO_VYKLADKA)
+    if rol == "vykladka":
+        return bool(p) and p not in TOLKO_CHELOVEK
+    if rol == "sluzh":
+        if not p or p in TOLKO_CHELOVEK:
+            return False
+        if p in TOLKO_VYKLADKA:
+            return p in OKNO_VYKLADKI and m == "POST" and okno_vykladki_otkryto()
+        if not _v_spiske(p, SLUZH_TOCHNO, SLUZH_PREFIKS):
+            return False
+        return m in BEZOPASNYE or not _v_spiske(p, (), SLUZH_TOLKO_CHTENIE)
+    if rol == "admin" and sposob == "staryy" and k.get("login") == "admin":
+        return _v_spiske(p, PEREHOD_ADMIN, PEREHOD_PREFIKS) and perehod_admina_deystvuet()
+    return False
+
+
+def tekst_otkaza(k: dict | None) -> str:
+    """Что сказать тому, кого не пустили на адрес владельца."""
+    rol, sposob = (k or {}).get("rol"), (k or {}).get("sposob")
+    if (k or {}).get("kak"):
+        return "Только для владельца (проверка с правами админа: X-Kak)"
+    if rol == "owner" and sposob == "forma":
+        return ("Выкладка кода, перезапуск, копия базы и настройки сервера идут только ключом выкладки — "
+                "из браузера они закрыты")
+    if rol == "sluzh":
+        return "Ключу рутин этот адрес закрыт. Список разрешённых адресов — SLUZH_TOCHNO и SLUZH_PREFIKS в app/vhod.py"
+    if rol == "vykladka":
+        return "Ключу выкладки страницы настроек закрыты: их открывает только владелец"
+    return "Только для владельца"
+
+
+def stranica_otkaza(k: dict | None = None) -> str:
+    """Страница 403 «Только для владельца · ← На пульт» — вместо окна пароля."""
+    imya = (k or {}).get("imya") or ""
+    kto_ = f"Вы вошли как {_e(imya)}. " if imya and (k or {}).get("sposob") == "forma" else ""
+    return ("<!doctype html><html lang='ru'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<meta name='robots' content='noindex,nofollow'><title>Только для владельца · KidsUP</title>"
+            "<script src='/static/vhod.js'></script>"
+            "<style>body{margin:0;background:#f8f7fc;color:#15132e;font:17px/1.5 -apple-system,BlinkMacSystemFont,"
+            "'Segoe UI',Roboto,Helvetica,Arial,sans-serif}.k{max-width:520px;margin:12vh auto 0;padding:26px 22px;"
+            "background:#fff;border:1px solid #e4e2f0;border-radius:16px;border-top:5px solid #312783}"
+            "h1{margin:0 0 8px;font-size:24px;color:#312783}p{margin:8px 0;color:#4a4866}"
+            "a.b{display:inline-block;margin-top:12px;padding:12px 18px;border-radius:10px;background:#312783;"
+            "color:#fff;text-decoration:none;font-weight:700}</style></head><body><div class='k'>"
+            "<h1>Только для владельца</h1>"
+            f"<p>{kto_}Эта страница открыта только Борису. Для работы она не нужна — всё, что нужно сегодня, "
+            "есть на пульте.</p>"
+            "<a class='b' href='/pult'>← На пульт</a></div></body></html>")
+
+
+def v_sisteme(minut: int = 30) -> list:
+    """Кто из людей сейчас в системе: [(имя, сколько минут назад был последний запрос)].
+    «Последний запрос» пишется не чаще раза в минуту на логин. Сбой — пустой список."""
+    try:
+        t = seychas()
+        with _baza() as c:
+            rows = c.execute("SELECT imya, posl_zapros FROM vhody WHERE rol IN ('admin', 'owner') AND vkl=1 "
+                             "AND posl_zapros IS NOT NULL").fetchall()
+        out = []
+        for r in rows:
+            pz = _iz_iso(r["posl_zapros"])
+            if pz is not None and 0 <= t - pz <= minut * 60:
+                out.append((r["imya"], int((t - pz) // 60)))
+        return sorted(out, key=lambda x: x[1])
+    except Exception:  # noqa: BLE001
+        log.exception("vhod: «сейчас в системе» не прочитано")
+        return []
+
+
+def shapka(k: dict | None, put: str = "/", cvet: str = "#312783") -> str:
+    """Полоска «кто вошёл» для шапки страниц и пульта.
+    Вошедшему через форму: «Вы: Лена · Выйти / сменить» (выход настоящий — сеанс стирается).
+    Под общим входом admin, когда личные входы уже заведены: жёлтая полоса «Вы под общим
+    входом. Он отключится ДД.ММ — войдите под своим именем». Пока входы не заведены, а также
+    ключам, автоматике и режиму без входа — ничего (в день выкладки шапка не меняется)."""
+    try:
+        if not k:
+            return ""
+        nxt = _e(bezopasnyy_next(put or "/") or "/")
+        if k.get("sposob") == "forma" and k.get("imya"):
+            return ("<div class='kto-polosa' style='display:flex;gap:10px;align-items:center;justify-content:flex-end;"
+                    "flex-wrap:wrap;padding:6px 14px;background:#fff;border-bottom:1px solid #e4e2f0;font:14px/1.3 "
+                    "-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif;color:#15132e'>"
+                    f"<span>Вы: <b style='color:{_e(cvet)}'>{_e(k['imya'])}</b></span>"
+                    "<form method='post' action='/vyhod' style='margin:0'>"
+                    f"<input type='hidden' name='next' value='{nxt}'>"
+                    "<button type='submit' style='font:inherit;padding:5px 12px;border-radius:8px;border:1px solid #c9c6e0;"
+                    "background:#f8f7fc;color:#312783;cursor:pointer'>Выйти / сменить</button></form></div>")
+        if k.get("sposob") == "staryy" and k.get("login") == "admin" and not k.get("kak") and zavedeny():
+            do = _iz_iso(_nastroyki("vhod_starye_do").get("vhod_starye_do"))
+            kogda_ = ""
+            if do is not None:
+                d = datetime.fromtimestamp(do, MSK)
+                kogda_ = f" Он отключится {d.day:02d}.{d.month:02d}"
+            return ("<div class='kto-polosa obshchiy' style='padding:8px 14px;background:#fff1d6;border-bottom:2px solid "
+                    "#F59C00;color:#5a3d00;font:15px/1.35 -apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Helvetica,"
+                    f"Arial,sans-serif'>Вы под общим входом.{kogda_} — "
+                    f"<a href='/vhod?next={quote(bezopasnyy_next(put or '/') or '/', safe='/')}' style='color:#312783;"
+                    "font-weight:700'>войдите под своим именем</a></div>")
+    except Exception:  # noqa: BLE001
+        log.exception("vhod: шапка «кто вошёл» не собрана")
+    return ""
 
 
 def avto_mozhno(request) -> bool:

@@ -28,6 +28,8 @@ align-items:center;gap:.5rem 1.1rem;padding:.6rem 1rem}
     владельцу — они же и свой раздел последним, педагогу по ключу — ничего.
     Подсветка — по адресу страницы, а не по параметру active. -#}
 {% set here = request.url.path %}
+{#- 12.11.2026, личные входы: «Вы: Лена · Выйти / сменить» или жёлтая полоса общего входа (vhod.shapka) -#}
+{{ kto_shapka if kto_shapka is defined else '' }}
 <header class="topbar">
 {% if menu %}
   <a class="brand" href="/" title="На свою главную"><img src="/static/logo.svg" alt=""> KidsUP</a>
