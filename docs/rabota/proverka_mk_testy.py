@@ -170,6 +170,9 @@ def stroki():
 def test_razdely():
     print("Правила разделов на маленьких примерах")
     zasejat()
+    # правила всех разделов проверяем при включённых 5 и 11г (по умолчанию они выключены —
+    # это отдельная проверка в test_skeptik2)
+    db.set_setting("proverka_mk_vyklyucheny", "-")
     # записи в группы
     for jid, uid, cid, st in [(1, 9001, 101, 2), (2, 9002, 102, 2), (3, 9003, 103, 2), (4, 9017, 101, 2),
                               (5, 9017, 102, 2), (6, 9018, 101, 2), (7, 9019, 108, 4), (8, 9020, 108, 2),
@@ -208,9 +211,12 @@ def test_razdely():
     urok(17, 102, "2026-11-24", status=0)
     urok(18, 102, "2026-11-24", status=0)
     urok(19, 107, "2026-11-26", t="16:10", konec="16:50", status=0)
-    # длинный горизонт расписания у другой группы → 101 «кончается рано» (12в, запасное правило)
+    # 12в — только по ночной проверке расписания до 31.05: группа 101 кончается 19.11,
+    # группа 103 идёт до конца мая
     urok(20, 103, "2027-01-12", t="18:00", konec="18:50", status=0)
     urok(21, 101, "2026-11-19", status=0)
+    db.set_state("proverka_mk_raspisanie", json.dumps({"ts": "2026-11-11", "do": "2027-05-31",
+                                                       "posledniy": {"101": "2026-11-19", "103": "2027-05-26"}}))
     # Р7: абонементы сезона
     abonement(501, 9001, 101, 8400, 8400)                       # оплаченный
     abonement(502, 9001, 101, 8400, 0)                          # 7а: рядом оплаченный — дубль
@@ -340,7 +346,8 @@ def test_razdely():
     proverka("11д: новый лид без дня рождения — не строка (поправка скептика)", "r11d:9015" in S, False)
     proverka("12а: два одинаковых занятия в один час — строка", "r12a:102:17:00" in S)
     proverka("12б: время занятий ≠ времени в названии — строка", "r12b:107" in S)
-    proverka("12в: расписание группы кончается рано — строка", "r12v:101" in S)
+    proverka("12в: расписание группы кончается рано (по ночной проверке) — строка", "r12v:101" in S)
+    proverka("12в: группа с занятиями до конца мая — не строка", "r12v:103" in S, False)
     proverka("ссылка на карточку МойКласса", S["r6:9004"]["ssylka"], "https://app.moyklass.com/user/9004")
     proverka("ссылка на группу МойКласса", S["r1:1"]["ssylka"], "https://app.moyklass.com/class/101")
     proverka("у строки написано, когда она уйдёт сама", bool(S["r1:1"]["obnovitsya"]))
@@ -544,12 +551,18 @@ def test_nastroyka():
         yavka.sverka = lambda day, **k: {"itogo": dict(it), "bez_otcheta": [{"time": "16:00", "class": "ЛГ Тестовая"}]}
         db.set_setting("proverka_mk_vmesto_punktov", "1")
         punkty.clear()
-        yavka.nightly("2026-11-11")
-        proverka("явка «1»: расхождения пунктом не перечисляем", punkty, [])
+        yavka.nightly("2026-11-11", who="Лиза")
+        proverka("явка «1», пункт Лизе: расхождения пунктом не перечисляем", punkty, [])
         it["bez_otcheta"] = 1
-        yavka.nightly("2026-11-11")
-        proverka("явка «1»: про занятия без отчёта педагога — пункт остаётся",
+        yavka.nightly("2026-11-11", who="Лиза")
+        proverka("явка «1», пункт Лизе: про занятия без отчёта педагога — пункт остаётся",
                  len(punkty) == 1 and "без отчёта педагога" in punkty[0][1] and "расхождений" not in punkty[0][1])
+        # проверка скептика 12.11: пункт о явке идёт Лене, закрытие дня — её работа; его не глушим
+        punkty.clear()
+        yavka.nightly("2026-11-11")
+        proverka("явка «1», пункт Лене: прежний текст — «не проведено», «отметок поставить», ссылка на /yavka",
+                 (len(punkty), punkty[0][0] if punkty else "", all(x in (punkty[0][1] if punkty else "") for x in (
+                     "не проведено 1", "отметок поставить 2", "app.kidsup.ru/yavka?day=2026-11-11"))), (1, "Лена", True))
         db.set_setting("proverka_mk_vmesto_punktov", "0")
         punkty.clear()
         yavka.nightly("2026-11-11")
@@ -564,13 +577,25 @@ def test_nastroyka():
         zadachi = []
         ap._client = lambda: Mk()
         ap._task = lambda mk, who, uid, body, day=None: zadachi.append(body)
-        ap._admins_today = lambda: [{"managerId": 1, "name": "Тест"}]
+        ap._admins_today = lambda: [{"managerId": 1, "name": "Лиза"}]
         db.set_setting("proverka_mk_vmesto_punktov", "1")
         ap.card_quality()
-        proverka("качество карточек «1»: пункта нет (раздел 11д)", zadachi, [])
+        proverka("качество карточек «1», дежурит Лиза: пункта нет (раздел 11д)", zadachi, [])
+        # проверка скептика 12.11: пункт идёт дежурному админу по очереди — другим он нужен
+        ap._admins_today = lambda: [{"managerId": 2, "name": "Аня"}]
+        ap.card_quality()
+        proverka("качество карточек «1», дежурит не Лиза: пункт ставится как раньше", len(zadachi), 1)
+        zadachi.clear()
+        ap._admins_today = lambda: [{"managerId": 1, "name": "Лиза"}]
         db.set_setting("proverka_mk_vmesto_punktov", "0")
         ap.card_quality()
         proverka("качество карточек «0»: пункт как раньше", len(zadachi), 1)
+        # выключатель возвращает и прежнее правило «явка и проведено — не Лизе»
+        from app.pult_proverka import liza_mozhno
+        proverka("«0»: пункт со словом «явка» Лизе снова нельзя", liza_mozhno("Поставить явку по отчёту педагога"), False)
+        proverka("«0»: пункт про долг Лизе можно", liza_mozhno("Долг 2 500 ₽ у семьи Тестовых"))
+        db.set_setting("proverka_mk_vmesto_punktov", "1")
+        proverka("«1»: пункт со словом «явка» Лизе можно", liza_mozhno("Поставить явку по отчёту педагога"))
     finally:
         (tbank.statement, komtet.cheki, yavka.sverka, ap.inbox_add, ap._client, ap._task, ap._admins_today) = st
         db.set_setting("proverka_mk_vmesto_punktov", "1")
@@ -730,8 +755,162 @@ def test_sverka_1211():
     proverka("4б: админ написала строку с датой занятия — строка ушла", "r4b:7300" in S, False)
 
 
+# ── 9. Проверка скептика 12.11 вечером: опасные советы и выключенные разделы ─
+
+def test_skeptik2():
+    print("Проверка 12.11 вечером: дубль занятия, доплата, возврат переплаты, выключенные разделы")
+    from datetime import timedelta
+    c = sqlite3.connect(config.DB_PATH)
+    c.executemany("INSERT INTO classes (id, name, status, raw) VALUES (?,?,?,'{}')", [
+        (301, "2627_ТАН_пн-чт_10:00_5-7 лет (Гр31)", "opened"),
+        (302, "2627_РОБ_Группа 5_вт_11:00_5-7 лет", "opened")])
+    novye = {9201: "Дублёв Сева", 9202: "Сегоднев Ян", 9203: "Сегоднева Яна", 9204: "Спорный Ян",
+             9205: "Сверхов Тим", 9206: "Пропускова Аня", 9207: "Доплатин Лёва", 9208: "Переплатова Соня"}
+    for uid, n in novye.items():
+        c.execute("INSERT INTO users (id, name, phone, balance, client_state_id, created_at, raw) VALUES (?,?,?,?,?,?,?)",
+                  (uid, n, tel(uid - 9000), 0, 125955, "2026-08-20",
+                   json.dumps({"name": n, "attributes": [{"attributeAlias": "birthday", "value": "2020-01-01"}]}, ensure_ascii=False)))
+    c.commit()
+    c.close()
+    for i, (uid, cid) in enumerate([(9201, 301), (9202, 301), (9203, 301), (9204, 301), (9205, 302), (9206, 302),
+                                    (9207, 301), (9208, 301)]):
+        zapis_v_gruppu(950 + i, uid, cid, 2)
+
+    def yav(d, lesson):
+        with db.get_conn() as conn:
+            r = conn.execute("SELECT data FROM yavka_sverka WHERE day=?", (d,)).fetchone()
+            data = json.loads(r[0]) if r else {"day": d, "lessons": []}
+            data["lessons"].append(lesson)
+            conn.execute("INSERT OR REPLACE INTO yavka_sverka VALUES (?,?,?)", (d, "x", json.dumps(data, ensure_ascii=False)))
+
+    # Р1: дубль занятия — двойник в тот же день и час проведён, ребёнку списано
+    urok(800, 301, "2026-11-02", t="10:00", konec="10:50", zapisi=[(8000, 9201, {"visit": True, "bill": {"summa": 2500}})])
+    urok(801, 301, "2026-11-02", t="10:00", konec="10:50", status=0, zapisi=[(8001, 9201, {})])
+    urok(812, 301, "2026-11-02", t="10:00", konec="10:50", status=0, zapisi=[(8120, 9204, {})])   # дубль, но ребёнок другой
+    # Р2а: сегодня и вчера — явку ещё вносят; с отчётом педагога — занятие было; старое без отчёта — строка
+    for lid, d in ((802, "2026-11-12"), (803, "2026-11-11"), (804, "2026-11-09"), (805, "2026-11-06")):
+        urok(lid, 301, d, t="09:00", konec="09:50", zapisi=[(lid * 10, 9202, {}), (lid * 10 + 1, 9203, {})])
+    yav("2026-11-09", {"lesson_id": 804, "class_id": 301, "class": "ТАН Гр31", "time": "09:00", "reports": [{"ts": "x"}],
+                       "records": [], "unmatched": [], "conflicts": []})
+    # Р3: отчёты спорили 20.10 (старше 14 дней) — отдельной строки нет, но приписка к строке ребёнка есть
+    urok(806, 301, "2026-10-20", t="10:00", konec="10:50", zapisi=[(8060, 9204, {"visit": True, "bill": {"summa": 1050}})])
+    yav("2026-10-20", {"lesson_id": 806, "class_id": 301, "class": "ТАН Гр31", "time": "10:00", "reports": [{"ts": "x"}],
+                       "records": [{"record_id": 8060, "uid": 9204, "name": "Спорный Ян", "crm_visit": True,
+                                    "report": "не был", "action": "conflict_visit"}],
+                       "unmatched": [], "conflicts": ["Спорный Ян: в одном отчёте «был», в другом «не был»"]})
+    # Р4а: посещение 30.10 сверх абонемента, пропуск со списанием случился ПОЗЖЕ (05.11) — это не отработка;
+    # у второго ребёнка пропуск 23.10 раньше посещения — отработка
+    abonement(530, 9205, 302, 8400, 8400, nachalo="2026-10-01", konec="2026-10-31", prodan="2026-10-01", st=4)
+    abonement(531, 9206, 302, 8400, 8400, nachalo="2026-10-01", konec="2026-10-31", prodan="2026-10-01", st=4)
+    urok(809, 302, "2026-10-23", t="11:00", konec="11:50", zapisi=[(8090, 9206, {"bill": {"summa": 1050}}),
+                                                                   (8091, 9205, {"visit": True, "bill": {"summa": 1050}})])
+    urok(807, 302, "2026-10-30", t="11:00", konec="11:50", zapisi=[(8070, 9205, {"visit": True}), (8071, 9206, {"visit": True})])
+    urok(808, 302, "2026-11-05", t="11:00", konec="11:50", zapisi=[(8080, 9205, {"bill": {"summa": 1050}})])
+    # Р5: файл контроля оплат старого вида (без max_pid) — строку «СБП без оплаты» не закрыть, не показываем
+    (KONTROL / "2026-11-05.json").write_text(json.dumps({
+        "day": "2026-11-05", "bloki": {}, "bank": {"mk_card": 0, "bank_card": 0, "diff": 0, "free_sbp": [3300], "sbp_as_term": []}},
+        ensure_ascii=False), encoding="utf-8")
+    # Р7а: неоплаченный абонемент на одно занятие рядом с оплаченным на 13 — доплата, не дубль
+    abonement(540, 9207, 301, 28817, 28817, zanyatiy=13, poseshch=7)
+    abonement(541, 9207, 301, 2217, 0, zanyatiy=1, prodan="2026-11-06")
+    urok(810, 301, "2026-11-16", t="10:00", konec="10:50", status=0, zapisi=[(8100, 9207, {}), (8101, 9208, {})])
+    # Р7г: возврат переплаты (больше оплаты абонемента), а ребёнок после возврата ходит
+    abonement(550, 9208, 301, 8400, 8400, poseshch=1)
+    platezh(1200, 9208, "2026-11-03", -13965, optype="refund", tip=64725)
+    urok(811, 301, "2026-11-05", t="10:00", konec="10:50", zapisi=[(8110, 9208, {"visit": True, "bill": {"summa": 1050}})])
+    # Р9: на кадре пусто, но оценка кадра говорит «не пропуск» (ребёнок пришёл в другое время)
+    with db.get_conn() as conn:
+        conn.execute("INSERT INTO kadry (key, lesson_id, day, ts, room, deti, ocenka) VALUES ('k811', 811, '2026-11-05', "
+                     "'2026-11-05T10:10', 'К1', 0, 'комната пустая. По отчёту педагога ребёнок был раньше — расхождение записи, не пропуск')")
+
+    db.set_setting("proverka_mk_vyklyucheny", "-")
+    S, res = stroki()
+    proverka("1: дубль занятия — строка есть, совет «НЕ проводить», а не «провести»",
+             ("дубль занятия" in S.get("r1:801", {}).get("chto", ""), "НЕ проводить" in S.get("r1:801", {}).get("sdelat", ""),
+              "провести с явкой" in S.get("r1:801", {}).get("sdelat", "")), (True, True, False))
+    proverka("1: дубль с другим ребёнком — не «снять записи», а перезаписать на проведённое занятие",
+             ("записать туда" in S.get("r1:812", {}).get("sdelat", ""), "снять записи" in S.get("r1:812", {}).get("sdelat", "")),
+             (True, False))
+    proverka("2а: сегодняшнее и вчерашнее «проведено» без явки — не строка (явку ещё вносят)",
+             ("r2a:802" in S, "r2a:803" in S), (False, False))
+    proverka("2а: есть отчёт педагога — занятие было, не строка", "r2a:804" in S, False)
+    proverka("2а: старше двух дней и без отчёта — строка", "r2a:805" in S)
+    proverka("3: старый спор отчётов — отдельной строки нет, приписка «уточнить у педагога» есть",
+             (any(k.startswith("r3k:301") for k in S), "расходятся" in S.get("r3:conflict_visit:9204:301", {}).get("chto", ""),
+              "уточнить у педагога" in S.get("r3:conflict_visit:9204:301", {}).get("sdelat", "")), (False, True, True))
+    proverka("4а: пропуск случился позже посещения — это не отработка, а «ходил сверх абонемента»",
+             ("отработ" in S.get("r4a:9205:РОБ", {}).get("sdelat", "x отработ"), "абонемент кончился" in S.get("r4a:9205:РОБ", {}).get("chto", "")),
+             (False, True))
+    proverka("4а: пропуск раньше посещения — отработка", "отработку пропуска 23.10" in S.get("r4a:9206:РОБ", {}).get("sdelat", ""))
+    proverka("5: файл без max_pid — строки «СБП без оплаты» нет", any(k.startswith("r5:2026-11-05:sbp") for k in S), False)
+    proverka("6: в совете — «ушёл или отложили — абонемент НЕ создавать»", "НЕ создавать" in S["r6:9004"]["sdelat"])
+    proverka("7а: доплата за одно занятие рядом с абонементом на 13 — не дубль и не «удалить»",
+             ("r7a:541" in S, "r7b:541" in S), (False, False))
+    proverka("7а: настоящий дубль (занятий поровну) остаётся строкой", "r7a:502" in S)
+    proverka("7г: после возврата ребёнок ходит и записан вперёд — «закрыть абонемент» не советуем", "r7g:550" in S, False)
+    proverka("7г: возврат без посещений после него — строка остаётся", "r7g:506" in S)
+    proverka("9: в оценке кадра «не пропуск» — строки нет", any(k.startswith("r9:811") for k in S), False)
+    proverka("9: кадр без такой оценки — строка остаётся", "r9:31:pusto" in S)
+    # 12в без свежей ночной проверки расписания не показываем
+    db.set_state("proverka_mk_raspisanie", "{}")
+    S, res = stroki()
+    proverka("12в: ночной проверки расписания не было — строк нет (край выгрузки — не конец занятий)",
+             any(k.startswith("r12v") for k in S), False)
+    # выключенные разделы: по умолчанию 5 и 11г
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM settings WHERE key='proverka_mk_vyklyucheny'")
+    S, res = stroki()
+    proverka("по умолчанию выключены 5 и 11г", pm.vyklyucheny(), {"5", "11г"})
+    proverka("выключенные: строк разделов 5 и 11г нет",
+             (any(x["razdel"] == "5" for x in S.values()), any(x["pod"] == "11г" for x in S.values())), (False, False))
+    proverka("выключенные: раздела 5 нет в списке разделов, 11 — есть",
+             ("5" in [rz["nomer"] for rz in res["razdely"]], "11" in [rz["nomer"] for rz in res["razdely"]]), (False, True))
+    proverka("выключенные: в «осталось» не считаются", res["itog"]["ostalos"],
+             len([x for x in S.values() if not x["seraya"] and not x["ne_oshibka"]]))
+    with db.get_conn() as conn:
+        z = conn.execute("SELECT COUNT(*) FROM proverka_mk_stroki WHERE zakryta IS NULL AND (key LIKE 'r5:%' OR key LIKE 'r11g:%')").fetchone()[0]
+    proverka("выключенные: открытых строк в таблице не остаётся", z, 0)
+    # пока раздел 5 выключен, пункты о банке и возвратах идут Лизе в пульт, как раньше
+    from app import tbank, komtet
+    st = (tbank.statement, komtet.cheki)
+    try:
+        tbank.statement = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("банк недоступен (тест)"))
+        komtet.cheki = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("КОМТЕТ недоступен (тест)"))
+        db.set_setting("proverka_mk_vmesto_punktov", "1")
+        R = kontrol_oplat.run("2026-11-03", dry=True)
+        proverka("раздел 5 выключен: возврат не тем типом — пунктом Лизе, не «на страницу»",
+                 (any(w == "Лиза" and "возврат записан типом" in t for w, t, _ in R["inbox"]),
+                  any("возврат записан типом" in t for t in R["na_stranicu"])), (True, False))
+        db.set_setting("proverka_mk_vyklyucheny", "11г")
+        R = kontrol_oplat.run("2026-11-03", dry=True)
+        proverka("раздел 5 включён настройкой: возврат — на страницу, пункта нет",
+                 (any("возврат записан типом" in t for w, t, _ in R["inbox"]),
+                  any("возврат записан типом" in t for t in R["na_stranicu"])), (False, True))
+    finally:
+        tbank.statement, komtet.cheki = st
+        with db.get_conn() as conn:
+            conn.execute("DELETE FROM settings WHERE key='proverka_mk_vyklyucheny'")
+    # ночной шаг: в 22 часа — всегда; иначе догон, если не проходил больше 26 часов
+    db.set_state("proverka_mk_noch", "{}")
+    proverka("ночной шаг ни разу не проходил — нужен догон в любой час", pm.noch_nuzhen(CHASY))
+    db.set_state("proverka_mk_noch", json.dumps({"ts": (CHASY - timedelta(hours=13)).isoformat(timespec="minutes")}))
+    proverka("ночной шаг был 13 часов назад — днём не запускаем", pm.noch_nuzhen(CHASY), False)
+    proverka("в 22 часа ночной шаг нужен всегда", pm.noch_nuzhen(CHASY.replace(hour=22)))
+    db.set_state("proverka_mk_noch", json.dumps({"ts": (CHASY - timedelta(hours=40)).isoformat(timespec="minutes")}))
+    proverka("ночной шаг был 40 часов назад — догон", pm.noch_nuzhen(CHASY))
+    marki = []
+    st_mark = ap._mark
+    try:
+        ap._mark = lambda kind, key: marki.append((kind, key)) or True
+        proverka("автопилот: догон ночного шага помечается раз в 3 часа, а не раз в сутки",
+                 (ap._proverka_mk_noch_pora(CHASY), marki), (True, [("proverka_mk_noch", f"{ap._today()}:dogon:3")]))
+    finally:
+        ap._mark = st_mark
+
+
 def main():
-    for t in (test_razdely, test_zhizn, test_ne_oshibka, test_sredniy, test_pult, test_nastroyka, test_http, test_sverka_1211):
+    for t in (test_razdely, test_zhizn, test_ne_oshibka, test_sredniy, test_pult, test_nastroyka, test_http, test_sverka_1211,
+              test_skeptik2):
         t()
         print()
     if oshibok:

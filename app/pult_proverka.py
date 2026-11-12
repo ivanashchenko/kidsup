@@ -37,10 +37,21 @@ LIZA_NELZYA = re.compile(
     r"\bпозвонить|\bперезвонить|\bзвонком\b|\bзвонок\b|\bзвонки\b|\bобзвон|\bнабрать\b|\bдозвон|"
     r"\bв холле\b|\bв зале\b|\bна стойке\b|\bна ресепшен|\bтетрад|\bналичн|\bкасс[аеуы]\b|"
     r"\bзакрыть занятия", re.I)
+# Прежнее правило (до страницы): при proverka_mk_vmesto_punktov="0" страница правки явки
+# у Лизы не заменяет пункты, и слова «проведено», «явка» снова признак чужого пункта —
+# выключатель возвращает всё как было (проверка 12.11 вечером).
+LIZA_NELZYA_YAVKA = re.compile(r"\bпроведено\b|\bявк[аиу]\b", re.I)
 
 
 def liza_mozhno(text: str) -> bool:
-    return not LIZA_NELZYA.search(text or "")
+    if LIZA_NELZYA.search(text or ""):
+        return False
+    if LIZA_NELZYA_YAVKA.search(text or ""):
+        try:
+            return db.get_setting("proverka_mk_vmesto_punktov", "1") == "1"
+        except Exception:  # noqa: BLE001
+            return True
+    return True
 
 # Формулировки, запрещённые брендом. «Бесплатное пробное занятие» обещает
 # бесплатно — у нас первое занятие условно-бесплатное, и это разные обещания

@@ -3587,7 +3587,8 @@ def card_quality() -> None:
         admins = _admins_today() or _admins()
         if not admins:
             return
-        who = admins[_today().toordinal() % len(admins)]["managerId"]
+        dezhurnyi = admins[_today().toordinal() % len(admins)]
+        who = dezhurnyi["managerId"]
         parts = []
         if bad_bd:
             parts.append(f"без даты рождения {len(bad_bd)}")
@@ -3610,7 +3611,9 @@ def card_quality() -> None:
         # 12.11.2026, Борис — правило 2: качество карточек пунктом не ставим — его
         # показывает страница «Проверка МойКласса» (раздел 11д), и только по карточкам
         # после разговора. proverka_mk_vmesto_punktov="0" возвращает пункт.
-        if db.get_setting("proverka_mk_vmesto_punktov", "1") == "1":
+        # Проверка 12.11 вечером: пункт идёт дежурному админу по очереди, а страница — только
+        # у Лизы. Глушим пункт, только когда он достался Лизе; остальным — как раньше.
+        if db.get_setting("proverka_mk_vmesto_punktov", "1") == "1" and _eto_liza(dezhurnyi):
             log.info("card_quality: %s — пункт не ставим, раздел 11д страницы /proverka-mk", ", ".join(parts))
             return
         _task(mk, who, None, obrezat(body, predel))
@@ -5366,7 +5369,7 @@ def _loop() -> None:
                     threading.Thread(target=proverka_mk.peresschet, daemon=True, name="proverka-mk").start()
                 except Exception:
                     log.exception("пересчёт страницы проверки МК не запустился")
-            if now.hour == 22 and _mark("proverka_mk_noch", str(_today())):
+            if _proverka_mk_noch_pora(now):
                 try:
                     from . import proverka_mk
                     threading.Thread(target=proverka_mk.noch, daemon=True, name="proverka-mk-noch").start()
@@ -5536,6 +5539,24 @@ def _loop() -> None:
         except Exception:
             log.exception("autopilot: ошибка цикла")
         time.sleep(60)
+
+
+def _eto_liza(admin: dict) -> bool:
+    """Админ из call_admins — Лиза (у неё страница «Проверка МойКласса»)."""
+    return "лиз" in str((admin or {}).get("name") or "").lower()
+
+
+def _proverka_mk_noch_pora(now) -> bool:
+    """Ночной шаг страницы проверки МК: в 22 часа, а если он не проходил больше 26 часов
+    (выкладка после 23:00, сервер лежал) — догон в ближайшую минуту, не чаще раза в 3 часа."""
+    try:
+        from . import proverka_mk
+        if not proverka_mk.noch_nuzhen(now):
+            return False
+    except Exception:
+        log.exception("ночной шаг страницы проверки МК: не понять, пора ли")
+        return False
+    return _mark("proverka_mk_noch", str(_today()) if now.hour == 22 else f"{_today()}:dogon:{now.hour // 3}")
 
 
 def _proverka_mk_sredniy() -> None:

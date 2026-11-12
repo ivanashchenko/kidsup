@@ -78,6 +78,16 @@ SEZON_OT = "2026-08-25"            # абонементы сезона — пр�
 RASPISANIE_DO = "2027-05-31"
 KESH_MINUT = 10
 R1_DEN = 5                         # столько незакрытых занятий за день — уже «день не закрыт», одна строка
+# Разделы и подразделы, которые страница пока НЕ показывает и не считает в «осталось N»
+# (проверка скептика 12.11 вечером): 5 — на настоящих файлах контроля оплат не прогонялся
+# ни разу (его пункты поэтому идут Лизе в пульт, как раньше, см. kontrol_oplat);
+# 11г — 2 строки из 5 были про запись в группу, которой в МойКлассе уже нет (ждёт, пока
+# заработает пометка удалённых записей в группы). Включить без выкладки — настройка
+# proverka_mk_vyklyucheny (номера через запятую; пустая строка «-» — показывать всё).
+VYKLYUCHENY_UMOLCH = "5,11г"
+# Оценка кадра сама говорит, что это не пропуск (группа в другой комнате, перенос, пришёл
+# в другое время) — раздел 9 такую строку не показывает (2 ложных из 4, проверка 12.11).
+_KADR_NE_PROPUSK = re.compile(r"не\s+пропуск|перенесл|перенос|в\s+друг\w+\s+(комнат|кабинет|зал)|занима\w+\s+в\s+К\d", re.I)
 
 # статусы карточек
 NOVYI_LID, NET_OTVETA, DUMAET, ZAPISALSYA, POSETIL = 125951, 345768, 146950, 125952, 125953
@@ -150,6 +160,15 @@ def _otpechatok(fakty) -> str:
 
 def pervoe_proshlogo_mesyaca(d: date) -> str:
     return (d.replace(day=1) - timedelta(days=1)).replace(day=1).isoformat()
+
+
+def vyklyucheny() -> set[str]:
+    """Номера выключенных разделов и подразделов («5», «11г»)."""
+    try:
+        v = db.get_setting("proverka_mk_vyklyucheny", VYKLYUCHENY_UMOLCH)
+    except Exception:  # noqa: BLE001
+        v = VYKLYUCHENY_UMOLCH
+    return {x.strip().lower() for x in str(v or "").replace(";", ",").split(",") if x.strip() and x.strip() != "-"}
 
 
 def _init(conn) -> None:
@@ -400,13 +419,35 @@ def r1(D: Dannye) -> list[dict]:
     lo = D.lo("1")
     vecher = D.hm >= "21:30"
     po_dnyam = defaultdict(list)
+    # Проверка 12.11: 4 строки из 8 были дублями — в той же группе в тот же день и час есть
+    # второе занятие, оно проведено, детям стоит «был» и списано. Совет «провести» дал бы
+    # второе списание. Для дубля совет другой: не проводить, записи снять, занятие удалить.
+    provedennye = defaultdict(list)
+    for l in D.lessons.values():
+        if l["status"] == 1:
+            provedennye[(l["cid"], l["date"], l["begin"])].append(l)
+    out = []
     for l in D.lessons.values():
         if not D.is27(l["cid"]) or l["status"] != 0 or not D.rbl.get(l["id"]):
             continue
         if not (lo <= l["date"] <= D.dd(-1) or (vecher and l["date"] == D.today and D.konchilos(l))):
             continue
+        dv = provedennye.get((l["cid"], l["date"], l["begin"]))
+        if dv:
+            n = len(D.rbl[l["id"]])
+            te_zhe = {r["userId"] for r in D.rbl[l["id"]]} & {r["userId"] for x in dv for r in D.rbl.get(x["id"], [])}
+            out.append(_stroka("1", f"r1:{l['id']}", gruppa=D.gruppa(l["cid"]), class_id=l["cid"], data=l["date"],
+                               kogda=_kogda(l["date"], l["begin"]),
+                               chto=(f"дубль занятия: в этот же день и час у группы есть второе занятие, оно проведено"
+                                     + (f" (те же дети: {len(te_zhe)})" if te_zhe else "") + f"; на этом записано {n}, оно не закрыто"),
+                               sdelat=("НЕ проводить (будет второе списание): снять записи и удалить это занятие"
+                                       if len(te_zhe) == n else
+                                       "НЕ проводить как есть: детей, которых нет на проведённом занятии, записать туда "
+                                       "и отметить явку по факту, а это занятие удалить"),
+                               obnovitsya=D.obnovitsya("zanyatie", l["date"]),
+                               fakty={"status": 0, "n": n, "dubl": sorted(x["id"] for x in dv)}))
+            continue
         po_dnyam[l["date"]].append(l)
-    out = []
     for den, ls in sorted(po_dnyam.items()):
         if len(ls) >= R1_DEN:
             vsego = sum(1 for l in D.lessons.values() if l["date"] == den and D.is27(l["cid"]) and D.rbl.get(l["id"]))
@@ -462,14 +503,19 @@ def r2(D: Dannye) -> list[dict]:
             continue
         if l["status"] != 1 or not D.konchilos(l):
             continue
-        if rs and l["date"] >= lo and not any(r.get("visit") for r in rs) \
+        # Проверка 12.11 (5 ложных из 12): сегодняшнее и вчерашнее занятие «проведено» без
+        # явки — явку ещё вносят (такая строка уходила сама через день), поэтому берём не
+        # позже позавчерашнего дня; а если отчёт педагога по занятию есть — занятие было:
+        # кто по отчёту «был», тот уже строка раздела 3, остальные действительно не пришли.
+        ya = (D.yavka.get(l["date"]) or {}).get("lessons") or []
+        yl = next((x for x in ya if x.get("lesson_id") == l["id"]), None)
+        s_otchetom = bool(yl and yl.get("reports"))
+        if rs and lo <= l["date"] <= D.dd(-2) and not s_otchetom and not any(r.get("visit") for r in rs) \
                 and (len(rs) >= 2 or not any(_bill(r) > 0 for r in rs)):
             spisano = sum(_bill(r) for r in rs)
             kd = kadry.get(l["id"]) or []
             kadr = (f"на кадре детей {max(int(k['deti'] or 0) for k in kd)}" if kd else "кадра с камеры нет")
-            ya = (D.yavka.get(l["date"]) or {}).get("lessons") or []
-            yl = next((x for x in ya if x.get("lesson_id") == l["id"]), None)
-            otchet = ("отчёт педагога есть" if yl and yl.get("reports") else "отчёта педагога нет")
+            otchet = "отчёта педагога нет"
             out.append(_stroka(
                 "2а", f"r2a:{l['id']}", gruppa=D.gruppa(l["cid"]), class_id=l["cid"], data=l["date"],
                 kogda=_kogda(l["date"], l["begin"]),
@@ -560,6 +606,7 @@ def _byl_ryadom(D: Dannye, uid, day: str, cid, krome_lid=None) -> bool:
 def r3(D: Dannye) -> list[dict]:
     lo = D.lo("3")
     sklejka: dict[str, dict] = {}
+    spor_staryi: set = set()          # (ребёнок, группа): отчёты спорили больше 14 дней назад
 
     def dobavit(key, d, l, **kw):
         if key in sklejka:
@@ -612,10 +659,14 @@ def r3(D: Dannye) -> list[dict]:
                 # не может, поэтому: старше 14 дней не показываем (уточнять у педагога уже
                 # поздно), а если по этому ребёнку и группе есть своя строка расхождения —
                 # отдельной строки не даём (сверка 12.11: 5 из 8 были такими повторами).
-                if day < D.dd(-HVOST_DNEY):
-                    continue
+                # Приписка «отчёты расходятся» к своей строке ребёнка нужна и для старых дней
+                # (проверка 12.11: без неё оставался голый совет «поставить пропуск»).
                 nm = str(c).split(":")[0].strip()
                 k_uid = next((r.get("uid") for r in L.get("records") or [] if (r.get("name") or "").strip() == nm), None)
+                if day < D.dd(-HVOST_DNEY):
+                    if k_uid:
+                        spor_staryi.add((k_uid, L.get("class_id")))
+                    continue
                 dobavit(f"r3k:{L.get('class_id')}:{k_uid or nm.lower()}", day, L, uid=k_uid, vid="conflict",
                         chto="два отчёта расходятся: в одном «был», в другом «не был»",
                         sdelat="уточнить у педагога и поставить явку по факту", rebenok=nm)
@@ -646,6 +697,11 @@ def r3(D: Dannye) -> list[dict]:
             if "отчёты педагогов расходятся" not in svoya["chto"]:
                 svoya["chto"] += "; отчёты педагогов расходятся между собой — уточнить у педагога"
             del sklejka[key]
+    for uid, cid in spor_staryi:
+        for k in (f"r3:rashozhdenie:{uid}:{cid}", f"r3:conflict_visit:{uid}:{cid}"):
+            if k in sklejka and "отчёты педагогов расходятся" not in sklejka[k]["chto"]:
+                sklejka[k]["chto"] += "; отчёты педагогов расходятся между собой — уточнить у педагога"
+                sklejka[k]["sdelat"] = "сначала уточнить у педагога, потом поставить явку по факту"
     for key, x in sklejka.items():
         dni = sorted(x["_dni"])
         cid = x["_cid"]
@@ -667,8 +723,13 @@ def _fams_sub(D: Dannye, s: dict) -> set:
     return {x for x in f if x}
 
 
-def _prichina_4a(D: Dannye, uid, f: str, d0: str):
-    """Одна из четырёх причин (поправка скептика) и что сделать."""
+def _prichina_4a(D: Dannye, uid, f: str, d0: str, d_posl: str = ""):
+    """Одна из четырёх причин (поправка скептика) и что сделать.
+
+    Проверка 12.11: отработать можно только пропуск, который уже случился, — пропуск ищем
+    строго раньше последнего посещения без списания (было: посещение 30.10 сверх абонемента,
+    а совет — «отметить как отработку пропуска 05.11»)."""
+    d_posl = d_posl or d0
     subs_f = [s for s in D.subs_by_user.get(uid, []) if f in _fams_sub(D, s)]
     paid_f = [s for s in subs_f if _num(s.get("payed")) > 0]
     svoi = [r for r in D.recs_by_user.get(uid, []) if D.fam(D.lessons[r["lessonId"]]["cid"]) == f]
@@ -679,7 +740,7 @@ def _prichina_4a(D: Dannye, uid, f: str, d0: str):
         l = D.lessons[r["lessonId"]]
         if not r.get("visit") and l["status"] == 1 and _bill(r) > 0 and r["id"] not in D.linked:
             try:
-                if abs((date.fromisoformat(l["date"]) - date.fromisoformat(d0)).days) <= 30:
+                if l["date"] < d_posl and (date.fromisoformat(d0) - date.fromisoformat(l["date"])).days <= 30:
                     return (f"не отмечена отработка (пропуск {_dm(l['date'])} со списанием)",
                             f"отметить посещение как отработку пропуска {_dm(l['date'])}")
             except ValueError:
@@ -749,7 +810,7 @@ def r4(D: Dannye) -> list[dict]:
     for (uid, f), xs in r4a.items():
         xs.sort(key=lambda x: x[0]["date"])
         d0 = xs[0][0]["date"]
-        pochemu, sdelat = _prichina_4a(D, uid, f, d0)
+        pochemu, sdelat = _prichina_4a(D, uid, f, d0, xs[-1][0]["date"])
         gr = sorted({D.gruppa(l["cid"]) for l, _ in xs})
         out.append(_stroka("4а", f"r4a:{uid}:{f}", rebenok=D.imya(uid), uid=uid, gruppa=", ".join(gr)[:80],
                            data=d0, kogda=", ".join(_dm(l["date"]) for l, _ in xs[:5]) + (f" и ещё {len(xs) - 5}" if len(xs) > 5 else ""),
@@ -831,9 +892,12 @@ def r5(D: Dannye) -> list[dict]:
                             else "проверить оплаты «карта» за день: какая не прошла по терминалу"),
                     ssylka="", obnovitsya=obn, fakty={"diff": diff}))
         # — СБП есть в банке, в МойКлассе нет
-        for i, a in enumerate(bank.get("free_sbp") or []):
+        # Файл, записанный до выкладки страницы, не знает max_pid: по нему не понять, внесли
+        # оплату после контроля или нет, и строка висела бы 31 день даже после правки
+        # (проверка 12.11). По таким файлам строку «СБП без оплаты» не показываем.
+        for i, a in enumerate((bank.get("free_sbp") or []) if max_pid else []):
             novye = [p for p in dnya if p.get("paymentTypeId") == T_ONLINE and abs(p["summa"] - _num(a)) < 0.5
-                     and (p["id"] > max_pid if max_pid else False)]
+                     and p["id"] > max_pid]
             if novye:
                 continue
             out.append(_stroka("5", f"r5:{day}:sbp:{a}:{i}", data=day, kogda=_kogda(day), gruppa="СБП",
@@ -922,7 +986,10 @@ def r6(D: Dannye) -> list[dict]:
         out.append(_stroka("6", f"r6:{uid}", rebenok=u["name"], uid=uid, data=perevod.get(uid) or posl[uid],
                            kogda=f"приход {_dm(perevod.get(uid) or posl[uid])}",
                            chto=f"на балансе {rub(b)}{mk}, активного абонемента нет",
-                           sdelat="создать абонемент со списанием с баланса",
+                           # проверка 12.11: семья могла уйти или отложить курс — тогда абонемент не нужен
+                           sdelat=("если ребёнок ходит — создать абонемент со списанием с баланса; если ушёл или курс "
+                                   "отложили — абонемент НЕ создавать: вернуть деньги или оставить по договорённости "
+                                   "и записать это в карточке"),
                            obnovitsya=D.obnovitsya("abonement", D.today), fakty={"balans": b}))
     return out
 
@@ -969,6 +1036,11 @@ def r7(D: Dannye) -> list[dict]:
                 para = [x for x in ss if x is not s and _num(x.get("payed")) > 0 and _num(x.get("payed")) >= _num(x.get("price")) - 1
                         and D.fam(x.get("mainClassId")) == f and (x.get("beginDate") or "")[:7] == (s.get("beginDate") or "")[:7]
                         and _perekrytie(s, x) >= 0.5]
+                # Проверка 12.11: неоплаченный абонемент на 1–2 занятия рядом с оплаченным на
+                # месяц — это доплата за занятия сверх абонемента, а не дубль; «удалить» стёрло
+                # бы настоящий долг. Дубль — когда занятий сопоставимо.
+                para = [x for x in para if not (0 < _num(s.get("visitCount")) <= 2
+                                                and _num(x.get("visitCount")) >= 2 * _num(s.get("visitCount")) + 2)]
                 if para:
                     t = para[0]
                     s_poseshch = _num(s.get("visitedCount")) > 0
@@ -996,6 +1068,15 @@ def r7(D: Dannye) -> list[dict]:
                         # возврат ровно на оплату абонемента, по которому никто не ходил (п. 3767, летние)
                         or (any(abs(abs(p["summa"]) - payed) < 1 for p in rf) and not _num(s.get("visitedCount")))):
                     vd = max(p["date"] for p in rf)
+                    # Проверка 12.11: возврат переплаты (пришёл маткапитал — вернули прежние
+                    # оплаты семьи) принят за возврат абонемента, а ребёнок ходит. Абонемент,
+                    # по которому после возврата есть посещения или впереди записи, не трогаем.
+                    svoi_gr = set(s.get("classIds") or []) | {s.get("mainClassId")}
+                    hodit = bool(svoi_gr & fut[uid]) or any(
+                        r.get("visit") and D.lessons[r["lessonId"]]["cid"] in svoi_gr
+                        and D.lessons[r["lessonId"]]["date"] >= vd for r in D.recs_by_user.get(uid, []))
+                    if hodit:
+                        continue
                     out.append(_stroka("7г", f"r7g:{s['id']}", kogda=f"возврат {_dm(vd)}",
                                        chto=f"абонемент открыт, хотя вся оплата {rub(payed)} возвращена",
                                        sdelat="закрыть абонемент", fakty={"payed": payed, "st": st},
@@ -1152,6 +1233,7 @@ def r9(D: Dannye) -> list[dict]:
         rs = D.rbl.get(lid, [])
         deti = max(int(k["deti"] or 0) for k in kd)
         byl = sum(1 for r in rs if r.get("visit"))
+        ne_propusk = any(_KADR_NE_PROPUSK.search(str(k.get("ocenka") or "")) for k in kd)
         vremya = ", ".join(sorted({str(k.get("ts") or "")[11:16] for k in kd if k.get("ts")}))
         baza = dict(gruppa=D.gruppa(l["cid"]) or (kd[0].get("class_name") or ""), class_id=l["cid"], data=l["date"],
                     kogda=_kogda(l["date"], l["begin"]), obnovitsya=D.obnovitsya("zanyatie", l["date"]))
@@ -1166,6 +1248,8 @@ def r9(D: Dannye) -> list[dict]:
                                fakty={"deti": deti, "zapisey": len(rs)}))
         if not zakryto:
             continue        # (а) и (в) — только по закрытому занятию (поправка скептика)
+        if ne_propusk:
+            continue        # оценка кадра: группа в другой комнате или ребёнок пришёл в другое время
         if deti == 0 and byl:
             out.append(_stroka("9", f"r9:{lid}:pusto", **baza,
                                chto=f"на кадрах ({vremya}) детей нет, а занятие «проведено» и «был» у {byl}",
@@ -1415,7 +1499,6 @@ def r12(D: Dannye) -> list[dict]:
     noch = _j(db.get_state("proverka_mk_raspisanie") or "{}")
     svezho = str(noch.get("ts") or "") >= D.dd(-3)
     posl = {int(k): v for k, v in (noch.get("posledniy") or {}).items()} if svezho else {}
-    gorizont = max((l["date"] for l in D.lessons.values()), default=D.today)
     for cid, c in D.classes.items():
         if not D.is27(cid) or c["status"] != "opened" or not D.active_join.get(cid):
             continue
@@ -1425,10 +1508,10 @@ def r12(D: Dannye) -> list[dict]:
         if not bud and cid not in posl:
             continue
         konec = posl.get(cid) or max(bud)
-        # без ночной проверки — только локальные занятия (полный синк берёт +62 дня).
-        # Запас две недели: у новогодних каникул следующее занятие недельной группы
-        # может лежать за краем горизонта, и неделя запаса давала ложные строки
-        if (konec < "2027-05-24") if svezho else (konec <= (date.fromisoformat(gorizont) - timedelta(days=14)).isoformat()):
+        # Проверка 12.11: без ночной проверки расписания до 31.05 правило видит только край
+        # локальной выгрузки (+62 дня), и 5 строк из 6 были ложными (группа «кончалась»
+        # перед новогодними каникулами). Поэтому 12в — только по свежей ночной проверке.
+        if svezho and konec < "2027-05-24":
             out.append(_stroka("12в", f"r12v:{cid}", gruppa=D.gruppa(cid), class_id=cid, data=D.today,
                                kogda=f"последнее занятие {_dm(konec)}",
                                chto=f"занятия в расписании кончаются {_dm(konec)}, раньше 31.05",
@@ -1478,6 +1561,8 @@ def sobrat(seychas: datetime | None = None, zapisat: bool = False) -> dict:
     # окно с 1-го числа прошлого месяца берёт только НОВЫЕ строки; открытая строка
     # живёт, пока данные не исправлены (поправка скептика)
     stroki = [r for r in stroki if not (r["pod"] in OKONNYE and r["data"] and r["data"] < D.m1 and r["key"] not in otkr)]
+    vykl = vyklyucheny()
+    stroki = [r for r in stroki if r["pod"].lower() not in vykl and r["razdel"] not in vykl]
     uniq = {}
     for r in stroki:
         uniq.setdefault(r["key"], r)
@@ -1539,7 +1624,10 @@ def _itog(D: Dannye, stroki: list[dict], oshibki: dict, seychas: datetime, ne_os
     except Exception:  # noqa: BLE001
         zakryto = 0
     razdely = []
+    vykl = vyklyucheny()
     for nomer, nazv, dengi in RAZDELY:
+        if nomer in vykl:
+            continue
         rs = sorted([r for r in stroki if r["razdel"] == nomer], key=lambda r: (r["pod"], r["data"] or "", r["key"]))
         vid = [r for r in rs if not r["ne_oshibka"] and not r["seraya"]]
         star = max((r["vozrast"] for r in vid), default=0)
@@ -1559,7 +1647,7 @@ def _itog(D: Dannye, stroki: list[dict], oshibki: dict, seychas: datetime, ne_os
     }
     return {"ts": seychas.isoformat(timespec="minutes"), "itog": itog, "razdely": razdely, "oshibki": oshibki,
             "sredniy_sync": _j(db.get_state("sredniy_sync") or "{}"),
-            "udaleno_pomecheno": {t: len(v) for t, v in D.ud.items()}}
+            "udaleno_pomecheno": {t: len(v) for t, v in D.ud.items()}, "vyklyucheny": sorted(vykl)}
 
 
 # ── кэш, фон, счётчик ─────────────────────────────────────────────────────
@@ -1747,5 +1835,20 @@ def noch(seychas: datetime | None = None, s_raspisaniem: bool = True) -> dict:
             itog["raspisanie"] = len(posl)
         except Exception:  # noqa: BLE001
             log.exception("ночная проверка расписания до 31.05 не прошла")
+    try:
+        db.set_state("proverka_mk_noch", json.dumps({"ts": seychas.isoformat(timespec="minutes"), **itog}, ensure_ascii=False))
+    except Exception:  # noqa: BLE001
+        log.exception("отметка ночного шага не сохранилась")
     peresschet(seychas)
     return itog
+
+
+def noch_nuzhen(seychas: datetime | None = None) -> bool:
+    """Пора ли запускать ночной шаг: в 22 часа — всегда; в остальное время — догон, если
+    последний успешный шаг старше 26 часов или его не было вовсе (проверка 12.11: при
+    выкладке после 23:00 страница сутки жила бы без пересчёта явки и без раздела 12в)."""
+    seychas = seychas or _now()
+    if seychas.hour == 22:
+        return True
+    ts = str(_j(db.get_state("proverka_mk_noch") or "{}").get("ts") or "")
+    return ts < (seychas - timedelta(hours=26)).isoformat(timespec="minutes")

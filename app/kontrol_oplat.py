@@ -122,7 +122,17 @@ def run(day: str | None = None, dry: bool = False) -> dict:
     # этому же файлу дня. Касса (чек КОМТЕТ, фото тетради), пункты Лене и Борису —
     # как раньше. Настройка proverka_mk_vmesto_punktov="0" возвращает всё как было.
     na_stranicu = db.get_setting("proverka_mk_vmesto_punktov", "1") == "1"
-    BLOKI_NA_STRANICU = {"A. Банк", "A. Маткапитал", "A. Возвраты", "B. Абонементы", "C. Занятия"}
+    BLOKI_NA_STRANICU = {"B. Абонементы", "C. Занятия"}
+    # Проверка 12.11 вечером: раздел 5 страницы (банк, маткапитал, возвраты) на настоящих
+    # файлах контроля оплат не прогонялся и пока выключен (proverka_mk.VYKLYUCHENY_UMOLCH).
+    # Пока он выключен, эти три блока идут Лизе пунктами, как раньше, — иначе о расхождении
+    # с банком не узнал бы никто. Включили раздел 5 настройкой — блоки уходят на страницу.
+    try:
+        from . import proverka_mk
+        if "5" not in proverka_mk.vyklyucheny():
+            BLOKI_NA_STRANICU |= {"A. Банк", "A. Маткапитал", "A. Возвраты"}
+    except Exception:  # noqa: BLE001
+        pass
     with db.get_conn() as conn:
         # платёж с id больше этого внесён после контроля — так страница узнаёт «внесли»
         R["max_pid"] = int(conn.execute("SELECT COALESCE(MAX(id), 0) FROM payments").fetchone()[0])
