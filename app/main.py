@@ -142,19 +142,15 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 _security = HTTPBasic(auto_error=False)
 
 
-def _is_owner(credentials: HTTPBasicCredentials | None) -> bool:
-    """Логин boris с паролем владельца (настройка owner_password)."""
-    owner_pw = db.get_setting("owner_password")
+def _eto_boris(credentials: HTTPBasicCredentials | None, owner_pw: str) -> bool:
     return bool(owner_pw and credentials is not None
                 and secrets.compare_digest(credentials.username, "boris")
                 and secrets.compare_digest(credentials.password, owner_pw))
 
 
-def _kto(credentials: HTTPBasicCredentials | None) -> str:
-    """Роль вошедшего: "owner" — логин boris с паролем владельца, иначе "admin".
-    Пока пароль владельца не задан, владельцем считается любой вошедший —
-    так же, как это делает check_owner."""
-    return "owner" if (_is_owner(credentials) or not db.get_setting("owner_password")) else "admin"
+def _is_owner(credentials: HTTPBasicCredentials | None) -> bool:
+    """Логин boris с паролем владельца (настройка owner_password)."""
+    return _eto_boris(credentials, db.get_setting("owner_password"))
 
 
 def _zapomnit(request: Request | None, rol: str) -> None:
@@ -179,20 +175,22 @@ def check_auth(credentials: HTTPBasicCredentials | None = Depends(_security),
     страницам admin». Владелец проходит везде, где проходит admin, — одним
     входом, без второго окна пароля между /owner и админскими страницами.
 
-    request стоит последним и с умолчанием: функцию зовут и напрямую,
-    check_auth(credentials), — такие вызовы роль просто не запоминают."""
-    if not config.APP_PASSWORD:
-        _zapomnit(request, _kto(credentials))
-        return
-    ok = (
-        credentials is not None
-        and secrets.compare_digest(credentials.username, config.APP_USER)
-        and secrets.compare_digest(credentials.password, config.APP_PASSWORD)
-    ) or _is_owner(credentials)
-    if not ok:
-        raise HTTPException(status_code=401, detail="Требуется авторизация",
-                            headers={"WWW-Authenticate": "Basic"})
-    _zapomnit(request, _kto(credentials))
+    12.11.2026: здесь же определяется роль для меню — "owner" (логин boris с паролем
+    владельца) или "admin". Пока пароль владельца не задан, владельцем считается любой
+    вошедший — так же, как это делает check_owner. request стоит последним и с
+    умолчанием: функцию зовут и напрямую, check_auth(credentials)."""
+    owner_pw = db.get_setting("owner_password")
+    owner = _eto_boris(credentials, owner_pw)
+    if config.APP_PASSWORD:
+        ok = owner or (
+            credentials is not None
+            and secrets.compare_digest(credentials.username, config.APP_USER)
+            and secrets.compare_digest(credentials.password, config.APP_PASSWORD)
+        )
+        if not ok:
+            raise HTTPException(status_code=401, detail="Требуется авторизация",
+                                headers={"WWW-Authenticate": "Basic"})
+    _zapomnit(request, "owner" if (owner or not owner_pw) else "admin")
 
 
 AUTH = [Depends(check_auth)]
