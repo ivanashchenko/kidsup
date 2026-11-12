@@ -392,15 +392,24 @@ def test_menu(c, m):
 
 def test_glavnaya(c, m):
     from app import boris_docs
-    print("Главная: переход на рабочее место роли")
-    proverka("/ админ → 303 /pult", lokaciya(c, "/") == (303, "/pult"), lokaciya(c, "/"))
-    proverka("/ владелец → /boris/docs (архив документов там свёрнут)",
-             lokaciya(c, "/", VLADELEC) == (303, "/boris/docs"), lokaciya(c, "/", VLADELEC))
-    # документ start на сервере собран 10.11 по старому меню — главной он не становится,
-    # даже когда выложен (замечание 4 проверки 12.11); открывается из списка документов
+    # 12.11.2026, вечер: Борис спросил, почему главная перекидывает на пульт и на документы,
+    # и выбрал «страницу разделов»: главная отвечает 200, на ней всё меню с пояснениями.
+    print("Главная: страница разделов")
+    r = c.get("/", auth=ADMIN, follow_redirects=False)
+    proverka("/ админ → 200, без перехода", (r.status_code, r.headers.get("location")) == (200, None),
+             (r.status_code, r.headers.get("location")))
+    proverka("у админа все четыре раздела и кнопка пульта",
+             all(x in r.text for x in ("Смена", "Группы", "Деньги", "Справка", "Открыть пульт", "href=\"/pult\"")))
+    proverka("у админа нет раздела «Владельцу» и документов", "Владельцу" not in r.text and "Ваши документы" not in r.text)
     boris_docs.save("start", "Стартовая страница (стенд)", "<!doctype html><title>стенд</title>" + "<p>стенд</p>" * 5)
-    proverka("/ владелец и выложенный start → всё равно /boris/docs",
-             lokaciya(c, "/", VLADELEC) == (303, "/boris/docs"), lokaciya(c, "/", VLADELEC))
+    boris_docs.save("stary-stend", "Старый документ (стенд)", "<!doctype html><title>стенд</title>" + "<p>стенд</p>" * 5)
+    boris_docs.v_arhiv(["stary-stend"], True)
+    r = c.get("/", auth=VLADELEC, follow_redirects=False)
+    proverka("/ владелец → 200, раздел «Владельцу» и его документы",
+             r.status_code == 200 and "Владельцу" in r.text and "Ваши документы" in r.text
+             and "Стартовая страница (стенд)" in r.text, r.status_code)
+    proverka("архивные документы на главной не показываются", "Старый документ (стенд)" not in r.text)
+    boris_docs.remove("stary-stend")      # не мешать проверкам блока «Архив» ниже
     proverka("…а сам start открывается по адресу", c.get("/boris/docs/start", auth=VLADELEC).status_code == 200)
     proverka("/ без входа → 401, куда ведёт — не видно", lokaciya(c, "/", kto=None) == (401, None))
     proverka("дашборда больше нет", not hasattr(m, "dashboard") and "GET /" in marshruty(m))
@@ -590,11 +599,11 @@ UBRANY_17 = {
 # + старая /sverka (только владельцу) и второй, мёртвый обработчик /spiski — проверяются отдельно.
 # Объединённые: переход ставим, только где цель закрывает главную нужду; остальные семь
 # открываются по адресу до шага 2 (nav.PEREEZD).
-OBEDINENY_PEREHOD = ("/", "/brief", "/boris", "/obeshchaniya")
+OBEDINENY_PEREHOD = ("/brief", "/boris", "/obeshchaniya")
 OBEDINENY_SHAG2 = {"/settings": "/owner", "/metrics": "/journal", "/segodnya": "/pult", "/spiski": "/blank-grupp",
                    "/zayavki": "/blank-grupp", "/leads": "/istochniki", "/clicks": "/istochniki"}
 # Чего не должно быть ни в меню, ни на пульте, ни на рабочих страницах.
-ZAPRET = set(UBRANY_17) | {"/sverka"} | ARHIVNYE | set(OBEDINENY_PEREHOD[1:]) | set(OBEDINENY_SHAG2)
+ZAPRET = set(UBRANY_17) | {"/sverka"} | ARHIVNYE | set(OBEDINENY_PEREHOD) | set(OBEDINENY_SHAG2)
 # Пункты раздела «Владельцу», которые админ всё же открывает, — каждый с причиной.
 VLADELCU_I_ADMINU = {
     "/pult?who=Борис": "это пульт — стартовая страница админов, колонку выбирают параметром",
@@ -701,7 +710,7 @@ def test_perehody_bez_cepochek(c, m):
             zhdem = domoy(kto) if kuda == DOMOY else quote(kuda, safe="/?=&")
             kod, loc, cel = perehod_i_cel(c, otkuda, kto)
             proverka(f"{rol}: {otkuda} → 303 {zhdem} → 200", (kod, loc, cel) == (303, zhdem, 200), (kod, loc, cel))
-        zhdem = {"/": domoy(kto), "/brief": "/liniya", "/boris": "/boris/docs" if kto == VLADELEC else "/pult",
+        zhdem = {"/brief": "/liniya", "/boris": "/boris/docs" if kto == VLADELEC else "/pult",
                  "/obeshchaniya": "/pult?who=" + quote("Лиза")}
         for otkuda in OBEDINENY_PEREHOD:
             kod, loc, cel = perehod_i_cel(c, otkuda, kto)
