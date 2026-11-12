@@ -1,0 +1,5 @@
+{"den": "2026-11-12", "istoriya_mk": {"sobytiy": 253, "po_sotrudnikam": {"admin_stoyka": 173, "admin_mk": 12, "avto": 53, "prochee": 15}, "udaleniy": 5, "v_dolg": 7, "vne_8_21": 7},
+ "oplaty": {"chislo": 12, "summa": 47187}, "probnye": {"bylo": 1, "kupili": 1},
+ "kamery": {"kadrov": 27, "oceneno": 26},
+ "otkryto": {"Борис": 67, "Лена": 38, "Лиза": 87},
+ "vyvod": "подозрительного нет: удаление абонемента исправлено в тот же день, «в долг» — 2 ученика без абонемента (на страницу проверки МК)"}
