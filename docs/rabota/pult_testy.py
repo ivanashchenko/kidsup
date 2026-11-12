@@ -335,10 +335,45 @@ def test_utro():
         pult.today, pult.duty, config.DB_PATH = st_today, st_duty, staryj
 
 
+def test_boris_desyat():
+    # 12.11.2026, Борис: в его колонке 10 решений сверху, остальное — «Позже».
+    # И номер пункта виден у каждого пункта инбокса (вопрос «где их видно?»).
+    print("Колонка владельца: 10 + «Позже», номера пунктов")
+    from app import pult
+    lis = [(False, True, i % 3 == 0, f"<li>п{i}</li>", {}) for i in range(14)]
+    lis.append((True, False, False, "<li>сделан</li>", {}))
+    h = pult._boris_desyat(lis)
+    proverka("сверху ровно десять", h.split("<details")[0].count("<li>п"), 10)
+    proverka("порядок ленты сохранён", h.index("<li>п0</li>") < h.index("<li>п9</li>"), True)
+    proverka("одиннадцатый — под «Позже»", h.index("<li>п10</li>") > h.index("Позже · 4"), True)
+    proverka("хвосты прошлых дней — тоже решения", "<li>п3</li>" in h, True)
+    proverka("сделанный не попадает", "сделан" in h, False)
+    proverka("заголовок «10 из 14»", "Решения · 10 из 14" in h, True)
+    mal = pult._boris_desyat(lis[:4])
+    proverka("до десяти — без «Позже»", ("Позже" in mal, "Решения · 4<" in mal), (False, True))
+    proverka("пусто — пусто", pult._boris_desyat([]), "")
+    st_lenta, st_paid = pult._lenta, pult._paid_recently
+    try:
+        pult._paid_recently = lambda days=30: {}
+        pult._lenta = lambda day, who, items: [
+            {"kind": "inbox", "id": 6140 + n, "t": "", "text": f"Решить вопрос {n}", "done": 0,
+             "note": None, "tag": "обещание", "phone": "", "tries": 0, "prio": 100 + n, "ves": 1}
+            for n in range(12)]
+        kol = pult._col("Борис", [], True, "2026-11-12", "18:00")
+        proverka("в колонке Бориса «Позже · 2»", "Позже · 2" in kol, True)
+        proverka("номер пункта виден", "№6140<" in kol, True)
+        proverka("блоков дежурной у Бориса нет", "Обзвон базы" in kol or "Хвосты прошлых" in kol, False)
+        kol_l = pult._col("Лена", [], True, "2026-11-12", "18:00")
+        proverka("у Лены блоки как раньше, без «Позже»", "Позже" in kol_l, False)
+        proverka("у Лены номер тоже виден", "№6141<" in kol_l, True)
+    finally:
+        pult._lenta, pult._paid_recently = st_lenta, st_paid
+
+
 def main():
     for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_bloki, test_audit,
               test_data_gruppy, test_povtor,
-              test_zayavki_odin_punkt, test_utro):
+              test_zayavki_odin_punkt, test_utro, test_boris_desyat):
         t()
         print()
     if oshibok:
