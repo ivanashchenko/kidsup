@@ -574,8 +574,10 @@ def _najti_rebenka(D: Dannye, imya: str, cid=None):
     toks = [t for t in re.findall(r"[а-яё]{3,}", (imya or "").lower().replace("ё", "е")) if t not in _SLUZH_SLOVA]
     if len(toks) < 2:
         return None
+    # служебные карточки («ДУБЛЬ Ивановы Маша и Петя», «Номер Ивановых») — не дети
     hits = [uid for uid, u in D.users.items()
-            if all(t in u["name"].lower().replace("ё", "е") for t in toks[:2])]
+            if all(t in u["name"].lower().replace("ё", "е") for t in toks[:2])
+            and not re.match(r"\s*(дубль|номер)\b", u["name"].lower())]
     if not hits:
         return None
     if cid is not None:

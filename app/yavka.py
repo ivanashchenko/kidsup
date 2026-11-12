@@ -123,6 +123,25 @@ def _tok_match(t: str, f: str) -> bool:
     return False
 
 
+def _tok_match_odno(t: str, f: str) -> bool:
+    """Одно слово в отчёте («Рома», «Кира», «Саша») — это имя ребёнка, а не фамилия.
+
+    12.11.2026, Лиза: «очень много пунктов, где ты пишешь „по отчёту педагога был / не был“,
+    а отчёт указан неправильно». Английский 02.11, 19:00: «Не было: … Рома» общим правилом
+    префикса сошлось с девочкой с фамилией на «Роман…» (рома → романова), и она, отмеченная
+    в том же отчёте в «Были», попала в «по отчёту не был». Поэтому одно слово сравниваем строго:
+    точное совпадение, уменьшительное из DIM, окончание в одну букву (Софья / София) или
+    опечатка в одну букву при той же длине."""
+    if t == f:
+        return True
+    for x in (t,) + tuple(DIM.get(t, ())):
+        if f == x:
+            return True
+        if len(x) >= 4 and abs(len(f) - len(x)) <= 1 and f[:len(x) - 1] == x[:len(x) - 1]:
+            return True
+    return len(t) >= 5 and abs(len(t) - len(f)) <= 1 and difflib.SequenceMatcher(None, t, f).ratio() >= 0.8
+
+
 def name_matches(report_name: str, crm_name: str) -> bool:
     toks = _norm(report_name)
     full = _norm(crm_name)
@@ -130,6 +149,7 @@ def name_matches(report_name: str, crm_name: str) -> bool:
         return False
     if len(toks) == 1 and len(toks[0]) < 3:
         return False
+    odno = len(toks) == 1
     used = set()
     for t in toks:
         hit = None
@@ -140,7 +160,7 @@ def name_matches(report_name: str, crm_name: str) -> bool:
                 if f.startswith(t):
                     hit = i
                     break
-            elif _tok_match(t, f):
+            elif (_tok_match_odno(t, f) if odno else _tok_match(t, f)):
                 hit = i
                 break
         if hit is None:
@@ -215,6 +235,19 @@ def _split_names(line: str) -> list[tuple[str, str]]:
     return out
 
 
+def _spisok_imen(rest: str) -> bool:
+    """После «Не было:» в той же строке — список имён через запятую, а не фраза.
+
+    12.11.2026, Лиза: «Не было: Иванов Петя, Сидорова Маша, Козлов Ваня» (ПШ 05.11)
+    и «Не было: Петров Рома, Орлова Мира» (ПШ 29.10) — больше трёх слов, маркер не
+    узнавался, и строка уходила в «были»: отсутствующие дети стояли в разделе 3 как
+    «по отчёту был» и «был без записи». Список — это запятые, в каждой части не больше
+    трёх слов, и хотя бы одно имя разобралось."""
+    chasti = [c for c in re.split(r"[,;]", re.sub(r"\([^)]*\)", " ", rest)) if c.strip(" .")]
+    return (len(chasti) >= 2 and all(len(_norm(c)) <= 3 for c in chasti)
+            and bool(_split_names(rest)))
+
+
 def _time_of(s: str, msg_date: dt.date):
     """«16:00 Имя» / «10.00ч» / «11ч» → ('16:00', остаток) или None. Дата — не время."""
     if _date_in(s, msg_date):
@@ -274,7 +307,7 @@ def parse_report(text: str, msg_ts: str) -> list[dict]:
             mode = "present"; saw_marker = True
             continue
         ma = RE_ABSENT.match(low)
-        if ma and (not ma.group(2) or len(_norm(ma.group(2))) <= 3):
+        if ma and (not ma.group(2) or len(_norm(ma.group(2))) <= 3 or _spisok_imen(s[ma.start(2):])):
             mode = "absent"; saw_marker = True
             rest = s[ma.start(2):].strip() if ma.group(2) else ""
             if rest:
@@ -485,6 +518,11 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
             out.append(L)
         return out
 
+    # имена (не фамилии): уменьшительные и полные из DIM плюс второе слово карточек дня
+    # («Фамилия Имя …») — для запасного поиска по фамилии в find()
+    imena = set(DIM) | {v for vs in DIM.values() for v in vs}
+    imena |= {t[1] for t in (_norm(nm) for nm in names.values()) if len(t) >= 2}
+
     def find(name, pool):
         hits = []
         for L in pool:
@@ -495,13 +533,17 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
         if hits:
             return hits
         # имя не сошлось («Степанян Дана» — в карточке «Даниелла»): если среди
-        # кандидатов ровно один ребёнок с такой фамилией — это он
-        toks = [t for t in _norm(name) if len(t) >= 5]
+        # кандидатов ровно один ребёнок с такой фамилией — это он.
+        # 12.11.2026, Лиза: сравнивать здесь можно только фамилии. Раньше шли все слова
+        # от пяти букв, и «Орлова София» (её нет в записях) сошлась по имени «София»
+        # с Лебедевой Софией из соседней группы ПШ в 18:00 — та, отмеченная в своём
+        # отчёте «была», попала в «два отчёта расходятся» (имена здесь выдуманные).
+        toks = [t for t in _norm(name) if len(t) >= 5 and t not in imena]
         if len(_norm(name)) >= 2 and toks:
             for L in pool:
                 for r in L.get("records") or []:
                     nm = names.get(int(r["userId"]), "") if r.get("userId") else ""
-                    ft = _norm(nm)
+                    ft = [f for f in _norm(nm) if f not in imena]
                     if any(t == f or (len(f) >= 5 and difflib.SequenceMatcher(None, t, f).ratio() >= 0.85) for t in toks for f in ft):
                         hits.append((L, r))
             if len(hits) != 1:
@@ -509,7 +551,7 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
         return hits
 
     ne_razobrano = []
-    for b in reports:
+    for bi, b in enumerate(reports):
         pool = candidates(b)
         time_note = ""
         if not pool and b["time"]:
@@ -521,7 +563,7 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
                                  "names": [n for n, _, _ in all_names], "why": "нет занятия с таким предметом в этот день"})
             continue
         touched = set()
-        assigned = []  # (lesson_id, record_id, prev_report, prev_note) — чтобы откатить блок-пустышку
+        assigned = []  # (lesson_id, record_id, prev_report, prev_note, prev_blok, prev_imya) — чтобы откатить блок-пустышку
         extra = {"unmatched": [], "ambiguous": []}
         for n, note, kind in all_names:
             hits = find(n, pool)
@@ -530,10 +572,24 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
             if len(hits) == 1:
                 L, r = hits[0]
                 rec = next(x for x in by_id[L["id"]]["records"] if x["record_id"] == r["id"])
-                assigned.append((L["id"], r["id"], rec["report"], rec["note"]))
+                if rec.get("blok") == bi and rec.get("po_imeni") != n:
+                    # Два разных имени одного отчёта легли на одного ребёнка — одно из них
+                    # сошлось ошибочно (12.11: «Алина Романова» в «Были» и «Рома» в «Не было» —
+                    # имя выдуманное, шаблон настоящий).
+                    # Оставляем более полное имя, второе — в спорные, а не в «отчёты расходятся».
+                    if len(_norm(n)) > len(_norm(rec.get("po_imeni") or "")):
+                        extra["ambiguous"].append((L["id"], {"name": rec["po_imeni"], "kind": rec["report"], "note": rec["note"],
+                                                             "variants": [rec["name"]]}))
+                        rec["report"], rec["po_imeni"] = kind, n
+                        rec["note"] = (note + (f"; {time_note}" if time_note else "")).strip("; ")
+                    else:
+                        extra["ambiguous"].append((L["id"], {"name": n, "kind": kind, "note": note, "variants": [rec["name"]]}))
+                    continue
+                assigned.append((L["id"], r["id"], rec["report"], rec["note"], rec.get("blok"), rec.get("po_imeni")))
                 if rec["report"] and rec["report"] != kind:
                     by_id[L["id"]]["conflicts"].append(f"{rec['name']}: в одном отчёте «был», в другом «не был»")
                 rec["report"] = kind
+                rec["blok"], rec["po_imeni"] = bi, n
                 rec["note"] = (note + (f"; {time_note}" if time_note else "")).strip("; ")
                 touched.add(L["id"])
             elif len(hits) > 1:
@@ -546,7 +602,7 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
         # имена без адреса кладём в занятие, где нашлось больше всего детей этого
         # блока (несколько занятий в одно время: ПШ вт-чт и ПШ вт-пт в 16:00,
         # логопед 11:40 и «Музыка с мамой» 11:45), иначе — в первое из кандидатов
-        home = collections.Counter(lid for lid, _, _, _ in assigned).most_common(1)
+        home = collections.Counter(a[0] for a in assigned).most_common(1)
         home = home[0][0] if home else pool[0]["id"]
         for k in ("ambiguous", "unmatched"):
             extra[k] = [(t if t is not None else home, item) for t, item in extra[k]]
@@ -555,9 +611,9 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
         # блок, где почти никто не нашёлся, — не из этих групп (педагог поставил не ту дату,
         # «29/09» вместо 28.09) или не отчёт вовсе: откатываем, чтобы не засорять занятия
         if len(all_names) >= 3 and len(assigned) < 0.4 * len(all_names):
-            for lid, rid, prev_r, prev_n in assigned:
+            for lid, rid, prev_r, prev_n, prev_b, prev_i in assigned:
                 rec = next(x for x in by_id[lid]["records"] if x["record_id"] == rid)
-                rec["report"], rec["note"] = prev_r, prev_n
+                rec["report"], rec["note"], rec["blok"], rec["po_imeni"] = prev_r, prev_n, prev_b, prev_i
             ne_razobrano.append({"ts": b["ts"], "author": b["author"], "subj": b["subj"], "time": b["time"],
                                  "names": [n for n, _, _ in all_names],
                                  "why": f"из {len(all_names)} имён в записях этого дня нашлись {len(assigned)} — возможно, отчёт за другой день"})
