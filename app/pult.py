@@ -649,6 +649,30 @@ def _inbox_tries(conn) -> None:
             pass
 
 
+BORIS_SRAZU = 10
+
+
+def _boris_desyat(lis: list) -> str:
+    """Колонка владельца: десять открытых решений сверху, остальные под «Позже».
+
+    lis — строки колонки из _col в порядке ленты (_lenta: уровень, место из
+    prio, время): (сделано, открыто, хвост, html, пункт). Хвосты прошлых дней
+    у владельца — те же решения, отдельного блока по датам у него нет."""
+    otkr = [h for d_, o_, st_, h, _ in lis if o_]
+    if not otkr:
+        return ""
+    srazu, pozzhe = otkr[:BORIS_SRAZU], otkr[BORIS_SRAZU:]
+    out = (f"<li style='margin:14px 0 4px;font-size:12px;font-weight:800;letter-spacing:.05em;"
+           f"text-transform:uppercase;color:#312783;border-bottom:1px solid #e4e2f0;padding-bottom:2px'>"
+           f"Решения · {len(srazu)}" + (f" из {len(otkr)}" if pozzhe else "") + "</li>")
+    out += "".join(srazu)
+    if pozzhe:
+        out += (f"<details style='margin:10px 0 4px'><summary style='cursor:pointer;color:#6c6a86;font-size:13px;"
+                f"font-weight:700'>Позже · {len(pozzhe)}</summary>"
+                f"<ol style='list-style:none;padding:0;margin:0'>{''.join(pozzhe)}</ol></details>")
+    return out
+
+
 def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str = "") -> str:
     """Метка СЕЙЧАС идёт за часами: текущий — несделанный пункт с самым поздним временем,
     которое уже наступило (мы внутри его окна). Несделанные пункты с более ранним временем —
@@ -814,13 +838,19 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             ctrl += (f" <a href='#' style='font-size:12px;color:#6c6a86;white-space:nowrap' "
                      f"title='Комментарий к пункту: что сделано, причина, договорённость — пункт не закрывается' "
                      f"onclick=\"pultNote({it['id']});return false\">✎ комментарий</a>")
+        # 12.11.2026, Борис о «п. 6140»: «что за странные номера? И где их видно?»
+        # Номер пункта был только в базе, а ассистент ссылался на него в чатах.
+        # Теперь он виден у каждого пункта — мелко, в конце строки.
+        nomer = (f" <span style='font-size:11px;color:#9a98b0;white-space:nowrap' "
+                 f"title='Номер пункта — по нему его можно назвать в чате'>№{it['id']}</span>"
+                 if it["kind"] == "inbox" else "")
         lis.append((it["done"] == 1, it["done"] == 0, bool(it.get("staryj")),
             head + f"<li style='margin:7px 0;{st}'><label style='display:flex;gap:8px;align-items:flex-start;cursor:pointer'>"
             f"<input type='checkbox' {'checked' if it['done'] == 1 else ''} style='margin-top:4px;width:18px;height:18px;flex:none' "
             f"onchange=\"{done_js}\">"
             f"<span>{badge}"
             + (f"<b>{html.escape(it['t'])}</b> — " if it["t"] and it["kind"] == "task" else "")
-            + f"{text_html}{tel}{extra}{ctrl}</span></label></li>", it))
+            + f"{text_html}{tel}{extra}{ctrl}{nomer}</span></label></li>", it))
     done_html = "".join(h for d_, o_, st_, h, _ in lis if d_)
     # 22.09.2026. Незакрытые дела прошлых дней раньше просто исчезали в
     # полночь — так пропало 261 обещание семьям. Теперь они видны, но не в
@@ -833,7 +863,16 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     # «Горит» без пожара приучает не смотреть на него, когда пожар будет.
     POKAZ = 5
     body = ""
-    for key, nazv in BLOKI:
+    if who == "Борис":
+        # 12.11.2026, Борис: «Три правила, которые реально сократят списки…
+        # в вашем списке 10 решений, остальное — под „Позже“» — «да».
+        # У владельца не смена, а решения: блоки дежурной («Пробные на
+        # сегодня», «Чистка базы») и хвосты по датам ему не помогают. Десять
+        # первых по важности (уровень и место из prio, как разобрано вручную;
+        # без prio — по словам) видны сразу, остальные свёрнуты.
+        body = _boris_desyat(lis)
+        segodnya, staryj = [], []
+    for key, nazv in (() if who == "Борис" else BLOKI):
         v_bloke = [h for h, i in segodnya if i.get("blok") == key]
         if not v_bloke:
             continue
