@@ -26,9 +26,12 @@ kidsup.db. Рядом сервер держит vhody.kopiya.db — только
 
 Пароли и ключи нигде не печатаются и не пишутся в журнал. Тело запросов в журнал не пишется.
 
-Что делают другие исполнители плана: страницу /owner и управление входами (spisok,
-sostoyanie, starye_vyklyuchit, консольная команда) — Б; права страниц владельца
-(mozhno_vladelcu целиком, списки SLUZH_*, PEREHOD_ADMIN, X-Kak) — В.
+Управление входами — только владелец, блок «Входы» на /owner (blok_vladelca,
+deystvie_vladelca): каждое действие подтверждается его паролем. Запасной путь владельца —
+консольная команда на сервере: python3 -m app.vhod parol boris.
+
+Что делает исполнитель В плана: права страниц владельца (mozhno_vladelcu целиком, списки
+SLUZH_*, PEREHOD_ADMIN, X-Kak).
 """
 from __future__ import annotations
 
@@ -96,7 +99,7 @@ ZAPISI = (
 
 # Права по адресам (раздел 5 плана). Пути — строки; сравнение «равен или начинается с
 # записи + "/"». Списки заполняет исполнитель В; здесь — заготовки, чтобы имена были.
-SLUZH_TOCHNO: frozenset = frozenset()        # адреса владельца, открытые ключу рутин (точно)
+SLUZH_TOCHNO: frozenset = frozenset({"/api/vhod/sostoyanie"})   # адреса владельца, открытые ключу рутин (точно)
 SLUZH_PREFIKS: tuple = ()                    # … и с продолжением
 TOLKO_VYKLADKA: frozenset = frozenset()      # выкладка, перезапуск, копия базы, настройки
 TOLKO_CHELOVEK: frozenset = frozenset()      # /owner, /owner/vhody, /settings — только человеку
@@ -1189,6 +1192,617 @@ def dobavit(login: str, imya: str, sutki: bool = False) -> str:
     return ""
 
 
+# --- страница владельца: блок «Входы» (исполнитель Б) ----------------------------------------
+# Данные для блока и для /api/vhod/sostoyanie — без хешей, паролей и ключей. Действия —
+# deystvie_vladelca(): каждое подтверждается паролем владельца (поле moy_parol): без этого
+# скрипт из документа, который служебный вход положил в /boris/docs, мог бы менять входы от
+# имени владельца. Окна «подтверждено на 10 минут» нет нарочно.
+
+PODTV = "boris:podtv"            # счётчик неверных подтверждений — отдельно от входа boris
+SROK_OKNA_VYKLADKI = 2 * 3600    # «Разрешить Клоду выкладку на 2 часа»
+NAZVANIE_KLYUCHA = {"klod": "Ключ рутин", "klod-vykladka": "Ключ выкладки"}
+KUDA_KLYUCH = {
+    "klod": "в защищённую форму Claude для app.kidsup.ru (тип «Bearer») в основном окружении — там, где работают рутины",
+    "klod-vykladka": "в защищённую форму Claude для app.kidsup.ru (тип «Bearer») в отдельном окружении «KidsUP выкладка»",
+}
+ROL_SLOVOM = {"admin": "админ", "owner": "владелец", "sluzh": "ключ рутин", "vykladka": "ключ выкладки"}
+
+
+def kogda(x) -> str:
+    """Время словами: «3 мин назад», «сегодня 09:02», «вчера 23:13», «12.11 22:41»."""
+    t = _iz_iso(x) if isinstance(x, str) else x
+    if not t:
+        return ""
+    d, n = datetime.fromtimestamp(t, MSK), datetime.fromtimestamp(seychas(), MSK)
+    dt = seychas() - t
+    if 0 <= dt < 60:
+        return "только что"
+    if 0 <= dt < 3600:
+        return f"{int(dt // 60)} мин назад"
+    if d.date() == n.date():
+        return "сегодня " + d.strftime("%H:%M")
+    if d.date() == (n - timedelta(days=1)).date():
+        return "вчера " + d.strftime("%H:%M")
+    return d.strftime("%d.%m %H:%M")
+
+
+def spisok() -> list:
+    """Учётные записи для блока «Входы»: без хешей. Сначала шесть постоянных, потом добавленные."""
+    t = seychas()
+    with _baza() as c:
+        rows = c.execute("SELECT * FROM vhody").fetchall()
+        seansy = {r[0]: r[1] for r in c.execute('SELECT login, COUNT(*) FROM seansy WHERE "do">? GROUP BY login', (t,))}
+        zaperty = set()
+        for r in c.execute("SELECT login, COUNT(*) AS n, MAX(ts) AS m FROM popytki WHERE ts>? AND login<>'' "
+                           "GROUP BY login, adres HAVING n>=5", (t - 3600,)):
+            if r["m"] + (900 if r["n"] >= 15 else 300 if r["n"] >= 10 else 60) > t:
+                zaperty.add(r["login"])
+    poryadok = {z[0]: i for i, z in enumerate(ZAPISI)}
+    rows = sorted(rows, key=lambda r: (poryadok.get(r["login"], 99), r["sozdan"] or "", r["login"]))
+    out = []
+    for r in rows:
+        sdo = _iz_iso(r["staryy_do"])
+        out.append({
+            "login": r["login"], "imya": r["imya"], "rol": r["rol"], "vkl": bool(r["vkl"]),
+            "zadan": bool(r["hesh"]),                 # задан пароль (человеку) или выпущен ключ (служебной)
+            "parol_ot": r["parol_ot"], "forma_vhod": r["forma_vhod"],
+            "posl_zapros": r["posl_zapros"], "posl_adres": r["posl_adres"],
+            "do": r["do"], "istek": _istekla(r), "seansov": int(seansy.get(r["login"], 0)),
+            "pauza": r["login"] in zaperty,
+            "prezhniy_klyuch_do": r["staryy_do"] if (r["hesh_staryy"] and sdo and sdo > t) else None,
+        })
+    return out
+
+
+def obshchie_ustroystva() -> list:
+    """Браузеры, помеченные общим компьютером: кто входил и когда последний раз."""
+    with _baza() as c:
+        imena = {r["login"]: r["imya"] or r["login"] for r in c.execute("SELECT login, imya FROM vhody")}
+        rows = c.execute("SELECT id, loginy, posl FROM ustroystva WHERE obshchiy=1 ORDER BY posl DESC").fetchall()
+    out = []
+    for r in rows:
+        try:
+            loginy = list(json.loads(r["loginy"] or "[]"))
+        except ValueError:
+            loginy = []
+        out.append({"id": r["id"], "imena": [imena.get(x, x) for x in loginy], "posl": _iso(r["posl"]) if r["posl"] else None})
+    return out
+
+
+def _prezhniy_parol_deystvuet() -> bool:
+    """Прежний пароль владельца ещё принимается в сером окне."""
+    return bool(db.get_setting("owner_password")) and starye_vklyucheny() and _staryy_boris_v_okne()
+
+
+def sostoyanie(s_ustroystvami: bool = False) -> dict:
+    """Всё о входах без секретов: у кого задан пароль, даты входов, выпущены ли ключи, срок
+    старых входов, хвост общего входа, отказы ключу рутин, автоматика, строки «Важное»."""
+    t = seychas()
+    s = _nastroyki("vhod_zavedeny", "vhod_starye_do", "vhod_starye_vykl", "vhod_okno_vykladki_do")
+    with _baza() as c:
+        hv = [dict(r) for r in c.execute(
+            "SELECT login, adres, chem, SUM(n) AS n, MAX(posl) AS posl FROM hvost WHERE posl>? "
+            "GROUP BY login, adres, chem ORDER BY posl DESC", (_iso(t - 3 * 86400),))]
+    sutki = _iso(t - 86400)
+    with db.get_conn() as c:
+        _zhurnal_init(c)
+        vazhnoe = [dict(r) for r in c.execute(
+            "SELECT ts, imya, chto FROM deystviya WHERE vazhnoe=1 AND ts>? ORDER BY id DESC LIMIT 30",
+            (_iso(t - 7 * 86400),))]
+        otkazy = [dict(r) for r in c.execute(
+            "SELECT put, COUNT(*) AS n, MAX(ts) AS posl FROM deystviya WHERE login='klod' AND kod=403 AND ts>? "
+            "GROUP BY put ORDER BY n DESC LIMIT 30", (_iso(t - 7 * 86400),))]
+    okno = _iz_iso(s.get("vhod_okno_vykladki_do"))
+    ustr = obshchie_ustroystva()
+    return {
+        "seychas": _iso(t),
+        "vhody": spisok(),
+        "starye": {
+            "zavedeny": bool(s.get("vhod_zavedeny")),
+            "vklyucheny": starye_vklyucheny(),
+            "do": s.get("vhod_starye_do"),
+            "vyklyucheny_kogda": s.get("vhod_starye_vykl"),
+            "prezhniy_parol_vladelca": _prezhniy_parol_deystvuet(),
+            "hvost": hv,
+            "obshchiy_za_sutki": sum(int(h["n"] or 0) for h in hv if h["login"] == "admin" and (h["posl"] or "") > sutki),
+        },
+        "avtomatika_posl": _iso(POSL_AVTO[0]) if POSL_AVTO[0] else None,
+        "vazhnoe": vazhnoe,
+        "klodu_otkazano": otkazy,
+        "okno_vykladki_do": s.get("vhod_okno_vykladki_do") if (okno and okno > t) else None,
+        "obshchie_kompyutery": ustr if s_ustroystvami else [{"imena": u["imena"], "posl": u["posl"]} for u in ustr],
+    }
+
+
+def otmetit_vazhnoe(chto: str, imya: str = "сервер") -> None:
+    """Строка «Важное» в журнал без запроса (консольная команда, автопилот). Секретов не писать."""
+    with db.get_conn() as c:
+        _zhurnal_init(c)
+        c.execute("INSERT INTO deystviya (ts, login, imya, rol, sposob, metod, put, kod, chto, adres, rutina, vazhnoe) "
+                  "VALUES (?,?,?,?,?,?,?,?,?,?,?,1)", (_iso(), "", imya, "", "", "", "", None, (chto or "")[:300], "", ""))
+
+
+def starye_proverit() -> tuple:
+    """Предохранители кнопки «Отключить старые входы» → (отказ словами или "", [предупреждения])."""
+    t = seychas()
+    lyudi = spisok()
+    boris = next((z for z in lyudi if z["login"] == "boris"), None)
+    if boris is None or not boris["zadan"]:
+        return ("Сначала задайте себе новый пароль: без него после отключения вы не войдёте на эту страницу.", [])
+    pred = []
+    klod = next((z for z in lyudi if z["login"] == "klod"), None)
+    posl = _iz_iso(klod["posl_zapros"]) if klod else None
+    if klod is None or not klod["zadan"]:
+        pred.append("Ключ рутин Клода ещё не выпущен: рутины ходят общим входом и после отключения остановятся.")
+    elif posl is None or t - posl > 86400:
+        pred.append("Ключ рутин Клода не делал запросов последние сутки: похоже, рутины ещё ходят общим входом.")
+    with _baza() as c:
+        n = c.execute("SELECT COALESCE(SUM(n), 0) FROM hvost WHERE login='admin' AND posl>?",
+                      (_iso(t - 3 * 86400),)).fetchone()[0]
+    if n:
+        pred.append(f"Общим входом admin пользовались за последние 3 дня ({n} запросов) — кто и откуда, видно ниже.")
+    ne_vhodili = [z["imya"] for z in lyudi if z["rol"] == "admin" and z["vkl"] and not z["do"] and not z["forma_vhod"]]
+    if ne_vhodili:
+        pred.append("Ещё не входили через форму: " + ", ".join(ne_vhodili) + ".")
+    return ("", pred)
+
+
+def starye_vyklyuchit(kem: str = "владелец") -> str:
+    """«Отключить старые входы»: общий admin и прежний пароль владельца больше не принимаются
+    нигде, любой браузер без входа получает форму, а не серое окно. "" — готово, иначе отказ.
+    owner_password затирается длинной случайной строкой, а не удаляется: прежний код при
+    пустом значении открыл бы страницы владельца общему логину (откат на старую версию).
+    Кнопки «включить обратно» нет: аварийный вход — временная личная запись на 24 часа."""
+    otkaz_, _ = starye_proverit()
+    if otkaz_:
+        return otkaz_
+    ts = _iso()
+    db.set_setting("vhod_starye_do", ts)             # срок «сейчас» — раньше всего остального
+    db.set_setting("vhod_zavedeny", "1")
+    db.set_setting("owner_password", secrets.token_urlsafe(48))
+    db.set_setting("vhod_starye_vykl", ts)
+    _POSL_STARYE[0] = False
+    soobshchit_borisu("app.kidsup.ru: старые входы отключены (" + kem + "). Общий пароль admin и прежний пароль "
+                      "владельца больше не принимаются; вход — только личный, на странице app.kidsup.ru/vhod. "
+                      "Аварийный вход — «Добавить вход» на /owner, временный на 24 часа.",
+                      chto="старые входы отключены: " + kem)
+    return ""
+
+
+def starye_po_sroku() -> str:
+    """Автовыключение по сроку (зовёт автопилот). До срока меньше двух часов: ключ рутин
+    работал последние сутки и у владельца задан новый пароль — выключить (с затиранием
+    owner_password); иначе сдвинуть срок на сутки и сообщить владельцу причину.
+    → "" (рано или уже выключены), "vyklyucheny", "sdvinuto"."""
+    s = _nastroyki("vhod_zavedeny", "vhod_starye_do", "vhod_starye_vykl")
+    do = _iz_iso(s.get("vhod_starye_do"))
+    if not s.get("vhod_zavedeny") or s.get("vhod_starye_vykl") or do is None:
+        return ""
+    t = seychas()
+    if do - t > 7200:
+        return ""
+    boris, klod = _zapis("boris"), _zapis("klod")
+    posl = _iz_iso(klod["posl_zapros"]) if klod is not None else None
+    prichiny = []
+    if boris is None or not boris["hesh"]:
+        prichiny.append("у вас не задан новый пароль")
+    if klod is None or not klod["hesh"]:
+        prichiny.append("ключ рутин Клода не выпущен")
+    elif posl is None or t - posl > 86400:
+        prichiny.append("ключ рутин Клода не работал последние сутки")
+    if not prichiny:
+        return "vyklyucheny" if starye_vyklyuchit("сами, по сроку") == "" else ""
+    novyy = _iso(max(do, t) + 86400)
+    db.set_setting("vhod_starye_do", novyy)
+    soobshchit_borisu("app.kidsup.ru: общий вход не отключён — " + "; ".join(prichiny) + ". Срок сдвинут на сутки, до "
+                      + kogda(novyy) + ". Отключить можно кнопкой на /owner.",
+                      chto="общий вход не отключён, срок сдвинут на сутки: " + "; ".join(prichiny))
+    return "sdvinuto"
+
+
+_POSL_SROK = [0.0]
+
+
+def avtopilot_tik() -> None:
+    """Из цикла автопилота: проверка срока старых входов — не чаще раза в 10 минут."""
+    t = time.time()
+    if t - _POSL_SROK[0] < 600:
+        return
+    _POSL_SROK[0] = t
+    starye_po_sroku()
+
+
+def podtverdit(request, moy_parol: str) -> str:
+    """Подтверждение действия паролем владельца: "" — подошёл, иначе отказ словами.
+    По хешу владельца, а пока новый пароль не задан — по прежнему. Промахи считаются, как
+    на форме входа (попытка пишется до проверки): 5 подряд — пауза."""
+    if not moy_parol:
+        return "Введите ваш нынешний пароль: без него ничего не меняется."
+    adr = adres(request)
+    try:
+        ustr = _ustr_id(request)
+    except Exception:  # noqa: BLE001
+        ustr = ""
+    with _ZAMOK_POPYTOK:
+        p = pauza(PODTV, adr, ustr)
+        if p > 0:
+            return tekst_pauzy(p)
+        popytka(PODTV, adr)
+    z = _zapis("boris")
+    ok = False
+    try:
+        for v in [moy_parol] + ([na_latinicu(moy_parol)] if est_kirillica(moy_parol) else []):
+            if z is not None and z["hesh"]:
+                ok = parol_veren(v, z["hesh"])
+            else:
+                parol_veren(v, None)
+                own = db.get_setting("owner_password")
+                ok = bool(own) and _ravny(v, own)
+            if ok:
+                break
+    except Zanyat:
+        return "Сервер занят. Попробуйте ещё раз через минуту."
+    if not ok:
+        return "Ваш пароль не подошёл — ничего не изменено."
+    uspeh(PODTV, adr)
+    return ""
+
+
+def deystvie_vladelca(request, f) -> dict:
+    """POST /owner/vhody. f — поля формы. Зовёт только обработчик владельца, уже проверивший:
+    человек-владелец, вошёл через форму. → {"msg"|"osh": текст, "klyuch": (логин, ключ) —
+    показать один раз, "predupr": [предупреждения — нужно второе подтверждение]}.
+    В журнал идёт только название действия и логины — паролей и ключей там нет."""
+    def pole(n):
+        return str(f.get(n) or "")
+    d, _, arg = pole("deystvie").strip().partition(":")
+    request.state.chto = "входы: " + (d or "?")[:20] + " — отказ"
+    prichina = podtverdit(request, pole("moy_parol"))
+    if prichina:
+        return {"osh": prichina}
+    ya = iz(request)
+
+    def gotovo(chto, msg, **kw):
+        request.state.chto = "входы: " + chto
+        return {"msg": msg, **kw}
+
+    def zapis_ili_none(login):
+        return _zapis((login or "").strip())
+
+    if d == "paroli":
+        novye = {}
+        for k_ in f.keys():
+            if str(k_).startswith("parol_") and pole(k_):
+                novye[str(k_)[6:]] = pole(k_)
+        if not novye:
+            return {"osh": "Не введено ни одного нового пароля. Ничего не изменено."}
+        plohie, imena = [], {}
+        for lg, p in novye.items():
+            z = _zapis(lg)
+            imena[lg] = (z["imya"] if z is not None else "") or lg
+            pr = "нет такого входа" if z is None else parol_goden(p, lg, z["imya"])
+            if not pr and z["rol"] not in LYUDI:
+                pr = "служебной записи обычный пароль задать нельзя"
+            if not pr and lg == "boris" and z["hesh"] and parol_veren(p, z["hesh"]):
+                pr = "совпадает со старым паролем"
+            if not pr and sum(1 for x in novye.values() if x == p) > 1:
+                pr = "одинаковый пароль у двух человек"
+            if pr:
+                plohie.append(f"{imena[lg]} — {pr}")
+        if plohie:
+            return {"osh": "Пароли не сохранены: " + "; ".join(plohie) + ". Ничего не изменено."}
+        for lg, p in novye.items():
+            pr = zadat_parol(lg, p, krome=ya.get("seans", "") if lg == ya.get("login") else "")
+            if pr:
+                plohie.append(f"{imena[lg]} — {pr}")
+        if plohie:
+            return {"osh": "Не все пароли сохранены: " + "; ".join(plohie) + "."}
+        return gotovo("пароли — " + ", ".join(sorted(novye)),
+                      "Пароли сохранены: " + ", ".join(imena[x] for x in novye) + ". Скажите каждой её пароль лично "
+                      "или по телефону — не в чатах. Прежние сеансы этих людей закрыты.")
+
+    if d == "klyuch":
+        login = (arg or pole("login")).strip()
+        if login not in SLUZH_LOGINY:
+            return {"osh": "Ключ выпускается только для Клода: ключ рутин или ключ выкладки."}
+        srazu = pole("srazu") == "1"
+        klyuch = vydat_klyuch(login, srazu=srazu)
+        soobshchit_borisu(f"app.kidsup.ru: выпущен новый {NAZVANIE_KLYUCHA[login].lower()} Клода. Прежний ключ "
+                          + ("погашен сразу." if srazu else "гаснет при первом запросе новым, самое позднее через 24 часа.")
+                          + " Если это были не вы — выпустите ключ заново с галочкой «подозрение на утечку».",
+                          chto=f"новый {NAZVANIE_KLYUCHA[login].lower()}" + (" (прежний погашен сразу)" if srazu else ""))
+        return gotovo("ключ — " + login, NAZVANIE_KLYUCHA[login] + " выпущен.", klyuch=(login, klyuch))
+
+    if d == "vyiti_vezde":
+        z = zapis_ili_none(arg or pole("login"))
+        if z is None:
+            return {"osh": "Нет такого входа."}
+        svoy = z["login"] == ya.get("login")
+        seansy_zakryt(z["login"], krome=ya.get("seans", "") if svoy else "")
+        return gotovo("выйти везде — " + z["login"],
+                      "Вы вышли на всех устройствах, кроме этого." if svoy
+                      else f"{z['imya'] or z['login']}: все сеансы закрыты — на каждом устройстве нужно войти заново.")
+
+    if d == "vkl":
+        login, _, vkl_ = (arg or (pole("login") + ":" + pole("vkl"))).partition(":")
+        z = zapis_ili_none(login)
+        if z is None or vkl_ not in ("0", "1"):
+            return {"osh": "Нет такого входа."}
+        pr = vklyuchit(z["login"], vkl_ == "1")
+        if pr:
+            return {"osh": pr[:1].upper() + pr[1:] + "."}
+        return gotovo(("включён" if vkl_ == "1" else "отключён") + " вход — " + z["login"],
+                      f"{z['imya'] or z['login']}: вход " + ("включён." if vkl_ == "1"
+                                                               else "отключён, сеансы закрыты. История действий остаётся."))
+
+    if d == "dobavit":
+        login, imya, sutki = pole("novyy_login").strip().lower(), pole("novoe_imya"), pole("sutki") == "1"
+        pr = dobavit(login, imya, sutki=sutki)
+        if pr:
+            return {"osh": "Вход не добавлен: " + pr + "."}
+        return gotovo("добавлен вход — " + login + (" (на 24 часа)" if sutki else ""),
+                      "Вход добавлен" + (" на 24 часа" if sutki else "") + ". Теперь задайте ему пароль — "
+                      "поле «Новый пароль» в его карточке.")
+
+    if d == "snyat_pauzu":
+        z = zapis_ili_none(arg or pole("login"))
+        if z is None:
+            return {"osh": "Нет такого входа."}
+        snyat_pauzu(z["login"])
+        return gotovo("снята пауза — " + z["login"], f"{z['imya'] or z['login']}: пауза снята, можно входить.")
+
+    if d == "ustr_lichnoe":
+        uid = (arg or pole("ustr")).strip()
+        if not re.fullmatch(r"[0-9a-f]{64}", uid) or not any(u["id"] == uid for u in obshchie_ustroystva()):
+            return {"osh": "Нет такого компьютера в списке общих."}
+        ustr_lichnoe(uid)
+        return gotovo("компьютер считается личным",
+                      "Компьютер снова считается личным: галочка «Запомнить» на нём появится. "
+                      "Если с него войдёт второй человек — он опять станет общим.")
+
+    if d == "okno_vykladki":
+        do = _iso(seychas() + SROK_OKNA_VYKLADKI)
+        db.set_setting("vhod_okno_vykladki_do", do)
+        soobshchit_borisu("app.kidsup.ru: Клоду разрешена выкладка ключом рутин на 2 часа, до " + kogda(do) + ".",
+                          chto="аварийное окно выкладки на 2 часа")
+        return gotovo("окно выкладки на 2 часа", "Клоду разрешена выкладка на 2 часа — до " + kogda(do) + ".")
+
+    if d == "starye_vykl":
+        otkaz_, pred = starye_proverit()
+        if otkaz_:
+            return {"osh": otkaz_}
+        if pred and arg != "tochno":
+            request.state.chto = "входы: отключение старых входов — предупреждения"
+            return {"predupr": pred}
+        pr = starye_vyklyuchit("владелец")
+        if pr:
+            return {"osh": pr}
+        return gotovo("старые входы отключены",
+                      "Старые входы отключены: общий пароль admin и ваш прежний пароль больше не принимаются. "
+                      "Любой браузер без входа теперь получает форму входа.")
+
+    return {"osh": "Неизвестное действие — ничего не изменено."}
+
+
+_STIL_VH = """
+.vh{background:#fff;border:1px solid #e4e2f0;border-radius:14px;padding:14px 16px;margin:14px 0 22px}
+.vh h2{color:#312783;font-size:20px;margin:0 0 4px}.vh h3{color:#312783;font-size:16.5px;margin:20px 0 6px}
+.vh label{display:inline;background:none;border:0;border-radius:0;padding:0;margin:0}
+.vh .vk{border:1px solid #e4e2f0;border-radius:12px;padding:10px 12px;margin:8px 0;background:#fbfbfe}
+.vh .vk.net{opacity:.72}.vh .vz{font-size:16px}.vh .vs{color:#6c6a86;font-size:14px;margin:2px 0 8px}
+.vh .vp{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.vh .vp span{font-weight:600;font-size:14.5px}
+.vh .vp input{flex:1 1 180px;width:auto;min-width:0}
+.vh input[type=checkbox]{width:20px;height:20px;vertical-align:-4px;margin:0 6px 0 0;padding:0}
+.vh .vb{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.vh button{background:#fff;color:#312783;border:1.5px solid #312783;border-radius:10px;padding:8px 12px;font-size:14.5px;
+font-weight:600;cursor:pointer}
+.vh button.gl{background:#312783;color:#fff;padding:11px 18px;font-size:16px}
+.vh button.op{border-color:#B3261E;color:#B3261E}
+.vh .moy{background:#f1f0fa;border-radius:12px;padding:10px 12px;margin:10px 0}
+.vh .moy b{display:block;margin-bottom:4px}.vh p{margin:6px 0}.vh .tih{color:#6c6a86;font-size:14px}
+.vh .osh{background:#FDECEA;color:#B3261E;border-radius:10px;padding:10px 12px;margin:10px 0}
+.vh .ok{background:#eef8e6;border-left:4px solid #7DB928;border-radius:8px;padding:10px 12px;margin:10px 0}
+.vh .pr{background:#FFF6DA;border:1.5px solid #E0B100;border-radius:12px;padding:10px 12px;margin:10px 0}
+.vh .kl{background:#FFF6DA;border:1.5px solid #E0B100;border-radius:12px;padding:12px;margin:10px 0}
+.vh .kl input{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}
+.vh ul{margin:6px 0;padding-left:20px}.vh .ryad{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.vh .ryad input[type=text]{flex:1 1 150px;width:auto;min-width:0}
+"""
+
+_SKRIPT_VH = """
+(function(){
+  var f=document.getElementById('vhody-forma'); if(!f)return;
+  f.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.target.tagName==='INPUT')e.preventDefault();});
+  function sl(n){var a=new Uint32Array(1),p=4294967296-4294967296%n;do{crypto.getRandomValues(a)}while(a[0]>=p);return a[0]%n}
+  function pridumat(){var s='bdfgklmnprstvz',g='aeiou',w=[],i,j,x;
+    for(i=0;i<4;i++){x='';for(j=0;j<2;j++)x+=s.charAt(sl(s.length))+g.charAt(sl(g.length));w.push(x)}
+    return w.join('-')+'-'+(10+sl(90))}
+  var novye=f.querySelectorAll('input.np'), glaz=document.getElementById('vh-glaz'), vidno=false;
+  function pokazat(v){vidno=v;for(var i=0;i<novye.length;i++)novye[i].type=v?'text':'password';
+    if(glaz)glaz.textContent=v?'Скрыть новые пароли':'Показать новые пароли'}
+  if(glaz)glaz.onclick=function(){pokazat(!vidno)};
+  var pr=f.querySelectorAll('button.prid');
+  for(var i=0;i<pr.length;i++)pr[i].onclick=function(){var p=f.elements[this.getAttribute('data-dlya')];
+    if(p){p.value=pridumat();pokazat(true);p.focus()}};
+  var sp=f.querySelectorAll('button[data-sprosit]');
+  for(i=0;i<sp.length;i++)sp[i].addEventListener('click',function(e){if(!confirm(this.getAttribute('data-sprosit')))e.preventDefault()});
+  f.addEventListener('submit',function(e){var m=f.elements['moy_parol'];
+    if(m&&!m.value){e.preventDefault();m.focus();m.scrollIntoView({block:'center'});
+      var t=document.getElementById('vh-nado');if(t)t.hidden=false}});
+  var kop=document.getElementById('vh-kop');
+  if(kop)kop.onclick=function(){var k=document.getElementById('vh-klyuch');k.select();
+    function ok(){kop.textContent='Скопировано'}
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(k.value).then(ok,function(){document.execCommand('copy');ok()});
+    else{document.execCommand('copy');ok()}};
+})();
+"""
+
+
+def blok_vladelca(request, itog: dict | None = None) -> str:
+    """HTML блока «Входы» для /owner. Виден только человеку-владельцу, вошедшему через форму;
+    остальным (серое окно) — ссылка «войти через форму». Паролей и хешей в странице нет;
+    только что выпущенный ключ показывается один раз — в ответе на сам запрос выпуска."""
+    k = iz(request)
+    if not (k.get("rol") == "owner" and k.get("sposob") == "forma"):
+        return ("<section class='vh'><h2>Входы на app.kidsup.ru</h2><p><a href='/vhod?next=/owner'><b>Управлять входами → "
+                "войти через форму</b></a></p><p class='tih'>Пароли админов, ключи Клода и отключение старых входов "
+                "открываются только после входа под своим именем на странице входа. Логин — boris, пароль — ваш нынешний."
+                "</p></section>")
+    itog = itog or {}
+    s = sostoyanie(s_ustroystvami=True)
+    h = ["<section class='vh'><h2>Входы на app.kidsup.ru</h2>"]
+    if itog.get("osh"):
+        h.append(f"<div class='osh' role='alert'>{_e(itog['osh'])}</div>")
+    if itog.get("msg"):
+        h.append(f"<div class='ok'>{_e(itog['msg'])}</div>")
+    h.append("<form method='post' action='/owner/vhody' id='vhody-forma' autocomplete='off'>"
+             "<input type='text' name='username' value='boris' autocomplete='username' hidden>")
+    if itog.get("klyuch"):
+        lg, kl_ = itog["klyuch"]
+        h.append(f"<div class='kl'><b>{_e(NAZVANIE_KLYUCHA.get(lg, lg))} — показывается один раз</b>"
+                 f"<div class='ryad' style='margin:8px 0'><input type='text' id='vh-klyuch' readonly value='{_e(kl_)}'>"
+                 "<button type='button' id='vh-kop'>Скопировать</button></div>"
+                 f"<p>Вставьте его {_e(KUDA_KLYUCH.get(lg, ''))}. В чат ключ не отправляйте и нигде не сохраняйте: "
+                 "после закрытия этой страницы его не увидеть — только выпустить новый.</p></div>")
+    if itog.get("predupr"):
+        h.append("<div class='pr'><b>Перед отключением старых входов — проверьте:</b><ul>"
+                 + "".join(f"<li>{_e(x)}</li>" for x in itog["predupr"])
+                 + "</ul><p>Обратной кнопки нет. Если всё равно отключаете — введите пароль ниже ещё раз и нажмите:</p>"
+                 "<button type='submit' class='op' name='deystvie' value='starye_vykl:tochno'>Всё равно отключить старые входы"
+                 "</button></div>")
+    h.append("<div class='moy'><b>Ваш нынешний пароль</b><input type='password' name='moy_parol' "
+             "autocomplete='current-password'><p class='tih'>Нужен для любого действия в этом блоке: введите и нажмите "
+             "нужную кнопку.</p><p class='osh' id='vh-nado' hidden>Сначала введите ваш нынешний пароль.</p></div>")
+
+    lyudi = [z for z in s["vhody"] if z["rol"] in LYUDI]
+    for z in lyudi:
+        lg, svoy = z["login"], z["login"] == k.get("login")
+        zag = f"<b>{_e(z['imya'] or lg)}</b> · {_e(lg)} · {ROL_SLOVOM.get(z['rol'], z['rol'])}"
+        if z["do"]:
+            zag += " · временный, " + ("срок вышел" if z["istek"] else "до " + _e(kogda(z["do"])))
+        if not z["vkl"]:
+            st = "вход отключён"
+        elif z["istek"]:
+            st = "срок временного входа вышел — войти не может"
+        elif not z["zadan"]:
+            st = ("новый пароль не задан — на форме входа действует ваш прежний пароль" if lg == "boris"
+                  else "пароль не задан — войти не может")
+        else:
+            st = "пароль задан " + _e(kogda(z["parol_ot"]))
+            st += (" · вход через форму: " + _e(kogda(z["forma_vhod"]))) if z["forma_vhod"] else " · через форму ещё не входили"
+            if z["posl_zapros"]:
+                st += " · последний запрос " + _e(kogda(z["posl_zapros"]))
+            if z["seansov"]:
+                st += f" · открыто сеансов: {z['seansov']}"
+        if z["pauza"]:
+            st += " · <b>пауза после неверных паролей</b>"
+        kn = []
+        if z["seansov"] or svoy:
+            kn.append(f"<button type='submit' name='deystvie' value='vyiti_vezde:{_e(lg)}'>"
+                      + ("Выйти на других устройствах" if svoy else "Выйти везде") + "</button>")
+        if z["pauza"]:
+            kn.append(f"<button type='submit' name='deystvie' value='snyat_pauzu:{_e(lg)}'>Снять паузу</button>")
+        if lg != "boris":
+            if z["vkl"]:
+                kn.append(f"<button type='submit' class='op' name='deystvie' value='vkl:{_e(lg)}:0' data-sprosit='Отключить вход: "
+                          f"{_e(z['imya'] or lg)}? Войти будет нельзя, открытые сеансы закроются.'>Отключить вход</button>")
+            else:
+                kn.append(f"<button type='submit' name='deystvie' value='vkl:{_e(lg)}:1'>Включить вход</button>")
+        h.append(f"<div class='vk{'' if z['vkl'] and not z['istek'] else ' net'}'><div class='vz'>{zag}</div>"
+                 f"<div class='vs'>{st}</div><div class='vp'><span>{'Мой новый пароль' if svoy else 'Новый пароль'}</span>"
+                 f"<input type='password' class='np' name='parol_{_e(lg)}' autocomplete='new-password'>"
+                 f"<button type='button' class='prid' data-dlya='parol_{_e(lg)}'>Придумать</button></div>"
+                 + (f"<div class='vb'>{''.join(kn)}</div>" if kn else "") + "</div>")
+    h.append("<div class='vb'><button type='submit' class='gl' name='deystvie' value='paroli'>Сохранить пароли</button>"
+             "<button type='button' id='vh-glaz'>Показать новые пароли</button></div>"
+             "<p class='tih'>Пустое поле — пароль не меняется. Пароль — не короче 10 знаков. «Придумать» собирает пароль прямо "
+             "в вашем браузере: его легко продиктовать. После сохранения пароль нигде не показывается — запишите или "
+             "продиктуйте сразу.</p>")
+
+    h.append("<h3>Ключи Клода</h3>")
+    for lg in ("klod-vykladka", "klod"):
+        z = next((x for x in s["vhody"] if x["login"] == lg), None)
+        if z is None:
+            continue
+        if z["zadan"]:
+            st = "выпущен " + _e(kogda(z["parol_ot"]))
+            st += (" · последний запрос " + _e(kogda(z["posl_zapros"]))) if z["posl_zapros"] else " · запросов этим ключом ещё не было"
+            if z["prezhniy_klyuch_do"]:
+                st += " · прежний ключ ещё действует — самое позднее до " + _e(kogda(z["prezhniy_klyuch_do"]))
+        else:
+            st = "не выпущен"
+        h.append(f"<div class='vk'><div class='vz'><b>{NAZVANIE_KLYUCHA[lg]}</b> · {lg}</div><div class='vs'>{st}</div>"
+                 f"<div class='vb'><button type='submit' name='deystvie' value='klyuch:{lg}'"
+                 + (" data-sprosit='Выпустить новый ключ? Его нужно будет сразу вставить в форму Claude.'" if z["zadan"] else "")
+                 + ">Выпустить новый</button></div></div>")
+    h.append("<p><label><input type='checkbox' name='srazu' value='1'>подозрение на утечку — погасить прежний ключ сразу"
+             "</label></p><p class='tih'>Сначала ключ выкладки, потом ключ рутин — когда вы с Клодом оба на связи. "
+             "Ключ показывается один раз; Клод его не видит.</p>")
+    if s["klodu_otkazano"]:
+        h.append("<p>Клоду отказано за 7 дней: " + "; ".join(
+            f"{_e(o['put'])} — {int(o['n'])} раз" for o in s["klodu_otkazano"][:10]) + "</p>")
+    if s["avtomatika_posl"]:
+        h.append(f"<p class='tih'>Автоматика сервера: последний запрос {_e(kogda(s['avtomatika_posl']))}.</p>")
+    if s["okno_vykladki_do"]:
+        h.append(f"<p><b>Клоду разрешена выкладка ключом рутин до {_e(kogda(s['okno_vykladki_do']))}.</b></p>")
+
+    st_ = s["starye"]
+    h.append("<h3>Старые входы</h3>")
+    if not st_["vklyucheny"]:
+        h.append("<p>Отключены" + (" " + _e(kogda(st_["vyklyucheny_kogda"])) if st_["vyklyucheny_kogda"] else "")
+                 + ": общий пароль admin и прежний пароль владельца не принимаются нигде. Аварийный вход — «Добавить вход» "
+                 "ниже, с галочкой «временный, на 24 часа».</p>")
+    else:
+        if not st_["zavedeny"]:
+            h.append("<p>Работают как раньше: общий admin и ваш прежний пароль в сером окне браузера. Срок (7 дней) "
+                     "начнётся, когда вы зададите первый пароль или выпустите первый ключ.</p>")
+        else:
+            hv = [x for x in st_["hvost"] if x["login"] == "admin"]
+            kto_ = "; ".join(f"{_e(x['adres'])} — {_e(x['chem'])}, последний раз {_e(kogda(x['posl']))}" for x in hv[:6])
+            h.append(f"<p>Общий admin: работает до {_e(kogda(st_['do']))} · за сутки запросов: {int(st_['obshchiy_za_sutki'])}"
+                     + (f" · за 3 дня: {kto_}" if kto_ else " · за 3 дня им никто не пользовался") + "</p>")
+            h.append("<p>Прежний пароль владельца: " + ("в сером окне ещё действует (пока не задан ваш новый пароль или "
+                     "ключ выкладки не сделал первый запрос)" if st_["prezhniy_parol_vladelca"] else "уже не действует") + "</p>")
+        h.append("<div class='vb'><button type='submit' class='op' name='deystvie' value='starye_vykl' data-sprosit='Отключить "
+                 "старые входы? Общий пароль admin перестанет приниматься везде. Обратной кнопки нет.'>Отключить старые входы"
+                 "</button></div><p class='tih'>Обратной кнопки нет. В срок старые входы отключатся сами — если ключ рутин "
+                 "Клода работает и у вас задан новый пароль; иначе срок сдвинется на сутки, а вам придёт сообщение.</p>")
+
+    if s["vazhnoe"]:
+        h.append("<h3>Важное за 7 дней</h3><ul>" + "".join(
+            f"<li>{_e(kogda(v['ts']))} — {_e(v['chto'])}</li>" for v in s["vazhnoe"][:15]) + "</ul>")
+
+    h.append("<h3>Добавить вход</h3><div class='ryad'><input type='text' name='novoe_imya' placeholder='Имя: Оля' maxlength='30'>"
+             "<input type='text' name='novyy_login' placeholder='Логин латиницей: olya' maxlength='20' autocapitalize='none'>"
+             "<label><input type='checkbox' name='sutki' value='1'>временный, на 24 часа</label>"
+             "<button type='submit' name='deystvie' value='dobavit'>Добавить вход</button></div>"
+             "<p class='tih'>Роль — всегда «админ». Временный вход на 24 часа — аварийный, вместо общего пароля. "
+             "После добавления задайте пароль в карточке.</p>")
+    h.append("<h3>Выкладка Клодом в аварийном случае</h3><div class='vb'><button type='submit' name='deystvie' "
+             "value='okno_vykladki' data-sprosit='Разрешить Клоду выкладку кода ключом рутин на 2 часа?'>"
+             "Разрешить Клоду выкладку на 2 часа</button></div>"
+             "<p class='tih'>Обычно код выкладывает только ключ выкладки. Эта кнопка — на случай, если им не получается.</p>")
+    if s["obshchie_kompyutery"]:
+        h.append(f"<h3>Общие компьютеры: {len(s['obshchie_kompyutery'])}</h3>")
+        for u in s["obshchie_kompyutery"]:
+            h.append("<div class='vk'><div class='vs'>входили: " + _e(", ".join(u["imena"]) or "—")
+                     + (" · последний вход " + _e(kogda(u["posl"])) if u["posl"] else "") + "</div><div class='vb'>"
+                     f"<button type='submit' name='deystvie' value='ustr_lichnoe:{_e(u['id'])}'>Считать личным</button></div></div>")
+        h.append("<p class='tih'>На общем компьютере вход держится до 4:00 утра и галочки «Запомнить» нет.</p>")
+    h.append("</form></section>")
+    return "".join(h)
+
+
+def blok_vladelca_bezopasno(request, itog: dict | None = None) -> str:
+    """Блок «Входы» или, при сбое, короткая строка: остальная страница владельца должна открыться."""
+    try:
+        return blok_vladelca(request, itog)
+    except Exception:  # noqa: BLE001
+        log.exception("vhod: блок «Входы» не собран")
+        return ("<section class='vh'><h2>Входы на app.kidsup.ru</h2><p class='osh'>Блок «Входы» не открылся — "
+                "ошибка записана в журнал сервера. Остальные настройки ниже работают.</p></section>")
+
+
 # --- журнал «кто что сделал» (основная база, таблица deystviya) ------------------------------
 
 _ZHURNAL_GOTOV: set = set()
@@ -1476,3 +2090,48 @@ def stranica(next_: str = "", login: str = "", oshibka: str = "", podskazka: boo
 }})();
 </script></body></html>"""
     return golova + telo
+
+
+# --- консольная команда: python3 -m app.vhod parol <логин> -------------------------------------
+# Запасной путь владельца (забыл пароль, пропал vhody.db): консоль сервера в панели Рег.облака.
+# Запускать из каталога кода, от того же пользователя и с теми же переменными, что служба
+# kidsup (KIDSUP_DATA_DIR). Пошагово — docs/rabota/vosstanovlenie.md.
+
+def _konsol(argv: list, vvod=None, pechat=print) -> int:
+    """parol <логин>: дважды спрашивает новый пароль (при вводе не виден), пишет хеш.
+    Сам пароль не печатается и никуда, кроме хеша, не попадает. → код выхода."""
+    if len(argv) != 2 or argv[0] != "parol":
+        pechat("Использование: python3 -m app.vhod parol <логин>   (например: parol boris)")
+        return 2
+    login = login_po_vvodu(argv[1]) or argv[1].strip()
+    z = _zapis(login)
+    if z is None:
+        pechat("Нет такого входа. Есть: " + ", ".join(x["login"] for x in spisok() if x["rol"] in LYUDI))
+        return 1
+    if z["rol"] not in LYUDI:
+        pechat("Это служебная запись: ей нужен ключ, а не пароль. Ключ выпускает владелец на странице /owner.")
+        return 1
+    if vvod is None:
+        import getpass
+        vvod = getpass.getpass
+    imya = z["imya"] or login
+    p1 = vvod(f"Новый пароль для входа «{imya}» ({login}), при вводе не виден: ")
+    p2 = vvod("Ещё раз тот же пароль: ")
+    if p1 != p2:
+        pechat("Пароли не совпали — ничего не изменено.")
+        return 1
+    prichina = zadat_parol(login, p1)
+    if prichina:
+        pechat("Пароль не задан: " + prichina + ". Ничего не изменено.")
+        return 1
+    try:
+        otmetit_vazhnoe(f"пароль задан из консоли сервера: {login}", imya="консоль сервера")
+    except Exception:  # noqa: BLE001
+        log.exception("vhod: строка «Важное» не записана")
+    pechat(f"Пароль задан: {imya} ({login}). Прежние сеансы этого входа закрыты. Вход — на странице app.kidsup.ru/vhod.")
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(_konsol(sys.argv[1:]))

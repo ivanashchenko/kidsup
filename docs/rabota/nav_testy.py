@@ -222,7 +222,8 @@ PROPALI = {"POST /api/ask", "GET /api/ask/health", "POST /api/publish", "GET /ap
 # чужих новых адресов быть не должно.
 NOVYE = {"GET /arhiv", "POST /api/boris-docs/arhiv", "POST /api/admin-docs/arhiv"}
 # 12.11.2026, личные входы (app/vhod.py): страница входа, выход и «кто вошёл».
-NOVYE_VHOD = {"GET /vhod", "POST /vhod", "POST /vyhod", "GET /api/kto"}
+NOVYE_VHOD = {"GET /vhod", "POST /vhod", "POST /vyhod", "GET /api/kto",
+              "POST /owner/vhody", "GET /api/vhod/sostoyanie"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
 # чтобы пропажа была видна и без снимка «до».
 NUZHNY = """

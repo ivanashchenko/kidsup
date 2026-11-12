@@ -5012,6 +5012,13 @@ def _loop() -> None:
     last3 = 0.0
     while True:
         try:
+            # 12.11.2026, личные входы: срок старых входов (общий admin). Стоит до проверки
+            # «автопилот включён»: срок должен сработать и при выключенном автопилоте.
+            try:
+                from . import vhod as _vhod
+                _vhod.avtopilot_tik()
+            except Exception:
+                log.exception("срок старых входов не проверен — продолжаем")
             if db.get_setting("autopilot", "off") != "on":
                 time.sleep(60)
                 continue

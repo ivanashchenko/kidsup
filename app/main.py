@@ -1765,11 +1765,17 @@ OWNER_FIELDS = [
     ("hooppy_token", "Hooppy — API-токен (Настройки → API): посты, истории, клипы в ВК/Telegram/Instagram", True),
     ("green_api_instance", "Green-API — idInstance (статусы WhatsApp с отдельного номера)", False),
     ("green_api_token", "Green-API — apiTokenInstance", True),
-    ("owner_password", "Пароль владельца для этой страницы (пользователь boris)", True),
+    # 12.11.2026, личные входы: строки «Пароль владельца» (owner_password) здесь больше нет.
+    # Пароли задаются в блоке «Входы» выше и хранятся только хешем в data/vhody.db.
 ]
 
 
-def _owner_ctx(msg: str = "") -> str:
+def _owner_ctx(request: Request = None, msg: str = "", vhody: dict | None = None) -> str:
+    """Страница владельца. 12.11.2026: вверху блок «Входы» (vhod.blok_vladelca) — пароли
+    админов, ключи Клода, отключение старых входов. Виден только владельцу, вошедшему через
+    форму; пришедшему через серое окно — ссылка «войти через форму». vhody — итог действия
+    из блока (сообщение, отказ, ключ на один показ)."""
+    blok = vhod.blok_vladelca_bezopasno(request, vhody) if request is not None else ""
     rows = []
     for key, label, secret in OWNER_FIELDS:
         val = db.get_setting(key)
@@ -1777,8 +1783,8 @@ def _owner_ctx(msg: str = "") -> str:
         rows.append(f"<label><span>{html.escape(label)}</span><small>сейчас: {html.escape(shown)}</small>"
                     f"<input type='{'password' if secret else 'text'}' name='{key}' placeholder='вставьте новое значение, чтобы заменить' autocomplete='off'></label>")
     return f"""<!doctype html><html lang='ru'><head><meta charset='utf-8'><title>Настройки владельца</title>
-<meta name='viewport' content='width=device-width,initial-scale=1'>
-<style>body{{font:16px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;background:#f8f7fc;color:#15132e;margin:0;padding:20px}}
+<meta name='viewport' content='width=device-width,initial-scale=1'><script src='/static/vhod.js'></script>
+<style>{vhod._STIL_VH}body{{font:16px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;background:#f8f7fc;color:#15132e;margin:0;padding:20px}}
 .w{{max-width:720px;margin:0 auto}}h1{{color:#312783;font-size:24px}}label{{display:block;background:#fff;border:1px solid #e4e2f0;border-radius:12px;padding:12px 14px;margin:10px 0}}
 label span{{display:block;font-weight:600}}label small{{display:block;color:#6c6a86;margin:2px 0 6px}}input{{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #cfcde0;border-radius:8px;font-size:15px}}
 button{{background:#7DB928;color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:16px;font-weight:700;cursor:pointer}}.msg{{background:#eef8e6;border-left:4px solid #7DB928;padding:10px 12px;border-radius:8px;margin:12px 0}}
@@ -1786,15 +1792,17 @@ p.note{{color:#6c6a86;font-size:14px}}p.nav{{font-size:14.5px;margin:-6px 0 10px
 <h1>Настройки владельца</h1>
 <p class='nav'><a href='/boris/docs'>← Мои документы</a> · <a href='/settings'>Ключ МойКласса и выгрузка</a> · <a href='/kamery/nastroyka'>Камеры</a> · <a href='/arhiv'>Архив страниц</a></p>
 <p class='note'>Эта страница и всё, что на ней, закрыто отдельным паролем владельца — общий пароль admin сюда не подходит. Значения хранятся как секреты и в ответах сервера не показываются. Пустое поле — оставить как есть.</p>
+{blok}
+<h2 style='color:#312783;font-size:20px'>Ключи банка, кассы и сервисов</h2>
 {('<div class="msg">' + html.escape(msg) + '</div>') if msg else ''}
 <form method='post'>{''.join(rows)}<button type='submit'>Сохранить</button></form>
-</div></body></html>"""
+</div><script>{vhod._SKRIPT_VH}</script></body></html>"""
 
 
 @app.get("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
-def owner_page():
+def owner_page(request: Request):
     """Форма владельца для ключей банка, кассы и МойКласса (09.09.2026)."""
-    return HTMLResponse(_owner_ctx())
+    return HTMLResponse(_owner_ctx(request))
 
 
 @app.post("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -1806,7 +1814,39 @@ async def owner_save(request: Request):
         if v:
             db.set_setting(key, v)
             saved.append(label.split(" — ")[0])
-    return HTMLResponse(_owner_ctx("Сохранено: " + ", ".join(saved) if saved else "Ничего не изменено."))
+    return HTMLResponse(_owner_ctx(request, "Сохранено: " + ", ".join(saved) if saved else "Ничего не изменено."))
+
+
+@app.post("/owner/vhody", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+async def owner_vhody(request: Request):
+    """Управление входами из блока «Входы» (12.11.2026): пароли, ключи Клода, «Выйти везде»,
+    отключение входа и старых входов, временный вход, аварийное окно выкладки.
+
+    Только человек-владелец, вошедший через форму: ни служебный ключ, ни прежний пароль в
+    сером окне, ни режим без входа сюда не проходят (403). Каждый запрос несёт поле
+    moy_parol и проверяется по хешу владельца — см. vhod.deystvie_vladelca. Ответ — та же
+    страница с сообщением; выпущенный ключ показывается один раз и не кешируется."""
+    k = vhod.iz(request)
+    if not (k.get("rol") == "owner" and k.get("sposob") == "forma"):
+        raise HTTPException(status_code=403, detail="Входами управляет только владелец, вошедший через форму: app.kidsup.ru/vhod")
+    form = await request.form()
+    from starlette.concurrency import run_in_threadpool
+    try:
+        itog = await run_in_threadpool(vhod.deystvie_vladelca, request, form)
+    except Exception:  # noqa: BLE001 — сбой файла входов: понятная страница, а не ошибка 500
+        logging.getLogger("kidsup.vhod").exception("действие владельца со входами не выполнено")
+        itog = {"osh": "Не получилось — ошибка записана в журнал сервера. Что успело измениться, видно ниже."}
+    stranica = await run_in_threadpool(_owner_ctx, request, "", itog)
+    return HTMLResponse(stranica, status_code=200 if not itog.get("osh") else 400,
+                        headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY"})
+
+
+@app.get("/api/vhod/sostoyanie", dependencies=OWNER_AUTH)
+def api_vhod_sostoyanie():
+    """Входы без секретов — владельцу и служебным ключам ассистента: у кого задан пароль,
+    даты входов, выпущены ли ключи, срок старых входов, хвост общего входа (кто ещё ходит
+    под admin), отказы ключу рутин, последний запрос автоматики, строки «Важное»."""
+    return vhod.sostoyanie()
 
 
 @app.get("/arhiv", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -4774,7 +4814,7 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # молча падает каждую ночь, а заявки с сайта туда не уходят вовсе
             "roistat_project", "roistat_key",
             # доступы на чтение для контроля работы админов «со всех сторон» (09.09): банк и касса
-            "cam_password", "cam_embeds", "cam_okna", "tbank_token", "tbank_inn", "ivideon_login", "ivideon_password", "komtet_login", "komtet_password", "komtet_imap_password", "pochta_password", "komtet_code", "ivideon_code", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "owner_password", "yandex_audience_token",
+            "cam_password", "cam_embeds", "cam_okna", "tbank_token", "tbank_inn", "ivideon_login", "ivideon_password", "komtet_login", "komtet_password", "komtet_imap_password", "pochta_password", "komtet_code", "ivideon_code", "komtet_shop_id", "komtet_secret", "komtet_queue_id", "yandex_audience_token",
             "hooppy_token", "tbank_terminal", "tbank_terminal_password", "zenmoney_token", "green_api_instance", "green_api_token",
             # наборы страниц Hooppy. Кнопку «Опубликовать» на /makety убрали 12.11.2026,
             # ключи остаются: в настройках лежат id наборов, и этот же список — то,

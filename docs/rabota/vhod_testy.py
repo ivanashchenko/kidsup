@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
-"""Личные входы на app.kidsup.ru (app/vhod.py) — проверки группы А «вход», на стенде,
+"""Личные входы на app.kidsup.ru (app/vhod.py) — проверки групп А «вход» и Б «управление», на стенде,
 без сервера и без сети.
 
 12.11.2026, Борис: «да» личным логинам админов. Каждый входит под своим именем на
 странице /vhod, сервер знает, кто сделал действие. Главное требование выкатки: в момент
 выкладки для людей и рутин не меняется НИЧЕГО — общий admin и прежний пароль владельца в
 сером окне браузера работают как раньше, новое включается только действиями владельца.
+
+Группа Б «управление» (раздел 9.2, проверки 21–30): блок «Входы» на /owner, подтверждение
+паролем владельца, правила пароля, ключи Клода, самопорядок, «Отключить старые входы», срок
+и автовыключение, временный вход, консольная команда, хранение. Владелец в тесте проходит
+действия 1, 2 и 4 из раздела 7.2 плана.
 
 Здесь зафиксировано (план, раздел 9.1, проверки 1–20): «как сегодня» до заведения входов;
 обход всех адресов; форма входа, метка и выход; сроки; общий компьютер; подделка запросов;
@@ -24,6 +29,7 @@ import argparse
 import base64
 import importlib
 import importlib.util
+import logging
 import os
 import pkgutil
 import re
@@ -864,9 +870,6 @@ def test_vhod_js():
     for kto_, rol in ((admin, "admin"), (vladelec, "owner")):
         for razdel, punkty in nav.menu(rol):
             for imya, adres in punkty:
-                if adres == "/owner":
-                    print("  (–)     /owner — vhod.js подключает исполнитель Б вместе с блоком «Входы»")
-                    continue
                 r = kto_.get(adres, headers=STR)
                 proverka(f"{rol}: «{imya}» {adres} → 200 и /static/vhod.js",
                          r.status_code == 200 and "/static/vhod.js" in r.text, r.status_code)
@@ -917,11 +920,563 @@ def test_avtomatika():
              (kl().get("/api/duty", auth=vh).status_code, kl().get("/api/dialogs", auth=vh).status_code) == (200, 200))
 
 
+# --- группа Б: страница владельца и управление входами (план, 9.2, проверки 21–30) ------------------------
+
+SEKRETY: list = []          # пароли и ключи, придуманные в проверках группы Б (для поиска следов)
+ZAHVAT: list = []           # всё, что прогон напечатал и записал в лог
+
+
+class _Tee:
+    """Печать идёт и на экран, и в ZAHVAT: в конце ищем в ней пароли и ключи."""
+
+    def __init__(self, kuda):
+        self.kuda = kuda
+
+    def write(self, s):
+        ZAHVAT.append(s)
+        return self.kuda.write(s)
+
+    def flush(self):
+        self.kuda.flush()
+
+
+class _LogVZahvat(logging.Handler):
+    def emit(self, record):
+        try:
+            ZAHVAT.append(self.format(record) + "\n")
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def novyy_parol() -> str:
+    p = pridumat()
+    SEKRETY.append(p)
+    return p
+
+
+def vh(c, deystvie, moy=None, **polya):
+    """Запрос из блока «Входы»: POST /owner/vhody со своей страницы."""
+    data = {"deystvie": deystvie, **polya}
+    if moy is not None:
+        data["moy_parol"] = moy
+    return c.post("/owner/vhody", data=data, headers=SVOI)
+
+
+def klyuch_iz(r) -> str:
+    """Ключ со страницы ответа (показывается один раз). Значение не печатаем."""
+    x = re.search(r"id='vh-klyuch' readonly value='([^']+)'", r.text)
+    k_ = x.group(1) if x else ""
+    if k_:
+        SEKRETY.append(k_)
+    return k_
+
+
+def heshi() -> dict:
+    with baza_vhodov() as b:
+        return {r["login"]: r["hesh"] for r in b.execute("SELECT login, hesh FROM vhody")}
+
+
+def nastroyki_vhoda() -> dict:
+    with osnovnaya() as o:
+        return {r["key"]: r["value"] for r in o.execute(
+            "SELECT key, value FROM settings WHERE key LIKE 'vhod_%' OR key='owner_password'")}
+
+
+def bear(k_):
+    return {"authorization": "Bearer " + k_}
+
+
+def test_vladelec_paroli():
+    """Действие 1 владельца (план, 7.2): войти прежним паролем через форму и задать пароли
+    Лене, Ире, Лизе и новый себе — одной кнопкой. Заодно проверки 21, 22, 28 и отказ из 26."""
+    print("21–22, 28. Страница владельца: блок «Входы», подтверждение паролем, правила пароля")
+    do = (heshi(), nastroyki_vhoda())
+    r = kl().get("/owner", auth=STARYY_VLADELCA)
+    proverka("/owner в сером окне (прежний boris): открыт, вместо блока — ссылка «войти через форму»",
+             r.status_code == 200 and "/vhod?next=/owner" in r.text and "id='vhody-forma'" not in r.text, r.status_code)
+    proverka("…/static/vhod.js подключён, строки «Пароль владельца» на странице больше нет",
+             "/static/vhod.js" in r.text and "owner_password" not in r.text)
+    proverka("/owner общему admin закрыт, как раньше (401 с окном)",
+             kl().get("/owner", auth=OBSHCHIY).status_code == 401)
+    c = kl()
+    r = voyti(c, "boris", STARYY_VLADELCA[1], next_="/owner")
+    proverka("владелец входит через форму прежним паролем (новый ещё не задан) → /owner",
+             (r.status_code, r.headers.get("location")) == (303, "/owner"), r.status_code)
+    r = c.get("/owner", headers=STR)
+    proverka("у вошедшего через форму — блок «Входы»: четыре карточки, ключи Клода, старые входы",
+             r.status_code == 200 and "id='vhody-forma'" in r.text and all(
+                 f"name='parol_{lg}'" in r.text for lg in ("lena", "ira", "liza", "boris"))
+             and "Ключи Клода" in r.text and "Старые входы" in r.text and "Сохранить пароли" in r.text, r.status_code)
+    proverka("…у всех «пароль не задан», старые входы — «работают как раньше»",
+             r.text.count("пароль не задан — войти не может") == 3 and "Работают как раньше" in r.text)
+    proverka("…на странице нет ни прежних паролей, ни хешей",
+             not any(s in r.text for s in (STARYY_VLADELCA[1], OBSHCHIY[1], "pbkdf2_sha256", "sha256$")))
+
+    # 28. owner_password больше не меняется ни через /api/settings, ни через POST /owner
+    chuzhoy = "stend-" + secrets.token_urlsafe(10)
+    r1 = kl().post("/api/settings", json={"key": "owner_password", "value": chuzhoy}, auth=STARYY_VLADELCA)
+    r2 = kl().post("/owner", data={"owner_password": chuzhoy}, auth=STARYY_VLADELCA)
+    r3 = c.post("/owner", data={"owner_password": chuzhoy}, headers=SVOI)
+    proverka("28. owner_password не меняется через /api/settings (400) и через POST /owner",
+             (r1.status_code, r2.status_code, r3.status_code) == (400, 200, 200)
+             and m.db.get_setting("owner_password") == STARYY_VLADELCA[1], (r1.status_code, r2.status_code, r3.status_code))
+    proverka("…и в списке /api/settings его нет; настройки входов через /api/settings тоже не задать",
+             "owner_password" not in kl().get("/api/settings", auth=STARYY_VLADELCA).json()
+             and all(kl().post("/api/settings", json={"key": k_, "value": "1"}, auth=STARYY_VLADELCA).status_code == 400
+                     for k_ in ("vhod_zavedeny", "vhod_starye_do", "vhod_starye_vykl", "vhod_okno_vykladki_do")))
+    r = kl().post("/owner", data={"tbank_inn": "0000000000"}, auth=STARYY_VLADELCA)
+    proverka("…остальные поля страницы владельца сохраняются, как раньше",
+             r.status_code == 200 and "Сохранено" in r.text and m.db.get_setting("tbank_inn") == "0000000000")
+
+    # 21. подтверждение паролем
+    np = {lg: novyy_parol() for lg in ("lena", "ira", "liza", "boris")}
+    polya = {f"parol_{lg}": p for lg, p in np.items()}
+    r = vh(c, "paroli", None, **polya)
+    proverka("21. без moy_parol → отказ словами, ничего не меняется",
+             r.status_code == 400 and "Введите ваш нынешний пароль" in r.text and (heshi(), nastroyki_vhoda()) == do,
+             r.status_code)
+    r = vh(c, "paroli", "ne-tot-" + secrets.token_hex(5), **polya)
+    proverka("…с неверным moy_parol → отказ, ничего не меняется",
+             r.status_code == 400 and "не подошёл" in r.text and (heshi(), nastroyki_vhoda()) == do, r.status_code)
+    r = vh(c, "paroli", OBSHCHIY[1], **polya)
+    proverka("…общий пароль admin подтверждением не служит", r.status_code == 400 and (heshi(), nastroyki_vhoda()) == do)
+    proverka("…новые пароли из отказанного запроса в ответ не попали", not any(p in r.text for p in np.values()))
+    r = kl().post("/owner/vhody", data={"deystvie": "paroli", "moy_parol": STARYY_VLADELCA[1], **polya},
+                  auth=STARYY_VLADELCA)
+    proverka("…прежний boris в сером окне (скрипт) → 403, даже с верным moy_parol",
+             r.status_code == 403 and (heshi(), nastroyki_vhoda()) == do, r.status_code)
+    r = kl().post("/owner/vhody", data={"deystvie": "paroli", "moy_parol": STARYY_VLADELCA[1], **polya}, auth=OBSHCHIY)
+    proverka("…общий admin → не пускает (401 с окном, как на всех страницах владельца)",
+             r.status_code == 401 and (heshi(), nastroyki_vhoda()) == do, r.status_code)
+    d = kopiya_metki(c)
+    r = d.post("/owner/vhody", data={"deystvie": "paroli", "moy_parol": STARYY_VLADELCA[1], **polya},
+               headers={"origin": "https://chuzhoy.example", "user-agent": UA})
+    proverka("…с чужого сайта (метка владельца, чужой Origin) → 403", r.status_code == 403 and heshi() == do[0])
+    r = vh(c, "pridumannoe", STARYY_VLADELCA[1])
+    proverka("…неизвестное действие → отказ", r.status_code == 400 and "Неизвестное действие" in r.text)
+
+    # 26 (часть): без нового пароля владельца старые входы не отключить
+    r = vh(c, "starye_vykl:tochno", STARYY_VLADELCA[1])
+    proverka("26. «Отключить старые входы» без нового пароля владельца → отказ, ничего не меняется",
+             r.status_code == 400 and "Сначала задайте себе новый пароль" in r.text
+             and nastroyki_vhoda() == do[1] and m.vhod.starye_vklyucheny(), r.status_code)
+
+    # 22. правила пароля — отказ словами
+    def otkaz(polya_, slova):
+        r_ = vh(c, "paroli", STARYY_VLADELCA[1], **polya_)
+        return r_.status_code == 400 and slova in r_.text and "Ничего не изменено" in r_.text and heshi() == do[0]
+    proverka("22. короче 10 знаков → отказ", otkaz({"parol_lena": "abc-12"}, "Лена — короче 10 знаков"))
+    proverka("…меньше 5 разных знаков → отказ", otkaz({"parol_ira": "abababababab"}, "Ира — слишком простой"))
+    proverka("…равен общему паролю → отказ", otkaz({"parol_liza": OBSHCHIY[1]}, "Лиза — совпадает со старым паролем"))
+    proverka("…новый пароль Бориса равен прежнему → отказ",
+             otkaz({"parol_boris": STARYY_VLADELCA[1]}, "Борис — совпадает со старым паролем"))
+    proverka("…равен логину или имени → отказ (правило пароля)",
+             m.vhod.parol_goden("dlinnyy-login", "dlinnyy-login") == "совпадает с логином"
+             and m.vhod.parol_goden("Екатерина-Вторая", "ekaterina", "екатерина-вторая") == "совпадает с именем")
+    proverka("…служебной записи пароль задать нельзя",
+             otkaz({"parol_klod": novyy_parol()}, "служебной записи обычный пароль задать нельзя")
+             and otkaz({"parol_klod-vykladka": novyy_parol()}, "служебной записи"))
+    proverka("…незнакомому логину — тоже", otkaz({"parol_nikto": novyy_parol()}, "нет такого входа"))
+    odin = novyy_parol()
+    proverka("…один пароль двоим → отказ", otkaz({"parol_lena": odin, "parol_ira": odin}, "одинаковый пароль у двух человек"))
+    proverka("…один плохой пароль из четырёх — не сохраняется ни один",
+             otkaz({**polya, "parol_ira": "korotkiy"}, "Ира — короче 10 знаков"))
+    proverka("…пустая форма → «не введено ни одного»", otkaz({}, "Не введено ни одного нового пароля"))
+    proverka("входы всё ещё не заведены: отказы ничего не включили", not m.vhod.zavedeny())
+
+    print("Действие 1 владельца: пароли Лене, Ире, Лизе и новый себе — одной кнопкой")
+    r = vh(c, "paroli", STARYY_VLADELCA[1], **polya)
+    h = heshi()
+    proverka("пароли сохранены: у четверых хеш PBKDF2, у служебных — пусто",
+             r.status_code == 200 and "Пароли сохранены: Лена, Ира, Лиза, Борис" in r.text
+             and all(h[lg].startswith("pbkdf2_sha256$600000$") for lg in np) and not h["klod"] and not h["klod-vykladka"],
+             r.status_code)
+    proverka("…в ответе и на странице паролей нет", not any(p in r.text for p in np.values())
+             and not any(p in c.get("/owner", headers=STR).text for p in np.values()))
+    P.update(np)
+    proverka("…владелец, сменив пароль себе, остался в системе (свой сеанс не закрыт)",
+             kto(c) == {"login": "boris", "imya": "Борис", "rol": "owner", "sposob": "forma"}, kto(c))
+    with osnovnaya() as o:
+        zh = o.execute("SELECT imya, sposob, kod, chto FROM deystviya WHERE put='/owner/vhody' ORDER BY id DESC LIMIT 1").fetchone()
+    proverka("…в журнале: Борис, форма, «входы: пароли — …» — без паролей",
+             zh is not None and tuple(zh)[:3] == ("Борис", "forma", 200) and zh["chto"] == "входы: пароли — boris, ira, lena, liza",
+             zh and tuple(zh))
+    r = c.get("/owner", headers=STR)
+    proverka("…на странице: у всех «пароль задан», общий admin «работает до …»",
+             r.text.count("пароль задан ") == 4 and "Общий admin: работает до" in r.text
+             and "в сером окне ещё действует" in r.text)
+
+    print("25. Самопорядок: после нового пароля владельца")
+    proverka("форма принимает только новый пароль владельца",
+             voyti(kl(), "boris", STARYY_VLADELCA[1]).status_code == 401 and voyti(kl(), "boris", P["boris"]).status_code == 303)
+    proverka("…подтверждением теперь служит новый пароль, прежний — нет",
+             vh(c, "snyat_pauzu:lena", STARYY_VLADELCA[1]).status_code == 400
+             and vh(c, "snyat_pauzu:lena", P["boris"]).status_code == 200)
+    proverka("…прежний пароль в сером окне ещё проходит (ключа выкладки ещё нет)",
+             kl().get("/api/settings", auth=STARYY_VLADELCA).status_code == 200)
+
+
+def test_upravlenie(klyuch_a, work):
+    """Действия 2 и 4 владельца и проверки 21 (остаток), 24–27, 29, 30."""
+    chasy(None)
+    print("21. /owner/vhody — только владелец через форму")
+    c = kl()
+    proverka("владелец входит новым паролем", voyti(c, "boris", P["boris"], next_="/owner").status_code == 303)
+    MOY = P["boris"]
+    lena = kl()
+    voyti(lena, "lena", P["lena"])
+    do = (heshi(), nastroyki_vhoda())
+    r = vh(lena, "klyuch:klod", MOY)
+    proverka("админ (Лена через форму) → 403, даже зная пароль владельца", r.status_code == 403, r.status_code)
+    r = kl().post("/owner/vhody", data={"deystvie": "klyuch:klod", "moy_parol": MOY}, headers=bear(klyuch_a))
+    proverka("ключ рутин → 403", r.status_code == 403, r.status_code)
+    proverka("…ничего не изменилось", (heshi(), nastroyki_vhoda()) == do)
+    proverka("/api/vhod/sostoyanie: админу — 403, без входа — 401",
+             (lena.get("/api/vhod/sostoyanie").status_code, kl().get("/api/vhod/sostoyanie").status_code) == (403, 401))
+    m.vhod._HVOST.clear()                # хвост пишется раз в минуту — на стенде не ждём
+    kl().get("/api/pult/tasks", auth=OBSHCHIY)
+    r = c.get("/api/vhod/sostoyanie")
+    s = r.json() if r.status_code == 200 else {}
+    proverka("/api/vhod/sostoyanie владельцу: у четверых пароль задан, ключ рутин выпущен, ключ выкладки — нет",
+             r.status_code == 200 and {z["login"]: z["zadan"] for z in s["vhody"]} == {
+                 "lena": True, "ira": True, "liza": True, "boris": True, "klod": True, "klod-vykladka": False}, r.status_code)
+    proverka("…срок старых входов, хвост общего входа, автоматика, «Важное» — на месте",
+             s.get("starye", {}).get("zavedeny") is True and s["starye"]["vklyucheny"] is True and s["starye"]["do"]
+             and any(h["login"] == "admin" for h in s["starye"]["hvost"]) and s.get("avtomatika_posl")
+             and isinstance(s.get("vazhnoe"), list) and isinstance(s.get("klodu_otkazano"), list))
+    proverka("…секретов нет: ни хешей, ни паролей, ни ключей",
+             not any(x in r.text for x in ("pbkdf2", "sha256$", '"hesh', klyuch_a, *P.values())))
+    proverka("…ключу рутин и прежнему boris в окне — тоже 200",
+             (kl().get("/api/vhod/sostoyanie", headers=bear(klyuch_a)).status_code,
+              kl().get("/api/vhod/sostoyanie", auth=STARYY_VLADELCA).status_code) == (200, 200))
+
+    print("Действие 2 владельца и 24. Ключи Клода: показываются один раз, замена без остановки рутин")
+    r = vh(c, "klyuch:lena", MOY)
+    proverka("ключ человеку не выпускается", r.status_code == 400 and not klyuch_iz(r))
+    proverka("прежний пароль владельца в окне проходит, пока ключ выкладки не работал",
+             kl().get("/api/settings", auth=STARYY_VLADELCA).status_code == 200)
+    r = vh(c, "klyuch:klod-vykladka", MOY)
+    kv = klyuch_iz(r)
+    proverka("ключ выкладки выпущен: 43 знака, показан на странице ответа, ответ не кешируется",
+             r.status_code == 200 and len(kv) == 43 and "показывается один раз" in r.text
+             and "KidsUP выкладка" in r.text and r.headers.get("cache-control") == "no-store", r.status_code)
+    proverka("…второй раз его не увидеть: ни на /owner, ни в состоянии",
+             kv not in c.get("/owner", headers=STR).text and kv not in c.get("/api/vhod/sostoyanie").text)
+    proverka("…в базе — только SHA-256", heshi()["klod-vykladka"].startswith("sha256$") and kv not in heshi()["klod-vykladka"])
+    proverka("25. ключ выкладки ещё не делал запросов — прежний boris в окне проходит",
+             kl().get("/api/settings", auth=STARYY_VLADELCA).status_code == 200)
+    proverka("ключ выкладки: /api/kto → klod-vykladka", login_kto(kl(), headers=bear(kv)) == "klod-vykladka")
+    proverka("25. после первого запроса ключом выкладки прежний пароль владельца в окне не проходит",
+             (kl().get("/api/settings", auth=STARYY_VLADELCA).status_code,
+              kl().get("/api/pult/tasks", auth=STARYY_VLADELCA).status_code) == (401, 401))
+    proverka("…а общий admin ещё работает", kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200)
+    proverka("…на странице: «Прежний пароль владельца: уже не действует»",
+             "Прежний пароль владельца: уже не действует" in c.get("/owner", headers=STR).text)
+    r = kl().post("/owner/vhody", data={"deystvie": "klyuch:klod", "moy_parol": MOY}, headers=bear(kv))
+    proverka("21. ключ выкладки на /owner/vhody → 403", r.status_code == 403, r.status_code)
+
+    def zhiv(k_):
+        return kl().get("/api/kto", headers=bear(k_)).status_code
+    r = vh(c, "klyuch:klod", MOY)
+    k1 = klyuch_iz(r)
+    proverka("новый ключ рутин выпущен, подпись — в какую форму вставлять",
+             r.status_code == 200 and len(k1) == 43 and k1 != klyuch_a and "в основном окружении" in r.text)
+    proverka("24. прежний ключ рутин живёт, пока новым не сделан ни один запрос", zhiv(klyuch_a) == 200)
+    proverka("…первый запрос новым — прежний гаснет", zhiv(k1) == 200 and zhiv(klyuch_a) == 401)
+    r = vh(c, "klyuch:klod", MOY)
+    k2 = klyuch_iz(r)
+    proverka("…ещё одна замена: прежний жив", bool(k2) and zhiv(k1) == 200)
+    try:
+        chasy(time.time() + 86400 + 120)
+        proverka("…но не дольше 24 часов: через сутки прежний не принимается", zhiv(k1) == 401)
+    finally:
+        chasy(None)
+    proverka("…а новый работает", zhiv(k2) == 200)
+    r = vh(c, "klyuch:klod", MOY, srazu="1")
+    k3 = klyuch_iz(r)
+    proverka("…с галочкой «подозрение на утечку» прежний гаснет сразу", bool(k3) and zhiv(k2) == 401 and zhiv(k3) == 200)
+    with osnovnaya() as o:
+        vazh = [r_["chto"] for r_ in o.execute("SELECT chto FROM deystviya WHERE vazhnoe=1")]
+    proverka("выпуск ключей — в «Важном» (без самих ключей)",
+             "новый ключ выкладки" in vazh and "новый ключ рутин" in vazh and "новый ключ рутин (прежний погашен сразу)" in vazh
+             and not any(k_ in x for x in vazh for k_ in (kv, k1, k2, k3)), vazh[-5:])
+
+    print("Карточки: «Выйти везде», «Отключить вход», пауза, общий компьютер")
+    proverka("сеанс Лены жив", login_kto(lena) == "lena")
+    r = vh(c, "vyiti_vezde:lena", MOY)
+    proverka("«Выйти везде» у Лены: её сеанс закрыт, владелец остался",
+             r.status_code == 200 and lena.get("/api/kto").status_code == 401 and login_kto(c) == "boris", r.status_code)
+    vtoroy = kl()
+    voyti(vtoroy, "boris", MOY)
+    r = vh(c, "vyiti_vezde:boris", MOY)
+    proverka("«Выйти на других устройствах» у себя: этот сеанс жив, второй закрыт",
+             r.status_code == 200 and login_kto(c) == "boris" and vtoroy.get("/api/kto").status_code == 401)
+    voyti(lena, "lena", P["lena"])
+    r = vh(c, "vkl:lena:0", MOY)
+    proverka("«Отключить вход»: сеанс закрыт, войти нельзя",
+             r.status_code == 200 and lena.get("/api/kto").status_code == 401 and voyti(kl(), "lena", P["lena"]).status_code == 401)
+    proverka("…«Включить вход» возвращает", vh(c, "vkl:lena:1", MOY).status_code == 200
+             and voyti(kl(), "lena", P["lena"]).status_code == 303)
+    r = vh(c, "vkl:boris:0", MOY)
+    proverka("…свой вход владельцу не отключить", r.status_code == 400 and "отключить нельзя" in r.text)
+    x = kl("7.7.7.7")
+    for _ in range(5):
+        voyti(x, "ira", "ne-tot-" + secrets.token_hex(5))
+    proverka("Ира заперта после пяти промахов — на странице «пауза» и кнопка «Снять паузу»",
+             voyti(x, "ira", P["ira"]).status_code == 429 and "snyat_pauzu:ira" in c.get("/owner", headers=STR).text)
+    proverka("…«Снять паузу» — Ира входит сразу",
+             vh(c, "snyat_pauzu:ira", MOY).status_code == 200 and voyti(x, "ira", P["ira"]).status_code == 303)
+    voyti(x, "liza", P["liza"])                      # второй человек в том же браузере — общий компьютер
+    ustr = m.vhod.obshchie_ustroystva()
+    moe = [u for u in ustr if set(u["imena"]) == {"Ира", "Лиза"}]
+    proverka("общий компьютер виден владельцу: «входили: Ира, Лиза»",
+             len(moe) == 1 and f"ustr_lichnoe:{moe[0]['id']}" in c.get("/owner", headers=STR).text, len(ustr))
+    r = vh(c, "ustr_lichnoe:" + (moe[0]["id"] if moe else "0" * 64), MOY)
+    proverka("…«Считать личным» — компьютер больше не общий",
+             r.status_code == 200 and not any(u["id"] == moe[0]["id"] for u in m.vhod.obshchie_ustroystva()))
+    proverka("…чужой номер компьютера → отказ", vh(c, "ustr_lichnoe:" + "0" * 64, MOY).status_code == 400)
+
+    print("29. Временный вход на 24 часа; занятые имена")
+    zanyatye = [vh(c, "dobavit", MOY, novoe_imya="Проверка", novyy_login=lg).status_code
+                for lg in ("admin", "boris", "klod", "klod-vykladka", "avtomatika", "vyhod", "owner", "root")]
+    proverka("занятые логины не выдаются", zanyatye == [400] * 8, zanyatye)
+    plohie = [vh(c, "dobavit", MOY, novoe_imya="Проверка", novyy_login=lg).status_code
+              for lg in ("ab", "1abc", "оля", "a b c", "x" * 21, "lena")]
+    proverka("кривой логин (короткий, с цифры, по-русски, длинный) и уже существующий — отказ", plohie == [400] * 6, plohie)
+    proverka("имя, которое уже есть (Лена), и пустое имя — отказ",
+             (vh(c, "dobavit", MOY, novoe_imya="лена", novyy_login="lena2").status_code,
+              vh(c, "dobavit", MOY, novoe_imya=" ", novyy_login="lena3").status_code) == (400, 400))
+    with baza_vhodov() as b:
+        n = b.execute("SELECT COUNT(*) FROM vhody").fetchone()[0]
+    proverka("…после отказов записей по-прежнему шесть", n == 6, n)
+    r = vh(c, "dobavit", MOY, novoe_imya="Замена", novyy_login="zamena-stoyka", sutki="1")
+    proverka("временный вход добавлен: роль «админ», срок — сутки, пароля нет",
+             r.status_code == 200 and "Вход добавлен на 24 часа" in r.text and "name='parol_zamena-stoyka'" in r.text
+             and "временный, до " in r.text and heshi().get("zamena-stoyka") == "", r.status_code)
+    with baza_vhodov() as b:
+        z = b.execute('SELECT rol, "do" FROM vhody WHERE login=?', ("zamena-stoyka",)).fetchone()
+    proverka("…в базе: admin, срок через 24 часа",
+             z is not None and z["rol"] == "admin" and 86300 < m.vhod._iz_iso(z["do"]) - time.time() <= 86400)
+    r = vh(c, "paroli", MOY, **{"parol_zamena-stoyka": "zamena-stoyka"})
+    proverka("22. пароль, равный логину, → отказ", r.status_code == 400 and "совпадает с логином" in r.text)
+    pz = novyy_parol()
+    proverka("пароль временному входу задан", vh(c, "paroli", MOY, **{"parol_zamena-stoyka": pz}).status_code == 200)
+    zam = kl()
+    proverka("временный вход работает — по имени и по логину, права админа",
+             voyti(zam, "Замена", pz).status_code == 303 and kto(zam).get("rol") == "admin"
+             and zam.get("/owner", headers=STR).status_code == 403)
+    try:
+        chasy(time.time() + 86400 + 120)
+        proverka("через сутки временный вход не действует: сеанс закрыт, войти нельзя",
+                 zam.get("/api/kto").status_code == 401 and voyti(kl(), "zamena-stoyka", pz).status_code == 401)
+    finally:
+        chasy(None)
+
+    print("27. Срок старых входов и автовыключение")
+    bylo = nastroyki_vhoda()
+
+    def srok(sek):
+        m.db.set_setting("vhod_starye_do", m.vhod._iso(time.time() + sek))
+
+    def klod_rabotal(sek_nazad):
+        with baza_vhodov() as b:
+            b.execute("UPDATE vhody SET posl_zapros=? WHERE login='klod'",
+                      (m.vhod._iso(time.time() - sek_nazad) if sek_nazad is not None else None,))
+
+    def vazhnoe_posl():
+        with osnovnaya() as o:
+            r_ = o.execute("SELECT chto FROM deystviya WHERE vazhnoe=1 ORDER BY id DESC LIMIT 1").fetchone()
+        return r_["chto"] if r_ else ""
+    srok(-60)
+    proverka("срок в прошлом → старые входы выключены",
+             not m.vhod.starye_vklyucheny() and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 401)
+    with osnovnaya() as o:
+        o.execute("DELETE FROM settings WHERE key='vhod_starye_do'")
+    proverka("отметка «заведены» есть, а записи о сроке нет → выключены",
+             m.vhod.zavedeny() and not m.vhod.starye_vklyucheny()
+             and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 401)
+    proverka("…автопилот без записи о сроке ничего не трогает", m.vhod.starye_po_sroku() == "")
+    srok(5 * 3600)
+    klod_rabotal(60)
+    proverka("до срока больше двух часов — автопилот ничего не делает",
+             m.vhod.starye_po_sroku() == "" and m.vhod.starye_vklyucheny())
+    srok(3600)
+    klod_rabotal(2 * 86400)
+    r = m.vhod.starye_po_sroku()
+    novyy = m.vhod._iz_iso(m.db.get_setting("vhod_starye_do"))
+    proverka("до срока меньше двух часов, ключ рутин не работал сутки → срок сдвинут на сутки, общий вход жив",
+             r == "sdvinuto" and 86400 + 3500 < novyy - time.time() <= 86400 + 3600 and m.vhod.starye_vklyucheny()
+             and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200, r)
+    proverka("…владельцу — строка «Важное» с причиной",
+             vazhnoe_posl() == "общий вход не отключён, срок сдвинут на сутки: ключ рутин Клода не работал последние сутки",
+             vazhnoe_posl())
+    proverka("…owner_password не тронут", m.db.get_setting("owner_password") == STARYY_VLADELCA[1])
+    srok(-600)
+    klod_rabotal(None)
+    r = m.vhod.starye_po_sroku()
+    proverka("срок прошёл, пока сервер лежал, а ключ рутин не работал → тоже сдвиг, рутины не остаются без входа",
+             r == "sdvinuto" and m.vhod.starye_vklyucheny(), r)
+    srok(3600)
+    klod_rabotal(600)
+    r = m.vhod.starye_po_sroku()
+    proverka("ключ рутин работал, у владельца новый пароль → в срок старые входы выключаются сами",
+             r == "vyklyucheny" and not m.vhod.starye_vklyucheny()
+             and m.db.get_setting("owner_password") not in ("", STARYY_VLADELCA[1])
+             and vazhnoe_posl() == "старые входы отключены: сами, по сроку", r)
+    proverka("…повторный тик автопилота ничего не меняет", m.vhod.starye_po_sroku() == "")
+    m.vhod._POSL_SROK[0] = 0.0
+    m.vhod.avtopilot_tik()
+    proverka("…тик из цикла автопилота — не чаще раза в 10 минут и без ошибок", m.vhod._POSL_SROK[0] > 0)
+    # стенд возвращаем к состоянию «переходные дни» — дальше то же самое делает владелец кнопкой
+    with osnovnaya() as o:
+        o.execute("DELETE FROM settings WHERE key='vhod_starye_vykl'")
+    for k_, v_ in bylo.items():
+        m.db.set_setting(k_, v_)
+    proverka("стенд возвращён в переходные дни: общий admin работает",
+             m.vhod.starye_vklyucheny() and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200)
+
+    print("Аварийное окно выкладки")
+    r = vh(c, "okno_vykladki", MOY)
+    okno = m.vhod._iz_iso(m.db.get_setting("vhod_okno_vykladki_do"))
+    proverka("«Разрешить Клоду выкладку на 2 часа»: срок окна записан, на странице и в состоянии виден",
+             r.status_code == 200 and okno and 7100 < okno - time.time() <= 7200
+             and "Клоду разрешена выкладка ключом рутин до" in r.text
+             and c.get("/api/vhod/sostoyanie").json()["okno_vykladki_do"], r.status_code)
+
+    print("Действие 4 владельца и 26. «Отключить старые входы»")
+    klod_rabotal(2 * 86400)
+    m.vhod._HVOST.clear()
+    kl().get("/api/pult/tasks", auth=OBSHCHIY, headers={"user-agent": UA, "sec-fetch-mode": "cors"})
+    with baza_vhodov() as b:             # будто Ира через форму ещё не входила
+        b.execute("UPDATE vhody SET forma_vhod=NULL WHERE login='ira'")
+    do = nastroyki_vhoda()
+    r = vh(c, "starye_vykl", MOY)
+    proverka("предупреждения: ключ рутин молчит сутки, общим входом пользовались, не все входили через форму",
+             r.status_code == 200 and "Перед отключением старых входов" in r.text
+             and "не делал запросов последние сутки" in r.text and "Общим входом admin пользовались" in r.text
+             and "Ещё не входили через форму: Ира." in r.text and "starye_vykl:tochno" in r.text, r.status_code)
+    proverka("…пока не подтверждено второй раз — ничего не меняется",
+             nastroyki_vhoda() == do and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200)
+    r = vh(c, "starye_vykl:tochno", "ne-tot-" + secrets.token_hex(5))
+    proverka("…второе подтверждение тоже требует пароль", r.status_code == 400 and nastroyki_vhoda() == do)
+    klod_rabotal(60)
+    r = vh(c, "starye_vykl:tochno", MOY)
+    proverka("старые входы отключены", r.status_code == 200 and "Старые входы отключены" in r.text
+             and not m.vhod.starye_vklyucheny(), r.status_code)
+    kody = [kl().get(a, auth=OBSHCHIY).status_code for a in ("/api/pult/tasks", "/api/settings", "/api/kto", "/export/raw/rooms.json")]
+    kody += [kl().get(a, auth=STARYY_VLADELCA).status_code for a in ("/api/pult/tasks", "/api/settings", "/owner")]
+    kody.append(kl().post("/api/deploy", content=b"", auth=STARYY_VLADELCA).status_code)
+    proverka("общий admin и прежний boris не принимаются нигде", kody == [401] * 8, kody)
+    proverka("…и в форме входа общий пароль и прежний пароль владельца не годятся",
+             (voyti(kl(), "admin", OBSHCHIY[1]).status_code, voyti(kl(), "boris", STARYY_VLADELCA[1]).status_code) == (401, 401))
+    r = kl().get("/liniya?phone=79990000000", headers=STR, auth=OBSHCHIY)
+    proverka("страница с присланным старым паролем уходит на форму входа",
+             r.status_code == 303 and r.headers.get("location", "").startswith("/vhod?next=/liniya"), r.status_code)
+    r = kl().get("/api/pult/tasks", auth=OBSHCHIY)
+    proverka("…скрипту — 401", r.status_code == 401)
+    own = m.db.get_setting("owner_password")
+    proverka("owner_password затёрт длинной случайной строкой (не удалён)",
+             len(own) >= 40 and own not in (STARYY_VLADELCA[1], OBSHCHIY[1], P["boris"]))
+
+    def staraya_check_owner(user, pw):
+        """Проверка владельца, как в коде до 12.11.2026 (на случай отката на старую версию)."""
+        own_ = m.db.get_setting("owner_password")
+        if not own_:
+            return user == m.config.APP_USER and pw == m.config.APP_PASSWORD
+        return user == "boris" and pw == own_
+    proverka("…прежняя логика check_owner с затёртой настройкой admin не пускает",
+             not staraya_check_owner(*OBSHCHIY) and not staraya_check_owner(*STARYY_VLADELCA))
+    proverka("…в «Важном» — «старые входы отключены: владелец»", vazhnoe_posl() == "старые входы отключены: владелец", vazhnoe_posl())
+    proverka("личные входы, ключи и автоматика работают",
+             login_kto(c) == "boris" and voyti(kl(), "lena", P["lena"]).status_code == 303
+             and zhiv(k3) == 200 and zhiv(kv) == 200 and kl().get("/api/duty", auth=m.db.admin_auth()).status_code == 200)
+    r = c.get("/owner", headers=STR)
+    proverka("на странице: «Отключены», кнопки отключения больше нет, обратной кнопки тоже",
+             "Отключены" in r.text and "value='starye_vykl'" not in r.text and "ключить обратно" not in r.text)
+    proverka("повторное нажатие (старый запрос) ничего не ломает", vh(c, "starye_vykl:tochno", MOY).status_code == 200
+             and not m.vhod.starye_vklyucheny())
+    proverka("автопилот после отключения срок не сдвигает", m.vhod.starye_po_sroku() == "" and not m.vhod.starye_vklyucheny())
+
+    print("Подтверждение паролем: перебор")
+    z2 = kl("6.6.6.6")
+    z2.cookies.set(m.vhod.COOKIE, c.cookies.get(m.vhod.COOKIE), domain="app.kidsup.ru")
+    kody = [vh(z2, "snyat_pauzu:lena", "ne-tot-" + secrets.token_hex(5)).status_code for _ in range(5)]
+    r = vh(z2, "snyat_pauzu:lena", MOY)
+    proverka("5 неверных подтверждений подряд → пауза: даже верный пароль не проверяется",
+             kody == [400] * 5 and r.status_code == 400 and "Слишком много попыток" in r.text, kody)
+    proverka("…вход владельца при этом не заперт", voyti(kl("6.6.6.6"), "boris", MOY).status_code == 303)
+
+    print("30. Консольная команда: python3 -m app.vhod parol <логин>")
+    napechatano = []
+    pk = novyy_parol()
+    kod = m.vhod._konsol(["parol", "Борис"], vvod=lambda podskazka: napechatano.append(podskazka) or pk,
+                         pechat=napechatano.append)
+    proverka("пароль владельца задан из консоли, прежние сеансы закрыты",
+             kod == 0 and c.get("/api/kto").status_code == 401 and voyti(kl(), "boris", pk).status_code == 303
+             and voyti(kl(), "boris", MOY).status_code == 401, kod)
+    proverka("…пароль не напечатан, в «Важном» — строка без пароля",
+             not any(pk in str(x) for x in napechatano) and vazhnoe_posl() == "пароль задан из консоли сервера: boris")
+    P["boris"] = pk
+    raznye = iter([novyy_parol(), novyy_parol()])
+    proverka("…пароли не совпали → ничего не меняется; плохой пароль — отказ словами; служебной записи — нельзя",
+             m.vhod._konsol(["parol", "boris"], vvod=lambda _p: next(raznye), pechat=napechatano.append) == 1
+             and m.vhod._konsol(["parol", "boris"], vvod=lambda _p: "korotkiy", pechat=napechatano.append) == 1
+             and m.vhod._konsol(["parol", "klod"], vvod=lambda _p: pk, pechat=napechatano.append) == 1
+             and m.vhod._konsol(["parol", "nikto"], vvod=lambda _p: pk, pechat=napechatano.append) == 1
+             and m.vhod._konsol(["chto-to"], pechat=napechatano.append) == 2
+             and voyti(kl(), "boris", pk).status_code == 303 and not heshi()["klod"].startswith("pbkdf2"))
+    import subprocess
+    pl = novyy_parol()
+    okr = {k_: v_ for k_, v_ in os.environ.items() if k_ not in ("APP_PASSWORD", "KIDSUP_BEZ_VHODA")}
+    okr["KIDSUP_DATA_DIR"] = str(work)
+    pr = subprocess.run([sys.executable, "-m", "app.vhod", "parol", "liza"], cwd=KOREN, env=okr, input=f"{pl}\n{pl}\n",
+                        capture_output=True, text=True, timeout=120, start_new_session=True)
+    proverka("настоящий запуск команды в отдельном процессе: код 0, Лиза входит новым паролем",
+             pr.returncode == 0 and "Пароль задан: Лиза (liza)" in pr.stdout
+             and voyti(kl(), "liza", pl).status_code == 303 and voyti(kl(), "liza", P["liza"]).status_code == 401,
+             (pr.returncode, pr.stderr[-300:].replace(pl, "***")))
+    proverka("…пароль не напечатан ни в выводе, ни в ошибках", pl not in pr.stdout and pl not in pr.stderr)
+    P["liza"] = pl
+    return [kv, k1, k2, k3]
+
+
+def test_hranenie(work):
+    print("23. Хранение: паролей и ключей нет ни в копии базы, ни в логе прогона")
+    import gzip
+    sekrety = [s for s in list(P.values()) + SEKRETY if s]
+    c = kl()
+    voyti(c, "boris", P["boris"])
+    kv = next((s for s in SEKRETY if len(s) == 43 and login_kto(kl(), headers=bear(s)) == "klod-vykladka"), "")
+    r = kl().get("/api/backup/db", headers=bear(kv))
+    proverka("копия базы снимается ключом выкладки", r.status_code == 200 and len(r.content) > 1000, r.status_code)
+    raw = gzip.decompress(r.content) if r.status_code == 200 else b""
+    proverka("…в ней нет ни одного пароля и ключа, нет хешей паролей", raw and not any(s.encode() in raw for s in sekrety)
+             and b"pbkdf2_sha256$" not in raw)
+    kop = Path(work) / "kopiya_proverka.db"
+    kop.write_bytes(raw)
+    with sqlite3.connect(kop) as k_:
+        tablicy = {x[0] for x in k_.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    kop.unlink()
+    proverka("…и нет таблиц входов (vhody, seansy, ustroystva, popytki, hvost)",
+             tablicy and not tablicy & {"vhody", "seansy", "ustroystva", "popytki", "hvost"})
+    with osnovnaya() as o:
+        zh = " ".join(" ".join(str(x) for x in r_) for r_ in o.execute("SELECT * FROM deystviya"))
+        nastr = " ".join(f"{r_[0]}={r_[1]}" for r_ in o.execute("SELECT key, value FROM settings"))
+    proverka("журнал действий и настройки: ни одного пароля и ключа", not any(s in zh or s in nastr for s in sekrety))
+    for f in sorted(Path(work).iterdir()):
+        if f.is_file():
+            raw = f.read_bytes()
+            proverka(f"{f.name}: ни одного пароля и ключа побайтно", not any(s.encode() in raw for s in sekrety))
+    log_ = "".join(ZAHVAT)
+    proverka(f"лог прогона ({len(log_) // 1000} КБ печати и записей журнала сервера): ни одного пароля и ключа",
+             len(log_) > 5000 and not any(s in log_ for s in sekrety + [OBSHCHIY[1], STARYY_VLADELCA[1], PED]))
+
+
 # --- хранение и следы ---------------------------------------------------------------------------------------
 
 def test_sledy(klyuch, work):
     print("Следы: паролей и ключей нет ни в файлах, ни в журнале")
-    sekrety = [p for p in P.values()] + [klyuch]
+    sekrety = [p for p in P.values()] + [klyuch] + SEKRETY
     fajly = [Path(m.config.VHODY_DB), m.vhod._put_kopii(), Path(m.config.DB_PATH)]
     for f in fajly:
         raw = f.read_bytes() if f.exists() else b""
@@ -950,6 +1505,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--work", default="")
     a = ap.parse_args()
+    sys.stdout = _Tee(sys.stdout)                     # всё напечатанное — в ZAHVAT (проверка 23)
     work = a.work or tempfile.mkdtemp(prefix="vhod_")
     os.makedirs(work, exist_ok=True)
     m = lt.zapustit(KOREN, work)
@@ -960,11 +1516,14 @@ def main():
     m.db.set_setting("owner_password", STARYY_VLADELCA[1])
     m.db.set_setting("pedagog_key", PED)
     _lovushki_na_vse()
+    _zh = _LogVZahvat()
+    _zh.setFormatter(logging.Formatter("%(name)s %(levelname)s %(message)s"))
+    logging.getLogger().addHandler(_zh)           # и всё, что сервер пишет в свой журнал
     test_kak_segodnya()
     test_obhod()
+    test_vladelec_paroli()          # пароли задаёт сам владелец на /owner (действие 1 из 7.2)
     for lg in ("lena", "ira", "liza", "boris"):
-        P[lg] = pridumat()
-        proverka(f"пароль задан: {lg}", m.vhod.zadat_parol(lg, P[lg]) == "")
+        proverka(f"пароль задан: {lg}", bool(P.get(lg)) and heshi()[lg].startswith("pbkdf2_sha256$"))
     proverka("первый пароль: отметка «входы заведены», старые входы ещё 7 дней",
              m.vhod.zavedeny() and m.vhod.starye_vklyucheny()
              and 6.9 * 86400 < m.vhod._iz_iso(m.db.get_setting("vhod_starye_do")) - time.time() <= 7 * 86400)
@@ -991,7 +1550,9 @@ def main():
     test_vhod_js()
     test_avtomatika()
     test_sboy(work)
+    test_upravlenie(klyuch, work)
     test_sledy(klyuch, work)
+    test_hranenie(work)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     chuzhie = [x for x in lt.SET if any("vhod" in f for f in x[1])]
     proverka("вход не ходит в сеть", not chuzhie, chuzhie)
