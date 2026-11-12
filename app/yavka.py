@@ -738,6 +738,22 @@ def nightly(day: str | None = None, who: str = "Лена") -> dict:
             applied = {"ok": False, "error": str(e)[:200]}
     it = res["itogo"]
     dd = f"{day[8:10]}.{day[5:7]}"
+    # 12.11.2026, Борис — правило 2: расхождения явки с отчётами педагогов пунктом
+    # больше не перечисляем — их показывает страница «Проверка МойКласса» (раздел 3)
+    # по этой же сверке. Пункт остаётся только про занятия без отчёта педагога:
+    # это не правка МойКласса, а напоминание педагогу. Настройка
+    # proverka_mk_vmesto_punktov="0" возвращает прежний пункт.
+    if db.get_setting("proverka_mk_vmesto_punktov", "1") == "1":
+        if it["bez_otcheta"]:
+            text = (f"Явка {dd}: без отчёта педагога {it['bez_otcheta']} занятий: "
+                    + ", ".join(f"{b['time']} {b['class'][:28]}" for b in res["bez_otcheta"][:4])
+                    + " — напомнить педагогам прислать списки в «KidsUP Team». Расхождения явки — "
+                      "на странице app.kidsup.ru/proverka-mk, раздел 3.")
+            try:
+                autopilot.inbox_add(text, who=who, source=f"явка {dd}")
+            except Exception:
+                log.exception("пункт о явке в Пульт не поставлен")
+        return {"day": day, "itogo": it, "applied": applied}
     if it["s_otchetom"] or it["bez_otcheta"]:
         parts = [f"Явка {dd}: отчёты педагогов есть по {it['s_otchetom']} занятиям"]
         if it["ne_provedeno"]:
