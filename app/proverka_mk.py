@@ -613,6 +613,26 @@ def _byl_ryadom(D: Dannye, uid, day: str, cid, krome_lid=None) -> bool:
     return False
 
 
+def _otkuda(o: dict | None, s_imenem: bool = True) -> str:
+    """Какой отчёт: «Педагог, 06.11 20:21 — «Иванов Петя», слот 19:00».
+
+    12.11.2026, Лиза: «каждого смотрю, а ты не правильно указываешь отчёт от педагога…
+    я просто так проверяю то, что не нужно проверять». Теперь в строке видно, чьё
+    сообщение, когда и каким именем ребёнок в нём записан, — проверка за секунды."""
+    if not o:
+        return ""
+    avtor = re.sub(r"\s*педагог\s+kidsup\s*", " ", str(o.get("avtor") or "").split("|")[0], flags=re.I).strip()
+    ts = str(o.get("ts") or "")
+    kogda = f"{ts[8:10]}.{ts[5:7]} {ts[11:16]}" if len(ts) >= 16 else ""
+    chasti = [x for x in (avtor, kogda) if x]
+    imya = str(o.get("imya") or "").strip()
+    return (", ".join(chasti) + (f" — «{imya.title()}»" if imya and s_imenem else "")
+            + (f", слот {o['vremya']}" if o.get("vremya") else ""))
+
+
+R3_ZANYATIE = 3   # столько расхождений «по отчёту был» на одном занятии — одна строка на занятие
+
+
 def r3(D: Dannye) -> list[dict]:
     lo = D.lo("3")
     sklejka: dict[str, dict] = {}
@@ -658,9 +678,13 @@ def r3(D: Dannye) -> list[dict]:
                 if uid in D.ud["users"]:
                     continue
                 key = f"r3:{act}:{uid}:{L.get('class_id')}"
-                dobavit(key, day, L, uid=uid, vid=act,
-                        chto=("по отчёту педагога был, в МойКлассе «не был»" if act == "rashozhdenie"
-                              else "по отчёту педагога не был, в МойКлассе «был»"
+                nado = "был" if act == "rashozhdenie" else "не был"
+                o = next((o for o in reversed(rec.get("otchety") or []) if o.get("kind") == nado), None)
+                otk = _otkuda(o)
+                dobavit(key, day, L, uid=uid, vid=act, _o=o,
+                        chto=(("по отчёту педагога был" + (f" ({otk})" if otk else "") + ", в МойКлассе «не был»")
+                              if act == "rashozhdenie"
+                              else "по отчёту педагога не был" + (f" ({otk})" if otk else "") + ", в МойКлассе «был»"
                               + (f" (списано {rub(_bill(cur))})" if _bill(cur) else "")),
                         sdelat=("поставить «был»" if act == "rashozhdenie" else "поставить пропуск («не был»)"),
                         rebenok=D.imya(uid))
@@ -677,8 +701,13 @@ def r3(D: Dannye) -> list[dict]:
                     if k_uid:
                         spor_staryi.add((k_uid, L.get("class_id")))
                     continue
+                k_rec = next((r for r in L.get("records") or [] if r.get("uid") == k_uid), {}) if k_uid else {}
+                ots = k_rec.get("otchety") or []
+                byl_o = next((o for o in ots if o.get("kind") == "был"), None)
+                ne_o = next((o for o in ots if o.get("kind") == "не был"), None)
                 dobavit(f"r3k:{L.get('class_id')}:{k_uid or nm.lower()}", day, L, uid=k_uid, vid="conflict",
-                        chto="два отчёта расходятся: в одном «был», в другом «не был»",
+                        chto=("два отчёта расходятся: в одном «был», в другом «не был»"
+                              + (f" («был»: {_otkuda(byl_o)}; «не был»: {_otkuda(ne_o)})" if byl_o and ne_o else "")),
                         sdelat="уточнить у педагога и поставить явку по факту", rebenok=nm)
             for u in L.get("unmatched") or []:
                 if u.get("kind") != "был" or _NE_BYLO.search(str(u.get("note") or "")):
@@ -694,8 +723,9 @@ def r3(D: Dannye) -> list[dict]:
                     continue
                 if _byl_ryadom(D, uid, day, L.get("class_id")):
                     continue
+                otk = _otkuda(u.get("otchet"))
                 dobavit(f"r3u:{uid}:{L.get('class_id')}", day, L, uid=uid, vid="unmatched",
-                        chto="в отчёте педагога «был», а записи на занятие нет",
+                        chto="в отчёте педагога «был»" + (f" ({otk})" if otk else "") + ", а записи на занятие нет",
                         sdelat="завести запись (отработка или пробное) и отметить «был»", rebenok=D.imya(uid))
     out = []
     for key, x in list(sklejka.items()):
@@ -712,6 +742,25 @@ def r3(D: Dannye) -> list[dict]:
             if k in sklejka and "отчёты педагогов расходятся" not in sklejka[k]["chto"]:
                 sklejka[k]["chto"] += "; отчёты педагогов расходятся между собой — уточнить у педагога"
                 sklejka[k]["sdelat"] = "сначала уточнить у педагога, потом поставить явку по факту"
+    # Явку целого занятия не отметили (ИЗО 12.10: в отчёте пришли шестеро, в МойКлассе «был»
+    # только у одного) — одна строка на занятие со списком, а не шесть строк по детям.
+    po_uroku = defaultdict(list)
+    for key, x in sklejka.items():
+        if x["vid"] == "rashozhdenie" and len(x["_dni"]) == 1:
+            po_uroku[(x["_cid"], x["_dni"][0])].append(key)
+    for (cid, den), keys in po_uroku.items():
+        if len(keys) < R3_ZANYATIE:
+            continue
+        xs = [sklejka.pop(k) for k in keys]
+        spisok = ", ".join(f"{x.get('rebenok') or '?'}" + (f" («{str(x['_o'].get('imya') or '').title()}»)" if x.get("_o") else "")
+                           for x in xs)
+        ist = _otkuda(next((x["_o"] for x in xs if x.get("_o")), None), s_imenem=False)
+        out.append(_stroka("3", f"r3z:{cid}:{den}", gruppa=D.gruppa(cid), class_id=cid, data=den,
+                           kogda=_kogda(den) + (f" {xs[0]['_time']}" if xs[0]["_time"] else ""),
+                           chto=f"по отчёту педагога были {len(xs)} детей" + (f" ({ist})" if ist else "")
+                                + f", а в МойКлассе у них «не был» — похоже, явку на занятии не отметили: {spisok}",
+                           sdelat="открыть занятие и поставить «был» по списку", obnovitsya=D.obnovitsya("zanyatie", den),
+                           fakty={"vid": "zanyatie", "dni": [den], "n": len(xs)}))
     for key, x in sklejka.items():
         dni = sorted(x["_dni"])
         cid = x["_cid"]

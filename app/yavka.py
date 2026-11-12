@@ -47,7 +47,7 @@ SUBJECTS = [
     (re.compile(r"логопед\w*"), ("ЛГ",)),
     (re.compile(r"музык[аи]\s+(с\s+мамой|и\s+речь)|\bмсм\b"), ("Музыка и речь",)),
     (re.compile(r"раннее\s+развитие|первая\s+школа"), ("Первая школа",)),
-    (re.compile(r"мини[\s-]?сад\w*"), ("Мини-сад",)),
+    (re.compile(r"мини\s*-?\s*сад\w*"), ("Мини-сад",)),
     (re.compile(r"лицей\w*"), ("Лицей",)),
     (re.compile(r"нулев\w*(\s+класс\w*)?"), ("Нулевой класс",)),
     (re.compile(r"английск\w*|english|\bангл\b"), ("АЯ",)),
@@ -61,13 +61,18 @@ RE_PRESENT = re.compile(r"^(были|был[аи]?|присутствовали|
 RE_ABSENT = re.compile(r"^(не\s*был[аои]?|не\s*пришл[иа]|отсутствовал[аи]?|пропустил[аи]?|нет)\s*:?\s*(.*)$")
 RE_TIME = re.compile(r"^(\d{1,2})\s*[.:]\s*(\d{2})\s*ч?(?![\d])\s*[-–—:]?\s*(.*)$")
 RE_HOUR = re.compile(r"^(\d{1,2})\s*ч(?![а-яa-z])\s*[-–—:]?\s*(.*)$")
+RE_TIME_PROBEL = re.compile(r"^(\d{1,2})\s+(\d{2})\s*$")   # «19 20», «17 40» — строка целиком
 RE_DATE = re.compile(r"(?<!\d)(\d{1,2})\s*[./]\s*(\d{1,2})(?:\s*[./]\s*(\d{2,4}))?(?!\d)")
 # номер пункта списка («1. Имя», «2)Имя») — за ним буква; «10.00» — время, его не трогаем
 RE_NUM = re.compile(r"^\s*(?:\d{1,2}\s*[.)]\s*(?=[^\d\s.)])|[•·\-–—*⏰]\s*)+")
 # после имени педагоги дописывают состояние — по нему и режем
-RE_NOTE = re.compile(r"\b(отработ\w*|пробн\w*|болеет|болен|больна|заболел\w*|уехал\w*|отпуск\w*|заморозк\w*|нов(ая|ый|енький|енькая)|"
+# 12.11.2026 (сверка 311 отчётов): «сад\w*» отрезало фамилию «Сад…» целиком — ребёнок с такой
+# фамилией пропадал из всех отчётов; теперь только слово «сад/саду/сада/садик». «болеют» и
+# «не было» после имени тоже пометка («Петров Ваня болеют», «Иванова Аня не было»).
+RE_NOTE = re.compile(r"\b(отработ\w*|пробн\w*|болеет|болеют|болел\w*|болен\b|больна\b|приболел\w*|заболел\w*|"
+                     r"не\s+был[аои]?\b.*|не\s+пришл\w*.*|уехал\w*|отпуск\w*|заморозк\w*|нов(ая|ый|енький|енькая)|"
                      r"мама\b.*|предупред\w*|опоздал\w*|пришел\w*|пришла|будет\b.*|будут\b.*|т\.?к\.?\b.*|из\s+\d.*|с\s+\d{1,2}[.:]\d{2}.*|"
-                     r"справк\w*|уваж\w*|карантин\w*|сад\w*|занят\w*|перенос\w*|отмен\w*|последний\s+раз.*|переходит.*|девочка|мальчик)", re.I)
+                     r"справк\w*|уваж\w*|карантин\w*|сад(?:у|а|ик\w*)?\b|занят\w*|перенос\w*|отмен\w*|последний\s+раз.*|переходит.*|девочка|мальчик)", re.I)
 # строка с такими словами — не имя, а разговор
 RE_NOISE = re.compile(r"\b(набираем|групп[аыу]|заняти\w*|урок\w*|сегодня|завтра|вчера|спасибо|пожалуйста|добрый|доброе|здравствуйте|"
                       r"коллеги|удалено|кликните|сообщение|списки|прислать|пришлите|всех|нас|каюсь|видела|должна|ресепшен\w*)\b", re.I)
@@ -75,6 +80,12 @@ RE_NOISE = re.compile(r"\b(набираем|групп[аыу]|заняти\w*|�
 # у ряда групп за неё идёт возврат 50 % (оферта, п. 2.7). «Болеет»,
 # «предупредили», «уехал» в отчёте педагога — обычный пропуск, его не трогаем.
 GOOD_REASON = re.compile(r"справк", re.I)
+# 12.11.2026 (сверка отчётов): «Иванова Аня (не было)», «(не было, заморозка)» — ребёнок стоит
+# в списке пришедших, но пометка говорит обратное; раньше он так и оставался «был».
+# «Не было: Орлов Глеб (перенесли его на вечер)» — не пропуск: ребёнок пришёл в другое время
+# (12.11: такая строка давала «два отчёта расходятся» у вечернего занятия, где он был)
+RE_PERENOS = re.compile(r"перен[её]?с|перенос|в\s+друго[ей]\s+(?:время|групп)|на\s+вечер|на\s+утро", re.I)
+RE_NE_BYLO_POMETKA = re.compile(r"^\s*(не\s*был[аои]?|не\s*пришл\w*|отсутств\w*)(?![а-яё])", re.I)
 BEZ_SPRAVKI = re.compile(r"без\s+справк|нет\s+справк|справк\w*\s+(?:нет|не\s|будет|позже|потом)|"
                          r"(?:принес[уёе]т|донес[уёе]т|занес[уёе]т|будет)\s+справк", re.I)
 
@@ -98,6 +109,9 @@ DIM = {
     "рита": ("маргарита",), "леня": ("леонид",), "боря": ("борис",), "петя": ("петр",), "сережа": ("сергей",), "максим": ("максим",),
     "макс": ("максим",), "никита": ("никита",), "глеб": ("глеб",), "ярик": ("ярослав",), "марк": ("марк",), "матвей": ("матвей",),
     "лера": ("валерия",), "валя": ("валентина", "валентин"), "кира": ("кира",), "алиса": ("алиса",), "агата": ("агата",),
+    # 12.11.2026: одно слово теперь сравнивается строго (_tok_match_odno) — уменьшительные нужны явно
+    "злата": ("златослава", "злата"), "ксюша": ("ксения",), "наташа": ("наталья", "наталия"), "света": ("светлана",),
+    "гоша": ("георгий",), "сема": ("семен",), "яся": ("ярослава",),
 }
 NOTE_WORDS = {"был", "была", "были", "не", "и", "а", "но", "в", "на", "с", "по", "за", "до", "от", "у", "к", "о"}
 
@@ -186,7 +200,10 @@ def _date_in(line: str, msg_date: dt.date) -> dt.date | None:
             cand = dt.date(year, mo, d)
         except ValueError:
             continue
-        if not (-3 <= (msg_date - cand).days <= 1):
+        # 12.11.2026: окно было перевёрнуто (до 3 дней вперёд и 1 назад) — «19.10 Нулевой класс
+        # (не отправилось)», присланное 22.10, не считалось датой, «19.10» становилось временем
+        # 19:10, а отчёт — отчётом за 22.10. Дата отчёта — до 3 дней назад, вперёд — на день.
+        if not (-1 <= (msg_date - cand).days <= 3):
             continue
         rest = (line[:m.start()] + " " + line[m.end():]).strip(" .:-–—()⏰")
         rest_l = rest.lower()
@@ -210,17 +227,31 @@ def _split_names(line: str) -> list[tuple[str, str]]:
     «Марк Костанян (отработка)»; «Настя Копылова уехала, будет отрабатывать»;
     «Зиньковская Д» (инициал отбрасываем, ищем по фамилии)."""
     line = RE_NUM.sub("", line).strip()
-    notes = " ".join(re.findall(r"\(([^)]*)\)", line))
-    line = re.sub(r"\([^)]*\)", " ", line)
-    line = re.sub(r"[.!]+$", "", line).strip()
-    if not line or RE_NOISE.search(line):
+    if line.count("(") > line.count(")"):
+        line += ")"  # «Орлов Глеб (перенесли его на вечер» — скобку не закрыли
+    if RE_NOISE.search(re.sub(r"\([^)]*\)", " ", line)):
         return []
+    # 12.11.2026 (сверка 311 отчётов): пометка в скобках относится к своему имени, а не ко
+    # всей строке («Иванова Аня (заморозка), Петров Ваня» — заморожена одна Аня); точка
+    # внутри списка — тот же разделитель, что запятая («Полина Белова. Ксения Лубова»).
+    chunks, buf, glub = [], "", 0
+    for i, ch in enumerate(line):
+        glub += (ch == "(") - (ch == ")")
+        konec_frazy = ch == "." and glub == 0 and re.match(r"\s+[А-ЯЁA-Z]", line[i + 1:])
+        if glub == 0 and (ch in ",;" or konec_frazy):
+            chunks.append(buf); buf = ""
+        else:
+            buf += ch
+    chunks.append(buf)
+    chunks = [c.strip(" .;!") for c in chunks if c.strip(" .;!")]
+    if not chunks:
+        return []
+    if any(len(_norm(re.sub(r"\([^)]*\)", " ", c))) > 4 for c in chunks):
+        chunks = [re.sub(r"[.!]+$", "", line).strip()]  # не список имён, а фраза с запятыми
     out = []
-    chunks = [c.strip(" .;") for c in re.split(r"[,;]", line) if c.strip(" .;")]
-    if any(len(_norm(c)) > 4 for c in chunks):
-        chunks = [line]  # не список имён, а фраза с запятыми
     for c in chunks:
-        note = notes
+        note = " ".join(re.findall(r"\(([^)]*)\)", c))
+        c = re.sub(r"\([^)]*\)", " ", c)
         m = RE_NOTE.search(c)
         if m:
             note = (note + " " + c[m.start():]).strip()
@@ -229,7 +260,9 @@ def _split_names(line: str) -> list[tuple[str, str]]:
         # одиночная буква в конце — инициал («Саркулова К»), в середине — предлог
         toks = [t for i, t in enumerate(raw)
                 if (len(t) >= 2 and t not in NOTE_WORDS) or (len(t) == 1 and i == len(raw) - 1 and i > 0)]
-        if not toks or len(toks) > 3 or sum(len(t) for t in toks) < 4 or len(toks[0]) < 2:
+        # одно имя из трёх букв («Ева», «Яна», «Лев») — тоже имя (раньше выпадало, и слот ИЗО
+        # с одной Евой пропадал целиком); сравнение одного слова строгое (_tok_match_odno)
+        if not toks or len(toks) > 3 or sum(len(t) for t in toks) < 3 or len(toks[0]) < 2:
             continue
         out.append((" ".join(toks), note.strip()))
     return out
@@ -252,7 +285,7 @@ def _time_of(s: str, msg_date: dt.date):
     """«16:00 Имя» / «10.00ч» / «11ч» → ('16:00', остаток) или None. Дата — не время."""
     if _date_in(s, msg_date):
         return None
-    mt = RE_TIME.match(s)
+    mt = RE_TIME.match(s) or RE_TIME_PROBEL.match(s)
     mh = None if mt else RE_HOUR.match(s)
     if not (mt or mh):
         return None
@@ -260,7 +293,10 @@ def _time_of(s: str, msg_date: dt.date):
     mi = int(mt.group(2)) if mt else 0
     if not (0 <= h <= 23 and 0 <= mi <= 59):
         return None
-    return f"{h:02d}:{mi:02d}", ((mt.group(3) if mt else mh.group(2)) or "").strip()
+    if mt and mt.re is RE_TIME_PROBEL and not 7 <= h <= 21:
+        return None
+    hvost = (mt.group(3) if mt.re is RE_TIME else "") if mt else mh.group(2)
+    return f"{h:02d}:{mi:02d}", (hvost or "").strip()
 
 
 def parse_report(text: str, msg_ts: str) -> list[dict]:
@@ -284,6 +320,9 @@ def parse_report(text: str, msg_ts: str) -> list[dict]:
         if date:
             break
     explicit_date = date is not None
+    if not explicit_date and msg_ts[11:13].isdigit() and int(msg_ts[11:13]) < 4:
+        # продолжение отчёта без даты, отправленное после полуночи, — про вчерашний вечер
+        date = msg_date - dt.timedelta(days=1)
     date = date or msg_date
     blocks: list[dict] = []
     cur = None
@@ -297,6 +336,11 @@ def parse_report(text: str, msg_ts: str) -> list[dict]:
         blocks.append(cur)
         if not keep_mode:
             mode = "present"
+
+    def put(names, kuda=None):
+        """Имена в текущий список; с пометкой «(не было)» — в «не было», где бы ни стояли."""
+        for n, note in names:
+            cur["absent" if RE_NE_BYLO_POMETKA.match(note or "") else (kuda or mode)].append((n, note))
 
     for l in lines:
         s = RE_NUM.sub("", l).strip()
@@ -313,7 +357,7 @@ def parse_report(text: str, msg_ts: str) -> list[dict]:
             if rest:
                 if cur is None:
                     new_block(None, keep_mode=True)
-                cur["absent"].extend(_split_names(rest))
+                put(_split_names(rest), "absent")
             continue
         d_here = _date_in(s, msg_date)
         keys, msub = _subject(low)
@@ -322,15 +366,21 @@ def parse_report(text: str, msg_ts: str) -> list[dict]:
             subj = keys
             rest = s[:msub.start()] + " " + s[msub.end():]
             if d_here:
-                rest = RE_DATE.sub(" ", rest)
+                # вторая дата в сообщении — новый день («31.10 … 17:30» в отчёте за 1.11);
+                # из строки убираем только саму дату: «24.10 музыка с мамой 9.45» — 9.45 время
+                date = d_here
+                rest = RE_DATE.sub(lambda m: " " if (int(m.group(1)), int(m.group(2))) == (d_here.day, d_here.month)
+                                   else m.group(0), rest)
             rest = rest.strip(" .:-–—()⏰")
             tm = _time_of(rest, msg_date) if rest else None
             new_block(tm[0] if tm else None)
             rest = tm[1] if tm else rest
-            if rest and not d_here:
-                cur[mode].extend(_split_names(rest))
+            if rest and (not d_here or tm):
+                put(_split_names(rest))
             continue
         if d_here and len(_norm(RE_DATE.sub(" ", s))) <= 1:
+            if d_here <= msg_date:
+                date = d_here   # «31.10» перед слотом в отчёте за 1.11 — дальше другой день
             continue  # строка-дата
         tm = _time_of(s, msg_date)
         if tm:
@@ -341,14 +391,14 @@ def parse_report(text: str, msg_ts: str) -> list[dict]:
             if cur is None or cur["time"] != t or (not names and (cur["present"] or cur["absent"])):
                 new_block(t, keep_mode=bool(names))
             if names:
-                cur[mode].extend(names)
+                put(names)
             continue
         names = _split_names(s)
         if not names:
             continue
         if cur is None:
             new_block(None, keep_mode=True)
-        cur[mode].extend(names)
+        put(names)
     out = [b for b in blocks if b["present"] or b["absent"]]
     # сообщение без даты, предмета, времени и маркеров «были/не был» — отчёт
     # только если это явный список: ≥3 имён вида «Фамилия Имя»
@@ -368,7 +418,7 @@ def _reports(day: str) -> list[dict]:
     пишут и ночью, и утром), разобранные на блоки нужного дня."""
     d = dt.date.fromisoformat(day)
     lo = (d - dt.timedelta(days=0)).isoformat() + "T00:00"
-    hi = (d + dt.timedelta(days=2)).isoformat() + "T00:00"
+    hi = (d + dt.timedelta(days=4)).isoformat() + "T00:00"   # отчёт задним числом — до 3 дней
     with db.get_conn() as conn:
         try:
             rows = conn.execute(
@@ -538,17 +588,46 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
         # от пяти букв, и «Орлова София» (её нет в записях) сошлась по имени «София»
         # с Лебедевой Софией из соседней группы ПШ в 18:00 — та, отмеченная в своём
         # отчёте «была», попала в «два отчёта расходятся» (имена здесь выдуманные).
-        toks = [t for t in _norm(name) if len(t) >= 5 and t not in imena]
-        if len(_norm(name)) >= 2 and toks:
+        # И имя не должно спорить: «Орлова Дарья» — не Орлова Виктория (сёстры),
+        # «Кульгин Максим» — не Кулагин Михаил (фамилия с опечаткой и другое имя; имена выдуманные).
+        # Фамилия точно — имя или инициал хотя бы с тех же букв (Дана / Даниелла);
+        # фамилия с опечаткой — имя должно совпасть полностью.
+        rt = _norm(name)
+        toks = [t for t in rt if len(t) >= 5 and t not in imena]
+        if len(rt) >= 2 and toks:
             for L in pool:
                 for r in L.get("records") or []:
                     nm = names.get(int(r["userId"]), "") if r.get("userId") else ""
-                    ft = [f for f in _norm(nm) if f not in imena]
-                    if any(t == f or (len(f) >= 5 and difflib.SequenceMatcher(None, t, f).ratio() >= 0.85) for t in toks for f in ft):
-                        hits.append((L, r))
+                    ft_all = _norm(nm)
+                    ft = [f for f in ft_all if f not in imena]
+                    for t in toks:
+                        f = next((f for f in ft if f == t), None)
+                        tochno = f is not None
+                        if f is None:
+                            f = next((f for f in ft if len(f) >= 5 and difflib.SequenceMatcher(None, t, f).ratio() >= 0.85), None)
+                        if f is None:
+                            continue
+                        ost_r = [x for x in rt if x != t]
+                        ost_f = [x for x in ft_all if x != f and x != "мк"]
+                        if not ost_r:
+                            ok = True
+                        elif tochno:
+                            ok = all(any((y.startswith(x) if len(x) == 1 else (x[:2] == y[:2] or _tok_match(x, y))) for y in ost_f)
+                                     for x in ost_r)
+                        else:
+                            ok = all(any(_tok_match(x, y) for y in ost_f) for x in ost_r if len(x) > 1)
+                        if ok:
+                            hits.append((L, r))
+                            break
             if len(hits) != 1:
                 return []
         return hits
+
+    def otchet(b, bi, imya, kind):
+        """Откуда отметка: кто написал, когда, каким именем и в каком слоте — для строки
+        Лизе (12.11: «ты неправильно указываешь отчёт от педагога» — теперь видно, какой)."""
+        return {"blok": bi, "ts": b.get("ts") or "", "avtor": b.get("author") or "", "vremya": b.get("time") or "",
+                "imya": imya, "kind": kind}
 
     ne_razobrano = []
     for bi, b in enumerate(reports):
@@ -566,6 +645,8 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
         assigned = []  # (lesson_id, record_id, prev_report, prev_note, prev_blok, prev_imya) — чтобы откатить блок-пустышку
         extra = {"unmatched": [], "ambiguous": []}
         for n, note, kind in all_names:
+            if kind == "не был" and RE_PERENOS.search(note or ""):
+                continue  # перенесли на другое время — про это занятие отчёт ничего не говорит
             hits = find(n, pool)
             if not hits and not b["time"] and b["subj"]:
                 hits = find(n, [L for L in lessons if L not in pool])  # предмет назвали иначе
@@ -582,6 +663,7 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
                                                              "variants": [rec["name"]]}))
                         rec["report"], rec["po_imeni"] = kind, n
                         rec["note"] = (note + (f"; {time_note}" if time_note else "")).strip("; ")
+                        rec["otchety"] = [o for o in rec.get("otchety") or [] if o.get("blok") != bi] + [otchet(b, bi, n, kind)]
                     else:
                         extra["ambiguous"].append((L["id"], {"name": n, "kind": kind, "note": note, "variants": [rec["name"]]}))
                     continue
@@ -590,6 +672,7 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
                     by_id[L["id"]]["conflicts"].append(f"{rec['name']}: в одном отчёте «был», в другом «не был»")
                 rec["report"] = kind
                 rec["blok"], rec["po_imeni"] = bi, n
+                rec.setdefault("otchety", []).append(otchet(b, bi, n, kind))
                 rec["note"] = (note + (f"; {time_note}" if time_note else "")).strip("; ")
                 touched.add(L["id"])
             elif len(hits) > 1:
@@ -598,7 +681,7 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
                                            {"name": n, "kind": kind, "note": note,
                                             "variants": sorted({names.get(int(r["userId"]), "") for _, r in hits})}))
             else:
-                extra["unmatched"].append((None, {"name": n, "kind": kind, "note": note}))
+                extra["unmatched"].append((None, {"name": n, "kind": kind, "note": note, "otchet": otchet(b, bi, n, kind)}))
         # имена без адреса кладём в занятие, где нашлось больше всего детей этого
         # блока (несколько занятий в одно время: ПШ вт-чт и ПШ вт-пт в 16:00,
         # логопед 11:40 и «Музыка с мамой» 11:45), иначе — в первое из кандидатов
@@ -614,6 +697,7 @@ def sverka(day: str, lessons: list[dict] | None = None, mk=None) -> dict:
             for lid, rid, prev_r, prev_n, prev_b, prev_i in assigned:
                 rec = next(x for x in by_id[lid]["records"] if x["record_id"] == rid)
                 rec["report"], rec["note"], rec["blok"], rec["po_imeni"] = prev_r, prev_n, prev_b, prev_i
+                rec["otchety"] = [o for o in rec.get("otchety") or [] if o.get("blok") != bi]
             ne_razobrano.append({"ts": b["ts"], "author": b["author"], "subj": b["subj"], "time": b["time"],
                                  "names": [n for n, _, _ in all_names],
                                  "why": f"из {len(all_names)} имён в записях этого дня нашлись {len(assigned)} — возможно, отчёт за другой день"})
