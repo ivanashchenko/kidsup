@@ -19,7 +19,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import analytics, config, db, leads, sync
+from . import config, db, leads, nav, sync
 from . import content as content_mod
 from . import descriptions as descr_mod
 
@@ -150,13 +150,39 @@ def _is_owner(credentials: HTTPBasicCredentials | None) -> bool:
                 and secrets.compare_digest(credentials.password, owner_pw))
 
 
-def check_auth(credentials: HTTPBasicCredentials | None = Depends(_security)):
+def _kto(credentials: HTTPBasicCredentials | None) -> str:
+    """Роль вошедшего: "owner" — логин boris с паролем владельца, иначе "admin".
+    Пока пароль владельца не задан, владельцем считается любой вошедший —
+    так же, как это делает check_owner."""
+    return "owner" if (_is_owner(credentials) or not db.get_setting("owner_password")) else "admin"
+
+
+def _zapomnit(request: Request | None, rol: str) -> None:
+    """Проверка входа оставляет роль в запросе: меню и стартовая страница читают её
+    оттуда и пароль второй раз не сверяют. Прямой вызов без request — как раньше."""
+    if request is not None:
+        request.state.rol = rol
+
+
+def _rol(request: Request) -> str:
+    """Кто открыл страницу: "owner", "admin" или "pedagog". Роль уже определила
+    зависимость маршрута (AUTH, OWNER_AUTH, PAUTH). Если её почему-то нет — считаем
+    админом: так раздел владельца не покажется тому, кому не положен."""
+    return getattr(request.state, "rol", "") or "admin"
+
+
+def check_auth(credentials: HTTPBasicCredentials | None = Depends(_security),
+               request: Request = None):
     """HTTP Basic — только если задан APP_PASSWORD.
 
     03.11.2026 Борис: «сделай, чтобы под логином boris я имел доступ ко всем
     страницам admin». Владелец проходит везде, где проходит admin, — одним
-    входом, без второго окна пароля между /owner и админскими страницами."""
+    входом, без второго окна пароля между /owner и админскими страницами.
+
+    request стоит последним и с умолчанием: функцию зовут и напрямую,
+    check_auth(credentials), — такие вызовы роль просто не запоминают."""
     if not config.APP_PASSWORD:
+        _zapomnit(request, _kto(credentials))
         return
     ok = (
         credentials is not None
@@ -166,12 +192,14 @@ def check_auth(credentials: HTTPBasicCredentials | None = Depends(_security)):
     if not ok:
         raise HTTPException(status_code=401, detail="Требуется авторизация",
                             headers={"WWW-Authenticate": "Basic"})
+    _zapomnit(request, _kto(credentials))
 
 
 AUTH = [Depends(check_auth)]
 
 
-def check_owner(credentials: HTTPBasicCredentials | None = Depends(_security)):
+def check_owner(credentials: HTTPBasicCredentials | None = Depends(_security),
+                request: Request = None):
     """Доступ владельца: пользователь «boris» и пароль из настройки owner_password.
 
     09.09.2026 Борис: «app.kidsup.ru/settings — а админы это не увидят?» Общий пароль
@@ -180,10 +208,11 @@ def check_owner(credentials: HTTPBasicCredentials | None = Depends(_security)):
     задан — работает обычная авторизация (чтобы можно было задать его в первый раз).
     """
     if not db.get_setting("owner_password"):
-        return check_auth(credentials)
+        return check_auth(credentials, request)
     if not _is_owner(credentials):
         raise HTTPException(status_code=401, detail="Только для владельца",
                             headers={"WWW-Authenticate": "Basic"})
+    _zapomnit(request, "owner")
 
 
 OWNER_AUTH = [Depends(check_owner)]
@@ -219,13 +248,35 @@ for _otkuda, _kuda in UBRANO.items():
     app.get(_otkuda, dependencies=AUTH)(_perehod(_kuda))
 
 
+def _domoy(request: Request) -> str:
+    """Стартовая страница роли: админам — пульт, владельцу — его стартовая страница
+    (документ start выкладывается на сервер запросом; пока его нет — список документов)."""
+    if _rol(request) != "owner":
+        return "/pult"
+    from . import boris_docs
+    return "/boris/docs/start" if (boris_docs.BORIS.dir / "start.html").exists() else "/boris/docs"
+
+
+def _vladelcu(request: Request):
+    """Архивная страница с базой клиентов, деньгами, рассылкой или фото детей — только
+    владельцу. Админа уводим на пульт без окна пароля: адрес мог остаться в закладке,
+    а окно пароля на знакомой странице читается как «сайт сломался»."""
+    if _rol(request) != "owner":
+        return RedirectResponse("/pult", status_code=303)
+
+
 def render(request: Request, template: str, **ctx) -> HTMLResponse:
     counts = db.table_counts()
+    rol = _rol(request)
     ctx.update({
         "request": request,
         "has_data": counts["users"] > 0 or counts["payments"] > 0,
         "has_api_key": bool(sync.get_api_key()),
         "last_sync": db.get_state("last_sync"),
+        # 12.11.2026: меню зависит от того, кто вошёл. Раздел владельца админу в
+        # страницу не попадает вовсе, педагогу по ключу меню не рисуется.
+        "rol": rol,
+        "menu": nav.menu(rol),
     })
     return templates.TemplateResponse(request, template, ctx)
 
@@ -318,22 +369,13 @@ def root(request: Request,
         return await_page("day")
     if page == "week":
         return await_page("week")
-    check_auth(credentials)          # служебный хост — как раньше, под паролем
-    return dashboard(request)
-
-
-def dashboard(request: Request):
-    return render(
-        request, "dashboard.html",
-        active="dashboard",
-        kpis=analytics.kpis(),
-        revenue=analytics.revenue_by_month(),
-        new_students=analytics.new_students_by_month(),
-        attendance=analytics.attendance_by_month(),
-        payments_by_type=analytics.payments_by_type(),
-        debtors=analytics.top_debtors(),
-        groups=analytics.group_stats()[:15],
-    )
+    check_auth(credentials, request)   # служебный хост — как раньше, под паролем
+    # 12.11.2026, Борис: «скрой не нужные / не актуальные / старые страницы». Главной был
+    # дашборд от 10.07 с графиками за год — в работе им не пользовались. Теперь главная —
+    # рабочее место роли. Переход стоит после разводки публичных доменов и после входа:
+    # посетитель kidsup.ru сюда не доходит, а без пароля адрес по-прежнему отвечает 401.
+    # 303, а не 301: постоянный переход браузер запомнил бы навсегда.
+    return RedirectResponse(_domoy(request), status_code=303)
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
@@ -367,6 +409,10 @@ def favicon():
 
 @app.get("/students", response_class=HTMLResponse, dependencies=AUTH)
 def students_page(request: Request, q: str = "", debtors: int = 0):
+    """Вся база карточек списком. С 12.11.2026 — в архиве владельца (/arhiv)."""
+    r = _vladelcu(request)
+    if r:
+        return r
     sql = "SELECT id, name, phone, email, balance, created_at FROM users"
     conds, args = [], []
     if q:
@@ -387,6 +433,10 @@ def students_page(request: Request, q: str = "", debtors: int = 0):
 @app.get("/payments", response_class=HTMLResponse, dependencies=AUTH)
 def payments_page(request: Request, date_from: str = "", date_to: str = "",
                   optype: str = ""):
+    """Журнал операций МойКласса. С 12.11.2026 — в архиве владельца (/arhiv)."""
+    r = _vladelcu(request)
+    if r:
+        return r
     if not date_from:
         date_from = (date.today() - timedelta(days=30)).isoformat()
     if not date_to:
@@ -2528,10 +2578,10 @@ def api_boris_status(payload: dict = Body(...)):
 
 
 @app.get("/pult", response_class=HTMLResponse, dependencies=AUTH)
-def pult_page(day: str = "", who: str = ""):
+def pult_page(request: Request, day: str = "", who: str = ""):
     """Пульт смены: задачи по тем, кто сегодня работает, + Лиза и Борис, живые блоки (06.09)."""
     from . import pult
-    return HTMLResponse(pult.page(day, who))
+    return HTMLResponse(pult.page(day, who, rol=_rol(request)))
 
 
 @app.get("/obeshchaniya", dependencies=AUTH)
@@ -2875,7 +2925,9 @@ def _csv_response(filename: str, header: list[str], rows: list[tuple]) -> Stream
     )
 
 
-@app.get("/export/students.csv", dependencies=AUTH)
+# 12.11.2026: /students и /payments ушли в архив владельца — туда же и их выгрузки.
+# Кнопки стоят только на этих страницах; рутины берут данные из /export/raw/*.json.
+@app.get("/export/students.csv", dependencies=OWNER_AUTH)
 def export_students():
     with db.get_conn() as conn:
         rows = conn.execute(
@@ -2888,7 +2940,7 @@ def export_students():
         [tuple(r) for r in rows])
 
 
-@app.get("/export/payments.csv", dependencies=AUTH)
+@app.get("/export/payments.csv", dependencies=OWNER_AUTH)
 def export_payments(date_from: str = "", date_to: str = ""):
     sql = """SELECT p.id, p.date, u.name, p.summa, p.optype, p.comment
              FROM payments p LEFT JOIN users u ON u.id = p.user_id"""
@@ -3452,7 +3504,11 @@ WA_HELLO = ("Здравствуйте! Пожалуйста, отправьте 
 
 @app.get("/chaty", response_class=HTMLResponse, dependencies=AUTH)
 def chaty_page(request: Request):
-    """Чаты учебных групп: ссылки-приглашения, состав и рассылка."""
+    """Чаты учебных групп: ссылки-приглашения, состав и рассылка.
+    С 12.11.2026 — в архиве владельца (/arhiv): на странице кнопка рассылки родителям."""
+    r = _vladelcu(request)
+    if r:
+        return r
     from . import chaty
     gs = chaty.groups()
     return render(request, "chaty.html", active="chaty", groups=gs,
@@ -3886,7 +3942,11 @@ def api_gruppy_pochinit():
 
 @app.get("/gruppy/media", response_class=HTMLResponse, dependencies=AUTH)
 def gruppy_media_page(request: Request, chat: str = "", days: int = 60):
-    """Фото и видео педагогов из рабочих групп — для сториз и постов (отбор, не публикация)."""
+    """Фото и видео педагогов из рабочих групп — для сториз и постов (отбор, не публикация).
+    С 12.11.2026 — в архиве владельца (/arhiv): на странице фото детей."""
+    r = _vladelcu(request)
+    if r:
+        return r
     from . import gruppy_chaty, autopilot
     since = (autopilot._today() - timedelta(days=max(1, min(int(days), 400)))).isoformat()
     rows = gruppy_chaty.messages(chat_id=chat, since=since, limit=2000, media_only=True)
@@ -4309,9 +4369,11 @@ def api_chaty_find_links(limit: int = 40):
     return chaty.find_links(limit=limit)
 
 
-@app.post("/api/chaty/send", dependencies=AUTH)
+@app.post("/api/chaty/send", dependencies=OWNER_AUTH)
 def api_chaty_send(dry: int = 1):
-    """Поставить приглашения в очередь рассылки. dry=1 — только посчитать."""
+    """Поставить приглашения в очередь рассылки. dry=1 — только посчитать.
+    Только владельцу (12.11.2026): кнопка стоит на архивной /chaty, автопилот
+    зовёт модуль chaty сам, без этого адреса."""
     from . import chaty
     return chaty.send(dry=bool(dry))
 
@@ -9398,8 +9460,14 @@ def check_pedagog_or_admin(request: Request,
     k = request.query_params.get("k") or request.headers.get("X-Pedagog-Key") or ""
     want = db.get_setting("pedagog_key", "")
     if want and k and secrets.compare_digest(k, want):
+        # 12.11.2026: педагогу меню админов не рисуем. Но ссылку с ключом открывает и
+        # админ — его браузер сам шлёт вход, и он остаётся админом со своим меню.
+        try:
+            check_auth(credentials, request)
+        except HTTPException:
+            request.state.rol = "pedagog"
         return
-    check_auth(credentials)
+    check_auth(credentials, request)
 
 
 PAUTH = [Depends(check_pedagog_or_admin)]
