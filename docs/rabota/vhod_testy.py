@@ -83,6 +83,7 @@ OBSHCHIY = ("admin", "stend-" + secrets.token_urlsafe(10))          # стары
 STARYY_VLADELCA = ("boris", "stend-" + secrets.token_urlsafe(10))   # прежний пароль владельца
 P: dict = {}                                                        # личные пароли
 PED = "stend-" + secrets.token_urlsafe(8)                           # ключ педагога
+VNE_SERVERA: list = []              # что было сразу после импорта app.main, до «запуска сервера»
 m = None
 
 
@@ -155,6 +156,24 @@ def osnovnaya():
     con = sqlite3.connect(m.config.DB_PATH)
     con.row_factory = sqlite3.Row
     return con
+
+
+def otm(klyuch: str, znachenie: str | None):
+    """Отметка входов (vhod_zavedeny, vhod_starye_do, vhod_starye_vykl) — сразу в оба
+    хранилища: settings основной базы и otmetki файла входов. None — убрать из обоих.
+    Сервер держит их в двух местах и при расхождении сводит к строгому."""
+    with osnovnaya() as o:
+        if znachenie is None:
+            o.execute("DELETE FROM settings WHERE key=?", (klyuch,))
+        else:
+            o.execute("INSERT INTO settings(key, value) VALUES(?, ?) "
+                      "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (klyuch, znachenie))
+    with m.vhod._baza() as b:
+        if znachenie is None:
+            b.execute("DELETE FROM otmetki WHERE klyuch=?", (klyuch,))
+        else:
+            b.execute("INSERT INTO otmetki (klyuch, znachenie) VALUES (?,?) "
+                      "ON CONFLICT(klyuch) DO UPDATE SET znachenie=excluded.znachenie", (klyuch, znachenie))
 
 
 def zashchishchennye():
@@ -245,6 +264,122 @@ def test_kak_segodnya():
                        "ORDER BY id DESC LIMIT 1").fetchone()
     proverka("изменяющий запрос записан в журнал: «общий вход», способ «старый»",
              zh is not None and tuple(zh) == ("общий вход", "staryy", "POST", 200), zh and tuple(zh))
+
+
+# --- замечания проверки 12.11: в день выкладки старые входы запереть нельзя ---------------------
+
+def test_zamechaniya_v_den_vykladki():
+    print("Замечания проверки 12.11 — день выкладки (входы не заведены)")
+    neverno = lambda: "ne-tot-" + secrets.token_hex(5)  # noqa: E731
+    proverka("отметки «входы заведены» нет", not m.vhod.zavedeny())
+
+    print("  автоматика: ключ — только в работающем сервере")
+    klyuch_bylo, vhod_bylo, fayl_byl = VNE_SERVERA[0]
+    proverka("после импорта app.main вне сервера ключа автоматики нет, db.admin_auth() его не отдаёт, "
+             "файл входов не появился",
+             klyuch_bylo is None and (vhod_bylo is None or vhod_bylo[0] == "admin") and not fayl_byl
+             and not m.vhod.eto_server(), (klyuch_bylo is None, vhod_bylo and vhod_bylo[0], fayl_byl))
+    proverka("после запуска сервера ключ есть", bool(m.vhod.vnutr_klyuch()) and m.db.admin_auth()[0] == "avtomatika")
+    bylo = m.vhod._VNUTR[0]
+    m.vhod._VNUTR[0] = None
+    try:
+        from fastapi.testclient import TestClient
+        with TestClient(m.app, base_url=B) as tc:      # настоящий запуск приложения (lifespan)
+            proverka("запуск приложения сам создаёт ключ автоматики",
+                     bool(m.vhod.vnutr_klyuch()) and tc.get("/api/health").status_code == 200)
+    finally:
+        m.vhod._VNUTR[0] = bylo
+
+    print("  перечень адресов без входа не отдаётся")
+    kody = [kl().get(a).status_code for a in ("/openapi.json", "/docs", "/redoc")]
+    kody_b = [kl().get(a, auth=STARYY_VLADELCA).status_code for a in ("/openapi.json", "/docs", "/redoc")]
+    proverka("/openapi.json, /docs, /redoc → 404 и без входа, и со входом", kody + kody_b == [404] * 6, kody + kody_b)
+    proverka("…таких маршрутов в приложении нет",
+             not {"/openapi.json", "/docs", "/redoc"} & {getattr(r_, "path", "") for r_ in m.app.routes})
+
+    print("  промахи формы /vhod не запирают старые входы в сером окне")
+    A = "198.51.100.30"
+    proverka("общий admin и прежний boris с адреса центра — проходят",
+             (kl(A).get("/api/pult/tasks", auth=OBSHCHIY).status_code,
+              kl(A).get("/api/settings", auth=STARYY_VLADELCA).status_code) == (200, 200))
+    kody = [voyti(kl(A), f"gost{i}", neverno()).status_code for i in range(22)]
+    proverka("22 неверных входа через форму с этого адреса: 20 раз 401, дальше форма на паузе",
+             kody == [401] * 20 + [429] * 2, kody[-4:])
+    r1, r2 = kl(A).get("/api/pult/tasks", auth=OBSHCHIY), kl(A).get("/api/settings", auth=STARYY_VLADELCA)
+    proverka("…верный общий admin и прежний boris в окне с того же адреса проходят, как раньше",
+             (r1.status_code, r2.status_code) == (200, 200), (r1.status_code, r2.status_code))
+    A0 = "198.51.100.31"
+    [voyti(kl(A0), f"gost{i}", neverno()) for i in range(21)]
+    proverka("…и с адреса, где верного входа в окне ещё не было, — тоже (счёт формы окну не мешает)",
+             (kl(A0).get("/api/pult/tasks", auth=OBSHCHIY).status_code,
+              kl(A0).get("/api/settings", auth=STARYY_VLADELCA).status_code) == (200, 200))
+    kody = [kl(A0).get("/api/pult/tasks", auth=("gost" + secrets.token_hex(2), neverno())).status_code for _ in range(25)]
+    proverka("25 неверных входов в окне с выдуманными логинами — каждый 401, общий admin после них проходит",
+             set(kody) == {401} and kl(A0).get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200, sorted(set(kody)))
+    with baza_vhodov() as b:
+        n = b.execute("SELECT COUNT(*) FROM popytki WHERE adres=? AND login LIKE 'okno:%'", (A0,)).fetchone()[0]
+    proverka("…выдуманные логины окна в счёт не идут", n == 0, n)
+
+    print("  чужие опечатки с того же адреса не запирают работающие браузеры и скрипты")
+    A1 = "198.51.100.40"
+    proverka("общий admin с адреса уже ходил", kl(A1).get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200)
+    kody = [kl(A1).get("/api/pult/tasks", auth=("admin", neverno())).status_code for _ in range(7)]
+    proverka("7 разных неверных паролей admin с этого адреса: 5 раз 401, дальше пауза", kody == [401] * 5 + [429] * 2, kody)
+    proverka("…верный общий пароль, которым с этого адреса уже ходили, паузу не замечает",
+             kl(A1).get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200)
+    proverka("…изменяющий запрос рутины с этого адреса — тоже",
+             kl(A1).post("/api/plan/inbox", json={"who": "Лена", "text": "проверка входа: пауза"},
+                         auth=OBSHCHIY).status_code == 200)
+    r = kl(A1).get("/api/settings", auth=STARYY_VLADELCA)
+    proverka("…у прежнего boris свой счётчик: чужие промахи по admin его не касаются", r.status_code == 200, r.status_code)
+    A2 = "198.51.100.41"
+    kody = [kl(A2).get("/api/pult/tasks", auth=("admin", neverno())).status_code for _ in range(5)]
+    r = kl(A2).get("/api/pult/tasks", auth=OBSHCHIY)
+    proverka("перебор не ослаблен: с адреса, где верного пароля ещё не видели, после 5 промахов и верный ждёт",
+             kody == [401] * 5 and r.status_code == 429 and r.headers.get("retry-after") == "60"
+             and r.json()["detail"].startswith("Слишком много попыток"), (kody, r.status_code))
+    r = kl(A2).get("/liniya", headers=STR, auth=OBSHCHIY)
+    proverka("…человеку в браузере — понятная страница, а не сырой JSON; код 429 и Retry-After на месте",
+             r.status_code == 429 and r.headers.get("content-type", "").startswith("text/html")
+             and "Слишком много попыток" in r.text and "Подождите 1 минуту" in r.text and "detail" not in r.text
+             and r.headers.get("retry-after") == "60", (r.status_code, r.headers.get("content-type")))
+    try:
+        chasy(time.time() + 61)
+        proverka("через минуту пауза проходит сама", kl(A2).get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200)
+    finally:
+        chasy(None)
+
+    print("  «5 промахов подряд»: удачный вход стирает промахи")
+    A3 = "198.51.100.50"
+    kody = [kl(A3).get("/api/pult/tasks", auth=("admin", neverno())).status_code for _ in range(4)]
+    kody += [kl(A3).get("/api/pult/tasks", auth=OBSHCHIY).status_code for _ in range(3)]
+    kody += [kl(A3).get("/api/pult/tasks", auth=("admin", neverno())).status_code]
+    r = kl(A3).get("/api/pult/tasks", auth=OBSHCHIY)
+    with baza_vhodov() as b:
+        n = b.execute("SELECT COUNT(*) FROM popytki WHERE login='okno:admin' AND adres=?", (A3,)).fetchone()[0]
+    proverka("4 опечатки, 3 удачных входа, ещё опечатка — верный пароль проходит, счёт промахов стёрт",
+             kody == [401] * 4 + [200] * 3 + [401] and r.status_code == 200 and n == 0, (kody, r.status_code, n))
+    A4 = "198.51.100.51"
+    [kl(A4).get("/api/pult/tasks", auth=("admin", neverno())) for _ in range(4)]
+    m.vhod._EST_PROMAHI.clear()
+    m.vhod._NEUD.clear()
+    m.vhod._NEUD_ZAGRUZHEN[0] = False                  # как после перезапуска сервера: память пуста
+    kl(A4).get("/api/pult/tasks", auth=OBSHCHIY)
+    kl(A4).get("/api/pult/tasks", auth=("admin", neverno()))
+    proverka("…то же после перезапуска сервера (промахи подняты из базы)",
+             kl(A4).get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200)
+
+    print("  страницы под старым входом кешируются как раньше")
+    r = kl().get("/liniya", headers=STR, auth=OBSHCHIY)
+    proverka("общий admin: страница без Cache-Control: no-store (кнопка «Назад» работает как раньше), "
+             "X-Frame-Options: DENY есть",
+             r.status_code == 200 and "no-store" not in (r.headers.get("cache-control") or "")
+             and r.headers.get("x-frame-options") == "DENY", (r.headers.get("cache-control"), r.headers.get("x-frame-options")))
+    r = kl().get("/owner", headers=STR, auth=STARYY_VLADELCA)
+    proverka("прежний boris: /owner открывается", r.status_code == 200, r.status_code)
+    with baza_vhodov() as b:
+        b.execute("DELETE FROM popytki")
+    m.vhod._EST_PROMAHI.clear()
 
 
 def _cred(u, p):
@@ -486,7 +621,9 @@ def test_obshchiy():
         lena = kopiya_metki(x)
         y = kopiya_metki(x, m.vhod.COOKIE_USTR)
         proverka("пока входила одна Лена — галочка «Запомнить» есть", "name=zapomnit" in y.get("/vhod").text)
-        r = voyti(x, "ira", P["ira"], zapomnit=True)
+        # Ира входит в том же браузере, но без метки входа Лены (у y — только метка устройства):
+        # так бывает, когда метку входа браузер уже потерял, а сеанс на сервере ещё жив
+        r = voyti(y, "ira", P["ira"], zapomnit=True)
         proverka("Ира на том же браузере: вход есть, но не запомнен (метка без срока)",
                  r.status_code == 303 and "max-age" not in metki(r).get(m.vhod.COOKIE, "").lower(), r.status_code)
         proverka("…галочки «Запомнить» на этом браузере больше нет", "name=zapomnit" not in y.get("/vhod").text)
@@ -494,9 +631,31 @@ def test_obshchiy():
         proverka("запомненный сеанс Лены живёт только до 4:00: в 03:59 ещё есть", login_kto(lena) == "lena")
         chasy(T0 + 18 * 3600 + 60)
         proverka("…в 04:01 — нет (хотя запоминала на 30 дней); сеанс Иры — тоже",
-                 (login_kto(lena), login_kto(x)) == (401, 401))
+                 (login_kto(lena), login_kto(y)) == (401, 401))
     finally:
         chasy(None)
+
+    print("8. Вход поверх чужого входа: прежний сеанс этого браузера гасится (замечание проверки 12.11)")
+    w = kl()
+    voyti(w, "lena", P["lena"])
+    lena = kopiya_metki(w)
+    proverka("копия метки Лены работает, пока Лена вошла", login_kto(lena) == "lena")
+    r = voyti(w, "ira", P["ira"])
+    proverka("в том же браузере без выхода вошла Ира — в браузере Ира", r.status_code == 303 and login_kto(w) == "ira")
+    proverka("…а скопированная раньше метка Лены больше не действует", login_kto(lena) == 401)
+    with baza_vhodov() as b:
+        ostalos = b.execute("SELECT COUNT(*) FROM seansy WHERE id=?",
+                            (m.vhod._sha(lena.cookies.get(m.vhod.COOKIE)),)).fetchone()[0]
+    proverka("…строки сеанса Лены в seansy нет — на /owner не висит лишний открытый сеанс", ostalos == 0, ostalos)
+    vyyti(w)
+    proverka("Ира нажала «Выйти» — в браузере никого", login_kto(w) == 401)
+    r = voyti(w, "ira", "ne-tot-" + secrets.token_hex(5))
+    w2 = kl()
+    voyti(w2, "liza", P["liza"])
+    liza = kopiya_metki(w2)
+    voyti(w2, "ira", "ne-tot-" + secrets.token_hex(5))
+    proverka("неудачный вход поверх чужого входа прежний сеанс не трогает", login_kto(liza) == "liza")
+    m.vhod.snyat_pauzu("ira")
 
 
 # --- 9. Метка и старый пароль вместе ------------------------------------------------------------
@@ -657,6 +816,25 @@ def test_perebor(klyuch):
     m.vhod.snyat_pauzu("ira")
     proverka("«Снять паузу» — Ира с того же адреса входит", voyti(kl("8.8.4.4"), "ira", P["ira"]).status_code == 303)
 
+    print("11. По счётчику промахов не видно, существует ли логин (замечание проверки 12.11)")
+    m.vhod.vklyuchit("liza", False)
+    ne_to = "parol-v-pole-logina-" + secrets.token_hex(6)       # в поле логина по ошибке набрали пароль
+    try:
+        ryady = {}
+        for i, lg in enumerate(("lena", "Лена", "netakogo" + secrets.token_hex(2), "klod", "liza", "admin", ne_to)):
+            ryady[lg] = [voyti(kl(f"9.9.8.{i + 1}"), lg, neverno()).status_code for _ in range(7)]
+        proverka("настоящий, незнакомый, служебный, отключённый логин и admin: 5 раз 401, дальше 429 — одинаково",
+                 all(v == [401] * 5 + [429] * 2 for v in ryady.values()), {k_[:8]: v for k_, v in ryady.items()})
+        with baza_vhodov() as b:
+            loginy = [r["login"] for r in b.execute("SELECT DISTINCT login FROM popytki")]
+        proverka("…введённое в поле логина в файл входов не пишется (только отпечаток)",
+                 not any(ne_to in x or "netakogo" in x for x in loginy)
+                 and ne_to.encode() not in Path(m.config.VHODY_DB).read_bytes())
+    finally:
+        m.vhod.vklyuchit("liza", True)
+        with baza_vhodov() as b:
+            b.execute("DELETE FROM popytki WHERE adres LIKE '9.9.8.%'")
+
     print("11. Перебор по адресу: знакомый браузер не попадает под запрет")
     znakomyy = kl("7.7.7.7")
     voyti(znakomyy, "liza", P["liza"])
@@ -679,7 +857,7 @@ def test_perebor(klyuch):
     for _ in range(30):
         kl("6.6.7.7").get("/api/pult/tasks", auth=("admin", odin))
     with baza_vhodov() as b:
-        n = b.execute("SELECT COUNT(*) FROM popytki WHERE login='admin' AND adres='6.6.7.7'").fetchone()[0]
+        n = b.execute("SELECT COUNT(*) FROM popytki WHERE login='okno:admin' AND adres='6.6.7.7'").fetchone()[0]
     proverka("один и тот же неверный пароль 30 раз — один промах (старая вкладка не запирает центр)", n == 1, n)
     proverka("…и общий вход с этого адреса работает", kl("6.6.7.7").get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200)
 
@@ -795,8 +973,10 @@ def test_bez_vhoda_rezhim(work):
         m.config.VHODY_DB = Path(work) / "pustoy" / "vhody.db"
         m.config.VHODY_DB.parent.mkdir(exist_ok=True)
         proverka("без переменной и без единого входа — закрыто", kl().get("/api/pult/tasks").status_code == 401)
+        for k_ in ("vhod_zavedeny", "vhod_starye_do"):
+            otm(k_, None)                   # и в пустом файле входов: сервер успел свести отметки
         with osnovnaya() as o:
-            o.execute("DELETE FROM settings WHERE key IN ('vhod_zavedeny', 'vhod_starye_do', 'owner_password')")
+            o.execute("DELETE FROM settings WHERE key='owner_password'")
         proverka("…и на «новом сервере» (пустой APP_PASSWORD, пустые vhody.db и настройки) — закрыто",
                  (kl().get("/api/pult/tasks").status_code, kl().get("/liniya", headers=STR).status_code) == (401, 401))
         m.config.BEZ_VHODA = True
@@ -807,7 +987,7 @@ def test_bez_vhoda_rezhim(work):
     finally:
         m.config.APP_PASSWORD, m.config.BEZ_VHODA, m.config.VHODY_DB = bylo
         for k_, v_ in nastr.items():
-            m.db.set_setting(k_, v_)
+            m.db.set_setting(k_, v_)        # в настоящем файле входов отметки не менялись
 
 
 # --- 17. Сбой файла входов ---------------------------------------------------------------------------
@@ -833,8 +1013,79 @@ def test_sboy(work):
         proverka("форма входа открывается", r.status_code == 200, r.status_code)
         r = voyti(d, "lena", P["lena"])
         proverka("вход через форму — понятный отказ, не 500", r.status_code == 503 and "Борису" in r.text, r.status_code)
+        r = d.get("/api/vhod/sostoyanie", auth=STARYY_VLADELCA)
+        proverka("/api/vhod/sostoyanie не падает: 200, «файл входов не читается», срок старых входов виден",
+                 r.status_code == 200 and r.json().get("fayl_vhodov") == "не читается"
+                 and r.json()["starye"]["zavedeny"] is True and r.json()["starye"]["do"] and r.json()["vhody"] == [],
+                 r.status_code)
     finally:
         m.vhod._baza = orig
+    proverka("…а с исправным файлом — «в порядке» и шесть записей",
+             (lambda j: j.get("fayl_vhodov") == "в порядке" and len(j["vhody"]) >= 6)(
+                 kl().get("/api/vhod/sostoyanie", auth=STARYY_VLADELCA).json()))
+
+    print("17. Файл входов нельзя подготовить: лог не раздувается, запросы не ждут")
+    zapisi, podgotovok = [], []
+
+    class _Schet(logging.Handler):
+        def emit(self, record):
+            zapisi.append(record.getMessage())
+    schet = _Schet()
+    logging.getLogger("kidsup.vhod").addHandler(schet)
+    bylo_put, orig_podg = m.config.VHODY_DB, m.vhod._podgotovit
+
+    def podg(p_):
+        podgotovok.append(1)
+        return orig_podg(p_)
+    m.vhod._podgotovit = podg
+    m.config.VHODY_DB = Path(work) / "net-takoy-papki" / "vhody.db"
+    m.vhod._ZHALOBY.clear()
+    try:
+        t0 = time.time()
+        d = kl(raise_server_exceptions=False)
+        kody = []
+        for _ in range(6):
+            kody += [d.get("/api/pult/tasks", auth=OBSHCHIY).status_code, d.get("/api/kto", auth=STARYY_VLADELCA).status_code,
+                     d.get("/liniya", headers=STR, auth=OBSHCHIY).status_code]
+        kody.append(d.get("/api/vhod/sostoyanie", auth=STARYY_VLADELCA).status_code)
+        proverka("19 запросов под старыми входами — все 200", kody == [200] * 19, sorted(set(kody)))
+        proverka("файл пробовали подготовить один раз, дальше минуту — сразу короткий отказ",
+                 len(podgotovok) == 1, len(podgotovok))
+        proverka("в логе входа — не больше десятка записей (было 53), каждая жалоба один раз",
+                 0 < len(zapisi) <= 10 and len(set(zapisi)) == len(zapisi), len(zapisi))
+        proverka("запертый файл ждут 5 секунд, а не 30; запросы прошли быстро",
+                 m.vhod.TAYMAUT == 5 and time.time() - t0 < 20, round(time.time() - t0, 1))
+    finally:
+        m.config.VHODY_DB, m.vhod._podgotovit = bylo_put, orig_podg
+        logging.getLogger("kidsup.vhod").removeHandler(schet)
+        m.vhod._SBOY.clear()
+        m.vhod._ZHALOBY.clear()
+    proverka("файл вернулся — входы работают сразу", voyti(kl(), "lena", P["lena"]).status_code == 303
+             and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200)
+
+    print("17. Файл входов заперт (долгая чужая запись): запрос ждёт один раз, а не при каждом обращении")
+    z = sqlite3.connect(m.config.VHODY_DB, timeout=1)
+    z.execute("BEGIN EXCLUSIVE")
+    bylo_t = m.vhod.TAYMAUT
+    m.vhod.TAYMAUT = 0.3
+    m.vhod._ZHALOBY.clear()
+    try:
+        t0 = time.time()
+        d = kl(raise_server_exceptions=False)
+        kody = []
+        for _ in range(6):
+            kody += [d.get("/api/pult/tasks", auth=OBSHCHIY).status_code, d.get("/api/kto", auth=STARYY_VLADELCA).status_code,
+                     d.get("/liniya", headers=STR, auth=OBSHCHIY).status_code]
+        dolgo = time.time() - t0
+        proverka("18 запросов под старыми входами при запертом файле — все 200, ожиданий — одно-два, а не 18",
+                 kody == [200] * 18 and dolgo < 0.3 * 6, (sorted(set(kody)), round(dolgo, 2)))
+    finally:
+        z.rollback()
+        z.close()
+        m.vhod.TAYMAUT = bylo_t
+        m.vhod._ZAPERT.clear()
+        m.vhod._ZHALOBY.clear()
+    proverka("файл отперт — входы работают", voyti(kl(), "lena", P["lena"]).status_code == 303)
     print("17. Испорченный vhody.db: берётся копия рядом")
     put = Path(m.config.VHODY_DB)
     proverka("копия рядом есть и в ней нет сеансов", m.vhod._put_kopii().exists()
@@ -893,7 +1144,7 @@ def test_avtomatika():
     proverka("db.admin_auth() в процессе сервера — вход «avtomatika», ключ длинный и случайный",
              vh is not None and vh[0] == "avtomatika" and len(vh[1]) >= 40 and vh[1] != OBSHCHIY[1])
     bylo_do = m.db.get_setting("vhod_starye_do")
-    m.db.set_setting("vhod_starye_do", m.vhod._iso(time.time() - 60))
+    otm("vhod_starye_do", m.vhod._iso(time.time() - 60))
     c = kl()
     orig_post, orig_get = httpx.post, httpx.get
 
@@ -914,7 +1165,7 @@ def test_avtomatika():
         nadezhda._inbox(metka + " (Надежда)", "")
     finally:
         httpx.post, httpx.get = orig_post, orig_get
-        m.db.set_setting("vhod_starye_do", bylo_do)
+        otm("vhod_starye_do", bylo_do)
     with osnovnaya() as o:
         punkty = [r["text"] for r in o.execute("SELECT text FROM plan_inbox WHERE text LIKE ?", (metka + "%",))]
         zh = o.execute("SELECT imya, sposob, kod FROM deystviya WHERE put='/api/plan/inbox' ORDER BY id DESC LIMIT 2").fetchall()
@@ -1257,6 +1508,27 @@ def test_upravlenie(klyuch_a, work):
     with baza_vhodov() as b:
         n = b.execute("SELECT COUNT(*) FROM vhody").fetchone()[0]
     proverka("…после отказов записей по-прежнему шесть", n == 6, n)
+    proverka("логин, равный имени другого входа, и служебное слово вместо имени — отказ словами "
+             "(замечание проверки 12.11)",
+             (m.vhod.dobavit("lena-novaya", "admin"), m.vhod.dobavit("avt", "Avtomatika"),
+              m.vhod.dobavit("boris2", "klod-vykladka"))
+             == ("это имя занято",) * 3 and m.vhod._zapis("lena-novaya") is None)
+    with baza_vhodov() as b:      # старая запись, чьё имя совпадает с чужим логином (так могло остаться от прежней версии)
+        b.execute("INSERT INTO vhody (login, imya, rol) VALUES ('aaa-proverka', 'Vasya', 'admin')")
+    try:
+        proverka("…новый логин vasya при живом имени «Vasya» не выдаётся",
+                 m.vhod.dobavit("vasya", "Петя") == "логин совпадает с именем другого входа"
+                 and vh(c, "dobavit", MOY, novoe_imya="Петя", novyy_login="vasya").status_code == 400
+                 and m.vhod._zapis("vasya") is None)
+        with baza_vhodov() as b:
+            b.execute("INSERT INTO vhody (login, imya, rol) VALUES ('vasya', 'Петя', 'admin')")
+        proverka("…а если такая пара уже есть — по вводу «vasya» находится логин vasya, а не чужое имя",
+                 (m.vhod.login_po_vvodu("vasya"), m.vhod.login_po_vvodu("VASYA"), m.vhod.login_po_vvodu("Петя"))
+                 == ("vasya", "vasya", "vasya"))
+    finally:
+        with baza_vhodov() as b:
+            b.execute("DELETE FROM vhody WHERE login IN ('aaa-proverka', 'vasya')")
+        m.vhod._obnovit_kopiyu()
     r = vh(c, "dobavit", MOY, novoe_imya="Замена", novyy_login="zamena-stoyka", sutki="1")
     proverka("временный вход добавлен: роль «админ», срок — сутки, пароля нет",
              r.status_code == 200 and "Вход добавлен на 24 часа" in r.text and "name='parol_zamena-stoyka'" in r.text
@@ -1284,7 +1556,7 @@ def test_upravlenie(klyuch_a, work):
     bylo = nastroyki_vhoda()
 
     def srok(sek):
-        m.db.set_setting("vhod_starye_do", m.vhod._iso(time.time() + sek))
+        otm("vhod_starye_do", m.vhod._iso(time.time() + sek))
 
     def klod_rabotal(sek_nazad):
         with baza_vhodov() as b:
@@ -1298,8 +1570,7 @@ def test_upravlenie(klyuch_a, work):
     srok(-60)
     proverka("срок в прошлом → старые входы выключены",
              not m.vhod.starye_vklyucheny() and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 401)
-    with osnovnaya() as o:
-        o.execute("DELETE FROM settings WHERE key='vhod_starye_do'")
+    otm("vhod_starye_do", None)
     proverka("отметка «заведены» есть, а записи о сроке нет → выключены",
              m.vhod.zavedeny() and not m.vhod.starye_vklyucheny()
              and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 401)
@@ -1332,14 +1603,78 @@ def test_upravlenie(klyuch_a, work):
              and m.db.get_setting("owner_password") not in ("", STARYY_VLADELCA[1])
              and vazhnoe_posl() == "старые входы отключены: сами, по сроку", r)
     proverka("…повторный тик автопилота ничего не меняет", m.vhod.starye_po_sroku() == "")
+
+    print("27. Отметки входов — в двух хранилищах: старая копия основной базы не открывает общий вход")
+    def v_fayle():
+        with baza_vhodov() as b:
+            return {r_["klyuch"]: r_["znachenie"] for r_ in b.execute("SELECT klyuch, znachenie FROM otmetki")}
+    otmetki = {k_: v_ for k_, v_ in nastroyki_vhoda().items() if k_ in m.vhod.OTMETKI}
+    proverka("после отключения отметки одинаковы в settings и в файле входов (и в его копии)",
+             set(otmetki) == set(m.vhod.OTMETKI) and v_fayle() == otmetki
+             and dict(sqlite3.connect(m.vhod._put_kopii()).execute("SELECT klyuch, znachenie FROM otmetki")) == otmetki,
+             (sorted(otmetki), sorted(v_fayle())))
+    with osnovnaya() as o:      # основную базу восстановили из копии, снятой до заведения входов
+        o.execute("DELETE FROM settings WHERE key IN ('vhod_zavedeny', 'vhod_starye_do', 'vhod_starye_vykl')")
+    r = kl().get("/api/kto", auth=OBSHCHIY)
+    proverka("в основной базе отметок нет (старая копия) → общий admin всё равно не принимается",
+             r.status_code == 401 and not m.vhod.starye_vklyucheny() and m.vhod.zavedeny(), r.status_code)
+    proverka("…отметки вернулись в основную базу сами, владельцу — строка «Важное»",
+             {k_: v_ for k_, v_ in nastroyki_vhoda().items() if k_ in m.vhod.OTMETKI} == otmetki
+             and vazhnoe_posl().startswith("отметки входов восстановлены из файла входов"), vazhnoe_posl())
+    with osnovnaya() as o:
+        o.execute("UPDATE settings SET value='' WHERE key='vhod_zavedeny'")
+    proverka("пустая отметка vhod_zavedeny в основной базе → общий admin не принимается",
+             kl().get("/api/kto", auth=OBSHCHIY).status_code == 401 and m.db.get_setting("vhod_zavedeny") == "1")
+    orig_n = m.vhod._nastroyki
+
+    def ne_chitaetsya(*a):
+        raise sqlite3.OperationalError("стенд: database is locked")
+    m.vhod._ZHALOBY.clear()
+    try:
+        m.vhod._nastroyki = ne_chitaetsya
+        m.vhod._POSL_STARYE[0] = True          # свежий процесс: удачного чтения ещё не было
+        r = kl(raise_server_exceptions=False).get("/api/kto", auth=OBSHCHIY)
+        r2 = kl(raise_server_exceptions=False).post("/api/plan/inbox", json={"who": "Лена", "text": "x"}, auth=OBSHCHIY)
+        proverka("сразу после перезапуска настройки не читаются → общий admin не принимается (решает файл входов)",
+                 (r.status_code, r2.status_code) == (401, 401) and not m.vhod.starye_vklyucheny(),
+                 (r.status_code, r2.status_code))
+    finally:
+        m.vhod._nastroyki = orig_n
+    orig_f = m.vhod._otmetki_fayla
+
+    def fayl_ne_chitaetsya():
+        raise sqlite3.DatabaseError("стенд: файл входов сломан")
+    try:
+        m.vhod._otmetki_fayla = fayl_ne_chitaetsya
+        proverka("файл входов не читается → решает основная база: выключены", not m.vhod.starye_vklyucheny())
+        m.vhod._nastroyki = ne_chitaetsya
+        proverka("не читаются оба хранилища → последнее прочитанное значение", not m.vhod.starye_vklyucheny())
+    finally:
+        m.vhod._nastroyki, m.vhod._otmetki_fayla = orig_n, orig_f
+        m.vhod._ZHALOBY.clear()
+    # переходные дни: расхождение срока сводится к меньшему, общий вход при этом жив
+    otm("vhod_starye_vykl", None)
+    otm("vhod_starye_do", m.vhod._iso(time.time() + 3 * 86400))
+    m.db.set_setting("vhod_starye_do", m.vhod._iso(time.time() + 6 * 86400))      # правка мимо файла входов
+    proverka("переходные дни, сроки разошлись → общий admin работает, срок — меньший из двух, в обоих хранилищах",
+             m.vhod.starye_vklyucheny() and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200
+             and m.db.get_setting("vhod_starye_do") == v_fayle()["vhod_starye_do"]
+             and m.vhod._iz_iso(m.db.get_setting("vhod_starye_do")) - time.time() < 3 * 86400 + 5)
+    with osnovnaya() as o:
+        o.execute("DELETE FROM settings WHERE key IN ('vhod_zavedeny', 'vhod_starye_do')")
+    proverka("переходные дни, основная база из старой копии → общий admin ещё работает до срока, отметки вернулись",
+             kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200 and m.vhod.zavedeny()
+             and m.db.get_setting("vhod_starye_do") == v_fayle()["vhod_starye_do"])
     m.vhod._POSL_SROK[0] = 0.0
     m.vhod.avtopilot_tik()
     proverka("…тик из цикла автопилота — не чаще раза в 10 минут и без ошибок", m.vhod._POSL_SROK[0] > 0)
     # стенд возвращаем к состоянию «переходные дни» — дальше то же самое делает владелец кнопкой
-    with osnovnaya() as o:
-        o.execute("DELETE FROM settings WHERE key='vhod_starye_vykl'")
+    otm("vhod_starye_vykl", None)
     for k_, v_ in bylo.items():
-        m.db.set_setting(k_, v_)
+        if k_ in m.vhod.OTMETKI:
+            otm(k_, v_)
+        else:
+            m.db.set_setting(k_, v_)
     proverka("стенд возвращён в переходные дни: общий admin работает",
              m.vhod.starye_vklyucheny() and kl().get("/api/pult/tasks", auth=OBSHCHIY).status_code == 200)
 
@@ -2169,6 +2504,8 @@ def main():
     os.makedirs(work, exist_ok=True)
     m = lt.zapustit(KOREN, work)
     lt.zasejat(os.path.join(work, "kidsup.db"))
+    VNE_SERVERA.append((m.vhod.vnutr_klyuch(), m.db.admin_auth(), Path(m.config.VHODY_DB).exists()))
+    m.vhod.zapusk(True)             # как при запуске работающего сервера: ключ автоматики в памяти
     # роли — как на сервере: общий вход админов и отдельный пароль владельца; режим без входа выключен
     m.config.APP_USER, m.config.APP_PASSWORD = OBSHCHIY
     m.config.BEZ_VHODA = False
@@ -2179,6 +2516,7 @@ def main():
     _zh.setFormatter(logging.Formatter("%(name)s %(levelname)s %(message)s"))
     logging.getLogger().addHandler(_zh)           # и всё, что сервер пишет в свой журнал
     test_kak_segodnya()
+    test_zamechaniya_v_den_vykladki()
     test_obhod()
     test_prava_v_den_vykladki()     # группа В: пока входы не заведены, права прежние
     test_vladelec_paroli()          # пароли задаёт сам владелец на /owner (действие 1 из 7.2)

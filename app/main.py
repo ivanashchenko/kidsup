@@ -9,6 +9,7 @@ import re
 import secrets
 import threading
 import time
+from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
@@ -31,7 +32,17 @@ db.init_db()
 # файл входов data/vhody.db, журнал действий. Сбой здесь старым входам не мешает.
 vhod.zapusk()
 
-app = FastAPI(title="KidsUP")
+# Перечень адресов (/openapi.json, /docs, /redoc) без входа не отдаём: служебному сайту он
+# не нужен, а чужому показывает все адреса владельца и выкладки с параметрами.
+@asynccontextmanager
+async def _zhizn(_app):
+    """Запуск работающего сервера: ключ автоматики создаётся только здесь и при загрузке
+    приложения самим сервером (см. vhod.zapusk), а не при любом импорте app.main."""
+    vhod.zapusk(True)
+    yield
+
+
+app = FastAPI(title="KidsUP", docs_url=None, redoc_url=None, openapi_url=None, lifespan=_zhizn)
 
 from . import autopilot  # noqa: E402  (нужен db.init_db выше)
 autopilot.start()
@@ -192,6 +203,17 @@ _security = _MyagkiyBasic(auto_error=False)
 async def _na_formu_vhoda(request: Request, exc: vhod.NuzhenVhod):
     """Человек открыл страницу без входа в браузере, где форма включена, — на форму входа."""
     return RedirectResponse(exc.kuda, status_code=303)
+
+
+@app.exception_handler(vhod.PauzaVhoda)
+async def _pauza_vhoda(request: Request, exc: vhod.PauzaVhoda):
+    """Пауза старого входа в сером окне после промахов: человеку, открывшему страницу, —
+    понятная страница, скрипту и запросу со страницы — прежний JSON. Код 429 и Retry-After."""
+    if (request.method in ("GET", "HEAD") and "text/html" in (request.headers.get("accept") or "")
+            and not request.url.path.startswith(("/api/", "/export/"))):
+        return HTMLResponse(vhod.stranica_pauzy(exc.detail), status_code=429,
+                            headers={**exc.headers, "Cache-Control": "no-store", "X-Frame-Options": "DENY"})
+    return JSONResponse({"detail": exc.detail}, status_code=429, headers=exc.headers)
 
 
 class TolkoVladelcu(Exception):
@@ -545,6 +567,9 @@ def vhod_post(request: Request, login: str = Form(""), parol: str = Form(""),
         r = vhod.voyti(request, login, parol)
         if r.get("login"):
             z = r["zapis"]
+            # прежний сеанс этого браузера гасится при любом удачном входе: иначе после
+            # «вошла Ира поверх Лены» скопированная метка Лены жила бы до своего срока
+            vhod.seans_zakryt(request.cookies.get(vhod.COOKIE) or "")
             nomer, srok = vhod.seans_otkryt(r["login"], bool(zapomnit), request)
     except Exception:  # noqa: BLE001 — сбой файла входов: понятная страница, а не ошибка 500
         logging.getLogger("kidsup.vhod").exception("вход через форму не сработал")
@@ -4871,7 +4896,7 @@ def _wazzup_process(payload: dict) -> None:
 
 
 # 12.11.2026 — шаг 1 «скрыть старое»: по смене версии в /api/health видно, что новая сборка поднялась
-APP_VERSION = "2026-11-12.2"
+APP_VERSION = "2026-11-12.4"   # .4 — личные входы (app/vhod.py)
 
 
 @app.get("/api/net")

@@ -47,6 +47,7 @@ import os
 import re
 import secrets
 import sqlite3
+import sys
 import threading
 import time
 import unicodedata
@@ -227,10 +228,43 @@ CREATE INDEX IF NOT EXISTS idx_popytki ON popytki(adres, login, ts);
 CREATE TABLE IF NOT EXISTS hvost (
     den TEXT NOT NULL, login TEXT NOT NULL, adres TEXT NOT NULL, chem TEXT NOT NULL,
     n INTEGER NOT NULL DEFAULT 0, posl TEXT, PRIMARY KEY (den, login, adres, chem));
+CREATE TABLE IF NOT EXISTS otmetki (klyuch TEXT PRIMARY KEY, znachenie TEXT NOT NULL DEFAULT '');
 """
+
+TAYMAUT = 5                          # сколько секунд ждать запертый файл (было 30: вход не должен висеть)
+SBOY_PAUZA = 60                      # после неудачной подготовки файла — минуту не пробовать заново
+ZAPERT_PAUZA = 10                    # файл оказался заперт дольше TAYMAUT — 10 секунд не ждать его заново
 
 _GOTOVO: set = set()                 # файлы, уже проверенные и заведённые в этом процессе
 _ZAMOK_BAZY = threading.RLock()
+_SBOY: dict = {}                     # файл → когда его не удалось подготовить (time.monotonic)
+_ZAPERT: dict = {}                   # файл → когда он оказался заперт дольше TAYMAUT
+_ZHALOBY: dict = {}                  # текст жалобы → [когда писали в лог, сколько раз промолчали]
+
+
+class FaylNedostupen(sqlite3.OperationalError):
+    """Файл входов недавно не удалось подготовить — минуту не пробуем заново (без ожиданий
+    и без полных трассировок в логе на каждый запрос)."""
+
+
+def _zhaloba(tekst: str) -> None:
+    """Запись об ошибке в лог — не чаще раза в минуту на один текст. Когда vhody.db
+    непригоден, каждый запрос под старым входом натыкается на него несколько раз; без этого
+    журнал службы раздувался бы (а если причина — кончившийся диск, это только хуже)."""
+    t = time.monotonic()
+    with _ZAMOK_BAZY:
+        b = _ZHALOBY.get(tekst)
+        if b is not None and t - b[0] < 60:
+            b[1] += 1
+            return
+        propushcheno = b[1] if b is not None else 0
+        _ZHALOBY[tekst] = [t, 0]
+    hvost = f" (и ещё {propushcheno} раз — не записаны)" if propushcheno else ""
+    oshibka = sys.exc_info()[1]
+    if oshibka is None or isinstance(oshibka, FaylNedostupen):
+        log.error("%s%s%s", tekst, hvost, f": {oshibka}" if oshibka is not None else "")
+    else:
+        log.exception(tekst + hvost)
 
 
 def _put() -> Path:
@@ -243,7 +277,7 @@ def _put_kopii() -> Path:
 
 
 def _sozdat(p: Path) -> None:
-    con = sqlite3.connect(p, timeout=30)
+    con = sqlite3.connect(p, timeout=TAYMAUT)
     try:
         con.executescript(SHEMA)
         ok = con.execute("PRAGMA quick_check").fetchone()
@@ -267,8 +301,8 @@ def _iz_kopii(p: Path) -> bool:
     if not k.exists() or k.stat().st_size == 0:
         return False
     try:
-        src = sqlite3.connect(k, timeout=30)
-        dst = sqlite3.connect(p, timeout=30)
+        src = sqlite3.connect(k, timeout=TAYMAUT)
+        dst = sqlite3.connect(p, timeout=TAYMAUT)
         try:
             src.backup(dst)
         finally:
@@ -278,7 +312,7 @@ def _iz_kopii(p: Path) -> bool:
         log.warning("vhody.db восстановлен из копии рядом (сеансы не восстанавливаются — войти заново)")
         return True
     except Exception:  # noqa: BLE001
-        log.exception("vhody.db: копия не читается")
+        _zhaloba("vhody.db: копия не читается")
         return False
 
 
@@ -296,7 +330,7 @@ def _podgotovit(p: Path) -> None:
             try:
                 p.rename(p.with_name(p.name + ".isporchen-" + str(int(time.time()))))
             except OSError:
-                log.exception("vhody.db: не отложить испорченный файл")
+                _zhaloba("vhody.db: не отложить испорченный файл")
                 raise
             _iz_kopii(p)
             _sozdat(p)
@@ -307,18 +341,35 @@ def _podgotovit(p: Path) -> None:
 def _baza():
     p = _put()
     if str(p) not in _GOTOVO or not p.exists():
-        _podgotovit(p)
-    con = sqlite3.connect(p, timeout=30)
+        bylo = _SBOY.get(str(p))
+        if bylo is not None and time.monotonic() - bylo < SBOY_PAUZA:
+            raise FaylNedostupen("файл входов недавно не удалось подготовить — следующая попытка через минуту")
+        try:
+            _podgotovit(p)
+        except Exception:
+            _SBOY[str(p)] = time.monotonic()
+            raise
+        _SBOY.pop(str(p), None)
+    bylo = _ZAPERT.get(str(p))
+    if bylo is not None and time.monotonic() - bylo < ZAPERT_PAUZA:
+        raise FaylNedostupen("файл входов заперт — следующая попытка через несколько секунд")
+    con = sqlite3.connect(p, timeout=TAYMAUT)
     con.row_factory = sqlite3.Row
     try:
         yield con
         con.commit()
+    except sqlite3.OperationalError as e:
+        # файл заперт дольше TAYMAUT: каждый запрос проверки входа обращается к нему несколько
+        # раз — без этой отметки он ждал бы столько же раз по TAYMAUT секунд
+        if "locked" in str(e) and not isinstance(e, FaylNedostupen):
+            _ZAPERT[str(p)] = time.monotonic()
+        raise
     finally:
         con.close()
 
 
 def _obnovit_kopiyu() -> None:
-    """Копия рядом: только учётные записи (соль + хеш), без сеансов и попыток. Обновляется при
+    """Копия рядом: только учётные записи (соль + хеш) и отметки, без сеансов и попыток. Обновляется при
     каждом изменении входов; восстановление не воскрешает закрытые сеансы."""
     try:
         k = _put_kopii()
@@ -328,18 +379,20 @@ def _obnovit_kopiyu() -> None:
         with _baza() as c:
             stroki = [tuple(r) for r in c.execute("SELECT * FROM vhody")]
             stolbcy = [d[0] for d in c.execute("SELECT * FROM vhody LIMIT 0").description]
+            otmetki = [tuple(r) for r in c.execute("SELECT klyuch, znachenie FROM otmetki")]
         con = sqlite3.connect(tmp)
         try:
             con.executescript(SHEMA)
             con.executemany(f"INSERT INTO vhody ({','.join(chr(34) + s + chr(34) for s in stolbcy)}) "
                             f"VALUES ({','.join('?' * len(stolbcy))})", stroki)
+            con.executemany("INSERT OR REPLACE INTO otmetki (klyuch, znachenie) VALUES (?,?)", otmetki)
             con.commit()
         finally:
             con.close()
         os.chmod(tmp, 0o600)
         os.replace(tmp, k)
     except Exception:  # noqa: BLE001
-        log.exception("vhody.kopiya.db не обновлена")
+        _zhaloba("vhody.kopiya.db не обновлена")
 
 
 def _zapis(login: str):
@@ -366,30 +419,122 @@ def _nastroyki(*klyuchi: str) -> dict:
     return {r["key"]: r["value"] for r in rows if r["value"]}
 
 
-_POSL_STARYE = [True]     # последнее прочитанное значение — на случай сбоя чтения
+_POSL_STARYE = [True]     # последнее прочитанное значение — на случай сбоя чтения обоих хранилищ
+
+# Отметки «входы заведены», срок старых входов и «старые входы отключены» лежат в ДВУХ местах:
+# в settings основной базы (kidsup.db — она возвращается с ночной копией) и в таблице otmetki
+# файла входов (vhody.db — он в копию не входит). Старые входы включены, только если ОБА
+# хранилища говорят «да». Иначе основная база, восстановленная из копии, снятой до заведения
+# входов (или сбой её чтения сразу после перезапуска), снова открыла бы общий пароль admin,
+# хотя личные пароли давно заданы. Расхождение чинится само — в строгую сторону.
+OTMETKI = ("vhod_zavedeny", "vhod_starye_do", "vhod_starye_vykl")
+
+
+def _otmetki_fayla() -> dict:
+    with _baza() as c:
+        return {r["klyuch"]: r["znachenie"] for r in c.execute("SELECT klyuch, znachenie FROM otmetki")
+                if r["klyuch"] in OTMETKI and r["znachenie"]}
+
+
+def _otmetku_v_fayl(klyuch: str, znachenie: str) -> None:
+    with _baza() as c:
+        c.execute("INSERT INTO otmetki (klyuch, znachenie) VALUES (?,?) "
+                  "ON CONFLICT(klyuch) DO UPDATE SET znachenie=excluded.znachenie", (klyuch, znachenie))
+
+
+def _otmetka(klyuch: str, znachenie: str) -> None:
+    """Записать отметку в оба хранилища. Сбой записи в файл входов не мешает: при следующей
+    проверке starye_vklyucheny() сведёт хранилища сама."""
+    db.set_setting(klyuch, znachenie)
+    try:
+        _otmetku_v_fayl(klyuch, znachenie)
+        _obnovit_kopiyu()
+    except Exception:  # noqa: BLE001
+        _zhaloba("vhod: отметка не записана в файл входов — сведу при следующей проверке")
+
+
+def _starye_po(o: dict) -> bool:
+    """Что говорит одно хранилище: работают ли старые входы."""
+    if o.get("vhod_starye_vykl"):
+        return False
+    if not o.get("vhod_zavedeny"):
+        return True
+    do = _iz_iso(o.get("vhod_starye_do"))
+    return do is not None and seychas() < do
+
+
+_SVEDENO = [-1e18]        # когда владельцу сообщали о восстановленных отметках (time.monotonic)
+
+
+def _svesti_otmetki(s: dict, f: dict) -> None:
+    """Хранилища разошлись — привести оба к строгому: отметка есть хоть в одном → есть в обоих;
+    срок — меньший из двух. Основная база потеряла отметку «входы заведены» (её восстановили
+    из старой копии) — строка «Важное» и сообщение владельцу."""
+    nado = {}
+    for k in ("vhod_zavedeny", "vhod_starye_vykl"):
+        v = s.get(k) or f.get(k)
+        if v:
+            nado[k] = v
+    sroki = [x for x in (s.get("vhod_starye_do"), f.get("vhod_starye_do")) if x and _iz_iso(x) is not None]
+    if sroki:
+        nado["vhod_starye_do"] = min(sroki, key=_iz_iso)
+    # срок раньше отметки: отметка без срока значит «старые входы выключены»
+    for k in ("vhod_starye_do", "vhod_starye_vykl", "vhod_zavedeny"):
+        if k in nado and s.get(k) != nado[k]:
+            db.set_setting(k, nado[k])
+        if k in nado and f.get(k) != nado[k]:
+            _otmetku_v_fayl(k, nado[k])
+    _obnovit_kopiyu()
+    if f.get("vhod_zavedeny") and not s.get("vhod_zavedeny"):
+        log.warning("vhod: в основной базе не было отметки «входы заведены» — восстановлена из файла входов")
+        t = time.monotonic()
+        if t - _SVEDENO[0] < 3600:           # владельцу — не чаще раза в час
+            return
+        _SVEDENO[0] = t
+        soobshchit_borisu("app.kidsup.ru: в основной базе пропала отметка о личных входах (похоже, базу "
+                          "восстановили из старой копии). Отметка возвращена: общий пароль admin заново не "
+                          "открылся. Проверьте блок «Входы» на /owner.",
+                          chto="отметки входов восстановлены из файла входов (основная база была без них)")
+    else:
+        log.warning("vhod: отметки входов в основной базе и в файле входов расходились — сведены")
 
 
 def zavedeny() -> bool:
-    """Входы уже заводились (первый заданный пароль или ключ)."""
-    return bool(_nastroyki("vhod_zavedeny").get("vhod_zavedeny"))
+    """Входы уже заводились (первый заданный пароль или ключ) — по любому из двух хранилищ."""
+    if _nastroyki("vhod_zavedeny").get("vhod_zavedeny"):
+        return True
+    try:
+        return bool(_otmetki_fayla().get("vhod_zavedeny"))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def starye_vklyucheny() -> bool:
     """Работают ли старые входы (общий admin и прежний пароль владельца в окне браузера).
     Отметки vhod_zavedeny нет — да, как раньше. Есть — да, пока не наступил vhod_starye_do;
-    записи о сроке нет — выключены. Сбой чтения — последнее прочитанное значение."""
+    записи о сроке нет или стоит vhod_starye_vykl — выключены. Смотрим оба хранилища (settings
+    основной базы и otmetki файла входов): включены, только если оба говорят «да». Одно не
+    читается — решает второе; не читаются оба — последнее прочитанное значение."""
     try:
-        s = _nastroyki("vhod_zavedeny", "vhod_starye_do")
-        if not s.get("vhod_zavedeny"):
-            ok = True
-        else:
-            do = _iz_iso(s.get("vhod_starye_do"))
-            ok = do is not None and seychas() < do
-        _POSL_STARYE[0] = ok
-        return ok
+        s = _nastroyki(*OTMETKI)
     except Exception:  # noqa: BLE001
-        log.exception("vhod: не прочитать срок старых входов — беру прежнее значение")
+        _zhaloba("vhod: не прочитать срок старых входов в основной базе — смотрю файл входов")
+        s = None
+    try:
+        f = _otmetki_fayla()
+    except Exception:  # noqa: BLE001
+        _zhaloba("vhod: не прочитать отметки в файле входов — решает основная база")
+        f = None
+    if s is None and f is None:
         return _POSL_STARYE[0]
+    if s is not None and f is not None and s != f:
+        try:
+            _svesti_otmetki(s, f)
+        except Exception:  # noqa: BLE001
+            _zhaloba("vhod: отметки входов не сведены")
+    ok = all(_starye_po(o) for o in (s, f) if o is not None)
+    _POSL_STARYE[0] = ok
+    return ok
 
 
 def otmetit_zavedeny() -> None:
@@ -400,8 +545,8 @@ def otmetit_zavedeny() -> None:
     if s.get("vhod_zavedeny"):
         return
     if not s.get("vhod_starye_do"):
-        db.set_setting("vhod_starye_do", _iso(seychas() + SROK_STARYH))
-    db.set_setting("vhod_zavedeny", "1")
+        _otmetka("vhod_starye_do", _iso(seychas() + SROK_STARYH))
+    _otmetka("vhod_zavedeny", "1")
 
 
 def otkryto() -> bool:
@@ -511,8 +656,11 @@ def login_po_vvodu(vvod: str) -> str:
         return ""
     with _baza() as c:
         rows = c.execute("SELECT login, imya FROM vhody").fetchall()
+    for r in rows:                       # сначала точное совпадение по логину, потом по имени
+        if v == _norm(r["login"]):
+            return r["login"]
     for r in rows:
-        if v == _norm(r["login"]) or (r["imya"] and v == _norm(r["imya"])):
+        if r["imya"] and v == _norm(r["imya"]):
             return r["login"]
     return ""
 
@@ -683,7 +831,7 @@ def _staryy_boris_v_okne() -> bool:
             v = c.execute("SELECT posl_zapros FROM vhody WHERE login='klod-vykladka'").fetchone()
         return not (b is not None and b["hesh"] and v is not None and v["posl_zapros"])
     except Exception:  # noqa: BLE001
-        log.exception("vhod: не проверить прежний пароль владельца — принимаю, как раньше")
+        _zhaloba("vhod: не проверить прежний пароль владельца — принимаю, как раньше")
         return True
 
 
@@ -705,40 +853,84 @@ def _sverit_staryy(user: str, pw: str, s_proverkoy=True):
     return None
 
 
+class PauzaVhoda(HTTPException):
+    """Пауза старого входа в сером окне после промахов: 429 с Retry-After. main.py отвечает
+    человеку, открывшему страницу, понятной страницей, а скрипту — тем же JSON, что и раньше."""
+
+    def __init__(self, sek: float):
+        super().__init__(429, tekst_pauzy(sek), headers={"Retry-After": str(int(sek) + 1)})
+
+
 def _starye(request, credentials):
+    """Старые входы в сером окне: общий admin и прежний пароль владельца.
+    Пароль сверяется ПЕРВЫМ. Пауза после промахов останавливает только тех, кого сервер с этого
+    адреса ещё не видел с верным паролем: неверные пароли и верный пароль, присланный впервые
+    (иначе перебор узнавал бы удачу по ответу). Браузеры и скрипты, которые за последние 12
+    часов уже ходили с этого адреса с верным паролем, паузу не замечают — чужие промахи с того
+    же адреса (один Wi-Fi на центр) не запирают общий вход всем. Удачный вход вне паузы стирает
+    промахи («5 промахов подряд»). Запрета «по адресу, любые логины» у окна нет: незнакомый
+    логин войти не может, а admin и boris считаются каждый своим счётчиком; промахи формы
+    /vhod в счёт окна не идут."""
     if credentials is None or not starye_vklyucheny():
         return None
     try:
         if _ustr_izvestno(request):
             return None          # с этого браузера уже входили через форму: общий вход здесь не годится
     except Exception:  # noqa: BLE001
-        log.exception("vhod: метка устройства не проверена")
+        _zhaloba("vhod: метка устройства не проверена")
     user, pw = credentials.username, credentials.password
-    adr = adres(request)
-    schet = ("admin" if _ravny(user, config.APP_USER or "admin") else
-             "boris" if _ravny(user, "boris") else "")
-    try:
-        p = _pauza_okna(schet, adr)
-    except Exception:  # noqa: BLE001
-        log.exception("vhod: счётчик попыток не прочитан")
-        p = 0
-    if p > 0:
-        raise HTTPException(429, tekst_pauzy(p), headers={"Retry-After": str(int(p) + 1)})
     k = _sverit_staryy(user, pw)
     if k is None and est_kirillica(pw):
         k = _sverit_staryy(user, na_latinicu(pw))
+    kogo = ("admin" if _ravny(user, config.APP_USER or "admin") else
+            "boris" if _ravny(user, "boris") else "")
+    if not kogo:
+        return k                 # незнакомый логин: войти им нельзя, считать нечего
+    adr = adres(request)
+    schet = OKNO + kogo
+    t = seychas()
+    otp = _otpechatok(adr, kogo, pw)
     if k is not None:
+        with _ZAMOK:
+            znakom = abs(t - _UDACHI.get(otp, -1e18)) < SROK_UDACHI
+        try:
+            p = _pauza_okna(schet, adr) if _est_promahi(schet, adr) else 0
+        except Exception:  # noqa: BLE001
+            _zhaloba("vhod: счётчик попыток не прочитан")
+            p = 0
+        if p > 0 and not znakom:
+            raise PauzaVhoda(p)
+        with _ZAMOK:
+            _UDACHI[otp] = t
+            if len(_UDACHI) > 5000:
+                for k_, v_ in list(_UDACHI.items()):
+                    if abs(t - v_) >= SROK_UDACHI:
+                        del _UDACHI[k_]
+        if p <= 0 and _est_promahi(schet, adr):
+            try:
+                uspeh(schet, adr)
+                with _ZAMOK:
+                    _EST_PROMAHI.discard((schet, adr))
+            except Exception:  # noqa: BLE001
+                _zhaloba("vhod: промахи после удачного входа не стёрты")
         return k
     try:
-        _promah_okna(schet, adr, pw)
+        p = _pauza_okna(schet, adr)
     except Exception:  # noqa: BLE001
-        log.exception("vhod: промах не записан")
+        _zhaloba("vhod: счётчик попыток не прочитан")
+        p = 0
+    if p > 0:
+        raise PauzaVhoda(p)
+    try:
+        _promah_okna(schet, adr, pw, kogo)
+    except Exception:  # noqa: BLE001
+        _zhaloba("vhod: промах не записан")
     return None
 
 
 def kto(request, credentials):
     """Кто пришёл: словарь {login, imya, rol, sposob, seans} или None.
-    Бросает только 403 на чужой запрос и 429 на паузу старого входа после промахов.
+    Бросает только 403 на чужой запрос и 429 (PauzaVhoda) на паузу старого входа после промахов.
     Заголовок X-Kak: admin понижает вошедшего до прав личного админа (см. _ponizit)."""
     return _ponizit(request, _kto(request, credentials))
 
@@ -784,7 +976,7 @@ def _kto(request, credentials):
     except HTTPException:
         raise
     except Exception:  # noqa: BLE001 — ошибка в новом коде или в vhody.db старым входам не мешает
-        log.exception("vhod: новая проверка входа не сработала — смотрю старые входы")
+        _zhaloba("vhod: новая проверка входа не сработала — смотрю старые входы")
     return _starye(request, credentials)
 
 
@@ -802,7 +994,7 @@ def kto_po_staromu(credentials):
         if k is not None:
             return k
     except Exception:  # noqa: BLE001
-        log.exception("vhod: ключ без request не проверен")
+        _zhaloba("vhod: ключ без request не проверен")
     if not starye_vklyucheny():
         return None
     return _sverit_staryy(credentials.username, credentials.password)
@@ -911,7 +1103,7 @@ def okno_vykladki_otkryto() -> bool:
         do = _iz_iso(_nastroyki("vhod_okno_vykladki_do").get("vhod_okno_vykladki_do"))
         return do is not None and seychas() < do
     except Exception:  # noqa: BLE001
-        log.exception("vhod: аварийное окно выкладки не прочитано — считаю закрытым")
+        _zhaloba("vhod: аварийное окно выкладки не прочитано — считаю закрытым")
         return False
 
 
@@ -923,7 +1115,7 @@ def perehod_admina_deystvuet() -> bool:
             r = c.execute("SELECT posl_zapros FROM vhody WHERE login='klod'").fetchone()
         return not (r is not None and r["posl_zapros"])
     except Exception:  # noqa: BLE001
-        log.exception("vhod: не проверить, работал ли ключ рутин — общий вход пускаю, как раньше")
+        _zhaloba("vhod: не проверить, работал ли ключ рутин — общий вход пускаю, как раньше")
         return True
 
 
@@ -996,6 +1188,24 @@ def stranica_otkaza(k: dict | None = None) -> str:
             "<a class='b' href='/pult'>← На пульт</a></div></body></html>")
 
 
+def stranica_pauzy(tekst: str) -> str:
+    """Страница 429 для человека в сером окне — вместо сырого {"detail": …}."""
+    return ("<!doctype html><html lang='ru'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<meta name='robots' content='noindex,nofollow'><title>Слишком много попыток · KidsUP</title>"
+            "<style>body{margin:0;background:#f8f7fc;color:#15132e;font:17px/1.5 -apple-system,BlinkMacSystemFont,"
+            "'Segoe UI',Roboto,Helvetica,Arial,sans-serif}.k{max-width:520px;margin:12vh auto 0;padding:26px 22px;"
+            "background:#fff;border:1px solid #e4e2f0;border-radius:16px;border-top:5px solid #312783}"
+            "h1{margin:0 0 8px;font-size:24px;color:#312783}p{margin:8px 0;color:#4a4866}"
+            "a.b{display:inline-block;margin-top:12px;padding:12px 18px;border-radius:10px;background:#312783;"
+            "color:#fff;text-decoration:none;font-weight:700}</style></head><body><div class='k'>"
+            "<h1>Слишком много попыток</h1>"
+            f"<p>{_e(tekst)}</p>"
+            "<p>С этого адреса несколько раз подряд ввели неверный пароль. Это защита, а не поломка: "
+            "подождите и обновите страницу — пароль заново вводить не нужно.</p>"
+            "<a class='b' href=''>Обновить страницу</a></div></body></html>")
+
+
 def v_sisteme(minut: int = 30) -> list:
     """Кто из людей сейчас в системе: [(имя, сколько минут назад был последний запрос)].
     «Последний запрос» пишется не чаще раза в минуту на логин. Сбой — пустой список."""
@@ -1011,7 +1221,7 @@ def v_sisteme(minut: int = 30) -> list:
                 out.append((r["imya"], int((t - pz) // 60)))
         return sorted(out, key=lambda x: x[1])
     except Exception:  # noqa: BLE001
-        log.exception("vhod: «сейчас в системе» не прочитано")
+        _zhaloba("vhod: «сейчас в системе» не прочитано")
         return []
 
 
@@ -1046,7 +1256,7 @@ def shapka(k: dict | None, put: str = "/", cvet: str = "#312783") -> str:
                     f"<a href='/vhod?next={quote(bezopasnyy_next(put or '/') or '/', safe='/')}' style='color:#312783;"
                     "font-weight:700'>войдите под своим именем</a></div>")
     except Exception:  # noqa: BLE001
-        log.exception("vhod: шапка «кто вошёл» не собрана")
+        _zhaloba("vhod: шапка «кто вошёл» не собрана")
     return ""
 
 
@@ -1149,6 +1359,11 @@ _ZAMOK = threading.Lock()                # память: последние пр
 _ZAMOK_POPYTOK = threading.Lock()        # пауза + запись попытки — одним шагом
 _NEUD: dict = {}                         # адрес → время последнего промаха (короткий путь без базы)
 _NEUD_ZAGRUZHEN = [False]
+OKNO = "okno:"                           # счётчики серого окна — отдельно от формы: okno:admin, okno:boris
+NEZNAKOMYY = "~"                         # счётчик формы для логина, которого нет: ~<отпечаток введённого>
+_EST_PROMAHI: set = set()                # (счётчик окна, адрес), по которым в базе есть промахи
+_UDACHI: dict = {}                       # отпечаток (адрес, логин, верный пароль) → когда был удачный вход
+SROK_UDACHI = 12 * 3600                  # сколько «знакомый верный» вход в окне не замечает паузу
 _POVTOR: dict = {}                       # (адрес, логин, отпечаток пароля) → когда засчитан
 _PROC_KLYUCH = secrets.token_bytes(32)   # отпечатки неверных паролей — только в памяти процесса
 _SOOBSHCHENO: dict = {}                  # логин → когда сообщили Борису о 50 промахах
@@ -1161,11 +1376,12 @@ def tekst_pauzy(sek: float) -> str:
     return f"Слишком много попыток. Подождите {n} {slovo} или позвоните Борису."
 
 
-def pauza(login: str, adres_: str, ustr: str = "") -> float:
+def pauza(login: str, adres_: str, ustr: str = "", po_adresu: bool = True) -> float:
     """Сколько секунд ждать (0 — можно пробовать).
     Один логин с одного адреса: 5 промахов подряд (за час) — минута, 10 — 5 минут, 15 — 15.
     Один адрес, любые логины: 20 промахов за 15 минут — 15 минут, но только браузерам без
-    метки устройства (стойка и телефоны в Wi-Fi центра — один адрес)."""
+    метки устройства (стойка и телефоны в Wi-Fi центра — один адрес). Это правило — только
+    для формы (po_adresu=False у серого окна), и промахи серого окна в него не входят."""
     t = seychas()
     p = 0.0
     with _baza() as c:
@@ -1176,10 +1392,11 @@ def pauza(login: str, adres_: str, ustr: str = "") -> float:
             if n >= 5:
                 dl = 900 if n >= 15 else 300 if n >= 10 else 60
                 p = max(p, rows[0]["ts"] + dl - t)
-        znakom = bool(ustr) and c.execute("SELECT 1 FROM ustroystva WHERE id=?", (ustr,)).fetchone() is not None
+        znakom = (not po_adresu or bool(ustr)
+                  and c.execute("SELECT 1 FROM ustroystva WHERE id=?", (ustr,)).fetchone() is not None)
         if not znakom:
-            rows = c.execute("SELECT ts FROM popytki WHERE adres=? AND ts>? ORDER BY ts DESC LIMIT 20",
-                             (adres_, t - 1800)).fetchall()
+            rows = c.execute("SELECT ts FROM popytki WHERE adres=? AND ts>? AND login NOT LIKE ? "
+                             "ORDER BY ts DESC LIMIT 20", (adres_, t - 1800, OKNO + "%")).fetchall()
             if len(rows) >= 20 and rows[0]["ts"] - rows[19]["ts"] <= 900:
                 p = max(p, rows[0]["ts"] + 900 - t)
     return max(0.0, p)
@@ -1210,34 +1427,57 @@ def snyat_pauzu(login: str) -> None:
         c.execute("DELETE FROM popytki WHERE login=?", (login,))
 
 
-def _pauza_okna(login: str, adres_: str) -> float:
-    """Пауза для старого входа в окне. Короткий путь: с адреса за час не было промахов —
-    в базу не ходим (окно шлёт пароль с каждым запросом страницы)."""
-    t = seychas()
+def _otpechatok(adres_: str, login: str, pw: str) -> str:
+    """Отпечаток «адрес + логин + пароль» — только в памяти процесса, с ключом процесса."""
+    return hmac.new(_PROC_KLYUCH, "\x00".join((adres_ or "", login or "", pw or "")).encode("utf-8"),
+                    hashlib.sha256).hexdigest()
+
+
+def _zagruzit_promahi() -> None:
+    """Один раз за процесс: по каким адресам за последний час были промахи (после перезапуска
+    счёт не теряется)."""
     with _ZAMOK:
-        if not _NEUD_ZAGRUZHEN[0]:
-            _NEUD_ZAGRUZHEN[0] = True
-            zagruzit = True
-        else:
-            zagruzit = False
-    if zagruzit:
-        with _baza() as c:
-            for r in c.execute("SELECT adres, MAX(ts) AS ts FROM popytki WHERE ts>? GROUP BY adres", (t - 3600,)):
-                with _ZAMOK:
-                    _NEUD[r["adres"]] = max(_NEUD.get(r["adres"], 0), r["ts"])
+        if _NEUD_ZAGRUZHEN[0]:
+            return
+        _NEUD_ZAGRUZHEN[0] = True
+    t = seychas()
+    with _baza() as c:
+        rows = c.execute("SELECT login, adres, MAX(ts) AS ts FROM popytki WHERE ts>? GROUP BY login, adres",
+                         (t - 3600,)).fetchall()
+    with _ZAMOK:
+        for r in rows:
+            _NEUD[r["adres"]] = max(_NEUD.get(r["adres"], 0), r["ts"])
+            if r["login"].startswith(OKNO):
+                _EST_PROMAHI.add((r["login"], r["adres"]))
+
+
+def _est_promahi(schet: str, adres_: str) -> bool:
+    try:
+        _zagruzit_promahi()
+    except Exception:  # noqa: BLE001
+        _zhaloba("vhod: промахи за последний час не прочитаны")
+    with _ZAMOK:
+        return (schet, adres_) in _EST_PROMAHI
+
+
+def _pauza_okna(schet: str, adres_: str) -> float:
+    """Пауза для старого входа в окне (schet — okno:admin или okno:boris): только счёт «логин +
+    адрес» по промахам самого окна. Короткий путь: с адреса за час не было промахов — в базу
+    не ходим (окно шлёт пароль с каждым запросом страницы)."""
+    t = seychas()
+    _zagruzit_promahi()
     with _ZAMOK:
         posl = _NEUD.get(adres_)
     if posl is None or t - posl > 3600:
         return 0.0
-    return pauza(login, adres_, "")
+    return pauza(schet, adres_, "", po_adresu=False)
 
 
-def _promah_okna(login: str, adres_: str, pw: str) -> None:
+def _promah_okna(schet: str, adres_: str, pw: str, nazvanie: str = "") -> None:
     """Неверный пароль в окне. Один и тот же неверный пароль с одного адреса засчитывается
     один раз в час: старая вкладка с устаревшим паролем не должна запереть весь центр."""
     t = seychas()
-    otp = hmac.new(_PROC_KLYUCH, (pw or "").encode("utf-8"), hashlib.sha256).hexdigest()
-    kl = (adres_, login, otp)
+    kl = _otpechatok(adres_, schet, pw)
     with _ZAMOK:
         bylo = _POVTOR.get(kl)
         if bylo is not None and t - bylo < 3600:
@@ -1247,14 +1487,18 @@ def _promah_okna(login: str, adres_: str, pw: str) -> None:
             for k_, v_ in list(_POVTOR.items()):
                 if t - v_ >= 3600:
                     del _POVTOR[k_]
-    popytka(login, adres_)
-    _posle_promaha(login)
+    popytka(schet, adres_)
+    with _ZAMOK:
+        _EST_PROMAHI.add((schet, adres_))
+    _posle_promaha(schet, nazvanie)
 
 
-def _posle_promaha(login: str) -> None:
-    """Один логин с разных адресов: 50 промахов за час — сообщение Борису (вход не закрывается)."""
+def _posle_promaha(login: str, nazvanie: str = "") -> None:
+    """Один логин с разных адресов: 50 промахов за час — сообщение Борису (вход не закрывается).
+    nazvanie — как назвать вход в сообщении (у счётчиков серого окна — admin или boris)."""
     if not login:
         return
+    nazvanie = nazvanie or login
     t = seychas()
     with _baza() as c:
         n = c.execute("SELECT COUNT(*) FROM popytki WHERE login=? AND ts>?", (login, t - 3600)).fetchone()[0]
@@ -1264,17 +1508,17 @@ def _posle_promaha(login: str) -> None:
         if t - _SOOBSHCHENO.get(login, 0) < 3600:
             return
         _SOOBSHCHENO[login] = t
-    soobshchit_borisu(f"app.kidsup.ru: за час {n} неверных паролей ко входу «{login}» с разных адресов. "
+    soobshchit_borisu(f"app.kidsup.ru: за час {n} неверных паролей ко входу «{nazvanie}» с разных адресов. "
                       "Вход не закрыт. Если это не вы и не админы — задайте этому входу новый пароль на /owner.",
-                      chto=f"много неверных паролей: {login}")
+                      chto=f"много неверных паролей: {nazvanie}")
 
 
 def voyti(request, vvod: str, parol: str) -> dict:
     """Проверка формы /vhod → {"login": …, "zapis": …} при удаче;
     {"pauza": сек} при отказе (0 — просто не подошло); {"zanyat": True} — сервер занят.
     Попытка пишется ДО проверки пароля (иначе пачка одновременных запросов обходит счётчик)
-    и стирается при удаче. Ответ на незнакомый логин и неверный пароль одинаков по тексту и
-    времени. Пароль в русской раскладке — один раз пробуем те же клавиши в английской."""
+    и стирается при удаче. Ответ на незнакомый логин и неверный пароль одинаков по тексту,
+    времени и по тому, когда наступает пауза. Пароль в русской раскладке — один раз пробуем те же клавиши в английской."""
     adr = adres(request)
     try:
         ustr = _ustr_id(request)
@@ -1283,7 +1527,11 @@ def voyti(request, vvod: str, parol: str) -> dict:
     login = login_po_vvodu(vvod)
     z = _zapis(login) if login else None
     chelovek = z is not None and z["rol"] in LYUDI and bool(z["vkl"]) and not _istekla(z)
-    schet = login if chelovek else ""
+    # Счётчик промахов одинаков для любого логина: настоящего, отключённого, служебного и
+    # такого, которого нет вовсе (по введённой строке). Иначе по тому, наступает ли пауза
+    # после пяти промахов, было бы видно, существует ли вход.
+    # В счётчик идёт отпечаток введённого, а не сам текст: в поле логина по ошибке набирают пароль.
+    schet = login or (NEZNAKOMYY + _sha(_norm(vvod)[:40])[:24])
     with _ZAMOK_POPYTOK:
         p = pauza(schet, adr, ustr)
         if p > 0:
@@ -1312,9 +1560,10 @@ def voyti(request, vvod: str, parol: str) -> dict:
         uspeh(schet, adr)
         return {"login": login, "zapis": z}
     try:
-        _posle_promaha(schet)
+        if chelovek:
+            _posle_promaha(schet)
     except Exception:  # noqa: BLE001
-        log.exception("vhod: проверка «50 промахов» не сработала")
+        _zhaloba("vhod: проверка «50 промахов» не сработала")
     return {"pauza": 0}
 
 
@@ -1395,8 +1644,12 @@ def dobavit(login: str, imya: str, sutki: bool = False) -> str:
         return "нужно имя"
     if _zapis(login) is not None:
         return "такой вход уже есть"
+    if _norm(imya) in ZANYATYE:
+        return "это имя занято"
     if login_po_vvodu(imya):
         return "вход с таким именем уже есть"
+    if login_po_vvodu(login):
+        return "логин совпадает с именем другого входа"
     with _baza() as c:
         c.execute('INSERT INTO vhody (login, imya, rol, sozdan, "do") VALUES (?,?,?,?,?)',
                   (login, imya, "admin", _iso(), _iso(seychas() + SROK_VREMENNOGO) if sutki else None))
@@ -1446,7 +1699,7 @@ def spisok() -> list:
         seansy = {r[0]: r[1] for r in c.execute('SELECT login, COUNT(*) FROM seansy WHERE "do">? GROUP BY login', (t,))}
         zaperty = set()
         for r in c.execute("SELECT login, COUNT(*) AS n, MAX(ts) AS m FROM popytki WHERE ts>? AND login<>'' "
-                           "GROUP BY login, adres HAVING n>=5", (t - 3600,)):
+                           "AND login NOT LIKE 'okno:%' GROUP BY login, adres HAVING n>=5", (t - 3600,)):
             if r["m"] + (900 if r["n"] >= 15 else 300 if r["n"] >= 10 else 60) > t:
                 zaperty.add(r["login"])
     poryadok = {z[0]: i for i, z in enumerate(ZAPISI)}
@@ -1488,13 +1741,23 @@ def _prezhniy_parol_deystvuet() -> bool:
 
 def sostoyanie(s_ustroystvami: bool = False) -> dict:
     """Всё о входах без секретов: у кого задан пароль, даты входов, выпущены ли ключи, срок
-    старых входов, хвост общего входа, отказы ключу рутин, автоматика, строки «Важное»."""
+    старых входов, хвост общего входа, отказы ключу рутин, автоматика, строки «Важное».
+    Файл входов не читается (испорчен, заперт, нет папки) — отдаём то, что есть в основной
+    базе, и поле fayl_vhodov: «не читается»: адрес нужен как раз тогда, когда что-то сломано."""
     t = seychas()
     s = _nastroyki("vhod_zavedeny", "vhod_starye_do", "vhod_starye_vykl", "vhod_okno_vykladki_do")
-    with _baza() as c:
-        hv = [dict(r) for r in c.execute(
-            "SELECT login, adres, chem, SUM(n) AS n, MAX(posl) AS posl FROM hvost WHERE posl>? "
-            "GROUP BY login, adres, chem ORDER BY posl DESC", (_iso(t - 3 * 86400),))]
+    fayl = "в порядке"
+    hv, vhody, ustr = [], [], []
+    try:
+        with _baza() as c:
+            hv = [dict(r) for r in c.execute(
+                "SELECT login, adres, chem, SUM(n) AS n, MAX(posl) AS posl FROM hvost WHERE posl>? "
+                "GROUP BY login, adres, chem ORDER BY posl DESC", (_iso(t - 3 * 86400),))]
+        vhody = spisok()
+        ustr = obshchie_ustroystva()
+    except Exception:  # noqa: BLE001
+        _zhaloba("vhod: состояние входов — файл входов не читается")
+        fayl = "не читается"
     sutki = _iso(t - 86400)
     with db.get_conn() as c:
         _zhurnal_init(c)
@@ -1505,10 +1768,10 @@ def sostoyanie(s_ustroystvami: bool = False) -> dict:
             "SELECT put, COUNT(*) AS n, MAX(ts) AS posl FROM deystviya WHERE login='klod' AND kod=403 AND ts>? "
             "GROUP BY put ORDER BY n DESC LIMIT 30", (_iso(t - 7 * 86400),))]
     okno = _iz_iso(s.get("vhod_okno_vykladki_do"))
-    ustr = obshchie_ustroystva()
     return {
         "seychas": _iso(t),
-        "vhody": spisok(),
+        "fayl_vhodov": fayl,
+        "vhody": vhody,
         "starye": {
             "zavedeny": bool(s.get("vhod_zavedeny")),
             "vklyucheny": starye_vklyucheny(),
@@ -1569,10 +1832,10 @@ def starye_vyklyuchit(kem: str = "владелец") -> str:
     if otkaz_:
         return otkaz_
     ts = _iso()
-    db.set_setting("vhod_starye_do", ts)             # срок «сейчас» — раньше всего остального
-    db.set_setting("vhod_zavedeny", "1")
+    _otmetka("vhod_starye_do", ts)                   # срок «сейчас» — раньше всего остального
+    _otmetka("vhod_zavedeny", "1")
     db.set_setting("owner_password", secrets.token_urlsafe(48))
-    db.set_setting("vhod_starye_vykl", ts)
+    _otmetka("vhod_starye_vykl", ts)
     _POSL_STARYE[0] = False
     soobshchit_borisu("app.kidsup.ru: старые входы отключены (" + kem + "). Общий пароль admin и прежний пароль "
                       "владельца больше не принимаются; вход — только личный, на странице app.kidsup.ru/vhod. "
@@ -1605,7 +1868,7 @@ def starye_po_sroku() -> str:
     if not prichiny:
         return "vyklyucheny" if starye_vyklyuchit("сами, по сроку") == "" else ""
     novyy = _iso(max(do, t) + 86400)
-    db.set_setting("vhod_starye_do", novyy)
+    _otmetka("vhod_starye_do", novyy)
     soobshchit_borisu("app.kidsup.ru: общий вход не отключён — " + "; ".join(prichiny) + ". Срок сдвинут на сутки, до "
                       + kogda(novyy) + ". Отключить можно кнопкой на /owner.",
                       chto="общий вход не отключён, срок сдвинут на сутки: " + "; ".join(prichiny))
@@ -2010,7 +2273,7 @@ def blok_vladelca_bezopasno(request, itog: dict | None = None) -> str:
     try:
         return blok_vladelca(request, itog)
     except Exception:  # noqa: BLE001
-        log.exception("vhod: блок «Входы» не собран")
+        _zhaloba("vhod: блок «Входы» не собран")
         return ("<section class='vh'><h2>Входы на app.kidsup.ru</h2><p class='osh'>Блок «Входы» не открылся — "
                 "ошибка записана в журнал сервера. Остальные настройки ниже работают.</p></section>")
 
@@ -2082,7 +2345,7 @@ def soobshchit_borisu(tekst: str, chto: str = "") -> None:
                       "VALUES (?,?,?,?,?,?,?,?,?,?,?,1)",
                       (_iso(), "", "сервер", "", "", "", "", None, (chto or tekst)[:300], "", ""))
     except Exception:  # noqa: BLE001
-        log.exception("vhod: строка «Важное» не записана")
+        _zhaloba("vhod: строка «Важное» не записана")
     if not (db.get_setting("digest_phone") or ""):
         return
 
@@ -2090,7 +2353,7 @@ def soobshchit_borisu(tekst: str, chto: str = "") -> None:
         try:
             _otpravit(tekst)
         except Exception:  # noqa: BLE001
-            log.exception("vhod: сообщение владельцу не отправлено")
+            _zhaloba("vhod: сообщение владельцу не отправлено")
     threading.Thread(target=_f, daemon=True).start()
 
 
@@ -2108,7 +2371,10 @@ def sloy_zagolovki(request, resp) -> None:
     if pr:
         resp.set_cookie(COOKIE, pr[0], max_age=pr[1], **_METKA)
     if not publichnyy(request) and (resp.headers.get("content-type") or "").startswith("text/html"):
-        if "cache-control" not in resp.headers:
+        # Старым входам в сером окне (общий admin, прежний boris) кеш не трогаем: пока владелец
+        # ничего не включил, страницы ведут себя как раньше (кнопка «Назад» возвращает страницу
+        # с прокруткой и недописанным текстом). У окна браузера выхода всё равно нет.
+        if "cache-control" not in resp.headers and iz(request).get("sposob") != "staryy":
             resp.headers["Cache-Control"] = "no-store"
         if "x-frame-options" not in resp.headers:
             resp.headers["X-Frame-Options"] = "DENY"
@@ -2123,7 +2389,7 @@ def sloy_zapis(request, kod: int) -> None:
         try:
             sled(request, getattr(request.state, "chto", "") or "", kod=kod)
         except Exception:  # noqa: BLE001
-            log.exception("vhod: строка журнала не записана")
+            _zhaloba("vhod: строка журнала не записана")
     if getattr(request.state, "vhod_kopiya", False):
         _obnovit_kopiyu()
     try:
@@ -2156,11 +2422,25 @@ def sloy_zapis(request, kod: int) -> None:
                               "ON CONFLICT(den, login, adres, chem) DO UPDATE SET n = n + excluded.n, posl = excluded.posl",
                               (*kl, n, _iso(t)))
     except Exception:  # noqa: BLE001
-        log.exception("vhod: «последний запрос» не записан")
+        _zhaloba("vhod: «последний запрос» не записан")
 
 
-def zapusk() -> None:
-    """Запуск процесса сервера (main.py): ключ автоматики в памяти, файл входов, журнал."""
+def eto_server() -> bool:
+    """Похоже на процесс сервера: приложение загрузил uvicorn (или gunicorn с его рабочими)."""
+    return "uvicorn" in sys.modules or "gunicorn" in sys.modules
+
+
+def zapusk(server: bool | None = None) -> None:
+    """Запуск процесса сервера: ключ автоматики в памяти, файл входов, журнал.
+    main.py зовёт её дважды: при импорте (server=None — только если приложение загрузил
+    сервер) и в обработчике запуска приложения (server=True). Вне сервера — контейнер
+    ассистента, где модуль вроде perepiska лениво тянет app.main, — ничего не делает: иначе
+    db.admin_auth() начинал бы отдавать ключ автоматики, которого боевой сервер не знает, а в
+    контейнере появлялся бы data/vhody.db. Тесты зовут vnutr_sozdat() сами."""
+    if server is None:
+        server = eto_server()
+    if not server:
+        return
     vnutr_sozdat()
     try:
         with _baza():
@@ -2168,7 +2448,7 @@ def zapusk() -> None:
         with db.get_conn() as c:
             _zhurnal_init(c)
     except Exception:  # noqa: BLE001
-        log.exception("vhod: файл входов не подготовлен — старые входы работают как раньше")
+        _zhaloba("vhod: файл входов не подготовлен — старые входы работают как раньше")
 
 
 # --- страница /vhod -----------------------------------------------------------------------------
@@ -2227,7 +2507,7 @@ def voshedshiy_po_metke(request) -> dict | None:
         s = _seans(request)
         return s[0] if s else None
     except Exception:  # noqa: BLE001
-        log.exception("vhod: метка входа не проверена")
+        _zhaloba("vhod: метка входа не проверена")
         return None
 
 
@@ -2339,7 +2619,7 @@ def _konsol(argv: list, vvod=None, pechat=print) -> int:
     try:
         otmetit_vazhnoe(f"пароль задан из консоли сервера: {login}", imya="консоль сервера")
     except Exception:  # noqa: BLE001
-        log.exception("vhod: строка «Важное» не записана")
+        _zhaloba("vhod: строка «Важное» не записана")
     pechat(f"Пароль задан: {imya} ({login}). Прежние сеансы этого входа закрыты. Вход — на странице app.kidsup.ru/vhod.")
     return 0
 

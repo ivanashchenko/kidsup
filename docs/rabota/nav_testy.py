@@ -229,6 +229,9 @@ NOVYE = {"GET /arhiv", "POST /api/boris-docs/arhiv", "POST /api/admin-docs/arhiv
 # 12.11.2026, личные входы (app/vhod.py): страница входа, выход и «кто вошёл».
 NOVYE_VHOD = {"GET /vhod", "POST /vhod", "POST /vyhod", "GET /api/kto",
               "POST /owner/vhody", "GET /api/vhod/sostoyanie"}
+# 12.11.2026, личные входы: перечень адресов (/openapi.json, /docs, /redoc) без входа больше
+# не отдаётся — его никто не зовёт, а чужому он показывал все адреса владельца и выкладки.
+UBRANY_VHOD = {"GET /docs", "GET /docs/oauth2-redirect", "GET /openapi.json", "GET /redoc"}
 # Не из шага 1: разовый просмотр «старых звонков» (решение Бориса 12.11), только чтение.
 NOVYE_ZVONKI_1211 = {"GET /api/hvost/staroe"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
@@ -257,8 +260,9 @@ def test_marshruty(m, fajl_do):
     do = set(json.load(open(fajl_do, encoding="utf-8")))
     posle = marshruty(m)
     proverka("снимок «до» — 471 маршрут", len(do) == 471, len(do))
-    proverka("пропали ровно пять — те, что звала только убранная страница", do - posle == PROPALI,
-             sorted((do - posle) ^ PROPALI))
+    proverka("пропали ровно пять — те, что звала только убранная страница (и перечень адресов: "
+             "/openapi.json, /docs, /redoc)", do - posle == PROPALI | UBRANY_VHOD,
+             sorted((do - posle) ^ (PROPALI | UBRANY_VHOD)))
     proverka("появились ровно три: «Архив» и признак «архив» у документов (и просмотр старых звонков 12.11, "
              "и адреса личных входов)",
              posle - do == NOVYE | NOVYE_ZVONKI_1211 | NOVYE_VHOD,
