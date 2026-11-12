@@ -7,9 +7,13 @@
 таблицы маршрутов пропало только то, что убирали нарочно — всё, чем пользуются
 рутины ассистента и автопилот (/api/…, /export/raw/…, вебхуки), на месте.
 
+Раздел «Д» — поправки по замечаниям проверки перед выкаткой (вечерний прозвон, отчёты о
+самих админах, рассылка в чаты только JSON-телом, плашка «архив», ссылки назад, заголовки,
+ключ педагога).
+
 Раздел «Г» — сквозная проверка решения владельца целиком, записанного здесь отдельно от
 кода: каждый пункт меню открывается у того, кому показан, а пункты владельца у админа —
-401/403; каждый убранный и объединённый адрес ведёт 303 прямо на страницу, которая сама
+401/403 или, для четырёх бывших пунктов админов, 303 на пульт без окна пароля; каждый убранный и объединённый адрес ведёт 303 прямо на страницу, которая сама
 отвечает 200 (без цепочек и петель); на меню, пульте и рабочих страницах нет ссылок на
 убранное, архивное и объединённое, а в app/ убранные адреса остались только в таблице
 переходов; адреса рутин на месте и под прежним входом.
@@ -18,7 +22,8 @@
 
   --tree  корень дерева, в котором лежит app/ (по умолчанию — этот репозиторий;
           перед выкаткой — чистая выгрузка `git archive`, без удалённых у нас файлов)
-  --work  рабочая папка стенда (по умолчанию — временная)
+  --work  рабочая папка стенда (по умолчанию — новая временная; своя — только пустая
+          и внутри временной папки: стенд пишет в базу выдуманных клиентов и пароли)
   --do    таблица маршрутов «до» (по умолчанию — nav_marshruty_do.json рядом, снимок 12.11)
 
 Обвязка — из liniya_testy.py: сеть закрыта, отправки — ловушки, автопилот не
@@ -387,11 +392,14 @@ def test_glavnaya(c, m):
     from app import boris_docs
     print("Главная: переход на рабочее место роли")
     proverka("/ админ → 303 /pult", lokaciya(c, "/") == (303, "/pult"), lokaciya(c, "/"))
-    proverka("/ владелец, стартовой страницы нет → /boris/docs",
+    proverka("/ владелец → /boris/docs (архив документов там свёрнут)",
              lokaciya(c, "/", VLADELEC) == (303, "/boris/docs"), lokaciya(c, "/", VLADELEC))
+    # документ start на сервере собран 10.11 по старому меню — главной он не становится,
+    # даже когда выложен (замечание 4 проверки 12.11); открывается из списка документов
     boris_docs.save("start", "Стартовая страница (стенд)", "<!doctype html><title>стенд</title>" + "<p>стенд</p>" * 5)
-    proverka("/ владелец, стартовая выложена → /boris/docs/start",
-             lokaciya(c, "/", VLADELEC) == (303, "/boris/docs/start"), lokaciya(c, "/", VLADELEC))
+    proverka("/ владелец и выложенный start → всё равно /boris/docs",
+             lokaciya(c, "/", VLADELEC) == (303, "/boris/docs"), lokaciya(c, "/", VLADELEC))
+    proverka("…а сам start открывается по адресу", c.get("/boris/docs/start", auth=VLADELEC).status_code == 200)
     proverka("/ без входа → 401, куда ведёт — не видно", lokaciya(c, "/", kto=None) == (401, None))
     proverka("дашборда больше нет", not hasattr(m, "dashboard") and "GET /" in marshruty(m))
     print("Главная: публичные сайты — как раньше")
@@ -591,12 +599,16 @@ VLADELCU_I_ADMINU = {
     "/promo": "решение Бориса 28.10 «промоутерами управляют админы»: «воронка и деньги по каждому» "
               "(методичка promo_upravlenie, ссылка «← Эффективность промоутеров» с /promo/grafik)",
 }
+# Пункты владельца, которые до 12.11 стояли в меню админов или на которые ведут методички
+# админов: админа уводим на пульт (303), а не окном пароля — как с архивными страницами.
+VLADELCU_NA_PULT = {"/journal", "/istochniki", "/sverka-chestnosti", "/audit"}
 # Адреса из жёстких правил и рутин: всё, что было под этими началами, обязано остаться.
 NACHALA = ("/api/plan/inbox", "/api/pult/", "/api/waiting", "/api/gruppy/", "/api/kadry", "/api/mesta",
            "/api/boris-docs", "/api/admin-docs", "/api/doc-state/", "/api/deploy", "/export/raw/", "/lk/", "/v/",
            "/go/", "/mango/", "/events/", "/wazzup/", "/api/wazzup/", "/api/tg/webhook", "/marquiz/", "/kadry/file/")
-# API рутин ассистента и автопилота (опись рутин 12.11) и API страниц, закрытых 12.11 для
-# админа, — с тем входом, что был до шага 1 (снимок 277ac71). Вход строже — рутина упадёт.
+# API рутин ассистента и автопилота (опись рутин 12.11) — с тем входом, что был до шага 1
+# (снимок 277ac71). Вход строже — рутина упадёт. Отчёты о самих админах (/api/audit,
+# /api/istochniki, /api/sverka-chestnosti) рутины не читают — их вход проверяет раздел «Д».
 RUTINY_VHOD = {
     "check_auth": """
 GET /api/plan/inbox · POST /api/plan/inbox · POST /api/plan/inbox/done · GET /api/promo/grafik · GET /api/calls/list
@@ -605,8 +617,7 @@ GET /api/sync/status · GET /api/day/firsts · GET /api/mesta · GET /api/oplata
 POST /api/crm/comment · GET /api/crm/user · GET /api/pult/tasks · POST /api/pult/tasks · POST /api/pult/done
 GET /api/obzvon-dnya · GET /api/kadry · POST /api/kadry/ocenka · GET /kadry/file/{day}/{name}
 POST /api/crm/roistat-merge · POST /api/roistat/auto-cards · GET /api/duty · GET /api/dialogs · GET /api/zayavki
-GET /api/dolgi · GET /api/blank-grupp · POST /api/blank-grupp/edit · GET /api/perepiska/kto
-GET /api/sverka-chestnosti · GET /api/audit · GET /api/istochniki""",
+GET /api/dolgi · GET /api/blank-grupp · POST /api/blank-grupp/edit · GET /api/perepiska/kto""",
     "check_owner": """
 POST /api/boris-docs · GET /api/boris-docs · GET /api/admin-docs · POST /api/admin-docs · GET /api/doc-state/{doc}
 POST /api/doc-state/{doc} · POST /api/deploy · GET /api/tbank/get · GET /api/komtet/cheki · POST /api/ads/vk
@@ -620,11 +631,9 @@ SSYLKA = re.compile(r"""(?:(?:href|action)\s*=\s*["']?|["'`]|app\.kidsup\.ru)(?:
 
 
 def domoy(kto) -> str:
-    """Стартовая страница роли — так её задал владелец."""
-    from app import boris_docs
-    if kto != VLADELEC:
-        return "/pult"
-    return "/boris/docs/start" if boris_docs.BORIS.get("start") is not None else "/boris/docs"
+    """Стартовая страница роли: админу — пульт, владельцу — список его документов
+    (не документ start: его сборка 10.11 повторяет старое меню — замечание проверки 12.11)."""
+    return "/boris/docs" if kto == VLADELEC else "/pult"
 
 
 def ssylki(html: str) -> set:
@@ -662,6 +671,10 @@ def test_punkty_menu(c, m):
         if adres in VLADELCU_I_ADMINU:
             proverka(f"«{imya}» {adres}: в меню админа нет; открывается ({VLADELCU_I_ADMINU[adres][:60]}…)",
                      not v_menu and kod == 200, (v_menu, kod))
+        elif adres in VLADELCU_NA_PULT:
+            kuda = lokaciya(c, adres)
+            proverka(f"«{imya}» {adres}: в меню и на пульте админа нет, по адресу — 303 на пульт без окна пароля",
+                     not v_menu and kuda == (303, "/pult"), (v_menu, kuda))
         else:
             proverka(f"«{imya}» {adres}: в меню и на пульте админа нет, по адресу — 401/403",
                      not v_menu and kod in (401, 403), (v_menu, kod))
@@ -669,6 +682,11 @@ def test_punkty_menu(c, m):
                  put == "/pult" or put not in {a.split("?")[0] for a in _adresa(nav.ADMIN)})
     proverka("исключений ровно два, и оба — пункты владельца",
              set(VLADELCU_I_ADMINU) <= set(_adresa([nav.OWNER])) and len(VLADELCU_I_ADMINU) == 2)
+    proverka("уводим на пульт ровно четыре пункта владельца", VLADELCU_NA_PULT <= set(_adresa([nav.OWNER])))
+    for adres in sorted(VLADELCU_NA_PULT):
+        r = c.get(adres, auth=ADMIN, follow_redirects=False)
+        proverka(f"{adres}: у админа нет WWW-Authenticate (браузер не покажет окно пароля)",
+                 "www-authenticate" not in {k.lower() for k in r.headers}, dict(r.headers))
 
 
 def test_perehody_bez_cepochek(c, m):
@@ -843,6 +861,128 @@ def test_marshruty_zhestkie(m, fajl_do):
              all(x in vhod and not vhod[x] for x in hooki), {x: vhod.get(x) for x in hooki})
 
 
+# --- Д. Поправки по замечаниям проверки 12.11 (перед выкаткой) ------------------------
+
+def _plashka(html: str) -> str:
+    """Текст плашки «архивная / переезжает» вверху страницы, или пусто."""
+    return html.split('plashka-arh', 1)[1].split("</div>", 1)[0] if 'plashka-arh' in html else ""
+
+
+def test_popravki(c, m):
+    print("Д1. Вечерний прозвон не обещает список, которого нет")
+    import app.autopilot as ap
+    import app.mango as mango
+    zadachi = []
+
+    class Mk:                                   # вместо МойКласса: только запоминаем тело задачи
+        def post(self, put, telo):
+            zadachi.append((put, telo))
+    bylo_missed, bylo_duty = mango.missed, ap._duty_manager
+    mango.missed = lambda *a, **k: [{"phone": f"799900000{i}", "attempts": 1} for i in range(3)]
+    ap._duty_manager = lambda: 1
+    try:
+        ap.evening_recall(Mk())
+    finally:
+        mango.missed, ap._duty_manager = bylo_missed, bylo_duty
+    telo = zadachi[0][1]["body"] if zadachi else ""
+    proverka("задача с числом недозвонов", "3 утренних недозвонов" in telo, telo)
+    proverka("…без ссылки на «Обзвон» и вкладку «Недозвоны» (там другие люди)",
+             "obzvon-dnya" not in telo and "nedozvony" not in telo and "вкладк" not in telo, telo)
+
+    print("Д2. Отчёты о самих админах — только владельцу")
+    for adres in ("/api/audit", "/api/istochniki", "/api/sverka-chestnosti"):
+        proverka(f"GET {adres}: админ → 401", c.get(adres, auth=ADMIN).status_code == 401)
+        try:
+            kod = c.get(adres, auth=VLADELEC).status_code
+        except Exception as e:                  # на пустом стенде отчёт может упасть — нам важен вход
+            kod = type(e).__name__
+        proverka(f"GET {adres}: владелец проходит вход", kod != 401, kod)
+    kod = c.post("/api/audit/resolve?flag_id=0&status=ok", auth=ADMIN).status_code
+    proverka("POST /api/audit/resolve под общим входом (кнопки /pravila-kontrol)", kod not in (401, 403), kod)
+
+    print("Д3. Рассылка приглашений в чаты: только владелец и только JSON-телом")
+    import app.chaty as chaty
+    vyzovy = []
+    bylo = chaty.send, chaty.deliver
+    chaty.send = lambda dry=True: vyzovy.append(("send", dry)) or {"ok": True, "queued": 0, "total": 0}
+    chaty.deliver = lambda limit=3, dry=True: vyzovy.append(("deliver", dry)) or {"ok": True}
+    try:
+        proverka("POST /api/chaty/deliver: админ → 401", c.post("/api/chaty/deliver", auth=ADMIN).status_code == 401)
+        for put in ("/api/chaty/send", "/api/chaty/deliver"):
+            imya = put.rsplit("/", 1)[1]
+            vyzovy.clear()
+            r = c.post(put + "?dry=0", auth=VLADELEC)
+            proverka(f"{put}?dry=0 без тела — только подсчёт", r.status_code == 200 and vyzovy == [(imya, True)],
+                     (r.status_code, vyzovy))
+            vyzovy.clear()
+            r = c.post(put, auth=VLADELEC, content='{"dry": false}', headers={"content-type": "text/plain"})
+            proverka(f"{put}: тело формы чужой страницы (text/plain) → 422, ничего не вызвано",
+                     r.status_code == 422 and not vyzovy, (r.status_code, vyzovy))
+            vyzovy.clear()
+            r = c.post(put, auth=VLADELEC, json={"dry": False})
+            proverka(f"{put}: {{\"dry\": false}} JSON-телом — по-настоящему (здесь подмена)",
+                     r.status_code == 200 and vyzovy == [(imya, False)], (r.status_code, vyzovy))
+    finally:
+        chaty.send, chaty.deliver = bylo
+    h = c.get("/chaty", auth=VLADELEC).text
+    proverka("кнопка на /chaty шлёт JSON-тело, а не ?dry=0",
+             "?dry=0" not in h and "JSON.stringify({dry: false})" in h)
+
+    print("Д4. Плашка на архивных и переезжающих страницах")
+    p = _plashka(c.get("/content", auth=ADMIN).text)
+    proverka("/content у админа: «Архивная страница», не отправлять семьям, ссылка на «Подбор группы»",
+             "Архивная страница" in p and "без проверки не отправлять" in p and 'href="/enrollment"' in p, p[:200])
+    p = _plashka(c.get("/callplan", auth=ADMIN).text)
+    proverka("/callplan у админа: ссылка на «Обзвон»", "Архивная страница" in p and 'href="/obzvon-dnya"' in p,
+             p[:200])
+    # /prelaunch рисует свой HTML без общей шапки — плашки там нет (светофор, текстов для семей нет)
+    for adres in ("/nezvonili", "/nabor"):
+        proverka(f"{adres} у админа: плашка есть", "Архивная страница" in _plashka(c.get(adres, auth=ADMIN).text))
+    p = _plashka(c.get("/students", auth=VLADELEC).text)
+    proverka("/students у владельца: плашка и ссылка на «Линию»", 'href="/liniya"' in p, p[:200])
+    p = _plashka(c.get("/metrics", auth=VLADELEC).text)
+    proverka("/metrics у владельца: «переезжает», ссылка на «Журнал»",
+             "переезжает" in p and 'href="/journal"' in p, p[:200])
+    p = _plashka(c.get("/metrics", auth=ADMIN).text)
+    proverka("/metrics у админа: «скоро переедет», без ссылки на закрытый ему «Журнал»",
+             "скоро переедет" in p and "/journal" not in p, p[:200])
+    p = _plashka(c.get("/segodnya", auth=ADMIN).text)
+    proverka("/segodnya у админа: ссылка на пульт", 'href="/pult"' in p, p[:200])
+    for imya, adres in [x for _, punkty in m.nav.ADMIN for x in punkty]:
+        if adres in ("/pult",):
+            continue
+        r = c.get(adres, auth=ADMIN)
+        proverka(f"рабочая страница «{imya}» — без плашки", 'plashka-arh' not in r.text)
+
+    print("Д5. Свои страницы меню: ссылка назад на пульт")
+    for adres in ("/blank-grupp", "/dolgi", "/otkazy"):
+        h = c.get(adres, auth=ADMIN).text
+        proverka(f"{adres}: «← Пульт» и «Разделы»", 'href="/pult"' in h and 'href="/pult#razdely"' in h)
+
+    print("Д6. Заголовки вкладок — как пункты меню")
+    for adres, imya in (("/enrollment", "Подбор группы"), ("/courses", "Описания занятий"),
+                        ("/voronka", "Без оплаты"), ("/otkazy", "Стоп-лист")):
+        h = c.get(adres, auth=ADMIN).text
+        zag = h.split("<title>", 1)[-1].split("</title>", 1)[0]
+        proverka(f"{adres}: вкладка «{imya} — KidsUP»", zag.strip() == f"{imya} — KidsUP", zag)
+    stary = [f for f in os.listdir(os.path.join(ROOT, "app", "templates"))
+             if "KidsUp Analytics" in open(os.path.join(ROOT, "app", "templates", f), encoding="utf-8").read()]
+    proverka("старого имени «KidsUp Analytics» в шаблонах нет", not stary, stary)
+
+    print("Д7. Пульт: в «Ещё» нет методички из архива базы знаний")
+    h = c.get("/pult", auth=ADMIN).text
+    proverka("нет ссылки на /base/skripty_v3", "/base/skripty_v3" not in h)
+
+    print("Д8. Педагог по ключу: ключ идёт по ссылкам карточка ↔ методика")
+    kluch = m.db.get_setting("pedagog_key")
+    h = c.get(f"/english/karta?k={kluch}").text
+    proverka("карточка → методика с ключом", f'href="/english/metodika?k={kluch}#otchet"' in h)
+    h = c.get("/english/karta", auth=ADMIN).text
+    proverka("у админа ссылка без ключа", 'href="/english/metodika#otchet"' in h)
+    h = c.get(f"/english/metodika?k={kluch}").text
+    proverka("методика переносит ?k= в ссылки на карточку", 'a[href^="/english/karta"]' in h and "encodeURIComponent(k)" in h)
+
+
 def _lovushki_na_vse():
     """Страницы меню подгружают модули при первом открытии — ловушки отправки ставим и на них,
     до первого запроса: сеть на стенде закрыта, но и попытки отправить быть не должно."""
@@ -861,6 +1001,13 @@ def main():
     ap.add_argument("--do", default=os.path.join(TUT, "nav_marshruty_do.json"))
     a = ap.parse_args()
     work = a.work or tempfile.mkdtemp(prefix="nav_")
+    # 12.11.2026: стенд пишет в базу выдуманных клиентов и пароль владельца, опубликованный в этом
+    # файле. Ошибочный --work на папку данных сервера заменил бы настоящий пароль и засеял бы
+    # боевую базу — поэтому работаем только в пустой папке внутри временной.
+    tmp = os.path.realpath(tempfile.gettempdir())
+    w = os.path.realpath(work)
+    if not w.startswith(tmp + os.sep) or (os.path.isdir(w) and os.listdir(w)):
+        sys.exit(f"стенд только во временной папке: --work — пустая папка внутри {tmp}, а не {w}")
     os.makedirs(work, exist_ok=True)
     tree = os.path.abspath(a.tree)
     m = lt.zapustit(tree, work)
@@ -887,6 +1034,7 @@ def main():
     test_arhivnye(c, m)
     test_net_ssylok(c, m, tree)
     test_perepiska_send(c, m)
+    test_popravki(c, m)
     test_marshruty_zhestkie(m, a.do)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     proverka("ни одной попытки выйти в сеть, кроме известных опросов Mango с пульта и «Ответов»",
