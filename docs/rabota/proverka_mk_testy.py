@@ -870,6 +870,8 @@ def test_skeptik2():
     with db.get_conn() as conn:
         z = conn.execute("SELECT COUNT(*) FROM proverka_mk_stroki WHERE zakryta IS NULL AND (key LIKE 'r5:%' OR key LIKE 'r11g:%')").fetchone()[0]
     proverka("выключенные: открытых строк в таблице не остаётся", z, 0)
+    proverka("в данных страницы видно, какие разделы выключены, журнал пометок удалённого и ночной шаг",
+             (res["vyklyucheny"], isinstance(res["udaleno_zhurnal"], list), "noch" in res), (["11г", "5"], True, True))
     # пока раздел 5 выключен, пункты о банке и возвратах идут Лизе в пульт, как раньше
     from app import tbank, komtet
     st = (tbank.statement, komtet.cheki)

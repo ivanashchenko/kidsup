@@ -118,6 +118,14 @@ def _j(s):
         return {}
 
 
+def _spisok(s) -> list:
+    try:
+        v = json.loads(s) if isinstance(s, str) and s else []
+    except ValueError:
+        v = []
+    return v if isinstance(v, list) else []
+
+
 def _num(x) -> float:
     try:
         return float(x or 0)
@@ -1647,7 +1655,12 @@ def _itog(D: Dannye, stroki: list[dict], oshibki: dict, seychas: datetime, ne_os
     }
     return {"ts": seychas.isoformat(timespec="minutes"), "itog": itog, "razdely": razdely, "oshibki": oshibki,
             "sredniy_sync": _j(db.get_state("sredniy_sync") or "{}"),
-            "udaleno_pomecheno": {t: len(v) for t, v in D.ud.items()}, "vyklyucheny": sorted(vykl)}
+            "udaleno_pomecheno": {t: len(v) for t, v in D.ud.items()}, "vyklyucheny": sorted(vykl),
+            # для проверки после выкладки одним GET /api/proverka-mk: что решил синк про удалённое
+            # (в т. ч. «пропало больше 10 % — не помечаю») и когда прошёл ночной шаг
+            "udaleno_zhurnal": _spisok(db.get_state("mk_udaleno_zhurnal"))[-12:],
+            "noch": _j(db.get_state("proverka_mk_noch") or "{}"),
+            "raspisanie_provereno": str(_j(db.get_state("proverka_mk_raspisanie") or "{}").get("ts") or "")}
 
 
 # ── кэш, фон, счётчик ─────────────────────────────────────────────────────
