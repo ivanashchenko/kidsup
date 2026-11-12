@@ -232,6 +232,9 @@ NOVYE_VHOD = {"GET /vhod", "POST /vhod", "POST /vyhod", "GET /api/kto",
 # 12.11.2026, личные входы: перечень адресов (/openapi.json, /docs, /redoc) без входа больше
 # не отдаётся — его никто не зовёт, а чужому он показывал все адреса владельца и выкладки.
 UBRANY_VHOD = {"GET /docs", "GET /docs/oauth2-redirect", "GET /openapi.json", "GET /redoc"}
+# 12.11.2026, правило 2 Бориса: страница «Проверка МойКласса» и её API — ровно эти пять.
+NOVYE_PROVERKA_MK = {"GET /proverka-mk", "GET /api/proverka-mk", "POST /api/proverka-mk/perepoverit",
+                     "POST /api/proverka-mk/ne-oshibka", "POST /api/proverka-mk/zametka"}
 # Не из шага 1: разовый просмотр «старых звонков» (решение Бориса 12.11), только чтение.
 NOVYE_ZVONKI_1211 = {"GET /api/hvost/staroe"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
@@ -263,10 +266,10 @@ def test_marshruty(m, fajl_do):
     proverka("пропали ровно пять — те, что звала только убранная страница (и перечень адресов: "
              "/openapi.json, /docs, /redoc)", do - posle == PROPALI | UBRANY_VHOD,
              sorted((do - posle) ^ (PROPALI | UBRANY_VHOD)))
+    vse_novye = NOVYE | NOVYE_ZVONKI_1211 | NOVYE_PROVERKA_MK | NOVYE_VHOD
     proverka("появились ровно три: «Архив» и признак «архив» у документов (и просмотр старых звонков 12.11, "
-             "и адреса личных входов)",
-             posle - do == NOVYE | NOVYE_ZVONKI_1211 | NOVYE_VHOD,
-             sorted((posle - do) ^ (NOVYE | NOVYE_ZVONKI_1211 | NOVYE_VHOD)))
+             "пять адресов страницы «Проверка МойКласса» и адреса личных входов)",
+             posle - do == vse_novye, sorted((posle - do) ^ vse_novye))
     nuzhny = [x.strip() for x in NUZHNY.replace("\n", " · ").split(" · ") if x.strip()]
     net = [x for x in nuzhny if x not in posle]
     proverka(f"{len(nuzhny)} адресов рутин, автопилота и сайта — на месте", not net, net)

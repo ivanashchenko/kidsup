@@ -114,10 +114,33 @@ def run(day: str | None = None, dry: bool = False) -> dict:
         if (s.get("payed") or 0) > 0 and (s.get("sellDate") or ""):
             first_paid[s["userId"]] = min(first_paid.get(s["userId"], "9999"), s["sellDate"])
     inc = [p for p in pays if p["date"] == day and p.get("optype") == "income" and (p.get("summa") or 0) > 1]
-    R: dict = {"day": day, "sostavleno": datetime.now().strftime("%d.%m.%Y %H:%M"), "bloki": {}, "inbox": []}
+    R: dict = {"day": day, "sostavleno": datetime.now().strftime("%d.%m.%Y %H:%M"), "bloki": {}, "inbox": [],
+               "na_stranicu": [], "matkap_net": [], "vozvraty": []}
+    # 12.11.2026, Борис — правило 2: правки МойКласса Лизе (банк ↔ МК, маткапитал,
+    # возвраты, дубль абонемента, «проведено» без детей) пунктами в пульт больше не
+    # идут — их показывает страница «Проверка МойКласса» (разделы 2, 5, 6, 7) по
+    # этому же файлу дня. Касса (чек КОМТЕТ, фото тетради), пункты Лене и Борису —
+    # как раньше. Настройка proverka_mk_vmesto_punktov="0" возвращает всё как было.
+    na_stranicu = db.get_setting("proverka_mk_vmesto_punktov", "1") == "1"
+    BLOKI_NA_STRANICU = {"B. Абонементы", "C. Занятия"}
+    # Проверка 12.11 вечером: раздел 5 страницы (банк, маткапитал, возвраты) на настоящих
+    # файлах контроля оплат не прогонялся и пока выключен (proverka_mk.VYKLYUCHENY_UMOLCH).
+    # Пока он выключен, эти три блока идут Лизе пунктами, как раньше, — иначе о расхождении
+    # с банком не узнал бы никто. Включили раздел 5 настройкой — блоки уходят на страницу.
+    try:
+        from . import proverka_mk
+        if "5" not in proverka_mk.vyklyucheny():
+            BLOKI_NA_STRANICU |= {"A. Банк", "A. Маткапитал", "A. Возвраты"}
+    except Exception:  # noqa: BLE001
+        pass
+    with db.get_conn() as conn:
+        # платёж с id больше этого внесён после контроля — так страница узнаёт «внесли»
+        R["max_pid"] = int(conn.execute("SELECT COALESCE(MAX(id), 0) FROM payments").fetchone()[0])
     def flag(block, text, who=None, ph="", level="warn"):
         R["bloki"].setdefault(block, []).append({"text": text, "who": who, "level": level})
-        if who:
+        if who == "Лиза" and na_stranicu and block in BLOKI_NA_STRANICU:
+            R["na_stranicu"].append(text)
+        elif who:
             R["inbox"].append((who, text, ph))
 
     # ── A. деньги ↔ банк ────────────────────────────────────────────────────
@@ -155,7 +178,9 @@ def run(day: str | None = None, dry: bool = False) -> dict:
         mk_card = sum(p["summa"] for p in term if not p.get("_sbp"))
         diff = round(mk_card - card, 2)
         R["bank"] = {"mk_card": mk_card, "bank_card": card, "diff": diff, "sbp_ops": len(sbp), "free_sbp": free_sbp,
-                     "sbp_as_term": [(man(p), name(p["userId"]), p["summa"]) for p in sbp_as_term]}
+                     # 12.11.2026: четвёртым — id платежа: по нему страница проверки видит,
+                     # что тип исправили (имя и сумма не уникальны)
+                     "sbp_as_term": [(man(p), name(p["userId"]), p["summa"], p["id"]) for p in sbp_as_term]}
         if diff > 100:
             flag("A. Банк", f"Терминал {day[8:]}.{day[5:7]}: в МойКлассе картой записано на {rub(diff)} БОЛЬШЕ, чем пришло в банк "
                  f"(МК {rub(mk_card)}, банк {rub(card)}). Проверить оплаты «карта» за день: какая не прошла по терминалу.", "Лиза", level="bad")
@@ -222,6 +247,7 @@ def run(day: str | None = None, dry: bool = False) -> dict:
                 hit = [p for p in pays if p.get("paymentTypeId") == T_PEREVOD and abs((p.get("summa") or 0) - amt) < 1
                        and p["date"] >= od]
                 if not hit:
+                    R["matkap_net"].append({"summa": amt, "fio": f"{fam} {im}", "data": od})
                     flag("A. Маткапитал", f"Маткапитал {rub(amt)} за {fam} {im} пришёл {od[8:]}.{od[5:7]} на счёт Буракова — "
                          f"в МойКлассе прихода «перевод на счёт» на эту сумму нет. Внести на баланс и создать абонемент со списанием.", "Лиза", level="bad")
         except Exception as e:  # noqa: BLE001
@@ -242,9 +268,11 @@ def run(day: str | None = None, dry: bool = False) -> dict:
             act = [s for s in subs_by.get(p["userId"], []) if s.get("statusId") == 2 and (s.get("payed") or 0) > 0
                    and (s.get("visitedCount") or 0) < (s.get("visitCount") or 0)]
             if abs(u.get("balans") or 0) > 1 or act:
+                R["vozvraty"].append({"pid": p["id"], "uid": p["userId"], "vid": "ostatok"})
                 flag("A. Возвраты", f"{name(p['userId'])}: возврат {rub(-p['summa'])} ({man(p)}), но баланс {rub(u.get('balans') or 0)}"
                      f"{' и активный оплаченный абонемент не закрыт' if act else ''} — остаток → на баланс, возврат с баланса, абонемент закрыть.", "Лиза", phone(p["userId"]))
             if p.get("paymentTypeId") != T_VOZVRAT:
+                R["vozvraty"].append({"pid": p["id"], "uid": p["userId"], "vid": "tip"})
                 flag("A. Возвраты", f"{name(p['userId'])}: возврат записан типом «{TYPES.get(p.get('paymentTypeId'), p.get('paymentTypeId'))}» — должен быть «возврат» (правило 2).", "Лиза", phone(p["userId"]))
 
     # ── B. абонементы, проданные за день ─────────────────────────────────────

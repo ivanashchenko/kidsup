@@ -636,9 +636,17 @@ def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> di
                     # 14.10, ревью: неоплаченный счёт уводит баланс в минус без всякого
                     # платежа (баланс −12 040 при недоплате 12 040) — без поправки
                     # 7 из 9 «минусовых» клиентов были ложной тревогой.
+                    # 12.11.2026: счёт, удалённый в МойКлассе, в нашей базе остаётся с
+                    # пометкой (db.pometit_udalennye, полный синк) — в долг его не считаем,
+                    # он баланс в МойКлассе уже не двигает.
+                    try:
+                        conn.execute("SELECT 1 FROM mk_udaleno LIMIT 1")
+                        bez_udalennyh = " WHERE id NOT IN (SELECT rid FROM mk_udaleno WHERE tbl='invoices')"
+                    except sqlite3.OperationalError:
+                        bez_udalennyh = ""
                     dolg = {r["user_id"]: _num(r["d"]) for r in conn.execute(
                         "SELECT user_id, SUM(CASE WHEN price > payed THEN price - payed ELSE 0 END) d "
-                        "FROM invoices GROUP BY user_id")}
+                        "FROM invoices" + bez_udalennyh + " GROUP BY user_id")}
                     balansy = {uid: _num(u.get("balance")) for uid, u in users.items()
                                if (u.get("created_at") or "") >= okno_ot and uid in summy}
                     rash = tozhdestvo_balansa(balansy, summy, dolg=dolg)
@@ -728,6 +736,10 @@ def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> di
         except Exception:  # noqa: BLE001
             otkryto = ""
         n_b = n_l = 0
+        # 12.11.2026, Борис — правило 2: жёлтые правки Лизе пунктами больше не идут,
+        # их показывает страница «Проверка МойКласса» (раздел 10) по файлу этого дня.
+        # Настройка proverka_mk_vmesto_punktov="0" возвращает пункты как раньше.
+        lize_punktami = db.get_setting("proverka_mk_vmesto_punktov", "1") != "1"
         # 14.10, ревью: пункты без телефона — с телефоном наряд и возврат считали
         # семью «занятой» и не давали по ней звонков, пока пункт открыт.
         for x in sorted(R["nakhodki"], key=lambda z: {"red": 0, "yellow": 1, "info": 2}[z["level"]]):
@@ -736,7 +748,7 @@ def _run(day: str | None = None, dry: bool = False, days: int = OKNO_DNEY) -> di
             if x["level"] == "red" and n_b < 6:
                 if autopilot.inbox_add("Сверка честности: " + x["text"], "", "Борис", source=f"сверка честности {day[8:]}.{day[5:7]}"):
                     n_b += 1
-            elif x["level"] == "yellow" and n_l < 6 and x["kind"].startswith(("правка", "баланс")):
+            elif x["level"] == "yellow" and lize_punktami and n_l < 6 and x["kind"].startswith(("правка", "баланс")):
                 if autopilot.inbox_add("Проверить и объяснить в карточке: " + x["text"], "", "Лиза", source=f"сверка честности {day[8:]}.{day[5:7]}"):
                     n_l += 1
         autopilot.inbox_add(R["summary"], "", "Борис", source="сверка честности")

@@ -2941,7 +2941,10 @@ def obeshchaniya_perehod(request: Request, day: str = "", who: str = ""):
 def api_pult_tasks(day: str = ""):
     from . import pult
     d = day or pult.today()
-    return {"day": d, "duty": pult.duty(d), "tasks": pult.tasks(d), "kpi": pult.kpi(d)}
+    # 12.11.2026, правило 2: число строк страницы «Проверка МойКласса» — то же, что
+    # в строке колонки Лизы (ostalos = 0 — строки в колонке нет)
+    return {"day": d, "duty": pult.duty(d), "tasks": pult.tasks(d), "kpi": pult.kpi(d),
+            "proverka_mk": pult.proverka_mk_chislo()}
 
 
 @app.get("/api/hvost", dependencies=AUTH)
@@ -4552,6 +4555,61 @@ def sverka_perehod():
     return RedirectResponse("/boris/docs/sverka-oplat" if est else "/boris/docs", status_code=303)
 
 
+# 12.11.2026, Борис — правило 2: правки Лизы в МойКлассе — не пункты пульта, а одна
+# страница, которая сама собирается из данных МойКласса (app/proverka_mk.py). Вход —
+# обычный админский, как у пульта. Страница и её API только читают МойКласс; кнопка
+# «Перепроверить сейчас» перечитывает его (средний синк) и ничего не отмечает.
+@app.get("/proverka-mk", response_class=HTMLResponse, dependencies=AUTH)
+def proverka_mk_page(request: Request):
+    from . import proverka_mk
+    d = proverka_mk.dannye()
+    return render(request, "proverka_mk.html", active="proverka-mk", d=d,
+                  stroka_borisa=proverka_mk.stroka_dlya_borisa())
+
+
+@app.get("/api/proverka-mk", dependencies=AUTH)
+def api_proverka_mk(kratko: int = 0):
+    """Строки страницы по разделам, итог и сводка Бориса. kratko=1 — только «идёт ли
+    перепроверка» и время последней сборки (для кнопки)."""
+    from . import proverka_mk
+    return proverka_mk.kratko() if kratko else proverka_mk.dannye()
+
+
+@app.post("/api/proverka-mk/perepoverit", dependencies=AUTH)
+def api_proverka_mk_perepoverit():
+    """«Перепроверить сейчас»: перечитать МойКласс (занятия окна и абонементы сезона)
+    и пересобрать страницу. Ничего не отмечает и в МойКласс не пишет."""
+    from . import proverka_mk
+    return {"ok": True, "zapushcheno": proverka_mk.perepoverit_fon()}
+
+
+@app.post("/api/proverka-mk/ne-oshibka", dependencies=AUTH)
+def api_proverka_mk_ne_oshibka(request: Request, payload: dict = Body(...)):
+    """{"key": "…", "prichina": "…"} — «не ошибка» только с причиной и только в разделах,
+    где правило — догадка (2а, 3, 8в, 9, 11в). Строка скрывается на 30 дней или до
+    изменения данных; каждое «не ошибка» видно в сводке Бориса."""
+    from . import proverka_mk
+    # личные входы: вошедшему через форму — его имя, что бы ни стояло в запросе (vhod.podpis);
+    # под общим входом — как раньше
+    kto = (vhod.podpis(request, str(payload.get("kto") or ""))
+           or ("Борис" if _rol(request) == "owner" else "админ"))
+    try:
+        return proverka_mk.ne_oshibka(str(payload.get("key") or ""), str(payload.get("prichina") or ""), kto)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/proverka-mk/zametka", dependencies=AUTH)
+def api_proverka_mk_zametka(payload: dict = Body(...)):
+    """{"key": "…", "text": "…"} — заметка к строке: текст закрытого пункта пульта
+    (почему так, что обещано семье). Видна под строкой, пока строка жива."""
+    from . import proverka_mk
+    try:
+        return proverka_mk.zametka(str(payload.get("key") or ""), str(payload.get("text") or ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/yavka", response_class=HTMLResponse, dependencies=AUTH)
 def yavka_page(request: Request, day: str = "", refresh: int = 0):
     from . import yavka, autopilot
@@ -4936,6 +4994,10 @@ async def health():
 SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
             # явка по отчётам педагогов (app/yavka.py): 0 — только сверка, 1 — ставить отметки, 2 — и проводить занятия
             "yavka_auto", "gruppy_avtory",
+            # страница «Проверка МойКласса» (app/proverka_mk.py): «1» — правки МойКласса Лизе идут на
+            # страницу, «0» — пунктами в пульт, как раньше; и какие разделы страницы выключены
+            # (номера через запятую, по умолчанию «5,11г»; «-» — показывать все)
+            "proverka_mk_vmesto_punktov", "proverka_mk_vyklyucheny",
             "wazzup_dry_run", "digest_phone", "digest_off", "wa_watch_skip", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps", "vk_lead_forms",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",

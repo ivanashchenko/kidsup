@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Проверка МойКласса — KidsUP{% endblock %}
+{% block content %}
+{#- 12.11.2026, Борис — правило 2: правки Лизы в МойКлассе — не пункты пульта, а эта
+    страница. Галочек нет: исправила в МойКлассе — строка пропала при следующей проверке.
+    Страница только читает: в МойКласс она ничего не пишет. -#}
+<style>
+  .pm{--ind:#312783;--sky:#1DA7E0;--grn:#7DB928;--amb:#F59C00;--red:#E30613;
+      --grn-t:#3f6f0f;--amb-t:#8a5a00;--red-t:#b3121c;--sky-t:#0c6a94}
+  .pm{max-width:980px;margin:0 auto}
+  .pm h1{margin:0 0 4px;color:var(--ind);font-size:24px;line-height:1.2}
+  .pm .sub{color:var(--muted);margin:0 0 12px;font-size:14.5px;max-width:70ch}
+  .pm .hero{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;margin:6px 0 14px}
+  .pm .big{background:var(--card);border:1px solid var(--border);border-top:4px solid var(--sky);border-radius:14px;
+           padding:10px 16px;min-width:150px}
+  .pm .big b{display:block;font-size:34px;line-height:1.05;color:var(--ind);font-variant-numeric:tabular-nums}
+  .pm .big span{font-size:13px;color:var(--muted)}
+  .pm .big.zero{border-top-color:var(--grn)} .pm .big.zero b{color:var(--grn-t)}
+  .pm .chips{display:flex;gap:6px;flex-wrap:wrap;align-content:flex-start;flex:1 1 260px}
+  .pm .chip{border-radius:999px;padding:5px 11px;font-size:13px;font-weight:600;background:var(--card);
+            border:1px solid var(--border);color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pm .chip.a{border-color:#f3d9a3;color:var(--amb-t)} .pm .chip.r{border-color:#f2b8bb;color:var(--red-t)}
+  .pm .chip.g{border-color:#cfe6b3;color:var(--grn-t)}
+  .pm .knopki{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 14px}
+  .pm .btn-p{border:0;background:var(--ind);color:#fff;border-radius:10px;padding:10px 14px;font:600 15px/1.2 inherit;cursor:pointer}
+  .pm .btn-p[disabled]{opacity:.55;cursor:default}
+  .pm .stat{font-size:13px;color:var(--muted)}
+  .pm details.svodka{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--ind);
+                     border-radius:12px;padding:10px 14px;margin:0 0 16px}
+  .pm details.svodka summary{cursor:pointer;font-weight:700;color:var(--ind)}
+  .pm .stroka-b{font-size:13.5px;color:var(--text-2);margin:8px 0}
+  .pm table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+  .pm th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;
+         padding:5px 6px;border-bottom:2px solid var(--border)}
+  .pm td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:top}
+  .pm td.n{text-align:right;white-space:nowrap}
+  .pm tr.kr td{color:var(--red-t);font-weight:600}
+  .pm .razdel{margin:18px 0 6px}
+  .pm .razdel h2{font-size:18px;margin:0 0 6px;color:var(--ind);display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .pm .razdel h2 .num{display:inline-block;min-width:26px;height:26px;border-radius:8px;background:var(--ind);color:#fff;
+                      font-size:14px;text-align:center;line-height:26px}
+  .pm .razdel h2 .sch{font-size:14px;font-weight:600;color:var(--muted)}
+  .pm .razdel h2 .sch.r{color:var(--red-t)}
+  .pm .razdel.pusto h2{opacity:.6}
+  .pm .razdel.pusto h2 .num{background:var(--grn)}
+  .pm .st{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--sky);border-radius:12px;
+          padding:9px 12px;margin:7px 0;min-width:0}
+  .pm .st.dengi{border-left-color:var(--amb)}
+  .pm .st.sera{opacity:.7;border-left-color:var(--border-strong)}
+  .pm .st.skryta{opacity:.55;border-left-color:var(--grn)}
+  .pm .st .kto{font-weight:700;overflow-wrap:anywhere}
+  .pm .st .kto .gr{font-weight:500;color:var(--text-2)}
+  .pm .st .kogda{color:var(--muted);font-size:13px;white-space:nowrap}
+  .pm .st .chto{margin:3px 0 0;overflow-wrap:anywhere}
+  .pm .st .delo{margin:4px 0 0;font-weight:600;color:var(--ind);overflow-wrap:anywhere}
+  .pm .st .delo::before{content:"→ ";color:var(--sky)}
+  .pm .st .niz{display:flex;gap:6px 12px;flex-wrap:wrap;align-items:center;margin-top:6px;font-size:12.5px;color:var(--muted)}
+  .pm .st .niz a{font-weight:600}
+  .pm .metka{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 7px;vertical-align:middle;
+             background:var(--bg-deep);color:var(--text-2)}
+  .pm .metka.nov{background:#e6f4fb;color:var(--sky-t)} .pm .metka.sera{background:#fff1d6;color:var(--amb-t)}
+  .pm .metka.pod{background:var(--indigo-soft);color:var(--ind)}
+  .pm .no{border:1px solid var(--border-strong);background:var(--card);color:var(--text-2);border-radius:8px;
+          padding:4px 9px;font:600 12.5px/1.2 inherit;cursor:pointer}
+  .pm .zam{margin:6px 0 0;padding:6px 9px;background:var(--bg-deep);border-radius:8px;font-size:13px;color:var(--text-2)}
+  .pm details.hvost{margin:6px 0}
+  .pm details.hvost > summary{cursor:pointer;color:var(--amb-t);font-weight:700;font-size:14px;padding:4px 0}
+  .pm .oshibka{color:var(--red-t);font-size:13.5px;margin:4px 0}
+  .pm .ok{color:var(--grn-t);font-size:14px;margin:2px 0 4px}
+  .pm .kak{font-size:13.5px;color:var(--text-2);background:var(--card);border:1px dashed var(--border-strong);
+           border-radius:12px;padding:9px 12px;margin:0 0 14px}
+  .pm .kak b{color:var(--ind)}
+  .pm .foot{color:var(--muted);font-size:12px;margin:22px 0 6px}
+  @media (max-width:520px){
+    .pm h1{font-size:21px}
+    .pm .big{flex:1 1 100%}
+    .pm .big b{font-size:30px}
+    .pm .btn-p{flex:1 1 100%}
+    .pm td,.pm th{padding:4px 3px}
+    .pm .st{padding:8px 10px}
+  }
+</style>
+{% macro stroka(r, rz) -%}
+<div class="st {{ 'dengi' if rz.dengi }} {{ 'sera' if r.seraya }} {{ 'skryta' if r.ne_oshibka }}" data-key="{{ r.key }}">
+  <div class="kto">{% if r.rebenok %}{{ r.rebenok }}{% endif %}{% if r.gruppa %}{{ ' · ' if r.rebenok }}<span class="gr">{{ r.gruppa }}</span>{% endif %}
+    {% if r.kogda %}<span class="kogda"> · {{ r.kogda }}</span>{% endif %}</div>
+  <div class="chto">{{ r.chto }}</div>
+  <div class="delo">{{ r.sdelat }}</div>
+  <div class="niz">
+    <span class="metka pod">{{ r.pod }}</span>
+    {% if r.seraya %}<span class="metka sera">{{ r.seraya }}</span>{% endif %}
+    {% if r.vozrast == 0 and (r.pervyi or '') >= d.ts[:10] %}<span class="metka nov">новая</span>{% endif %}
+    {% if r.ssylka %}<a href="{{ r.ssylka }}" target="_blank" rel="noopener">{{ r.ssylka_tekst }} ↗</a>{% endif %}
+    {% if r.obnovitsya %}<span>{{ r.obnovitsya }}</span>{% endif %}
+    {% if r.ne_oshibka %}<span>«не ошибка»: {{ r.ne_oshibka.prichina }}</span>
+    {% elif r.dogadka %}<button class="no" type="button" onclick="neOshibka(this)">не ошибка…</button>{% endif %}
+  </div>
+  {% if r.zametka %}<div class="zam">{{ r.zametka }}</div>{% endif %}
+</div>
+{%- endmacro %}
+{% set it = d.itog %}
+<div class="pm">
+  <h1>Проверка МойКласса</h1>
+  <p class="sub">Здесь всё, что в МойКлассе записано не по факту. Исправь в МойКлассе — строка пропадёт сама при
+    следующей проверке (у каждой строки написано когда). Галочек ставить не нужно.</p>
+
+  <div class="hero">
+    <div class="big {{ 'zero' if not it.ostalos }}"><b>{{ it.ostalos }}</b><span>{{ 'осталось исправить' if it.ostalos else 'всё сходится' }}</span></div>
+    <div class="chips">
+      <span class="chip a">из них про деньги {{ it.pro_dengi }}</span>
+      <span class="chip">новых за сутки {{ it.novyh_za_sutki }}</span>
+      <span class="chip g">исправлено за сутки {{ it.zakryto_za_sutki }}</span>
+      <span class="chip {{ 'r' if it.samoy_staroy > 7 }}">самой старой строке {{ it.samoy_staroy }} дн.</span>
+      {% if it.ne_oshibka_skryto %}<span class="chip">«не ошибка»: скрыто {{ it.ne_oshibka_skryto }}</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="knopki">
+    <button class="btn-p" id="pere" type="button" onclick="perepoverit(this)">Перепроверить сейчас</button>
+    <span class="stat" id="pere-stat">проверено {{ d.ts[8:10] }}.{{ d.ts[5:7] }} в {{ d.ts[11:16] }} · сама обновляется каждые 10 минут</span>
+  </div>
+
+  <div class="kak"><b>Как работать.</b> Иди по разделам сверху вниз: сверху — то, что дороже стоит.
+    В каждой строке: кто, когда, что не так и <b>что сделать в МойКлассе</b> — одной фразой, и ссылка на карточку или группу.
+    Кнопка «не ошибка» есть только там, где проверка гадает (например, «дети просто не пришли») — нажми и напиши причину,
+    строка скроется на 30 дней. Старые строки (больше 14 дней) свёрнуты в «хвост».</div>
+
+  <details class="svodka">
+    <summary>Сводка для Бориса</summary>
+    <div class="stroka-b">{{ stroka_borisa }}</div>
+    <table>
+      <tr><th>Раздел</th><th class="n">висит</th><th class="n">самой старой</th></tr>
+      {% for rz in d.razdely %}
+      <tr class="{{ 'kr' if rz.krasnyi }}"><td>{{ rz.nomer }}. {{ rz.nazvanie }}</td><td class="n">{{ rz.vsego }}</td>
+        <td class="n">{{ (rz.samoy_staroy ~ ' дн.') if rz.vsego else '—' }}</td></tr>
+      {% endfor %}
+    </table>
+    <div class="stroka-b">Красным — раздел про деньги, где самой старой строке больше 7 дней.</div>
+    {% if it.zhdut_resheniya %}
+    <div class="stroka-b"><b>Ждёт решения Бориса:</b>
+      {% for r in it.zhdut_resheniya %}<div>· {{ r.chto }}</div>{% endfor %}</div>
+    {% endif %}
+    <div class="stroka-b"><b>«Не ошибка» за неделю: {{ it.ne_oshibka_za_nedelyu|length }}</b>
+      {% for x in it.ne_oshibka_za_nedelyu %}<div>· {{ x.ts[8:10] }}.{{ x.ts[5:7] }} {{ x.kto or '' }} — {{ x.tekst }} — <i>{{ x.prichina }}</i></div>{% endfor %}</div>
+  </details>
+
+  {% for rz in d.razdely %}
+  {% set svezhie = rz.stroki|rejectattr('hvost')|list %}
+  {% set starye = rz.stroki|selectattr('hvost')|list %}
+  <section class="razdel {{ 'pusto' if not rz.stroki }}" id="r{{ rz.nomer }}">
+    <h2><span class="num">{{ rz.nomer }}</span> {{ rz.nazvanie }}
+      <span class="sch {{ 'r' if rz.krasnyi }}">{{ rz.vsego if rz.stroki else 'всё сходится' }}{% if rz.vsego and rz.samoy_staroy %} · самой старой {{ rz.samoy_staroy }} дн.{% endif %}</span></h2>
+    {% if rz.oshibka %}<div class="oshibka">Раздел сейчас не собрался — прежние строки остаются, пока проверка не заработает. Клод видит это в журнале.</div>{% endif %}
+    {% for r in svezhie %}{{ stroka(r, rz) }}{% endfor %}
+    {% if starye %}
+    <details class="hvost"><summary>хвост: {{ starye|length }} — строки старше 14 дней</summary>
+      {% for r in starye %}{{ stroka(r, rz) }}{% endfor %}
+    </details>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <p class="foot">Страница собирается из копии МойКласса на сервере и ничего в МойКласс не пишет.
+    Последняя сверка с МойКлассом по занятиям и абонементам: {{ (d.sredniy_sync.konec or '—')[11:16] }}.</p>
+</div>
+
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function neOshibka(btn){
+  var st = btn.closest('.st'); var key = st.getAttribute('data-key');
+  var p = prompt('Почему это не ошибка? (например: «дети просто не пришли», «пауза до декабря», «брат и сестра»)', '');
+  if (p === null) return; p = p.trim();
+  if (p.length < 5) { alert('Напишите причину своими словами — хотя бы несколько слов'); return; }
+  btn.disabled = true;
+  fetch('/api/proverka-mk/ne-oshibka', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({key:key, prichina:p})})
+   .then(function(r){ return r.json().then(function(j){ return [r.ok, j]; }); })
+   .then(function(x){ if (!x[0]) { alert(x[1].detail || 'Не сохранилось'); btn.disabled = false; return; } location.reload(); })
+   .catch(function(){ alert('Не сохранилось — проверьте связь и нажмите ещё раз'); btn.disabled = false; });
+}
+function perepoverit(btn){
+  var stat = document.getElementById('pere-stat');
+  btn.disabled = true; stat.textContent = 'перечитываю МойКласс… это около минуты';
+  var bylo = '{{ d.ts }}';
+  fetch('/api/proverka-mk/perepoverit', {method:'POST'}).then(function(){
+    var n = 0;
+    var t = setInterval(function(){
+      n++;
+      fetch('/api/proverka-mk?kratko=1').then(function(r){ return r.json(); }).then(function(k){
+        if (!k.idet && (k.ts !== bylo || n > 3)) { clearInterval(t); location.reload(); }
+        else if (n > 60) { clearInterval(t); stat.textContent = 'МойКласс долго отвечает — обновите страницу через пару минут'; btn.disabled = false; }
+      }).catch(function(){});
+    }, 3000);
+  }).catch(function(){ stat.textContent = 'Не получилось — проверьте связь'; btn.disabled = false; });
+}
+</script>
+{% endblock %}

@@ -155,6 +155,14 @@ CREATE TABLE IF NOT EXISTS lesson_records (
     raw TEXT
 );
 
+CREATE TABLE IF NOT EXISTS mk_udaleno (
+    tbl TEXT,
+    rid INTEGER,
+    ts TEXT,
+    istochnik TEXT,
+    PRIMARY KEY (tbl, rid)
+);
+
 CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(date);
 CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
 CREATE INDEX IF NOT EXISTS idx_lessons_date ON lessons(date);
@@ -279,6 +287,85 @@ def upsert_rows(conn: sqlite3.Connection, table: str, columns: list[str], rows: 
     conn.executemany(sql, rows)
 
 
+# --- «удалено в МойКлассе» ----------------------------------------------
+#
+# 12.11.2026, страница «Проверка МойКласса» (правило 2 Бориса). upsert_rows только
+# добавляет и обновляет: занятие, абонемент, счёт, карточка или запись в группу,
+# удалённые в МойКлассе, живут в локальной базе вечно — 31 абонемент, удалённый
+# с 20.10, до сих пор «активен», а 17 из 27 карточек «ДУБЛЬ» в МойКлассе уже не
+# открываются. Физически такие строки НЕ удаляем: те же таблицы читают зарплата,
+# явка, прибыль и сверка честности (она находит удаления, сравнивая нашу строку с
+# живой выборкой, — стёртую строку она бы уже не увидела). Вместо этого — пометка в
+# отдельной таблице. Её учитывают страница проверки и сверка честности; остальные
+# страницы видят базу ровно как раньше.
+#
+# Пометку ставит только синк, получивший список ЦЕЛИКОМ (все страницы, счётчик API
+# совпал с числом строк), и только если пропала небольшая доля окна (pometit_udalennye).
+# Снимается сама: любой синк, увидевший строку живой, стирает её пометку (_snyat_pometki).
+
+UDALENO_DOLYA = 0.10      # пропало больше 10 % окна — выгрузка подозрительная, ничего не трогаем
+
+_UDALENO_SQL = ("CREATE TABLE IF NOT EXISTS mk_udaleno (tbl TEXT, rid INTEGER, ts TEXT, "
+                "istochnik TEXT, PRIMARY KEY (tbl, rid))")
+
+
+def _snyat_pometki(conn: sqlite3.Connection, tbl: str, ids) -> None:
+    """Строка снова пришла из МойКласса живой — пометка «удалено» с неё снимается."""
+    ids = [int(i) for i in ids if i is not None]
+    if not ids:
+        return
+    conn.execute(_UDALENO_SQL)
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        conn.execute("DELETE FROM mk_udaleno WHERE tbl=? AND rid IN (%s)" % ",".join("?" * len(part)),
+                     (tbl, *part))
+
+
+def udalennye(tbl: str, conn: sqlite3.Connection | None = None) -> set[int]:
+    """id строк таблицы, помеченных «удалено в МойКлассе»."""
+    def _q(c):
+        try:
+            return {int(r[0]) for r in c.execute("SELECT rid FROM mk_udaleno WHERE tbl=?", (tbl,))}
+        except sqlite3.OperationalError:          # таблицы ещё нет (старая база)
+            return set()
+    if conn is not None:
+        return _q(conn)
+    with get_conn() as c:
+        return _q(c)
+
+
+def pometit_udalennye(tbl: str, lokalnye, svezhie, istochnik: str,
+                      dolya: float = UDALENO_DOLYA) -> dict:
+    """Пометить «удалено в МойКлассе» строки окна, которых нет в свежем полном списке.
+
+    lokalnye — id нашей базы в том же окне, что и выгрузка; svezhie — id из выгрузки.
+    Вызывать ТОЛЬКО с полным списком (sync._polnyi_spisok вернул polnyi=True).
+    Пропало больше доли dolya строк окна — ничего не помечаем: так выглядит не работа
+    админа, а сбой выгрузки (обрезанный ответ, сменившийся фильтр API)."""
+    lok = {int(i) for i in lokalnye if i is not None}
+    sv = {int(i) for i in svezhie if i is not None}
+    propalo = sorted(lok - sv)
+    itog = {"tbl": tbl, "okno": len(lok), "svezhih": len(sv), "propalo": len(propalo),
+            "pomecheno": 0, "ok": True, "prichina": ""}
+    if not propalo:
+        return itog
+    if len(propalo) > dolya * len(lok):
+        import logging
+        logging.getLogger("kidsup.db").warning(
+            "пометка удалённых %s пропущена (%s): пропало %s из %s строк окна — больше %d %%",
+            tbl, istochnik, len(propalo), len(lok), round(dolya * 100))
+        itog.update(ok=False, prichina=f"пропало {len(propalo)} из {len(lok)} — больше {round(dolya * 100)} %")
+        return itog
+    from datetime import datetime as _dt
+    ts = _dt.now().isoformat(timespec="seconds")
+    with _lock, get_conn() as conn:
+        conn.execute(_UDALENO_SQL)
+        cur = conn.executemany("INSERT OR IGNORE INTO mk_udaleno (tbl, rid, ts, istochnik) VALUES (?,?,?,?)",
+                               [(tbl, i, ts, istochnik) for i in propalo])
+        itog["pomecheno"] = cur.rowcount if cur.rowcount is not None and cur.rowcount >= 0 else len(propalo)
+    return itog
+
+
 def save_users(items: list[dict]):
     rows = [
         (
@@ -292,6 +379,7 @@ def save_users(items: list[dict]):
         upsert_rows(conn, "users",
                     ["id", "name", "email", "phone", "balance", "client_state_id",
                      "created_at", "updated_at", "raw"], rows)
+        _snyat_pometki(conn, "users", [r[0] for r in rows])
 
 
 def save_joins(items: list[dict]):
@@ -305,6 +393,7 @@ def save_joins(items: list[dict]):
     with _lock, get_conn() as conn:
         upsert_rows(conn, "joins",
                     ["id", "user_id", "class_id", "status_id", "created_at", "raw"], rows)
+        _snyat_pometki(conn, "joins", [r[0] for r in rows])
 
 
 def save_payments(items: list[dict]):
@@ -357,6 +446,7 @@ def save_invoices(items: list[dict]):
     with _lock, get_conn() as conn:
         upsert_rows(conn, "invoices",
                     ["id", "user_id", "price", "payed", "created_at", "raw"], rows)
+        _snyat_pometki(conn, "invoices", [r[0] for r in rows])
 
 
 def save_simple(table: str, items: list[dict]):
@@ -404,6 +494,7 @@ def save_user_subscriptions(items: list[dict]):
         upsert_rows(conn, "user_subscriptions",
                     ["id", "user_id", "subscription_id", "status_id", "begin_date",
                      "end_date", "visits_total", "visits_used", "raw"], rows)
+        _snyat_pometki(conn, "user_subscriptions", [r[0] for r in rows])
 
 
 def save_lessons(items: list[dict]):
@@ -431,6 +522,7 @@ def save_lessons(items: list[dict]):
         upsert_rows(conn, "lessons",
                     ["id", "date", "begin_time", "end_time", "class_id", "filial_id",
                      "status", "topic", "raw"], lesson_rows)
+        _snyat_pometki(conn, "lessons", [r[0] for r in lesson_rows])
         upsert_rows(conn, "lesson_records",
                     ["id", "lesson_id", "user_id", "visit", "raw"], record_rows)
         for l in polnye:

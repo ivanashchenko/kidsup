@@ -3593,7 +3593,8 @@ def card_quality() -> None:
         admins = _admins_today() or _admins()
         if not admins:
             return
-        who = admins[_today().toordinal() % len(admins)]["managerId"]
+        dezhurnyi = admins[_today().toordinal() % len(admins)]
+        who = dezhurnyi["managerId"]
         parts = []
         if bad_bd:
             parts.append(f"без даты рождения {len(bad_bd)}")
@@ -3613,6 +3614,14 @@ def card_quality() -> None:
             body += "."
         # Пункт плана дня (crm_tasks_off=1) длинный текст держит; задача МойКласса — нет.
         predel = 2000 if db.get_setting("crm_tasks_off", "0") == "1" else 250
+        # 12.11.2026, Борис — правило 2: качество карточек пунктом не ставим — его
+        # показывает страница «Проверка МойКласса» (раздел 11д), и только по карточкам
+        # после разговора. proverka_mk_vmesto_punktov="0" возвращает пункт.
+        # Проверка 12.11 вечером: пункт идёт дежурному админу по очереди, а страница — только
+        # у Лизы. Глушим пункт, только когда он достался Лизе; остальным — как раньше.
+        if db.get_setting("proverka_mk_vmesto_punktov", "1") == "1" and _eto_liza(dezhurnyi):
+            log.info("card_quality: %s — пункт не ставим, раздел 11д страницы /proverka-mk", ", ".join(parts))
+            return
         _task(mk, who, None, obrezat(body, predel))
         log.info("card_quality: %s", ", ".join(parts))
     finally:
@@ -5358,6 +5367,27 @@ def _loop() -> None:
                     _sync.start_sync()
                 except Exception:
                     log.exception("полный автосинк не запустился")
+            # 12.11.2026, Борис — правило 2: страница «Проверка МойКласса» (/proverka-mk).
+            # Средний синк раз в 30 минут (занятия с 1-го числа прошлого месяца по +14
+            # дней и абонементы сезона, 5–6 запросов, только чтение МойКласса) и сразу
+            # пересчёт страницы; пересчёт ещё и раз в 10 минут — по свежему лёгкому
+            # синку; ночью — сверка явки за окно и расписание групп до 31.05.
+            _sred = 8 <= now.hour < 21 and _mark("sredniy_sync", f"{_today()}:{now.hour}:{now.minute // 30}")
+            _pere = 8 <= now.hour < 21 and _mark("proverka_mk", f"{_today()}:{now.hour}:{now.minute // 10}")
+            if _sred:
+                threading.Thread(target=_proverka_mk_sredniy, daemon=True, name="sredniy-sync").start()
+            elif _pere:
+                try:
+                    from . import proverka_mk
+                    threading.Thread(target=proverka_mk.peresschet, daemon=True, name="proverka-mk").start()
+                except Exception:
+                    log.exception("пересчёт страницы проверки МК не запустился")
+            if _proverka_mk_noch_pora(now):
+                try:
+                    from . import proverka_mk
+                    threading.Thread(target=proverka_mk.noch, daemon=True, name="proverka-mk-noch").start()
+                except Exception:
+                    log.exception("ночной шаг страницы проверки МК не запустился")
             # раз в 5 минут смотрим, не одобрила ли Meta шаблон: как только
             # одобрит, рассылка возобновится сама, без участия человека
             if now.minute % 5 == 0:
@@ -5522,6 +5552,40 @@ def _loop() -> None:
         except Exception:
             log.exception("autopilot: ошибка цикла")
         time.sleep(60)
+
+
+def _eto_liza(admin: dict) -> bool:
+    """Админ из call_admins — Лиза (у неё страница «Проверка МойКласса»)."""
+    return "лиз" in str((admin or {}).get("name") or "").lower()
+
+
+def _proverka_mk_noch_pora(now) -> bool:
+    """Ночной шаг страницы проверки МК: в 22 часа, а если он не проходил больше 26 часов
+    (выкладка после 23:00, сервер лежал) — догон в ближайшую минуту, не чаще раза в 3 часа."""
+    try:
+        from . import proverka_mk
+        if not proverka_mk.noch_nuzhen(now):
+            return False
+    except Exception:
+        log.exception("ночной шаг страницы проверки МК: не понять, пора ли")
+        return False
+    return _mark("proverka_mk_noch", str(_today()) if now.hour == 22 else f"{_today()}:dogon:{now.hour // 3}")
+
+
+def _proverka_mk_sredniy() -> None:
+    """Средний синк и пересчёт страницы «Проверка МойКласса» — в своём потоке."""
+    try:
+        from . import sync as _sync
+        r = _sync.sredniy_sync()
+        if not r.get("ok"):
+            log.info("средний синк: %s", r.get("prichina") or r.get("tablicy"))
+    except Exception:
+        log.exception("средний синк упал — страницу пересчитываем по тому, что есть")
+    try:
+        from . import proverka_mk
+        proverka_mk.peresschet()
+    except Exception:
+        log.exception("пересчёт страницы проверки МК упал")
 
 
 def start() -> None:

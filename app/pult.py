@@ -691,6 +691,34 @@ def _inbox_tries(conn) -> None:
 BORIS_SRAZU = 10
 
 
+def proverka_mk_chislo() -> dict:
+    """Сколько строк на странице «Проверка МойКласса» (правило 2 Бориса, 12.11.2026).
+
+    Число берётся из кэша страницы (app/proverka_mk.py пересобирает её раз в 10 минут);
+    пульт не должен падать из-за страницы — при любой ошибке строки просто нет."""
+    try:
+        from . import proverka_mk
+        return proverka_mk.schetchik()
+    except Exception:  # noqa: BLE001
+        log.exception("пульт: счётчик страницы «Проверка МойКласса» не прочитался")
+        return {"ostalos": 0, "novyh_za_sutki": 0, "ssylka": "/proverka-mk", "oshibka": True}
+
+
+def _proverka_mk_stroka() -> str:
+    """Одна строка сверху колонки Лизы вместо отдельных пунктов про правки МойКласса.
+    Это не пункт: галочки нет, при N = 0 строки нет."""
+    c = proverka_mk_chislo()
+    n = int(c.get("ostalos") or 0)
+    if n <= 0:
+        return ""
+    k = int(c.get("novyh_za_sutki") or 0)
+    return (f"<li style='margin:2px 0 10px;background:#e6f4fb;border-left:4px solid #1DA7E0;border-radius:8px;"
+            f"padding:7px 10px'><a href='/proverka-mk' style='font-weight:800;color:#312783;text-decoration:none'>"
+            f"Проверка МойКласса: осталось {n} (новых за сутки {k}) →</a>"
+            f"<div style='font-size:12px;color:#6c6a86'>что в МойКлассе записано не по факту — исправила, "
+            f"строка уходит сама</div></li>")
+
+
 def _boris_desyat(lis: list) -> str:
     """Колонка владельца: десять открытых решений сверху, остальные под «Позже».
 
@@ -950,6 +978,9 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
     if done_html:
         body += f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#4e8a12;font-size:13px'>сделано {done_n} ✓</summary><ol style='list-style:none;padding:0;margin:0'>{done_html}</ol></details>"
     body = body or "<li style='color:#6c6a86'>задач пока нет — Клод положит к началу смены</li>"
+    if who == "Лиза":
+        # 12.11.2026, Борис — правило 2: правки МойКласса — одной строкой со ссылкой
+        body = _proverka_mk_stroka() + body
     nb = "" if onduty else " <span style='font-size:11px;color:#6c6a86;font-weight:500'>не в смене</span>"
     if svoya:
         # 12.11.2026, личные входы: колонка вошедшего — первой, с пометкой
