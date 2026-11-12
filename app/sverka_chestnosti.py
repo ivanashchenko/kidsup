@@ -851,7 +851,7 @@ def html(day: str | None = None) -> str:
     css = ("body{font:15px/1.5 Inter,sans-serif;max-width:1000px;margin:0 auto;padding:20px 16px;color:#221F3B}"
            "h1,h2{color:#312783}li{margin:6px 0}li.red{color:#B3261E;font-weight:600}li.yellow{color:#7a4b00}"
            ".ok{color:#3f7d12}.lead{color:#6A6F87}small{color:#6A6F87;font-weight:400}table{border-collapse:collapse}td,th{padding:4px 10px;border-bottom:1px solid #ddd}")
-    return f"<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Сверка честности</title><style>{css}</style></head><body>{''.join(body)}</body></html>"
+    return f"<!doctype html><html lang=ru><head><meta charset=utf-8><script src='/static/vhod.js'></script><meta name=viewport content='width=device-width,initial-scale=1'><title>Сверка честности</title><style>{css}</style></head><body>{''.join(body)}</body></html>"
 
 
 # ── самопроверка ───────────────────────────────────────────────────────────

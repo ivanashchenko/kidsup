@@ -19,7 +19,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import config, db, leads, nav, sync
+from . import config, db, leads, nav, sync, vhod
 from . import content as content_mod
 from . import descriptions as descr_mod
 
@@ -27,6 +27,9 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
 db.init_db()
+# 12.11.2026, личные входы: ключ автоматики сервера (только в памяти этого процесса),
+# файл входов data/vhody.db, журнал действий. Сбой здесь старым входам не мешает.
+vhod.zapusk()
 
 app = FastAPI(title="KidsUp Analytics")
 
@@ -105,6 +108,26 @@ async def _public_hosts(request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def _vhod_sloy(request, call_next):
+    """12.11.2026, личные входы. После ответа обработчика — только если вход определён
+    (request.state.kto ставит проверка входа): изменяющий запрос — строка в журнал «кто что
+    сделал»; продление метки входа; HTML на служебном хосте — не кешировать и не встраивать
+    в чужие сайты; «последний запрос» и хвост общего входа — раз в минуту. Сбой здесь ответ
+    не ломает. Регистрируется после _public_hosts и до GZip: публичный сайт сюда не доходит
+    с меткой, а заголовки ставятся до сжатия."""
+    request.state.kto = None
+    resp = await call_next(request)
+    if getattr(request.state, "kto", None):
+        try:
+            vhod.sloy_zagolovki(request, resp)
+            from starlette.concurrency import run_in_threadpool
+            await run_in_threadpool(vhod.sloy_zapis, request, resp.status_code)
+        except Exception:  # noqa: BLE001
+            logging.getLogger("kidsup.vhod").exception("слой входа после ответа")
+    return resp
+
+
 _HVOST_SSYLKI = ".,;:!?)»”\"'"
 _HVOST_SSYLKI_KOD = ("%2E", "%2C", "%3B", "%3A", "%21", "%3F", "%29", "%C2%BB", "%E2%80%9D", "%22", "%27")
 
@@ -139,18 +162,36 @@ def _bez_hvosta_ssylki(path: str, query: str = "") -> str:
 from starlette.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-_security = HTTPBasic(auto_error=False)
+class _MyagkiyBasic(HTTPBasic):
+    """Окно браузера (HTTP Basic), которое не бросает 401 на кривой заголовок, а возвращает
+    None: дальше проверка входа посмотрит метку входа. 12.11.2026: браузер Лены, вошедшей
+    через форму, может слать и старый пароль из серого окна, и мусор с русскими буквами —
+    Лена должна остаться Леной, а не получить окно пароля или ошибку 500."""
+
+    async def __call__(self, request: Request) -> HTTPBasicCredentials | None:  # type: ignore[override]
+        import base64
+        import binascii
+        avt = request.headers.get("Authorization") or ""
+        shema, _, param = avt.partition(" ")
+        if shema.lower() != "basic":
+            return None
+        try:
+            data = base64.b64decode(param.strip()).decode("utf-8")
+        except (ValueError, UnicodeDecodeError, binascii.Error):
+            return None
+        login, razdel, parol = data.partition(":")
+        if not razdel:
+            return None
+        return HTTPBasicCredentials(username=login, password=parol)
 
 
-def _eto_boris(credentials: HTTPBasicCredentials | None, owner_pw: str) -> bool:
-    return bool(owner_pw and credentials is not None
-                and secrets.compare_digest(credentials.username, "boris")
-                and secrets.compare_digest(credentials.password, owner_pw))
+_security = _MyagkiyBasic(auto_error=False)
 
 
-def _is_owner(credentials: HTTPBasicCredentials | None) -> bool:
-    """Логин boris с паролем владельца (настройка owner_password)."""
-    return _eto_boris(credentials, db.get_setting("owner_password"))
+@app.exception_handler(vhod.NuzhenVhod)
+async def _na_formu_vhoda(request: Request, exc: vhod.NuzhenVhod):
+    """Человек открыл страницу без входа в браузере, где форма включена, — на форму входа."""
+    return RedirectResponse(exc.kuda, status_code=303)
 
 
 def _zapomnit(request: Request | None, rol: str) -> None:
@@ -175,22 +216,27 @@ def check_auth(credentials: HTTPBasicCredentials | None = Depends(_security),
     страницам admin». Владелец проходит везде, где проходит admin, — одним
     входом, без второго окна пароля между /owner и админскими страницами.
 
-    12.11.2026: здесь же определяется роль для меню — "owner" (логин boris с паролем
-    владельца) или "admin". Пока пароль владельца не задан, владельцем считается любой
-    вошедший — так же, как это делает check_owner. request стоит последним и с
-    умолчанием: функцию зовут и напрямую, check_auth(credentials)."""
-    owner_pw = db.get_setting("owner_password")
-    owner = _eto_boris(credentials, owner_pw)
-    if config.APP_PASSWORD:
-        ok = owner or (
-            credentials is not None
-            and secrets.compare_digest(credentials.username, config.APP_USER)
-            and secrets.compare_digest(credentials.password, config.APP_PASSWORD)
-        )
-        if not ok:
+    12.11.2026: здесь же определяется роль для меню — "owner" или "admin". request стоит
+    последним и с умолчанием: функцию зовут и напрямую, check_auth(credentials).
+
+    12.11.2026, личные входы: кто пришёл, решает vhod.kto() — служебный ключ, ключ
+    автоматики, метка входа через форму, а в переходные дни и старые входы (общий admin,
+    прежний пароль boris), которые сравниваются так же, как раньше. Входа нет —
+    vhod.otkaz(): форма входа, 401 с X-Vhod или прежнее окно пароля. Вошедший остаётся в
+    request.state.kto (подпись действий, журнал). Автоматике сервера — только AVTO_PUTI.
+    Без request (прямой вызов по-старому) — только то, что видно из окна, как раньше."""
+    if request is None:
+        if vhod.kto_po_staromu(credentials) is None:
             raise HTTPException(status_code=401, detail="Требуется авторизация",
                                 headers={"WWW-Authenticate": "Basic"})
-    _zapomnit(request, "owner" if (owner or not owner_pw) else "admin")
+        return
+    k = vhod.kto(request, credentials)
+    if not k:
+        vhod.otkaz(request)
+    request.state.kto = k
+    if k["rol"] == "avto" and not vhod.avto_mozhno(request):
+        raise HTTPException(status_code=403, detail="Автоматике сервера этот адрес закрыт")
+    _zapomnit(request, vhod.rol_menyu(k))
 
 
 AUTH = [Depends(check_auth)]
@@ -198,19 +244,32 @@ AUTH = [Depends(check_auth)]
 
 def check_owner(credentials: HTTPBasicCredentials | None = Depends(_security),
                 request: Request = None):
-    """Доступ владельца: пользователь «boris» и пароль из настройки owner_password.
+    """Доступ владельца.
 
     09.09.2026 Борис: «app.kidsup.ru/settings — а админы это не увидят?» Общий пароль
     admin знают все админы, поэтому настройки с ключами банка, кассы и МойКласса,
-    браузер МойКласса и деплой закрыты отдельным паролем. Пока owner_password не
-    задан — работает обычная авторизация (чтобы можно было задать его в первый раз).
-    """
-    if not db.get_setting("owner_password"):
-        return check_auth(credentials, request)
-    if not _is_owner(credentials):
-        raise HTTPException(status_code=401, detail="Только для владельца",
-                            headers={"WWW-Authenticate": "Basic"})
-    _zapomnit(request, "owner")
+    браузер МойКласса и деплой закрыты отдельным паролем.
+
+    12.11.2026, личные входы: вход — как в check_auth, затем vhod.mozhno_vladelcu().
+    Нельзя — 403 «Только для владельца». Исключение: общий admin в сером окне получает 401
+    с окном пароля, как раньше, — так владелец привычно переключается на boris.
+    Пока пароль владельца не задан и входы не заводились, общий admin — владелец (как раньше)."""
+    if request is None:
+        k = vhod.kto_po_staromu(credentials)
+        if k is None or not vhod.mozhno_vladelcu(k):
+            raise HTTPException(status_code=401, detail="Только для владельца",
+                                headers={"WWW-Authenticate": "Basic"})
+        return
+    k = vhod.kto(request, credentials)
+    if not k:
+        vhod.otkaz(request)
+    request.state.kto = k
+    if not vhod.mozhno_vladelcu(k, request.method, request.url.path):
+        if k["sposob"] == "staryy" and k["login"] == "admin":
+            raise HTTPException(status_code=401, detail="Только для владельца",
+                                headers={"WWW-Authenticate": "Basic"})
+        raise HTTPException(status_code=403, detail="Только для владельца")
+    _zapomnit(request, vhod.rol_menyu(k))
 
 
 OWNER_AUTH = [Depends(check_owner)]
@@ -278,6 +337,8 @@ def render(request: Request, template: str, **ctx) -> HTMLResponse:
         # страницу не попадает вовсе, педагогу по ключу меню не рисуется.
         "rol": rol,
         "menu": nav.menu(rol),
+        # 12.11.2026, личные входы: кто вошёл — для имени в шапке
+        "kto": vhod.iz(request),
     })
     return templates.TemplateResponse(request, template, ctx)
 
@@ -292,6 +353,8 @@ PUBLIC_HOSTS = {
     "kidsupday.ru": "day", "www.kidsupday.ru": "day",
     "kidsupweek.ru": "week", "www.kidsupweek.ru": "week",
 }
+# На публичных доменах формы входа нет: /vhod там 404, без входа — как раньше.
+vhod.PUBLICHNYE.update(PUBLIC_HOSTS)
 
 
 @app.get("/price.yml")
@@ -377,6 +440,97 @@ def root(request: Request,
     # посетитель kidsup.ru сюда не доходит, а без пароля адрес по-прежнему отвечает 401.
     # 303, а не 301: постоянный переход браузер запомнил бы навсегда.
     return RedirectResponse(_domoy(request), status_code=303)
+
+
+# --- личные входы (12.11.2026, app/vhod.py) ------------------------------------------
+# Страница входа открыта всем (на публичных доменах — 404). Пароль проверяется в
+# vhod.voyti(): попытка пишется до проверки, ответ на незнакомый логин и неверный пароль
+# одинаков. Изменяющие запросы — только со своей страницы (vhod.svoy_zapros).
+
+_VHOD_HEADERS = {"Cache-Control": "no-store", "X-Frame-Options": "DENY", "X-Robots-Tag": "noindex, nofollow"}
+
+
+def _vhod_otvet(html_text: str, kod: int = 200) -> HTMLResponse:
+    return HTMLResponse(html_text, status_code=kod, headers=_VHOD_HEADERS)
+
+
+@app.get("/vhod", response_class=HTMLResponse)
+def vhod_page(request: Request, next: str = ""):
+    """Вход: логин (можно по-русски: «Лена»), пароль, «Запомнить на этом устройстве» — её нет
+    на общем компьютере. Уже вошедшему — «Вы вошли как Лена · Продолжить · Выйти / сменить»."""
+    if vhod.publichnyy(request):
+        raise HTTPException(status_code=404, detail="Not Found")
+    nxt = vhod.bezopasnyy_next(next) if next else ""
+    k = vhod.voshedshiy_po_metke(request)
+    if k:
+        request.state.rol = vhod.rol_menyu(k)
+        return _vhod_otvet(vhod.stranica(next_=nxt, kto_voshel=k, prodolzhit=nxt or _domoy(request)))
+    return _vhod_otvet(vhod.stranica(next_=nxt, galochka=not vhod.ustroystvo_obshchee(request)))
+
+
+@app.post("/vhod", response_class=HTMLResponse)
+def vhod_post(request: Request, login: str = Form(""), parol: str = Form(""),
+              zapomnit: str = Form(""), next: str = Form("")):
+    if vhod.publichnyy(request):
+        raise HTTPException(status_code=404, detail="Not Found")
+    nxt = vhod.bezopasnyy_next(next) if next else ""
+    galochka = not vhod.ustroystvo_obshchee(request)
+    if not vhod.svoy_zapros(request):
+        return _vhod_otvet(vhod.stranica(next_=nxt, galochka=galochka,
+                                         oshibka="Вход открывается только со страницы app.kidsup.ru."), 403)
+    try:
+        r = vhod.voyti(request, login, parol)
+        if r.get("login"):
+            z = r["zapis"]
+            nomer, srok = vhod.seans_otkryt(r["login"], bool(zapomnit), request)
+    except Exception:  # noqa: BLE001 — сбой файла входов: понятная страница, а не ошибка 500
+        logging.getLogger("kidsup.vhod").exception("вход через форму не сработал")
+        r = {"zanyat": True}
+    if r.get("zanyat"):
+        return _vhod_otvet(vhod.stranica(next_=nxt, login=login, galochka=galochka,
+                                         oshibka="Сервер занят. Попробуйте ещё раз через минуту "
+                                                 "или позвоните Борису."), 503)
+    if not r.get("login"):
+        if (r.get("pauza") or 0) > 0:
+            return _vhod_otvet(vhod.stranica(next_=nxt, login=login, galochka=galochka,
+                                             oshibka=vhod.tekst_pauzy(r["pauza"])), 429)
+        return _vhod_otvet(vhod.stranica(next_=nxt, login=login, galochka=galochka,
+                                         oshibka=vhod.TEKST_NE_PODOSHLI, podskazka=True), 401)
+    # вошедший — для журнала (слой _vhod_sloy запишет «вход через форму») и стартовой страницы
+    request.state.kto = {"login": z["login"], "imya": z["imya"], "rol": z["rol"], "sposob": "forma",
+                         "seans": vhod._sha(nomer)}
+    request.state.chto = "вход через форму"
+    _zapomnit(request, vhod.rol_menyu(request.state.kto))
+    resp = RedirectResponse(nxt or _domoy(request), status_code=303)
+    vhod.postavit_metki(resp, request, nomer, srok)
+    return resp
+
+
+@app.post("/vyhod")
+def vyhod_post(request: Request, next: str = Form("")):
+    """«Выйти / сменить»: сеанс стирается на сервере, метка — в браузере. Метка устройства
+    остаётся: этот браузер и дальше получает форму входа, а не серое окно."""
+    if vhod.publichnyy(request):
+        raise HTTPException(status_code=404, detail="Not Found")
+    if not vhod.svoy_zapros(request):
+        raise HTTPException(status_code=403, detail=vhod.ZAPROS_CHUZHOY)
+    k = vhod.voshedshiy_po_metke(request)
+    vhod.seans_zakryt(request.cookies.get(vhod.COOKIE) or "")
+    nxt = vhod.bezopasnyy_next(next) if next else ""
+    resp = RedirectResponse("/vhod" + ("?next=" + quote(nxt, safe="/") if nxt and nxt != "/" else ""),
+                            status_code=303)
+    vhod.ubrat_metku(resp)
+    if k:
+        request.state.kto, request.state.chto = k, "выход"
+    return resp
+
+
+@app.get("/api/kto", dependencies=AUTH)
+def api_kto(request: Request):
+    """Кто вошёл: login, imya, rol, sposob (forma — форма, klyuch — служебный ключ,
+    vnutr — автоматика сервера, staryy — старый вход в окне, otkryto — режим без входа)."""
+    k = vhod.iz(request)
+    return {"login": k["login"], "imya": k["imya"], "rol": k["rol"], "sposob": k["sposob"]}
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
@@ -2440,12 +2594,13 @@ def api_pedagog_save(payload: dict = Body(...)):
 
 
 @app.get("/boris")
-def boris_perehod(credentials: HTTPBasicCredentials | None = Depends(_security)):
+def boris_perehod(request: Request, credentials: HTTPBasicCredentials | None = Depends(_security)):
     """Список решений владельца (06.09) переехал в его документы и в колонку «Борис»
     на пульте; страница убрана 12.11.2026. Цель — по роли: /boris/docs закрыт паролем
-    владельца, админ с закладкой получил бы окно пароля вместо страницы."""
-    check_auth(credentials)
-    return RedirectResponse("/boris/docs" if _is_owner(credentials) else "/pult", status_code=303)
+    владельца, админ с закладкой получил бы окно пароля вместо страницы.
+    Личные входы: роль — по вошедшему (метка входа видна только с request)."""
+    check_auth(credentials, request)
+    return RedirectResponse("/boris/docs" if vhod.iz(request)["rol"] == "owner" else "/pult", status_code=303)
 
 
 _DOC_HEADERS = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"}
@@ -6467,6 +6622,7 @@ def otkazy_page():
             f"<td>{'снят' if r['снят'] else 'не пишем'}</td></tr>")
     n_live = sum(1 for r in rows if not r["снят"])
     return f"""<!doctype html><meta charset=utf-8>
+<script src="/static/vhod.js"></script>
 <title>Отказы — KidsUP</title>
 <style>
 body{{font:15px/1.5 system-ui,sans-serif;margin:24px;color:#312783;max-width:1100px}}
@@ -9521,17 +9677,21 @@ def check_pedagog_or_admin(request: Request,
     карточку и отправляют родителям отчёты через сервер центра."""
     k = request.query_params.get("k") or request.headers.get("X-Pedagog-Key") or ""
     want = db.get_setting("pedagog_key", "")
-    if want and k and secrets.compare_digest(k, want):
+    if want and k and vhod._ravny(k, want):
         # 12.11.2026: педагогу меню админов не рисуем. Но ссылку с ключом открывает и
         # админ — его браузер сам шлёт вход, и он остаётся админом со своим меню.
-        # Без входа — всегда педагог: check_auth на стенде без APP_PASSWORD пропустил
-        # бы кого угодно и записал бы владельцем.
-        if credentials is not None:
-            try:
-                check_auth(credentials, request)
-                return
-            except HTTPException:
-                pass
+        # Без входа — всегда педагог. Личные входы: vhod.kto() на форму не уводит —
+        # вошедший (метка, ключ, старый вход) остаётся собой, иначе — педагог.
+        try:
+            kto = vhod.kto(request, credentials)
+        except HTTPException as e:
+            if e.status_code == 403:
+                raise
+            kto = None
+        if kto and kto["rol"] != "avto":
+            request.state.kto = kto
+            _zapomnit(request, vhod.rol_menyu(kto))
+            return
         request.state.rol = "pedagog"
         return
     check_auth(credentials, request)
@@ -10234,7 +10394,7 @@ async def audit_page():
     body = "".join(rows) or '<p class="empty">Лента пуста — за вчера расхождений нет.</p>'
     kinds = " · ".join(f"{k}: {v}" for k, v in (s.get("by_kind") or {}).items()) or "—"
     return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Лента аномалий — KidsUP</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Лента аномалий — KidsUP</title><script src="/static/vhod.js"></script>
 <style>
 :root{{--paper:#FAF9F5;--ink:#22271F;--muted:#6E7264;--line:#E3E1D6;--card:#fff}}
 @media (prefers-color-scheme:dark){{:root{{--paper:#151812;--ink:#E7E6DD;--muted:#9B9F90;
@@ -10443,7 +10603,7 @@ async def money_page():
     from . import crmcheck
     d = crmcheck.debts_report()
     if not d.get("ready"):
-        return HTMLResponse("<p>Нет ключа МойКласс</p>")
+        return HTMLResponse('<script src="/static/vhod.js"></script><p>Нет ключа МойКласс</p>')
     t = d["totals"]
     rows, nobill = d["rows"], d["nobill"]
     BUCKET = {
@@ -10492,7 +10652,7 @@ async def money_page():
                         for x in nobill) + '</table></div></section>')
     return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Долги по абонементам и занятиям</title><style>
+<title>Долги по абонементам и занятиям</title><script src="/static/vhod.js"></script><style>
 :root{{--paper:#FCFBF7;--ink:#1B1D2B;--muted:#5F6478;--line:#E7E4DA;--card:#fff;--fill:#F3F1E9}}
 @media (prefers-color-scheme:dark){{:root{{--paper:#14151D;--ink:#E7E6EC;--muted:#9A9EAE;
   --line:#292B37;--card:#1B1D26;--fill:#20222C}}}}

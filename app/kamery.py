@@ -288,6 +288,7 @@ def nastroyka(saved: int | None = None) -> str:
            f'<a href="/kamery">Открыть страницу камер</a></div>'
            if saved is not None else "")
     return f"""{HEAD}
+<script src="/static/vhod.js"></script>
 <h1>Настройка камер</h1>
 <p class=lead>Вставьте ссылку на трансляцию каждой камеры. В кабинете
 видеонаблюдения это «Поделиться» → «Встроить на сайт»: можно скопировать

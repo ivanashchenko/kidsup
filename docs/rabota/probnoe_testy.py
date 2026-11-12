@@ -7,9 +7,12 @@
 
   python3 docs/rabota/probnoe_testy.py
 """
+import os
 import sys
 
 sys.path.insert(0, "/home/user/kidsup")
+# 12.11.2026, личные входы: без пароля сайт открыт только в режиме без входа
+os.environ["KIDSUP_BEZ_VHODA"] = "1"
 
 from app import autopilot as ap  # noqa: E402
 

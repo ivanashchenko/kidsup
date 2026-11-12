@@ -209,22 +209,25 @@ def get_setting(key: str, default: str = "") -> str:
     return env or default
 
 
-def admin_auth() -> tuple[str, str]:
-    """Логин и пароль для запросов служебных модулей к app.kidsup.ru.
+def admin_auth() -> tuple[str, str] | None:
+    """Вход для запросов служебных модулей к app.kidsup.ru (httpx auth=…).
 
     12.10.2026: Аня уволена, общий пароль admin знали все админы — Борис его
-    меняет. Раньше пароль был зашит в код значением по умолчанию; теперь
-    сначала config.APP_PASSWORD (на сервере это ровно тот пароль, который
-    проверяет вход, — после смены он не устареет), затем настройка
-    admin_pass (или KIDSUP_ADMIN_PASS в окружении) — для контейнера разбора.
-    Нет ни того, ни другого — понятная ошибка в момент запроса, а не при
-    импорте: остальное приложение продолжает работать.
-    """
+    меняет. Раньше пароль был зашит в код значением по умолчанию.
+
+    12.11.2026, личные входы. В процессе самого сервера (perepiska, nadezhda) —
+    внутренний ключ автоматики ("avtomatika", ключ): он живёт только в памяти процесса,
+    меняется при каждом перезапуске и пускает только на три адреса (vhod.AVTO_PUTI).
+    Так пункты в пульте не перестанут появляться, когда общий admin выключат.
+    Вне сервера (контейнер разбора) — как раньше: config.APP_PASSWORD, затем настройка
+    admin_pass (или KIDSUP_ADMIN_PASS в окружении). Нет ни того, ни другого — None:
+    запрос уйдёт без пароля, вход подставит окружение (служебный ключ)."""
+    from . import vhod
+    k = vhod.vnutr_klyuch()
+    if k:
+        return (vhod.AVTO_LOGIN, k)
     pw = config.APP_PASSWORD or get_setting("admin_pass", "")
-    if not pw:
-        raise RuntimeError("пароль app.kidsup.ru не задан: настройка admin_pass, "
-                           "KIDSUP_ADMIN_PASS или APP_PASSWORD")
-    return ("admin", pw)
+    return ("admin", pw) if pw else None
 
 
 def set_setting(key: str, value: str) -> None:

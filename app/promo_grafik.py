@@ -137,6 +137,7 @@ def dannye(dney: int = 14, nazad: int = 2) -> dict:
 
 
 HEAD = """<!doctype html><html lang=ru><head><meta charset=utf-8>
+<script src="/static/vhod.js"></script>
 <meta name=viewport content="width=device-width, initial-scale=1">
 <title>График промоутеров — KidsUP</title>
 <style>

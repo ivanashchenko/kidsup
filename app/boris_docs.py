@@ -185,6 +185,7 @@ class Sklad:
             items = '<p class=empty>Документов пока нет.</p>'
         nav = " · ".join(f'<a href="{e(href)}">{e(name)}</a>' for name, href in self.ssylki)
         return f"""<!doctype html><html lang=ru><head><meta charset=utf-8>
+<script src="/static/vhod.js"></script>
 <meta name=viewport content="width=device-width, initial-scale=1">
 <meta name=robots content="noindex, nofollow">
 <title>{e(self.title)}</title>

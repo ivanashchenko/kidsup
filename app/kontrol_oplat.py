@@ -346,7 +346,7 @@ def html(day: str | None = None) -> str:
         f = OUT_DIR / f"{day}.json"
         files = [f] if f.exists() else []
     if not files:
-        return "<p>Контроль ещё не запускался.</p>"
+        return "<script src='/static/vhod.js'></script><p>Контроль ещё не запускался.</p>"
     R = json.loads(files[-1].read_text(encoding="utf-8"))
     days = "".join(f'<a href="/kontrol-oplat?day={p.stem}">{p.stem[8:]}.{p.stem[5:7]}</a> ' for p in sorted(OUT_DIR.glob("*.json"))[-14:])
     body = [f"<h1>Контроль оплат за {R['day'][8:]}.{R['day'][5:7]}</h1><p class=lead>{_h.escape(R.get('summary', ''))} · собрано {R.get('sostavleno', '')}</p><p>Дни: {days}</p>"]
@@ -358,4 +358,4 @@ def html(day: str | None = None) -> str:
     css = ("body{font:15px/1.5 Inter,sans-serif;max-width:1000px;margin:0 auto;padding:20px 16px;color:#221F3B}"
            "h1{color:#312783}h2{color:#312783;margin-top:24px}li{margin:6px 0}li.bad{color:#B3261E;font-weight:600}"
            "li.warn{color:#7a4b00}.ok{color:#3f7d12}.lead{color:#6A6F87}small{color:#6A6F87;font-weight:400}")
-    return f"<!doctype html><html lang=ru><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Контроль оплат</title><style>{css}</style></head><body>{''.join(body)}</body></html>"
+    return f"<!doctype html><html lang=ru><head><meta charset=utf-8><script src='/static/vhod.js'></script><meta name=viewport content='width=device-width,initial-scale=1'><title>Контроль оплат</title><style>{css}</style></head><body>{''.join(body)}</body></html>"

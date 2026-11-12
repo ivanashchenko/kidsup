@@ -98,6 +98,8 @@ def _postavit_lovushki():
 
 def zapustit(tree: str, work: str):
     os.environ["KIDSUP_DATA_DIR"] = work
+    # 12.11.2026, личные входы: без APP_PASSWORD сайт открыт только в режиме без входа
+    os.environ["KIDSUP_BEZ_VHODA"] = "1"
     for k in ("APP_PASSWORD", "KIDSUP_ADMIN_PASS", "MOYKLASS_API_KEY"):
         os.environ.pop(k, None)
     _zakryt_set()

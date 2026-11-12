@@ -221,6 +221,8 @@ PROPALI = {"POST /api/ask", "GET /api/ask/health", "POST /api/publish", "GET /ap
 # Новые адреса шага 1: страница «Архив» и признак «архив» у документов — ровно эти три,
 # чужих новых адресов быть не должно.
 NOVYE = {"GET /arhiv", "POST /api/boris-docs/arhiv", "POST /api/admin-docs/arhiv"}
+# 12.11.2026, личные входы (app/vhod.py): страница входа, выход и «кто вошёл».
+NOVYE_VHOD = {"GET /vhod", "POST /vhod", "POST /vyhod", "GET /api/kto"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
 # чтобы пропажа была видна и без снимка «до».
 NUZHNY = """
@@ -249,8 +251,8 @@ def test_marshruty(m, fajl_do):
     proverka("снимок «до» — 471 маршрут", len(do) == 471, len(do))
     proverka("пропали ровно пять — те, что звала только убранная страница", do - posle == PROPALI,
              sorted((do - posle) ^ PROPALI))
-    proverka("появились ровно три: «Архив» и признак «архив» у документов", posle - do == NOVYE,
-             sorted((posle - do) ^ NOVYE))
+    proverka("появились ровно три: «Архив» и признак «архив» у документов (+ адреса личных входов)",
+             posle - do == NOVYE | NOVYE_VHOD, sorted((posle - do) ^ (NOVYE | NOVYE_VHOD)))
     nuzhny = [x.strip() for x in NUZHNY.replace("\n", " · ").split(" · ") if x.strip()]
     net = [x for x in nuzhny if x not in posle]
     proverka(f"{len(nuzhny)} адресов рутин, автопилота и сайта — на месте", not net, net)
@@ -863,6 +865,7 @@ def main():
     work = a.work or tempfile.mkdtemp(prefix="nav_")
     os.makedirs(work, exist_ok=True)
     tree = os.path.abspath(a.tree)
+    os.environ["KIDSUP_BEZ_VHODA"] = "1"     # 12.11.2026: режим без входа гаснет, как только задан APP_PASSWORD
     m = lt.zapustit(tree, work)
     baza = os.path.join(work, "kidsup.db")
     lt.zasejat(baza)

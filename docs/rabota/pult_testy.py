@@ -14,6 +14,8 @@ import sys
 import tempfile
 
 sys.path.insert(0, "/home/user/kidsup")
+# 12.11.2026, личные входы: без пароля сайт открыт только в режиме без входа
+os.environ["KIDSUP_BEZ_VHODA"] = "1"
 
 DEN = "2026-09-22"
 oshibok = 0

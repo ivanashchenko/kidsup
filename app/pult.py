@@ -1038,7 +1038,7 @@ def page(day: str = "", who: str = "", rol: str = "admin") -> str:
     kpi_html += f"<div class='k' style='border-color:{vis_col}'><b style='color:{vis_col}'>{k['y_visits']} из {k['y_kids']}</b><span style='color:{vis_col};font-weight:700'>явка за вчера в CRM · {today_txt}</span></div>"
     hero_who = " + ".join(on) if on else "смена не задана"
     filt = "".join(f"<a href='/pult?who={html.escape(w)}' style='margin-right:8px'>{html.escape(w)}</a>" for w in on + ["Лиза", "Борис"])
-    return f"""<!doctype html><html lang='ru'><head><meta charset='utf-8'><title>Пульт KidsUP · {day}</title>
+    return f"""<!doctype html><html lang='ru'><head><meta charset='utf-8'><script src='/static/vhod.js'></script><title>Пульт KidsUP · {day}</title>
 <meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='300'>
 <style>
 :root{{--ink:#15132e;--muted:#6c6a86;--line:#e4e2f0;--bg:#f8f7fc;--card:#fff;--indigo:#312783;--blue:#1DA7E0;--green:#7DB928;--amber:#F59C00;--red:#E30613}}

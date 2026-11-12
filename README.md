@@ -51,8 +51,9 @@ uvicorn app.main:app --port 8000
 | `MOYKLASS_API_KEY` | API-ключ (вместо ввода в интерфейсе) | — |
 | `HISTORY_MONTHS` | Глубина выгрузки платежей и занятий, месяцев | 24 |
 | `MOYKLASS_RPS` | Ограничение запросов к API в секунду | 4 |
-| `APP_PASSWORD` | Если задан — вход по паролю (HTTP Basic) | выкл. |
+| `APP_PASSWORD` | Старый общий вход по паролю (HTTP Basic). Пустой пароль сайт **не** открывает | выкл. |
 | `APP_USER` | Логин для HTTP Basic | admin |
+| `KIDSUP_BEZ_VHODA` | `1` — режим без входа (тесты, свой компьютер); действует только при пустом `APP_PASSWORD`. Личные входы — страница `/vhod`, файл `data/vhody.db` (`app/vhod.py`) | выкл. |
 | `KIDSUP_DATA_DIR` | Каталог для базы данных | `./data` |
 
 ## Важно про безопасность

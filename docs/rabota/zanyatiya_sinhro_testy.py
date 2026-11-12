@@ -6,11 +6,14 @@
 
   python3 docs/rabota/zanyatiya_sinhro_testy.py
 """
+import os
 import sys
 import tempfile
 from pathlib import Path
 
 sys.path.insert(0, "/home/user/kidsup")
+# 12.11.2026, личные входы: без пароля сайт открыт только в режиме без входа
+os.environ["KIDSUP_BEZ_VHODA"] = "1"
 
 from app import config  # noqa: E402
 
