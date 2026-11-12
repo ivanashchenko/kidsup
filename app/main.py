@@ -4710,6 +4710,10 @@ async def health():
 SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule", "daily_tasks_per_admin", "broadcast_per_hour", "broadcast_transports",
             # явка по отчётам педагогов (app/yavka.py): 0 — только сверка, 1 — ставить отметки, 2 — и проводить занятия
             "yavka_auto", "gruppy_avtory",
+            # страница «Проверка МойКласса» (app/proverka_mk.py): «1» — правки МойКласса Лизе идут на
+            # страницу, «0» — пунктами в пульт, как раньше; и какие разделы страницы выключены
+            # (номера через запятую, по умолчанию «5,11г»; «-» — показывать все)
+            "proverka_mk_vmesto_punktov", "proverka_mk_vyklyucheny",
             "wazzup_dry_run", "digest_phone", "digest_off", "wa_watch_skip", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps", "vk_lead_forms",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",

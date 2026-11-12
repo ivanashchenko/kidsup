@@ -622,6 +622,8 @@ def test_http():
     d = c.get("/api/proverka-mk").json()
     proverka("API: итог и разделы", len(d["razdely"]) == 12 and "ostalos" in d["itog"])
     proverka("/api/pult/tasks: число для колонки Лизы", "ostalos" in c.get("/api/pult/tasks").json()["proverka_mk"])
+    proverka("выключатель и список выключенных разделов меняются через /api/settings (откат без выкладки)",
+             {"proverka_mk_vmesto_punktov", "proverka_mk_vyklyucheny"} <= m.SETTABLE)
     r = c.post("/api/proverka-mk/zametka", json={"key": "r6:9004", "text": "из пункта №6159: маткапитал 10.11"})
     proverka("заметка к строке сохраняется", r.status_code == 200
              and any(x.get("zametka") for rz in c.get("/api/proverka-mk").json()["razdely"] for x in rz["stroki"]
