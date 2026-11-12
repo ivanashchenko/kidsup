@@ -3,8 +3,9 @@
 
 15.10.2026. «Линия» — справка о звонящем и готовые ответы на время разговора.
 Здесь зафиксировано, что она должна показывать, и что соседние страницы
-(/brief, /pult, /obzvon-dnya, /waiting, /obeshchaniya) после ссылок «Линия»
-открываются как раньше.
+(/pult, /obzvon-dnya, /waiting) после ссылок «Линия» открываются как раньше.
+12.11.2026: /brief и /obeshchaniya убраны — их адреса ведут на «Линию» и на
+колонку пульта (303), номер и имя из адреса переносятся.
 
     python docs/rabota/liniya_testy.py [--tree КОРЕНЬ] [--db ОБРАЗЕЦ.db] [--work ПАПКА]
 
@@ -32,6 +33,7 @@ import sqlite3
 import sys
 import tempfile
 from datetime import date, datetime
+from urllib.parse import quote
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEN = "2026-10-14"                     # «сегодня» стенда (часы автопилота)
@@ -624,10 +626,14 @@ def test_stranicy(c, m):
 
 def test_sosedi(c):
     print("Соседние страницы и ссылки «Линия»")
-    r = c.get(f"/brief?phone={SEMYA}")
-    proverka("/brief → 200 и ссылка", r.status_code == 200 and f"/liniya?phone={SEMYA}" in r.text, r.status_code)
+    # досье слито с «Линией»: старый адрес ведёт на неё и не теряет номер
+    r = c.get(f"/brief?phone={SEMYA}", follow_redirects=False)
+    proverka("/brief → 303 на «Линию» с тем же номером",
+             r.status_code == 303 and r.headers.get("location") == f"/liniya?phone={SEMYA[-10:]}",
+             (r.status_code, r.headers.get("location")))
     r = c.get(f"/brief?phone={NEZNAKOMYJ}")
-    proverka("/brief незнакомый → 200 и ссылка", r.status_code == 200 and f"/liniya?phone={NEZNAKOMYJ}" in r.text)
+    proverka("/brief незнакомый → открылась «Линия» с его номером",
+             r.status_code == 200 and str(r.url).endswith(f"/liniya?phone={NEZNAKOMYJ[-10:]}"), (r.status_code, str(r.url)))
     r = c.get("/pult")
     proverka("/pult → 200 и ссылка", r.status_code == 200 and "/liniya?phone=" in r.text, r.status_code)
     r = c.get("/pult?who=Лиза")
@@ -642,10 +648,15 @@ def test_sosedi(c):
              r.status_code)
     r = c.get("/waiting")
     proverka("/waiting → 200 и ссылка", r.status_code == 200 and f"/liniya?phone={SEMYA[-10:]}" in r.text, r.status_code)
+    # обещания одного человека — это его колонка пульта; имя и день переносятся
+    r = c.get(f"/obeshchaniya?who=Лена&day={DEN}", follow_redirects=False)
+    proverka("/obeshchaniya → 303 на колонку пульта",
+             r.status_code == 303 and r.headers.get("location") == f"/pult?who={quote('Лена')}&day={DEN}",
+             (r.status_code, r.headers.get("location")))
     r = c.get(f"/obeshchaniya?who=Лена&day={DEN}")
-    proverka("/obeshchaniya → 200 и ссылка", r.status_code == 200 and "/liniya?phone=79990001001" in r.text,
-             r.status_code)
-    proverka("в меню есть «Линия»", 'href="/liniya"' in c.get(f"/brief?phone={SEMYA}").text)
+    proverka("/obeshchaniya → открылась колонка со ссылкой «Линия»",
+             r.status_code == 200 and "/liniya?phone=9990001001" in r.text, r.status_code)
+    proverka("в меню есть «Линия»", 'href="/liniya"' in c.get("/waiting").text)
 
 
 def test_store_calls(c, m):
