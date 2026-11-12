@@ -210,8 +210,8 @@ def test_ssylki(c, m, baza):
 # Маршруты, которые звала только убранная страница.
 PROPALI = {"POST /api/ask", "GET /api/ask/health", "POST /api/publish", "GET /api/publish/health",
            "POST /api/queue/result"}
-# Новые адреса шага 1: страница «Архив» и признак «архив» у документов. Пока их делают
-# следующие исполнители, отсутствие — не ошибка; чужих новых адресов быть не должно.
+# Новые адреса шага 1: страница «Архив» и признак «архив» у документов — ровно эти три,
+# чужих новых адресов быть не должно.
 NOVYE = {"GET /arhiv", "POST /api/boris-docs/arhiv", "POST /api/admin-docs/arhiv"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
 # чтобы пропажа была видна и без снимка «до».
@@ -241,9 +241,8 @@ def test_marshruty(m, fajl_do):
     proverka("снимок «до» — 471 маршрут", len(do) == 471, len(do))
     proverka("пропали ровно пять — те, что звала только убранная страница", do - posle == PROPALI,
              sorted((do - posle) ^ PROPALI))
-    proverka("чужих новых маршрутов нет", posle - do <= NOVYE, sorted(posle - do - NOVYE))
-    if NOVYE - posle:
-        print("          (ещё не сделаны: " + ", ".join(sorted(NOVYE - posle)) + ")")
+    proverka("появились ровно три: «Архив» и признак «архив» у документов", posle - do == NOVYE,
+             sorted((posle - do) ^ NOVYE))
     nuzhny = [x.strip() for x in NUZHNY.replace("\n", " · ").split(" · ") if x.strip()]
     net = [x for x in nuzhny if x not in posle]
     proverka(f"{len(nuzhny)} адресов рутин, автопилота и сайта — на месте", not net, net)
@@ -293,6 +292,159 @@ def test_uborka(tree):
         proverka("журнал вечернего контроля (kontrol/ДД-ММ.json) не тронут", len(zhurnal) >= 50, len(zhurnal))
 
 
+# --- Б. Меню и роли ----------------------------------------------------------------
+
+ARHIVNYE = {"/students", "/payments", "/content", "/callplan", "/chaty", "/nezvonili", "/gruppy/media",
+            "/prelaunch", "/nabor"}
+# Объединённые: у каждой есть страница-цель, в меню стоит она. Плюс страницы без пункта
+# меню по решению владельца (/constructor, /obzvon, /karta…) и прежние пункты шапки.
+NE_V_MENU = ARHIVNYE | {"/", "/brief", "/boris", "/obeshchaniya", "/sverka", "/settings", "/metrics", "/segodnya",
+                        "/spiski", "/zayavki", "/leads", "/clicks", "/constructor", "/obzvon", "/karta",
+                        "/english/karta", "/pravila-kontrol"}
+
+
+def shapka(c, adres, kto):
+    """HTML общей шапки страницы — всё, что до <main>."""
+    return c.get(adres, auth=kto).text.split("<main", 1)[0]
+
+
+def _adresa(razdely) -> list:
+    return [adres for _, punkty in razdely for _, adres in punkty]
+
+
+def test_menu(c, m):
+    from app import nav
+    print("Меню: что в нём есть")
+    est = marshruty(m)
+    vse = _adresa(nav.ADMIN + [nav.OWNER])
+    net = [a for a in vse if f"GET {a.split('?')[0]}" not in est]
+    proverka(f"все {len(vse)} пунктов меню ведут на существующие страницы", not net, net)
+    lishnie = [a for a in vse if a.split("?")[0] in set(m.UBRANO) | NE_V_MENU]
+    proverka("в меню нет убранных, архивных и объединённых страниц", not lishnie, lishnie)
+    proverka("у админа 16 пунктов: Смена, Группы, Деньги, Справка",
+             [r for r, _ in nav.menu("admin")] == ["Смена", "Группы", "Деньги", "Справка"]
+             and len(_adresa(nav.menu("admin"))) == 16, [r for r, _ in nav.menu("admin")])
+    proverka("у владельца — те же и 11 своих последним разделом",
+             nav.menu("owner")[:-1] == nav.menu("admin") and nav.menu("owner")[-1] == nav.OWNER
+             and len(nav.OWNER[1]) == 11)
+    proverka("педагогу по ключу меню не положено", nav.menu("pedagog") == [])
+
+    print("Меню: админ")
+    h = shapka(c, "/liniya", ADMIN)
+    net = [a for a in _adresa(nav.ADMIN) if f'href="{a}"' not in h]
+    proverka("в шапке все 16 пунктов админов", not net, net)
+    proverka("подсвечена открытая страница", 'href="/liniya" class="active"' in h)
+    proverka("на телефоне меню сворачивается: кнопка «☰ Разделы»",
+             'id="nav-toggle"' in h and "☰ Разделы" in h and 'aria-controls="nav-razdely"' in h)
+    vladelcu = [a for a in _adresa([nav.OWNER]) if f'href="{a}"' in h]
+    proverka("раздела владельца в шапке нет", "Владельцу" not in h and not vladelcu, vladelcu)
+    t = c.get("/liniya", auth=ADMIN).text
+    proverka("…и во всей странице нет «Владельцу», /owner, /arhiv, /kontrol-oplat",
+             all(x not in t for x in ("Владельцу", 'href="/owner"', 'href="/arhiv"', 'href="/kontrol-oplat"')))
+    proverka("кнопки «Синхронизировать» у админа нет", 'id="sync-btn"' not in t and "Синхронизировать" not in h)
+    # логотип ведёт на «/» — на свою главную по роли; это не пункт меню, смотрим только разделы
+    razdely = h.split('id="nav-razdely"', 1)[-1]
+    starye = [a for a in sorted(NE_V_MENU | {"/ask", "/makety", "/plan311", "/groups"}) if f'href="{a}"' in razdely]
+    proverka("ни одного прежнего пункта (/ask, /makety, /callplan, /students, /settings…)", not starye, starye)
+
+    print("Меню: владелец")
+    h = shapka(c, "/liniya", VLADELEC)
+    net = [a for a in _adresa(nav.menu("owner")) if f'href="{a}"' not in h]
+    proverka("в шапке все 16 пунктов админов и 11 своих", not net, net)
+    proverka("раздел «Владельцу» — последним", h.rfind("Владельцу") > h.find('href="/base"') > 0)
+    proverka("кнопка «Синхронизировать» есть", 'id="sync-btn"' in h)
+    proverka("/owner: строка-ссылка на ключ МойКласса (/settings) — иначе страницу не найти",
+             "href='/settings'" in c.get("/owner", auth=VLADELEC).text)
+
+    print("Педагог по ключу из ссылки")
+    kluch = m.db.get_setting("pedagog_key")
+    r = c.get(f"/english/karta?k={kluch}")
+    proverka("карточка речи по ключу без входа → 200", r.status_code == 200, r.status_code)
+    proverka("…ни меню, ни поиска, ни бейджа «ждут», ни синхронизации",
+             all(x not in r.text for x in ('class="nav-main"', 'id="gs-input"', 'id="wait-badge"', 'id="sync-btn"',
+                                           'id="nav-toggle"')))
+    proverka("…виджеты админов не опрашиваются (флаг педагога от сервера)", "KIDSUP_PED = true;" in r.text)
+    r = c.get(f"/english/karta?k={kluch}", auth=("boris", "chto-ugodno"))
+    proverka("ключ и поддельный вход boris → педагог, не владелец",
+             r.status_code == 200 and "Владельцу" not in r.text and 'class="nav-main"' not in r.text)
+    r = c.get(f"/english/karta?k={kluch}", auth=ADMIN)
+    proverka("та же ссылка у админа — с его меню",
+             r.status_code == 200 and 'class="nav-main"' in r.text and "KIDSUP_PED = false;" in r.text)
+    proverka("неверный ключ без входа → 401", c.get("/english/karta?k=nevernyj").status_code == 401)
+
+
+# --- Б. Главная по роли ------------------------------------------------------------
+
+def test_glavnaya(c, m):
+    from app import boris_docs
+    print("Главная: переход на рабочее место роли")
+    proverka("/ админ → 303 /pult", lokaciya(c, "/") == (303, "/pult"), lokaciya(c, "/"))
+    proverka("/ владелец, стартовой страницы нет → /boris/docs",
+             lokaciya(c, "/", VLADELEC) == (303, "/boris/docs"), lokaciya(c, "/", VLADELEC))
+    boris_docs.save("start", "Стартовая страница (стенд)", "<!doctype html><title>стенд</title>" + "<p>стенд</p>" * 5)
+    proverka("/ владелец, стартовая выложена → /boris/docs/start",
+             lokaciya(c, "/", VLADELEC) == (303, "/boris/docs/start"), lokaciya(c, "/", VLADELEC))
+    proverka("/ без входа → 401, куда ведёт — не видно", lokaciya(c, "/", kto=None) == (401, None))
+    proverka("дашборда больше нет", not hasattr(m, "dashboard") and "GET /" in marshruty(m))
+    print("Главная: публичные сайты — как раньше")
+    r = c.get("/", headers={"host": "kidsup.ru"}, follow_redirects=False)
+    proverka("kidsup.ru/ → 200, страница сайта (рутина баланса ждёт 200)",
+             r.status_code == 200 and "location" not in r.headers and "/pult" not in r.text, r.status_code)
+    r = c.get("/", headers={"host": "kidsup.ru"}, auth=ADMIN, follow_redirects=False)
+    proverka("kidsup.ru/ со входом админа — тоже сайт, не пульт", r.status_code == 200, r.status_code)
+    for host in ("kidsupday.ru", "kidsupweek.ru"):
+        r = c.get("/", headers={"host": host}, follow_redirects=False)
+        loc = r.headers.get("location") or ""
+        proverka(f"{host}/ → 301 на сайт", r.status_code == 301 and loc.startswith("https://kidsup.ru/"),
+                 (r.status_code, loc))
+
+
+# --- Б. Архив страниц и архивные страницы -----------------------------------------------
+
+def test_arhiv(c, m):
+    from app import nav
+    print("Архив страниц (/arhiv)")
+    proverka("/arhiv: админ → 401", c.get("/arhiv", auth=ADMIN).status_code == 401)
+    proverka("/arhiv без входа → 401", c.get("/arhiv").status_code == 401)
+    r = c.get("/arhiv", auth=VLADELEC)
+    proverka("/arhiv: владелец → 200, с его меню", r.status_code == 200 and "Владельцу" in r.text, r.status_code)
+    proverka("в списке ровно девять архивных страниц из решения", {a for a, *_ in nav.ARHIV} == ARHIVNYE)
+    net = [a for a, *_ in nav.ARHIV if f'href="{a}"' not in r.text]
+    proverka("на каждую — ссылка", not net, net)
+    proverka("у каждой — «что это» и «почему в архиве»",
+             all(chto and pochemu for _, _, chto, pochemu in nav.ARHIV) and r.text.count("Почему в архиве:") == 9)
+    net = [a for a, *_ in nav.PEREEZD if f'href="{a}"' not in r.text]
+    proverka("блок «Переезжают»: семь страниц с переносом на шаге 2",
+             "Переезжают" in r.text and len(nav.PEREEZD) == 7 and not net, net)
+    proverka("внизу — ссылки на свёрнутый архив документов",
+             'href="/boris/docs#arhiv"' in r.text and 'href="/admin/docs#arhiv"' in r.text)
+
+    print("Архивные страницы: кому открываются")
+    for adres in ("/students", "/payments", "/chaty", "/gruppy/media"):
+        proverka(f"{adres}: владелец → 200", c.get(adres, auth=VLADELEC).status_code == 200)
+        proverka(f"{adres}: админ → 303 на пульт, без окна пароля", lokaciya(c, adres) == (303, "/pult"),
+                 lokaciya(c, adres))
+    for adres in ("/content", "/callplan", "/nezvonili", "/prelaunch", "/nabor"):
+        proverka(f"{adres}: админ открывает по адресу, как раньше", c.get(adres, auth=ADMIN).status_code == 200)
+    # отправку не зовём: 401 отдаёт проверка входа раньше обработчика
+    for metod, adres in (("get", "/export/students.csv"), ("get", "/export/payments.csv"), ("post", "/api/chaty/send")):
+        proverka(f"{metod.upper()} {adres}: админ → 401", getattr(c, metod)(adres, auth=ADMIN).status_code == 401)
+    proverka("GET /export/students.csv: владелец → 200", c.get("/export/students.csv", auth=VLADELEC).status_code == 200)
+
+    print("Пульт: блок «Разделы» вместо «Рабочих списков»")
+    h = c.get("/pult", auth=ADMIN).text
+    blok = h.split("id='razdely'", 1)[-1].split("</div>", 1)[0]
+    proverka("у админа в разделах «Бланки групп» и «Списки»", "href='/blank-grupp'" in blok and "href='/admin/docs'" in blok)
+    for adres in ("/segodnya", "/nabor", "/nezvonili", "/spiski", "/base/plan_"):
+        proverka(f"пульт: ссылки {adres} нет", f"href='{adres}" not in h and f'href="{adres}' not in h)
+    proverka("у админа раздела владельца нет",
+             "Владельцу" not in blok and all(f"href='{a}'" not in h for a in ("/arhiv", "/owner", "/kontrol-oplat")))
+    proverka("строка «Ещё»: вернуть ушедших, карта, конструктор",
+             all(f"href='{a}'" in blok for a in ("/obzvon", "/karta", "/constructor")))
+    blok = c.get("/pult", auth=VLADELEC).text.split("id='razdely'", 1)[-1].split("</div>", 1)[0]
+    proverka("у владельца — и его раздел", "Владельцу" in blok and "href='/arhiv'" in blok and "href='/owner'" in blok)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tree", default=ROOT)
@@ -308,6 +460,7 @@ def main():
     # роли: общий вход админов и отдельный пароль владельца — как на сервере
     m.config.APP_USER, m.config.APP_PASSWORD = ADMIN
     m.db.set_setting("owner_password", VLADELEC[1])
+    m.db.set_setting("pedagog_key", "stend-kluch")         # ключ педагога — только на стенде
     from fastapi.testclient import TestClient
     c = TestClient(m.app)
     test_perehody(c, m)
@@ -315,6 +468,9 @@ def main():
     test_ssylki(c, m, baza)
     test_marshruty(m, a.do)
     test_uborka(tree)
+    test_menu(c, m)
+    test_glavnaya(c, m)
+    test_arhiv(c, m)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     print(f"\nИтого: {lt.proshlo} OK, {lt.oshibok} ошибок · стенд {work}")
     sys.exit(1 if lt.oshibok else 0)

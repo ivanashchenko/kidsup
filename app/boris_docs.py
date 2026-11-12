@@ -7,6 +7,11 @@
 docs/, а в data/boris_docs на сервере и выкладываются запросом владельца
 (POST /api/boris-docs). Прежняя версия при замене уходит в data/boris_docs/arhiv —
 «последняя версия» всегда одна, но старую можно достать.
+
+12.11.2026 Борис: «скрой не нужные / не актуальные / старые страницы». Разовые и
+устаревшие документы получают признак «arhiv» в index.json и уходят в свёрнутый блок
+«Архив (N)» внизу списка. Это не папка arhiv/ (там прежние версии файлов) и не remove():
+адрес документа продолжает открываться — на него ведут ссылки из чатов и рутин.
 """
 from __future__ import annotations
 
@@ -37,11 +42,15 @@ class Sklad:
     /admin/docs под логином admin, выкладывает владелец (POST /api/admin-docs).
     """
 
-    def __init__(self, papka: str, url: str, h1: str, lead: str, title: str):
+    def __init__(self, papka: str, url: str, h1: str, lead: str, title: str,
+                 ssylki: tuple = (("← Пульт", "/pult"),)):
         self.dir = config.DATA_DIR / papka
-        self.arhiv = self.dir / "arhiv"
+        self.arhiv = self.dir / "arhiv"          # прежние ВЕРСИИ файлов, не признак «архив»
         self.index = self.dir / "index.json"
         self.url, self.h1, self.lead, self.title = url, h1, lead, title
+        # строка над заголовком: общей шапки на этих страницах до шага 2 нет, без неё
+        # со списка некуда уйти
+        self.ssylki = ssylki
 
     def _index(self) -> dict:
         try:
@@ -55,8 +64,13 @@ class Sklad:
         tmp.write_text(json.dumps(idx, ensure_ascii=False, indent=1), encoding="utf-8")
         tmp.replace(self.index)
 
-    def save(self, slug: str, title: str, html: str, note: str = "", order: int | None = None) -> dict:
-        """Записать документ. Прежний файл с тем же slug переносится в архив."""
+    def save(self, slug: str, title: str, html: str, note: str = "", order: int | None = None,
+             arhiv: bool | None = None) -> dict:
+        """Записать документ. Прежний файл с тем же slug переносится в архив версий.
+
+        arhiv=None (так выкладывают рутины) — признак «архив» берётся из прежней записи:
+        mesta-v-gruppah и sverka-oplat перевыкладываются каждый день, и пометка владельца
+        не должна слетать от очередной выкладки. True / False — поставить или снять явно."""
         if not ok_slug(slug):
             raise ValueError("slug: латиница, цифры, «-» и «_», 2–61 символ")
         title = (title or "").strip()[:200]
@@ -88,8 +102,32 @@ class Sklad:
                 "order": order_v if order_v is not None else int(old.get("order") or 100),
                 "versions": int(old.get("versions") or 0) + 1,
             }
+            v_arhive = bool(old.get("arhiv")) if arhiv is None else bool(arhiv)
+            if v_arhive:
+                idx[slug]["arhiv"] = True       # поле пишем только «да»: нет поля — актуальный
             self._write_index(idx)
             return {"slug": slug, **idx[slug]}
+
+    def v_arhiv(self, slugs: list[str], da: bool = True) -> dict:
+        """Поставить (da=True) или снять признак «архив». Файлы и адреса не трогает."""
+        izmeneno, uzhe, net = [], [], []
+        with _lock:
+            idx = self._index()
+            for slug in slugs:
+                rec = idx.get(slug) if ok_slug(slug) else None
+                if rec is None:
+                    net.append(slug)
+                elif bool(rec.get("arhiv")) == da:
+                    uzhe.append(slug)
+                else:
+                    if da:
+                        rec["arhiv"] = True
+                    else:
+                        rec.pop("arhiv", None)
+                    izmeneno.append(slug)
+            if izmeneno:
+                self._write_index(idx)
+        return {"izmeneno": izmeneno, "uzhe_tak": uzhe, "net_takih": net}
 
     def get(self, slug: str) -> str | None:
         if not ok_slug(slug):
@@ -118,18 +156,34 @@ class Sklad:
         rows.sort(key=lambda r: (int(r.get("order") or 100), r["slug"]))
         return rows
 
+    def _kartochka(self, r: dict) -> str:
+        e = _html.escape
+        return (f'<a class=doc href="{self.url}/{e(r["slug"])}">'
+                f'<span class=t>{e(r["title"])}</span>'
+                + (f'<span class=n>{e(r["note"])}</span>' if r.get("note") else "")
+                + f'<span class=m>обновлено {e(r["updated"])} МСК · версия {int(r.get("versions") or 1)}</span></a>')
+
+    def _arhiv_blok(self, rows: list[dict]) -> str:
+        """Свёрнутый блок внизу: документы не мешают, но и не пропадают. id — для ссылки
+        /boris/docs#arhiv со страницы «Архив страниц»; по ней блок раскрывается сам."""
+        if not rows:
+            return ""
+        return (f'<details class=arh id=arhiv><summary>Архив ({len(rows)})</summary>'
+                f'<div class=list>{"".join(self._kartochka(r) for r in rows)}</div></details>'
+                "<script>if(location.hash==='#arhiv')document.getElementById('arhiv').open=true</script>")
+
     def page(self) -> str:
         rows = self.spisok()
         e = _html.escape
-        if rows:
-            items = "".join(
-                f'<a class=doc href="{self.url}/{e(r["slug"])}">'
-                f'<span class=t>{e(r["title"])}</span>'
-                + (f'<span class=n>{e(r["note"])}</span>' if r.get("note") else "")
-                + f'<span class=m>обновлено {e(r["updated"])} МСК · версия {int(r.get("versions") or 1)}</span></a>'
-                for r in rows)
+        deystv = [r for r in rows if not r.get("arhiv")]
+        arh = [r for r in rows if r.get("arhiv")]
+        if deystv:
+            items = "".join(self._kartochka(r) for r in deystv)
+        elif arh:
+            items = '<p class=empty>Актуальных документов нет.</p>'
         else:
             items = '<p class=empty>Документов пока нет.</p>'
+        nav = " · ".join(f'<a href="{e(href)}">{e(name)}</a>' for name, href in self.ssylki)
         return f"""<!doctype html><html lang=ru><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width, initial-scale=1">
 <meta name=robots content="noindex, nofollow">
@@ -151,17 +205,26 @@ a.doc:hover,a.doc:focus-visible{{border-color:var(--blue);outline:none}}
 .n{{color:var(--ink)}}
 .m{{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}}
 .empty{{color:var(--muted)}}
+.top{{font-size:14px;margin:0 0 14px;color:var(--muted)}}
+.top a{{color:var(--blue);text-decoration:none}}
+.top a:hover{{text-decoration:underline}}
+details.arh{{margin-top:26px}}
+details.arh>summary{{cursor:pointer;color:var(--muted);font-weight:650;padding:8px 2px}}
+details.arh>.list{{margin-top:10px}}
 </style></head><body><div class=w>
+<p class=top>{nav}</p>
 <h1>{e(self.h1)}</h1>
 <p class=lead>{e(self.lead)}</p>
 <div class=list>{items}</div>
+{self._arhiv_blok(arh)}
 </div></body></html>"""
 
 
 BORIS = Sklad("boris_docs", "/boris/docs", "Документы владельца",
               "Открываются только под логином boris. Данные лежат на сервере центра, в репозиторий "
-              "кода не попадают; при обновлении прежняя версия уходит в архив.",
-              "Документы владельца — KidsUP")
+              "кода не попадают; при обновлении прежняя версия сохраняется на сервере.",
+              "Документы владельца — KidsUP",
+              ssylki=(("← Пульт", "/pult"), ("Архив страниц", "/arhiv")))
 ADMIN = Sklad("admin_docs", "/admin/docs", "Списки для администраторов",
               "Рабочие списки с именами и телефонами семей. Лежат на сервере центра, не пересылайте "
               "их в чаты и мессенджеры.",
@@ -170,3 +233,4 @@ ADMIN = Sklad("admin_docs", "/admin/docs", "Списки для админист
 # Прежние имена модуля — для владельца, как до 16.10
 DIR, ARHIV, INDEX = BORIS.dir, BORIS.arhiv, BORIS.index
 save, get, remove, spisok, page = BORIS.save, BORIS.get, BORIS.remove, BORIS.spisok, BORIS.page
+v_arhiv = BORIS.v_arhiv

@@ -2469,12 +2469,13 @@ def api_boris_docs():
 
 @app.post("/api/boris-docs", dependencies=OWNER_AUTH)
 def api_boris_docs_save(payload: dict = Body(...)):
-    """{"slug", "title", "html", "note"?, "order"?} — записать или заменить документ владельца."""
+    """{"slug", "title", "html", "note"?, "order"?, "arhiv"?} — записать или заменить документ
+    владельца. Без "arhiv" признак «архив» остаётся прежним (рутины его не знают и не шлют)."""
     from . import boris_docs
     try:
         r = boris_docs.save(str(payload.get("slug") or ""), str(payload.get("title") or ""),
                             str(payload.get("html") or ""), str(payload.get("note") or ""),
-                            payload.get("order"))
+                            payload.get("order"), _priznak(payload.get("arhiv")))
     except (ValueError, TypeError) as e:
         raise HTTPException(400, str(e))
     return {"ok": True, **r}
@@ -2482,9 +2483,38 @@ def api_boris_docs_save(payload: dict = Body(...)):
 
 @app.post("/api/boris-docs/remove", dependencies=OWNER_AUTH)
 def api_boris_docs_remove(payload: dict = Body(...)):
-    """{"slug"} — убрать документ из списка (файл уходит в архив)."""
+    """{"slug"} — убрать документ из списка совсем: адрес начнёт отвечать 404 (файл
+    уходит в папку прежних версий). Чтобы только убрать с глаз — /api/boris-docs/arhiv."""
     from . import boris_docs
     return {"ok": boris_docs.remove(str(payload.get("slug") or ""))}
+
+
+def _priznak(v, umolch: bool | None = None) -> bool | None:
+    """true/false из JSON. Запрос могут собрать руками — строки "false", "0", "нет"
+    тоже значат «нет», а не «да», как сказал бы bool("false")."""
+    if v is None:
+        return umolch
+    if isinstance(v, str):
+        return v.strip().lower() not in ("", "0", "false", "no", "net", "нет")
+    return bool(v)
+
+
+def _docs_v_arhiv(sklad, payload: dict) -> dict:
+    slugs = payload.get("slugs") or ([payload.get("slug")] if payload.get("slug") else [])
+    if not isinstance(slugs, list) or not slugs:
+        raise HTTPException(400, "нужен slug или slugs")
+    da = _priznak(payload.get("arhiv"), True)
+    return {"ok": True, "arhiv": da, **sklad.v_arhiv([str(s) for s in slugs], da)}
+
+
+# 12.11.2026 Борис: «скрой не нужные / не актуальные / старые» — и документы тоже.
+# Признак ставится запросом, а не правкой кода: список архивного меняется чаще выкладок.
+@app.post("/api/boris-docs/arhiv", dependencies=OWNER_AUTH)
+def api_boris_docs_arhiv(payload: dict = Body(...)):
+    """{"slug": "…"} или {"slugs": […]}, "arhiv": true|false (по умолчанию true) — убрать
+    документ в свёрнутый «Архив» внизу списка или вернуть. Адрес документа не меняется."""
+    from . import boris_docs
+    return _docs_v_arhiv(boris_docs.BORIS, payload)
 
 
 # Отметки на страницах владельца (06.11.2026, «пульт внедрения»): статус, ответственный,
@@ -2548,12 +2578,13 @@ def api_admin_docs():
 
 @app.post("/api/admin-docs", dependencies=OWNER_AUTH)
 def api_admin_docs_save(payload: dict = Body(...)):
-    """{"slug", "title", "html", "note"?, "order"?} — выложить или заменить список для админов."""
+    """{"slug", "title", "html", "note"?, "order"?, "arhiv"?} — выложить или заменить список
+    для админов. Без "arhiv" признак «архив» остаётся прежним."""
     from . import boris_docs
     try:
         r = boris_docs.ADMIN.save(str(payload.get("slug") or ""), str(payload.get("title") or ""),
                                   str(payload.get("html") or ""), str(payload.get("note") or ""),
-                                  payload.get("order"))
+                                  payload.get("order"), _priznak(payload.get("arhiv")))
     except (ValueError, TypeError) as e:
         raise HTTPException(400, str(e))
     return {"ok": True, **r}
@@ -2563,6 +2594,14 @@ def api_admin_docs_save(payload: dict = Body(...)):
 def api_admin_docs_remove(payload: dict = Body(...)):
     from . import boris_docs
     return {"ok": boris_docs.ADMIN.remove(str(payload.get("slug") or ""))}
+
+
+@app.post("/api/admin-docs/arhiv", dependencies=OWNER_AUTH)
+def api_admin_docs_arhiv(payload: dict = Body(...)):
+    """То же, что /api/boris-docs/arhiv, для списков админов. Ставит только владелец:
+    списки выкладывает он же."""
+    from . import boris_docs
+    return _docs_v_arhiv(boris_docs.ADMIN, payload)
 
 
 # 12.11.2026: /api/boris/* звала только убранная страница /boris — под общим входом
@@ -4509,7 +4548,8 @@ def _wazzup_process(payload: dict) -> None:
         logging.getLogger("kidsup.wazzup").exception("tvoyklass: почта из ответа не обработана")
 
 
-APP_VERSION = "2026-10-19.1"
+# 12.11.2026 — шаг 1 «скрыть старое»: по смене версии в /api/health видно, что новая сборка поднялась
+APP_VERSION = "2026-11-12.1"
 
 
 @app.get("/api/net")
@@ -9472,10 +9512,15 @@ def check_pedagog_or_admin(request: Request,
     if want and k and secrets.compare_digest(k, want):
         # 12.11.2026: педагогу меню админов не рисуем. Но ссылку с ключом открывает и
         # админ — его браузер сам шлёт вход, и он остаётся админом со своим меню.
-        try:
-            check_auth(credentials, request)
-        except HTTPException:
-            request.state.rol = "pedagog"
+        # Без входа — всегда педагог: check_auth на стенде без APP_PASSWORD пропустил
+        # бы кого угодно и записал бы владельцем.
+        if credentials is not None:
+            try:
+                check_auth(credentials, request)
+                return
+            except HTTPException:
+                pass
+        request.state.rol = "pedagog"
         return
     check_auth(credentials, request)
 
