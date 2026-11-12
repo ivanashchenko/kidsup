@@ -3,104 +3,103 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}KidsUp Analytics{% endblock %}</title>
+<title>{% block title %}KidsUP{% endblock %}</title>
 <meta name="theme-color" content="#1DA7E0">
 <style>/* critical: если style.css не загрузился, шапка остаётся читаемой.
 Сетка та же, что в основном файле, — иначе при медленной загрузке видно,
 как блоки прыгают по местам. */
 .topbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;
-grid-template-areas:"brand search badge sync" "main main main main" "sub sub sub sub";
+grid-template-areas:"brand search badge sync" "nav nav nav nav";
 align-items:center;gap:.5rem 1.1rem;padding:.6rem 1rem}
 .brand{grid-area:brand}.nav-toggle{display:none}.gsearch{grid-area:search;min-width:0}
 .wait-badge{grid-area:badge}.sync-block{grid-area:sync;white-space:nowrap}
-.nav-main{grid-area:main}.nav-sub{grid-area:sub}
+.nav-razdely{grid-area:nav}
 .nav-main,.nav-sub{display:flex;flex-wrap:wrap;gap:.35rem;font-size:14px;align-items:center}
 .nav-main a,.nav-sub a{text-decoration:none;color:#312783}
 .gsearch input{width:100%}</style>
-<link rel="stylesheet" href="/static/style.css?v=14">
+<link rel="stylesheet" href="/static/style.css?v=15">
 <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 </head>
 <body>
+{#- 12.11.2026, Борис: «скрой не нужные / не актуальные / старые страницы».
+    Меню приходит с сервера уже под роль (app/nav.py): админам — четыре раздела,
+    владельцу — они же и свой раздел последним, педагогу по ключу — ничего.
+    Подсветка — по адресу страницы, а не по параметру active. -#}
+{% set here = request.url.path %}
 <header class="topbar">
-  <div class="brand"><img src="/static/logo.svg" alt="KidsUP"> KidsUP <span>Analytics</span></div>
-  <button id="nav-toggle" class="nav-toggle" aria-label="Меню">☰ Меню</button>
+{% if menu %}
+  <a class="brand" href="/" title="На свою главную"><img src="/static/logo.svg" alt=""> KidsUP</a>
+  <button id="nav-toggle" class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-razdely">☰ Разделы</button>
   <div class="gsearch">
     <input type="search" id="gs-input" placeholder="Поиск: группа, ребёнок, телефон…  ( / )"
            autocomplete="off" spellcheck="false">
     <div id="gs-drop" class="gs-drop" hidden></div>
   </div>
-  <nav class="nav-main">
-    <a href="/enrollment" class="{{ 'active' if active == 'enrollment' }}">Набор 26/27</a>
-    <a href="/courses" class="{{ 'active' if active == 'courses' }}">Занятия</a>
-    <a href="/grid" class="{{ 'active' if active == 'grid' }}">Шахматка</a>
-    <a href="/callplan" class="{{ 'active' if active in ('callplan', 'callaudit') }}">Обзвон</a>
-    <a href="/waiting" class="{{ 'active' if active == 'waiting' }}">Ответы</a>
-    <a href="/liniya" class="{{ 'active' if active == 'liniya' }}">Линия</a>
-    <a href="/constructor" class="{{ 'active' if active == 'constructor' }}">Конструктор</a>
-    <a href="/ask" class="{{ 'active' if active == 'ask' }}">Спросить Клода</a>
-    <a href="/base" class="{{ 'active' if active == 'base' }}">База знаний</a>
-  </nav>
   <a id="wait-badge" href="/waiting" class="wait-badge" hidden></a>
   <div class="sync-block">
     {% if last_sync %}<span class="muted small">Синхр.: {{ last_sync }}</span>{% endif %}
+    {#- полная выгрузка МойКласса тяжёлая — кнопка только у владельца -#}
+    {% if rol == 'owner' %}
     <button id="sync-btn" class="btn btn-primary" {% if not has_api_key %}disabled title="Укажите API-ключ в настройках"{% endif %}>
       Синхронизировать
     </button>
+    {% endif %}
   </div>
-  <nav class="nav-sub">
-    <span class="nav-label">Маркетинг</span>
-    <a href="/content" class="{{ 'active' if active == 'content' }}">Контент</a>
-    <a href="/makety" class="{{ 'active' if active == 'makety' }}">Макеты</a>
-    <a href="/leads" class="{{ 'active' if active in ('leads', 'clicks') }}">Лиды</a>
-    <a href="/promo" class="{{ 'active' if active == 'promo' }}">Промоутеры</a>
-    <a href="/chaty" class="{{ 'active' if active == 'chaty' }}">Чаты групп</a>
-    <a href="/segodnya" class="{{ 'active' if active == 'segodnya' }}">Горит сегодня</a>
-    <a href="/voronka" class="{{ 'active' if active == 'voronka' }}">Без оплаты</a>
-    <a href="/nabor" class="{{ 'active' if active == 'nabor' }}">Где теряем</a>
-    <a href="/obzvon-dnya" class="{{ 'active' if active == 'obzvon_dnya' }}">Обзвон дня</a>
-    <a href="/yavka" class="{{ 'active' if active == 'yavka' }}">Явка</a>
-    <a href="/gruppy/media" class="{{ 'active' if active == 'gruppy_media' }}">Фото педагогов</a>
-    <a href="/obzvon" class="{{ 'active' if active == 'obzvon' }}">Вернуть ушедших</a>
-    <a href="/istochniki" class="{{ 'active' if active == 'istochniki' }}">Откуда заявки</a>
-    <a href="/nezvonili" class="{{ 'active' if active == 'nezvonili' }}">Не звонили</a>
-    <a href="/english/karta" class="{{ 'active' if active == 'karta' }}">Карточка речи</a>
-    <span class="nav-label">Контроль</span>
-    <a href="/plan311" class="{{ 'active' if active == 'plan311' }}">План 311</a>
-    <a href="/" class="{{ 'active' if active == 'dashboard' }}">Дашборд</a>
-    <a href="/metrics" class="{{ 'active' if active == 'metrics' }}">Дисциплина</a>
-    <a href="/journal" class="{{ 'active' if active == 'journal' }}">Журнал</a>
-    <span class="nav-label">Данные</span>
-    <a href="/mesta" class="{{ 'active' if active == 'mesta' }}">Места</a>
-    <a href="/groups" class="{{ 'active' if active == 'groups' }}">Группы</a>
-    <a href="/students" class="{{ 'active' if active == 'students' }}">Ученики</a>
-    <a href="/payments" class="{{ 'active' if active == 'payments' }}">Платежи</a>
-    <a href="/settings" class="{{ 'active' if active == 'settings' }}">Настройки</a>
-  </nav>
+  <div id="nav-razdely" class="nav-razdely">
+    <nav class="nav-main" aria-label="{{ menu[0][0] }}">
+      <span class="nav-label">{{ menu[0][0] }}</span>
+      {% for name, href in menu[0][1] %}<a href="{{ href }}"{% if href == here %} class="active" aria-current="page"{% endif %}>{{ name }}</a>
+      {% endfor %}
+    </nav>
+    <nav class="nav-sub" aria-label="Разделы">
+      {% for title, items in (menu[1:-1] if rol == 'owner' else menu[1:]) %}
+      <div class="nav-group">
+        <span class="nav-label">{{ title }}</span>
+        {% for name, href in items %}<a href="{{ href }}"{% if href == here %} class="active" aria-current="page"{% endif %}>{{ name }}</a>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </nav>
+    {% if rol == 'owner' %}
+    <nav class="nav-sub nav-vlad" aria-label="{{ menu[-1][0] }}">
+      <span class="nav-label">{{ menu[-1][0] }}</span>
+      {% for name, href in menu[-1][1] %}<a href="{{ href }}"{% if href == here %} class="active" aria-current="page"{% endif %}>{{ name }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+  </div>
+{% else %}
+  {#- педагог открыл страницу по ключу из ссылки: меню, поиска и служебных кнопок ему не показываем -#}
+  <div class="brand"><img src="/static/logo.svg" alt=""> KidsUP</div>
+{% endif %}
 </header>
 
 <div id="sync-status" class="sync-status" hidden></div>
 
 <main>
-{% if not has_api_key and active != 'settings' %}
+{#- ключ и синхронизация — дело владельца: кнопка и страница ключа есть только у него -#}
+{% if rol == 'owner' and here != '/settings' %}
+{% if not has_api_key %}
   <div class="notice">
     Чтобы выгрузить данные из МойКласс, укажите API-ключ на странице
-    <a href="/settings">Настройки</a>. Ключ создаётся в CRM:
+    <a href="/settings">Ключ МойКласса и выгрузка</a>. Ключ создаётся в CRM:
     <em>Настройки → API</em>.
   </div>
-{% elif not has_data and active != 'settings' %}
+{% elif not has_data %}
   <div class="notice">
     Данных пока нет — нажмите «Синхронизировать», чтобы выгрузить базу из МойКласс.
   </div>
 {% endif %}
+{% endif %}
 {% block content %}{% endblock %}
 </main>
 
-<script src="/static/charts.js"></script>
 <script>
 // 08.11: страницу открыл педагог по ключу (?k=, карточка речи) — служебные виджеты
 // админов (синхронизация, «кто ждёт ответа») не опрашивать: их 401 заставлял браузер
-// просить пароль каждые 3 минуты.
-window.KIDSUP_PED = new URLSearchParams(location.search).has('k');
+// просить пароль каждые 3 минуты. 12.11: флаг ставит сервер по роли, а не по «?k=»
+// в адресе — админ, открывший ссылку педагога, остаётся со своими виджетами.
+window.KIDSUP_PED = {{ 'true' if rol == 'pedagog' else 'false' }};
 (function () {
   if (window.KIDSUP_PED) return;
   const btn = document.getElementById('sync-btn');
@@ -153,13 +152,19 @@ window.KIDSUP_PED = new URLSearchParams(location.search).has('k');
   });
 })();
 
-/* --- мобильное меню ------------------------------------------------------ */
+/* --- мобильное меню: «☰ Разделы» раскрывает и сворачивает разделы ------- */
 (function () {
   const t = document.getElementById('nav-toggle');
   if (!t) return;
-  t.addEventListener('click', () => document.body.classList.toggle('nav-open'));
-  document.querySelectorAll('.nav-main a, .nav-sub a').forEach(a =>
-    a.addEventListener('click', () => document.body.classList.remove('nav-open')));
+  function otkryt(da) {
+    document.body.classList.toggle('nav-open', da);
+    t.setAttribute('aria-expanded', da ? 'true' : 'false');
+    t.textContent = da ? '✕ Свернуть' : '☰ Разделы';
+  }
+  t.addEventListener('click', () => otkryt(!document.body.classList.contains('nav-open')));
+  document.querySelectorAll('.nav-razdely a').forEach(a =>
+    a.addEventListener('click', () => otkryt(false)));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') otkryt(false); });
 })();
 
 /* --- бейдж «кто ждёт ответа» -------------------------------------------- */

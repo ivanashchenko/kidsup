@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Архив страниц — KidsUP{% endblock %}
+{% block content %}
+<style>
+/* строки, а не таблица: на телефоне таблицы в карточках прокручиваются вбок одной
+   строкой, а здесь у каждой страницы два предложения текста */
+.arh-list { display: grid; gap: 10px; margin: 0 0 8px; padding: 0; list-style: none; }
+.arh-list li { background: var(--card); border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 13px 16px; }
+.arh-list a.t { font-weight: 700; font-size: 16px; }
+.arh-list .adr { margin-left: 8px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.arh-list p { margin: 4px 0 0; max-width: 78ch; }
+.arh-list p.pochemu { color: var(--text-2); font-size: 14px; }
+.arh-niz { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--border); }
+</style>
+
+<h1>Архив страниц</h1>
+<p class="muted">Страницы разовых кампаний и старые экраны. Данные и тексты на них могут быть
+устаревшими. В меню и на рабочих страницах их больше нет, по адресу они открываются.
+Список видит только владелец.</p>
+
+<ul class="arh-list">
+{% for adres, nazvanie, chto, pochemu in arhiv %}
+  <li>
+    <a class="t" href="{{ adres }}">{{ nazvanie }}</a><span class="adr">{{ adres }}</span>
+    <p>{{ chto }}</p>
+    <p class="pochemu"><b>Почему в архиве:</b> {{ pochemu }}</p>
+  </li>
+{% endfor %}
+</ul>
+
+<h2>Переезжают на другие страницы</h2>
+<p class="muted">На каждой из этих страниц осталось то, чего на новой пока нет. Пока содержимое
+не перенесено, они открываются по адресу; в меню их нет.</p>
+
+<ul class="arh-list">
+{% for adres, nazvanie, kuda, kuda_adres, ostalos in pereezd %}
+  <li>
+    <a class="t" href="{{ adres }}">{{ nazvanie }}</a><span class="adr">{{ adres }}</span>
+    <p>Переезжает на страницу <a href="{{ kuda_adres }}">«{{ kuda }}»</a>.</p>
+    <p class="pochemu"><b>Что там осталось:</b> {{ ostalos }}</p>
+  </li>
+{% endfor %}
+</ul>
+
+<p class="arh-niz">Старые документы лежат не здесь, а свёрнутым блоком «Архив» внизу своих
+списков: <a href="/boris/docs#arhiv">архив документов владельца</a> ·
+<a href="/admin/docs#arhiv">архив списков администраторов</a>.</p>
+{% endblock %}

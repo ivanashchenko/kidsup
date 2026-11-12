@@ -128,10 +128,12 @@ p { margin: 0 0 12px; }
 p:last-child { margin-bottom: 0; }
 
 /* ------------------------------------------------------------- шапка ---- */
-/* Шапка — явная сетка из трёх рядов, а не один flex с переносом.
+/* Шапка — явная сетка, а не один flex с переносом.
    В потоке лежали семь разнородных блоков, и при нехватке ширины
    «Синхронизировать» выдавливало МЕЖДУ рядами меню, а подписи групп
-   слипались с пунктами. Сетка закрепляет за каждым блоком своё место. */
+   слипались с пунктами. Сетка закрепляет за каждым блоком своё место.
+   12.11.2026: разделы меню лежат в одном блоке .nav-razdely (ряд «nav») —
+   на телефоне он сворачивается кнопкой «☰ Разделы» целиком. */
 .topbar {
   position: sticky;
   top: 0;
@@ -140,8 +142,7 @@ p:last-child { margin-bottom: 0; }
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   grid-template-areas:
     "brand search badge sync"
-    "main  main   main  main"
-    "sub   sub    sub   sub";
+    "nav   nav    nav   nav";
   /* toggle на широком экране скрыт (display:none) и места не занимает */
   align-items: center;
   gap: 8px 18px;
@@ -171,6 +172,7 @@ p:last-child { margin-bottom: 0; }
   color: var(--indigo);
   white-space: nowrap;
 }
+a.brand, a.brand:hover { text-decoration: none; }
 .brand img {
   height: 38px; width: 38px;
   object-fit: contain;
@@ -178,16 +180,24 @@ p:last-child { margin-bottom: 0; }
 }
 .brand span { color: var(--primary); font-weight: 650; }
 
-/* Меню в две строки: сверху — ежедневная работа на смене,
-   снизу — разделы контроля и разбора. */
+/* Меню по разделам: сверху — «Смена», то, что открыто весь день; ниже —
+   «Группы», «Деньги», «Справка»; у владельца ещё строка его раздела. */
+.nav-razdely {
+  grid-area: nav;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
 .topbar nav { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-.topbar nav.nav-main { grid-area: main; }
 .topbar nav.nav-sub {
-  grid-area: sub;
-  gap: 2px 4px;
+  gap: 2px 3px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
+/* раздел владельца — своим цветом: видно, что эта строка есть только у него */
+.topbar nav.nav-vlad .nav-label { color: var(--indigo); opacity: 1; }
+.topbar nav.nav-vlad a.active { background: var(--indigo-soft); color: var(--indigo); }
 .brand { grid-area: brand; }
 .nav-toggle { grid-area: toggle; }
 .gsearch { grid-area: search; min-width: 0; }
@@ -210,11 +220,16 @@ p:last-child { margin-bottom: 0; }
   color: #fff;
   box-shadow: 0 6px 16px -8px rgba(42, 167, 222, .85);
 }
-.topbar nav.nav-sub a { padding: 5px 11px; font-size: 13px; font-weight: 600; }
+/* поля ужаты до 8px: 11 пунктов и три подписи помещаются в один ряд при ширине
+   полотна 1240 — с прежними 11px последний пункт падал на новую строку один */
+.topbar nav.nav-sub a { padding: 5px 8px; font-size: 13px; font-weight: 600; }
+/* Раздел переносится целиком: если ряд всё же не поместился (другой шрифт, узкое
+   окно), на вторую строку уходит «Справка» вместе с подписью, а не один пункт. */
+.nav-group { display: flex; align-items: center; gap: 3px; }
 .topbar nav.nav-sub a.active { background: var(--primary-soft); color: var(--primary-dark); }
 
 
-/* подписи групп во второй строке меню: Маркетинг · Контроль · Данные */
+/* подписи разделов меню: Смена · Группы · Деньги · Справка · Владельцу */
 .nav-label {
   display: flex;
   align-items: center;
@@ -225,7 +240,7 @@ p:last-child { margin-bottom: 0; }
   text-transform: uppercase;
   color: var(--muted);
   opacity: .75;
-  margin-left: 10px;
+  margin-left: 8px;
   align-self: center;
   user-select: none;
   white-space: nowrap;
@@ -240,6 +255,9 @@ p:last-child { margin-bottom: 0; }
 }
 .nav-label:first-child { margin-left: 2px; }
 .nav-label:first-child::before { display: none; }
+/* черта и отступ — перед каждым разделом в ряду, кроме первого */
+.nav-group + .nav-group .nav-label { margin-left: 8px; }
+.nav-group + .nav-group .nav-label::before { display: block; }
 
 /* витрина занятий: текст описаний */
 .prose p { margin: 0 0 10px; max-width: 74ch; }
@@ -625,14 +643,6 @@ textarea.apology {
   .brand img { height: 30px; width: 30px; }
   .sync-block { justify-content: flex-start; }
   .gsearch input { width: 100%; }
-  /* меню одной прокручиваемой лентой — 15 разделов иначе занимают полэкрана */
-  .topbar nav.nav-main, .topbar nav.nav-sub {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .topbar nav::-webkit-scrollbar { display: none; }
   main { padding: 18px 12px 56px; }
   .card { padding: 15px 16px; border-radius: var(--r-md); }
   .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr; }
@@ -717,10 +727,6 @@ main { animation: pagein .18s ease-out; }
 .topbar { position: sticky; top: 0; z-index: 80;
   backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px); }
 
-@media (max-width: 760px) {
-  .gsearch { order: 5; flex-basis: 100%; max-width: none; }
-}
-
 /* --- кто ждёт ответа --- */
 .wait-badge{display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;
   border-radius:999px;background:#EAF6FC;color:#312783;font-weight:700;font-size:.82rem;
@@ -730,34 +736,41 @@ main { animation: pagein .18s ease-out; }
 @keyframes waitpulse{0%,100%{box-shadow:0 0 0 0 rgba(227,6,19,.35)}50%{box-shadow:0 0 0 7px rgba(227,6,19,0)}}
 tr.warn-row td{background:#FDF1F1}
 
-/* --- мобильное меню: на узких экранах навигация сворачивается в бургер --- */
+/* --- мобильное меню: на узких экранах разделы сворачиваются под «☰ Разделы» --- */
 .nav-toggle{display:none}
 @media (max-width: 920px){
-  /* С этой ширины появляется кнопка меню — сетка перестраивается здесь же,
-     а не на 700px: иначе кнопка видима, а места в сетке у неё нет,
-     и она уходит в неявную строку, ломая ряд. */
-  .topbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "brand  toggle"
-      "search search"
-      "badge  badge"
-      "sync   sync"
-      "main   main"
-      "sub    sub";
-    gap: 8px 10px;
-  }
-  .nav-toggle{display:inline-flex;align-items:center;gap:.35rem;margin-left:auto;
-    padding:.45rem .85rem;border:1.5px solid #1DA7E0;border-radius:999px;
-    background:#fff;color:#312783;font-weight:700;font-size:.9rem;cursor:pointer}
-  body:not(.nav-open) .nav-main,
-  body:not(.nav-open) .nav-sub,
+  /* С этой ширины появляется кнопка меню. Шапка здесь — лента с переносом, а не сетка:
+     у сетки скрытые ряды (свёрнутое меню, пустой бейдж) всё равно оставляли зазоры,
+     и под поиском висела пустая полоса. Порядок: логотип и кнопка, поиск, бейдж,
+     разделы, синхронизация. */
+  .topbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+  .brand{order:1;margin-right:auto}
+  .nav-toggle{order:2;display:inline-flex;align-items:center;gap:.35rem;
+    padding:.5rem .95rem;min-height:40px;border:1.5px solid var(--primary);border-radius:999px;
+    background:var(--card);color:var(--indigo);font:inherit;font-weight:700;font-size:.9rem;
+    white-space:nowrap;cursor:pointer}
+  .gsearch{order:3;flex:1 1 100%;max-width:none;min-width:0}
+  .wait-badge{order:4;font-size:.78rem;padding:.3rem .6rem}
+  .nav-razdely{order:5;flex:1 1 100%}
+  .sync-block{order:6;flex:1 1 100%;justify-content:flex-start}
+  body:not(.nav-open) .nav-razdely,
   body:not(.nav-open) .sync-block{display:none}
-  body.nav-open .nav-main, body.nav-open .nav-sub{display:flex;flex-wrap:wrap;width:100%}
-  body.nav-open .sync-block{display:flex;width:100%}
-  .topbar{row-gap:.5rem}
-  .gsearch{order:5;width:100%}
-  .wait-badge{font-size:.78rem;padding:.3rem .6rem}
+  /* Шапка липкая, а раскрытое меню у владельца (27 пунктов) выше экрана телефона:
+     без своей прокрутки нижние разделы оказались бы за краем и до них не добраться. */
+  body.nav-open .nav-razdely{max-height:calc(100vh - 200px);max-height:calc(100dvh - 200px);
+    overflow-y:auto;overscroll-behavior:contain;padding-bottom:4px}
+  /* на телефоне каждый раздел — подпись и под ней его пункты: палец попадает, глаз находит */
+  .nav-razdely .nav-label,
+  .nav-razdely .nav-group + .nav-group .nav-label{flex-basis:100%;margin:6px 0 2px 2px;font-size:11px}
+  .nav-razdely .nav-label::before,
+  .nav-razdely .nav-group + .nav-group .nav-label::before{display:none}
+  .nav-razdely nav, .nav-group{gap:6px}
+  .nav-group{flex:1 1 100%;flex-wrap:wrap}
+  .topbar .nav-razdely nav a{padding:9px 14px;font-size:14.5px;background:var(--bg-deep)}
+  .topbar nav.nav-main a.active{color:#fff;background:linear-gradient(180deg,var(--primary),var(--primary-dark))}
+  .topbar nav.nav-sub a.active{background:var(--primary-soft)}
+  .topbar nav.nav-vlad a.active{background:var(--indigo-soft)}
+  .topbar nav.nav-sub{padding-top:2px}
 }
 
 /* --- вкладки объединённых страниц --- */

@@ -12,8 +12,8 @@
     админ ставит галочку (POST /api/pult/done), галочка видна всем;
   • живые блоки: «Появилось за день», «Заявки с 10.08 без обработки»,
     «Свободные места сейчас»;
-  • ссылки на рабочие списки (/voronka, /mesta, /blank-grupp, /obzvon, /karta) —
-    админ не ходит туда сам, а попадает по ссылке из своей задачи.
+  • блок «Разделы» внизу — то же меню, что в общей шапке (app/nav.py): у пульта
+    свой HTML, общей шапки на нём нет, а это стартовая страница админов.
 
 ?who=Аня — только одна колонка (для вкладки самого админа).
 Никаких отправок — только чтение CRM и своя таблица задач.
@@ -974,8 +974,10 @@ def _safe(fn, *a, imya: str = "", **kw) -> str:
                 f"Остальной пульт работает. Клод увидит это в логе и починит.</div>")
 
 
-def page(day: str = "", who: str = "") -> str:
-    from . import zayavki, mesta
+def page(day: str = "", who: str = "", rol: str = "admin") -> str:
+    """rol — кто открыл пульт ("admin" или "owner"): от роли зависит блок «Разделы»,
+    раздел владельца админу не рисуется."""
+    from . import zayavki, mesta, nav
     from .main import _inbox_block
     day = day or today()
     on = duty(day)
@@ -1011,7 +1013,9 @@ def page(day: str = "", who: str = "") -> str:
     # 12.11.2026, Борис: «скрой не нужные / не актуальные / старые страницы». Из блока
     # ссылок внизу ушли /nabor и /nezvonili (архив владельца), /spiski (вместо него —
     # бланки групп) и «план и списки семей» /base/plan_<сегодня>: последняя страница
-    # плана дня — за 06.09, с тех пор ссылка каждый день вела на 404.
+    # плана дня — за 06.09, с тех пор ссылка каждый день вела на 404. Сам блок теперь —
+    # меню из app/nav.py: пульт стал стартовой страницей админов, а общей шапки на нём
+    # нет. /segodnya из блока ушла (переезжает на пульт, открывается по адресу).
     ver = ""
     try:
         from .main import APP_VERSION
@@ -1056,13 +1060,12 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 </style></head><body><div class='wrap'>
 <div class='hero'><h1>Пульт · {wd}, {d.day:02d}.{d.month:02d} · в смене: {html.escape(hero_who)} · <span id='clock'>{now_msk.strftime('%H:%M')}</span> МСК</h1>
 <p>Одна ссылка для всех: задачи по колонкам — только тем, кто сегодня работает, плюс Лиза и Борис. Галочка видна всем. Обновляется сама каждые 5 минут. Своя колонка: {filt}
-{"<a href='/pult'>все</a>" if who else ""}</p></div>
+{"<a href='/pult'>все</a>" if who else ""} · <a href='#razdely'>☰ Разделы</a></p></div>
 <div class='kpis'>{kpi_html}</div>
 {HOWTO}
 <div class='who'>{cols}</div>
-<div class='links card'><b>Рабочие списки</b> — открываются из задачи в колонке, отдельно заходить не нужно:
-<a href='/segodnya'>что горит сегодня</a> · <a href='/voronka'>кто без оплаты</a> · <a href='/obzvon'>вернуть ушедших</a> · <a href='/mesta'>свободные места</a> · <a href='/blank-grupp'>бланки групп</a> · <a href='/karta'>карта развития</a><br>
-<b>Справочное:</b> <a href='/base/gruppy_reshenia'>куда зовём, какие группы сливаем</a> · <a href='/base/skripty_v3'>скрипты</a> · <a href='/base'>вся база</a></div>
+<div class='links card' id='razdely'>{nav.stroka(rol)}<br>
+<span class='razdel'><b>Ещё:</b> {nav.eshche()}</span></div>
 <h2 style='margin-top:26px'>Справочные списки — для Бориса и на потом</h2>
 <p style='margin:-4px 0 10px;color:#6c6a86;font-size:13.5px'>Админам сюда ходить не нужно: всё, что нужно сделать сегодня, уже стоит в колонке выше.</p>
 {_safe(_nikogda_ne_zvonili, day, imya='кому не звонили')}

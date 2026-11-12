@@ -1627,8 +1627,9 @@ def _owner_ctx(msg: str = "") -> str:
 .w{{max-width:720px;margin:0 auto}}h1{{color:#312783;font-size:24px}}label{{display:block;background:#fff;border:1px solid #e4e2f0;border-radius:12px;padding:12px 14px;margin:10px 0}}
 label span{{display:block;font-weight:600}}label small{{display:block;color:#6c6a86;margin:2px 0 6px}}input{{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #cfcde0;border-radius:8px;font-size:15px}}
 button{{background:#7DB928;color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:16px;font-weight:700;cursor:pointer}}.msg{{background:#eef8e6;border-left:4px solid #7DB928;padding:10px 12px;border-radius:8px;margin:12px 0}}
-p.note{{color:#6c6a86;font-size:14px}}</style></head><body><div class='w'>
+p.note{{color:#6c6a86;font-size:14px}}p.nav{{font-size:14.5px;margin:-6px 0 10px}}p.nav a{{color:#312783}}</style></head><body><div class='w'>
 <h1>Настройки владельца</h1>
+<p class='nav'><a href='/boris/docs'>← Мои документы</a> · <a href='/settings'>Ключ МойКласса и выгрузка</a> · <a href='/kamery/nastroyka'>Камеры</a> · <a href='/arhiv'>Архив страниц</a></p>
 <p class='note'>Эта страница и всё, что на ней, закрыто отдельным паролем владельца — общий пароль admin сюда не подходит. Значения хранятся как секреты и в ответах сервера не показываются. Пустое поле — оставить как есть.</p>
 {('<div class="msg">' + html.escape(msg) + '</div>') if msg else ''}
 <form method='post'>{''.join(rows)}<button type='submit'>Сохранить</button></form>
@@ -1651,6 +1652,17 @@ async def owner_save(request: Request):
             db.set_setting(key, v)
             saved.append(label.split(" — ")[0])
     return HTMLResponse(_owner_ctx("Сохранено: " + ", ".join(saved) if saved else "Ничего не изменено."))
+
+
+@app.get("/arhiv", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+def arhiv_page(request: Request):
+    """Архив страниц — только владельцу.
+
+    12.11.2026, Борис: «скрой не нужные / не актуальные / старые страницы». Страницы
+    разовых кампаний из меню и с рабочих страниц убраны, но не удалены: здесь на каждую
+    есть ссылка и строка, что это и почему в архиве. Ниже — страницы, которые переезжают
+    на другие и пока открываются по адресу. Списки — в app/nav.py."""
+    return render(request, "arhiv.html", active="arhiv", arhiv=nav.ARHIV, pereezd=nav.PEREEZD)
 
 
 @app.get("/base", response_class=HTMLResponse, dependencies=AUTH)

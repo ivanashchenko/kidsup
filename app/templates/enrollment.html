@@ -86,7 +86,8 @@
   <h2>Что говорить о предмете</h2>
   <p class="muted" style="margin-top:0">Коротко: чем ценно → что получит ребёнок → чем закрыть на пробное.
   {% if not course %}Выберите предмет в фильтре, чтобы остался только он.{% endif %}
-  Полные описания с текстом для WhatsApp — на странице <a href="/courses">Занятия</a>.</p>
+  Полные описания с текстом для WhatsApp — на странице <a href="/courses">Описания занятий</a>.
+  Семье нужны 2–3 предмета в один вечер — <a href="/constructor">Конструктор</a>.</p>
   {% for p in pitches %}
   <details {% if course %}open{% endif %} style="margin-bottom:8px">
     <summary><b>{{ p.course }}</b></summary>
