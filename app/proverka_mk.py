@@ -22,7 +22,11 @@ pravila1211 (stranica_lizy.md, stranica_lizy_proverka.md); правила раз
 средний раз в 30 минут и по кнопке «Перепроверить сейчас» (sync.sredniy_sync),
 полный в 07:00. Удалённое в МойКлассе синк помечает в mk_udaleno — такие строки
 («призраки») на странице не показываются. Ещё один источник удалений — подтверждённые
-ответом 404 удаления сверки честности (sverka_chestnosti_udaleno).
+ответом 404 удаления сверки честности (sverka_chestnosti_udaleno), но только абонементов
+и платежей: для записей на занятия ответ 404 бывает и у живой записи.
+
+Сверка строк на копии базы 12.11 (что оказалось ложным и как поправлено) — в комментариях
+у r1, r3, r10 и в тесте test_sverka_1211.
 
 Строки живут в таблице proverka_mk_stroki (ключ, раздел, впервые, последний раз,
 закрыта, заметка): по ней считаются «новых и закрыто за сутки», возраст строки и
@@ -73,6 +77,7 @@ OKNO_PREDEL = "2026-09-01"         # окно не уходит раньше н�
 SEZON_OT = "2026-08-25"            # абонементы сезона — проданные с 25.08
 RASPISANIE_DO = "2027-05-31"
 KESH_MINUT = 10
+R1_DEN = 5                         # столько незакрытых занятий за день — уже «день не закрыт», одна строка
 
 # статусы карточек
 NOVYI_LID, NET_OTVETA, DUMAET, ZAPISALSYA, POSETIL = 125951, 345768, 146950, 125952, 125953
@@ -171,10 +176,16 @@ class Dannye:
         with db.get_conn() as conn:
             self.ud = {t: db.udalennye(t, conn) for t in
                        ("lessons", "user_subscriptions", "invoices", "users", "joins", "lesson_records", "payments")}
+            # Удаления, подтверждённые сверкой честности (404 по id), берём только для
+            # абонементов и платежей. Для записей на занятия им верить нельзя (сверка 12.11):
+            # GET /lessonRecords/{id} отвечает 404 и на живую запись непроведённого занятия —
+            # 10 из 113 таких «удалённых» записей были живы, и раздел 1 терял 6 строк из 8.
+            # Сама таблица lesson_records чистится синком: занятие приходит со всем списком
+            # записей, чего в списке нет — стирается (db.save_lessons).
             izv = _j(db.get_state("sverka_chestnosti_udaleno") or "{}")
             for k in (izv if isinstance(izv, dict) else {}):
                 tbl, _, rid = str(k).partition(":")
-                if tbl in self.ud and rid.isdigit():
+                if tbl in ("user_subscriptions", "payments") and rid.isdigit():
                     self.ud[tbl].add(int(rid))
             self.classes = {}
             for r in conn.execute("SELECT id, name, status FROM classes"):
@@ -240,7 +251,12 @@ class Dannye:
                 "AND COALESCE(payed, 0) < price") if r["id"] not in self.ud["invoices"]]
             try:
                 self.comments = [dict(r) for r in conn.execute(
-                    "SELECT user_id, ts, text FROM crm_comments WHERE ts >= ?", ("2026-08-15",))]
+                    "SELECT user_id, ts, manager_id, text FROM crm_comments WHERE ts >= ?", ("2026-08-15",))]
+                # Сверка 12.11: 7 из 10 комментариев в карточках пишет автоматика (журнал
+                # звонков и переписок, от имени API — без manager_id). Такой комментарий —
+                # не объяснение админа: строку раздела 10 он закрывать не должен.
+                for c in self.comments:
+                    c["chelovek"] = bool(c.get("manager_id")) and not _robot(c.get("text"))
             except Exception:  # noqa: BLE001 — кэша комментариев ещё нет
                 self.comments = []
             try:
@@ -351,6 +367,14 @@ class Dannye:
         return ""
 
 
+def _robot(text) -> bool:
+    try:
+        from . import voronka
+        return voronka._robot(text)
+    except Exception:  # noqa: BLE001
+        return str(text or "").lstrip().startswith(("Клод", "🤖", "Авто", "📞"))
+
+
 def _stroka(pod: str, key: str, **kw) -> dict:
     r = {"razdel": re.match(r"\d+", pod).group(), "pod": pod, "key": key, "rebenok": "", "uid": None,
          "gruppa": "", "class_id": None, "data": "", "kogda": "", "chto": "", "sdelat": "", "ssylka": "",
@@ -367,21 +391,44 @@ def _stroka(pod: str, key: str, **kw) -> dict:
 # ── Р1. Прошло — не закрыто ───────────────────────────────────────────────
 
 def r1(D: Dannye) -> list[dict]:
-    out = []
+    """Занятие прошло, записи есть, а оно не «проведено».
+
+    Сверка 12.11: занятия закрывают люди, обычно на следующий день, а то и через день
+    (вечером 11.11 не были закрыты 17 занятий 10.11 и 23 занятия 11.11). Поштучно это
+    40 строк каждый вечер, в которых тонут 8 настоящих забытых. Поэтому: день, где не
+    закрыто R1_DEN занятий и больше, — одна строка «день не закрыт»; меньше — по занятию."""
     lo = D.lo("1")
     vecher = D.hm >= "21:30"
+    po_dnyam = defaultdict(list)
     for l in D.lessons.values():
         if not D.is27(l["cid"]) or l["status"] != 0 or not D.rbl.get(l["id"]):
             continue
         if not (lo <= l["date"] <= D.dd(-1) or (vecher and l["date"] == D.today and D.konchilos(l))):
             continue
-        n = len(D.rbl[l["id"]])
-        out.append(_stroka("1", f"r1:{l['id']}", gruppa=D.gruppa(l["cid"]), class_id=l["cid"], data=l["date"],
-                           kogda=_kogda(l["date"], l["begin"]),
-                           chto=f"занятие не закрыто, записано {n}",
-                           sdelat="провести с явкой; если занятия не было — снять записи или удалить занятие",
-                           obnovitsya=D.obnovitsya("zanyatie", l["date"]),
-                           fakty={"status": 0, "n": n}))
+        po_dnyam[l["date"]].append(l)
+    out = []
+    for den, ls in sorted(po_dnyam.items()):
+        if len(ls) >= R1_DEN:
+            vsego = sum(1 for l in D.lessons.values() if l["date"] == den and D.is27(l["cid"]) and D.rbl.get(l["id"]))
+            po = Counter(D.fam(l["cid"]) or D.gruppa(l["cid"]) for l in ls)
+            out.append(_stroka(
+                "1", f"r1:den:{den}", gruppa="весь день", data=den, kogda=_kogda(den),
+                chto=(f"день не закрыт: не проведено {len(ls)} из {vsego} занятий с записями ("
+                      + ", ".join(f"{k} {v}" for k, v in po.most_common(6)) + ")"),
+                sdelat=("провести занятия дня с явкой по отчётам педагогов; если занятия не было — "
+                        "снять записи или удалить занятие"),
+                ssylka=f"/yavka?day={den}", ssylka_tekst="явка за день",
+                obnovitsya=D.obnovitsya("zanyatie", den),
+                fakty={"status": 0, "zanyatiy": len(ls)}))
+            continue
+        for l in ls:
+            n = len(D.rbl[l["id"]])
+            out.append(_stroka("1", f"r1:{l['id']}", gruppa=D.gruppa(l["cid"]), class_id=l["cid"], data=l["date"],
+                               kogda=_kogda(l["date"], l["begin"]),
+                               chto=f"занятие не закрыто, записано {n}",
+                               sdelat="провести с явкой; если занятия не было — снять записи или удалить занятие",
+                               obnovitsya=D.obnovitsya("zanyatie", l["date"]),
+                               fakty={"status": 0, "n": n}))
     return out
 
 
@@ -481,7 +528,33 @@ def _najti_rebenka(D: Dannye, imya: str, cid=None):
         svoi = [u for u in hits if (u, cid) in D.jst]
         if svoi:
             return svoi[0]
-    return hits[0]
+        # не из этой группы — тогда из этого направления (отработка в соседней группе)
+        f = D.fam(cid)
+        v_napr = [u for u in hits if any(uu == u and D.fam(c) == f for (uu, c) in D.jst)]
+        if len(v_napr) == 1:
+            return v_napr[0]
+    # тёзки, и ни один не из этой группы и направления — чью запись заводить, не понять
+    return hits[0] if len(hits) == 1 else None
+
+
+# Пометка педагога рядом с именем говорит, что ребёнка НЕ было, хотя строка попала в «был»
+# (сверка 12.11: «Иванов — не было», «Петрова (заморозка)» разобраны как присутствие —
+# 7 из 29 строк «по отчёту был, в МойКлассе не был» и 2 из 13 «был без записи»).
+_NE_BYLO = re.compile(r"не\s*был[оаи]?(?![а-яё])|отсутств|заморозк|боле[лею]|больн|не\s+приш|не\s+прид", re.I)
+
+
+def _byl_ryadom(D: Dannye, uid, day: str, cid, krome_lid=None) -> bool:
+    """Ребёнку в этот день уже стоит «был» на другом занятии того же направления.
+
+    Сверка 12.11: логопед ведёт субботу слотами (10:00, 10:50, 11:40…), ребёнок записан
+    в один слот, а в отчёте педагога оказался под соседним; то же с переходом между
+    группами ПШ. 16 из 27 строк «был без записи» были такими — явка и списание верны."""
+    f = D.fam(cid)
+    for r in D.recs_by_user.get(uid, []):
+        l = D.lessons.get(r["lessonId"])
+        if l and l["date"] == day and l["id"] != krome_lid and r.get("visit") and D.fam(l["cid"]) == f:
+            return True
+    return False
 
 
 def r3(D: Dannye) -> list[dict]:
@@ -515,6 +588,13 @@ def r3(D: Dannye) -> list[dict]:
                     continue                       # записи уже нет — снята
                 if act == "rashozhdenie" and cur.get("visit"):
                     continue                       # «был» уже поставлен
+                if act == "rashozhdenie" and (D.lessons.get(lid) or {}).get("status") != 1:
+                    continue                       # занятие ещё не проведено: явку ставят при проведении,
+                                                   # это строка раздела 1, а не расхождение (сверка 12.11)
+                if act == "rashozhdenie" and _NE_BYLO.search(str(rec.get("note") or "")):
+                    continue                       # в пометке педагога «не было» — отчёт разобран неверно
+                if act == "rashozhdenie" and _byl_ryadom(D, rec.get("uid"), day, L.get("class_id"), lid):
+                    continue                       # «был» стоит на соседнем занятии того же направления
                 if act == "conflict_visit" and not cur.get("visit"):
                     continue                       # «был» уже снят
                 uid = rec.get("uid")
@@ -528,12 +608,19 @@ def r3(D: Dannye) -> list[dict]:
                         sdelat=("поставить «был»" if act == "rashozhdenie" else "поставить пропуск («не был»)"),
                         rebenok=D.imya(uid))
             for c in L.get("conflicts") or []:
+                # Два отчёта спорят между собой. По данным МойКласса такая строка закрыться
+                # не может, поэтому: старше 14 дней не показываем (уточнять у педагога уже
+                # поздно), а если по этому ребёнку и группе есть своя строка расхождения —
+                # отдельной строки не даём (сверка 12.11: 5 из 8 были такими повторами).
+                if day < D.dd(-HVOST_DNEY):
+                    continue
                 nm = str(c).split(":")[0].strip()
-                dobavit(f"r3k:{L.get('class_id')}:{nm.lower()}", day, L, uid=None, vid="conflict",
+                k_uid = next((r.get("uid") for r in L.get("records") or [] if (r.get("name") or "").strip() == nm), None)
+                dobavit(f"r3k:{L.get('class_id')}:{k_uid or nm.lower()}", day, L, uid=k_uid, vid="conflict",
                         chto="два отчёта расходятся: в одном «был», в другом «не был»",
                         sdelat="уточнить у педагога и поставить явку по факту", rebenok=nm)
             for u in L.get("unmatched") or []:
-                if u.get("kind") != "был":
+                if u.get("kind") != "был" or _NE_BYLO.search(str(u.get("note") or "")):
                     continue
                 uid = _najti_rebenka(D, u.get("name") or "", L.get("class_id"))
                 if not uid:
@@ -544,10 +631,21 @@ def r3(D: Dannye) -> list[dict]:
                     same_day.append(lid)
                 if any(r["userId"] == uid for x in same_day for r in D.rbl.get(x, [])):
                     continue
+                if _byl_ryadom(D, uid, day, L.get("class_id")):
+                    continue
                 dobavit(f"r3u:{uid}:{L.get('class_id')}", day, L, uid=uid, vid="unmatched",
                         chto="в отчёте педагога «был», а записи на занятие нет",
                         sdelat="завести запись (отработка или пробное) и отметить «был»", rebenok=D.imya(uid))
     out = []
+    for key, x in list(sklejka.items()):
+        if x["vid"] != "conflict" or not x.get("uid"):
+            continue
+        svoya = next((sklejka[k] for k in (f"r3:rashozhdenie:{x['uid']}:{x['_cid']}", f"r3:conflict_visit:{x['uid']}:{x['_cid']}")
+                      if k in sklejka), None)
+        if svoya:
+            if "отчёты педагогов расходятся" not in svoya["chto"]:
+                svoya["chto"] += "; отчёты педагогов расходятся между собой — уточнить у педагога"
+            del sklejka[key]
     for key, x in sklejka.items():
         dni = sorted(x["_dni"])
         cid = x["_cid"]
@@ -604,7 +702,9 @@ def _kommentariy_ob_otrabotke(D: Dannye, uid, d: str) -> bool:
         if not (lo <= str(c.get("ts") or "") <= hi):
             continue
         t = (c.get("text") or "").lower()
-        if "отработ" in t or re.search(r"(?<!\d)" + re.escape(dm) + r"(?!\d)", t):
+        # дата занятия считается объяснением только в комментарии человека: журнал звонков
+        # автоматики сам начинается с даты («09.10 13:55, исходящий…») — сверка 12.11
+        if "отработ" in t or (c.get("chelovek") and re.search(r"(?<!\d)" + re.escape(dm) + r"(?!\d)", t)):
             return True
     return False
 
@@ -1101,6 +1201,13 @@ def r10(D: Dannye) -> list[dict]:
             nakhodki.append((f.stem, x))
             if str(x.get("kind") or "").startswith("удаление: user_subscriptions") and x.get("userId"):
                 udal_abon[x["userId"]].add(f.stem)
+    # правки абонементов по клиентам (любого уровня): по ним узнаём «эхо» — списание в оплату
+    # абонемента (debit) меняется само, когда меняют цену абонемента
+    abon_pravki = defaultdict(list)
+    for den, x in nakhodki:
+        if str(x.get("kind") or "") == "правка: user_subscriptions" and x.get("level") in ("red", "yellow") \
+                and x.get("userId") and x.get("rid"):
+            abon_pravki[x["userId"]].append((den, x["rid"], str(x.get("text") or "")))
     sklejka: dict[str, dict] = {}
     for den, x in nakhodki:
         kind, uid = str(x.get("kind") or ""), x.get("userId")
@@ -1138,6 +1245,21 @@ def r10(D: Dannye) -> list[dict]:
             if cur is not None and abs(cur["summa"] - _num((polya["summa"] + [0])[0])) < 0.01:
                 continue         # сумму вернули
         key = f"r10:{tbl}:{rid}" if rid else f"r10:{kind}:{uid}"
+        if tbl == "payments" and kind.startswith("правка:") and "summa" in polya:
+            # Сверка 12.11: 16 из 30 строк были «сумма -9450 → -8400» — это не отдельная правка,
+            # а списание в оплату абонемента, пересчитанное вслед за ценой абонемента. Строка
+            # одна — про абонемент, и словами, которые понятны («цена … снижена 9450 → 8400»).
+            try:
+                a_s, b_s = _num(polya["summa"][0]), _num(polya["summa"][1])
+            except Exception:  # noqa: BLE001
+                a_s = b_s = 0
+            if a_s < 0 and b_s < 0:
+                sid = (D.pay_by_id.get(rid) or {}).get("userSubscriptionId")
+                d0 = date.fromisoformat(den)
+                para = [p for p in abon_pravki.get(uid, [])
+                        if abs((date.fromisoformat(p[0]) - d0).days) <= 1 and (not sid or p[1] == sid)]
+                if para:
+                    key, tekst = f"r10:user_subscriptions:{para[0][1]}", para[0][2]
         if key in sklejka:
             if den not in sklejka[key]["dni"]:
                 sklejka[key]["dni"].append(den)
@@ -1146,8 +1268,10 @@ def r10(D: Dannye) -> list[dict]:
     out = []
     for key, x in sklejka.items():
         uid, dni = x["uid"], sorted(x["dni"])
-        # исчезает: в карточке появился комментарий позже находки
-        if any(str(c.get("ts") or "")[:10] >= dni[0] for c in D.comm_by_user.get(uid, [])):
+        # исчезает: в карточке появился комментарий человека не раньше находки
+        # (с вечера накануне: сверка замечает правку наутро, а объяснение пишут сразу)
+        s_dnya = (date.fromisoformat(dni[0]) - timedelta(days=1)).isoformat()
+        if any(c.get("chelovek") and str(c.get("ts") or "")[:10] >= s_dnya for c in D.comm_by_user.get(uid, [])):
             continue
         chto = x["tekst"].split(": ", 1)[1] if ": " in x["tekst"] else x["tekst"]
         chto = re.sub(r"\s*\(замечено [^)]*\)", "", chto)

@@ -603,8 +603,135 @@ def test_http():
                      if x["key"] == "r6:9004"))
 
 
+# ── 8. Ложные строки, найденные сверкой 12.11 на копии базы ────────────────
+
+def test_sverka_1211():
+    print("Сверка 12.11: ложные строки разделов 1, 3, 4б, 7 и 10")
+    c = sqlite3.connect(config.DB_PATH)
+    c.executemany("INSERT INTO classes (id, name, status, raw) VALUES (?,?,?,'{}')", [
+        (201, "2627_АЯ_пн-ср_18:00_9-11 лет (Гр21)", "opened"),
+        (202, "2627_ПШ_пн-чт_18:00_5-7 лет_ПШ2 читающие (Гр22)", "opened"),
+        (203, "2627_ПШ_пн-чт_19:00_5-7 лет_ПШ2 читающие (Гр23)", "opened"),
+        (204, "2627_МА_вс_14:00_7-12 лет", "opened")])
+    novye = {9101: "Непроведённов Ян", 9102: "Небылова Ася", 9103: "Соседов Лев", 9104: "Расхождин Тим",
+             9105: "Слотова Мия", 9106: "Заморозкина Ида", 9107: "Тёзкин Саша", 9108: "Тёзкин Саша",
+             9109: "Беззаписин Рома", 9110: "Спорова Уля", 9111: "Пересчётов Глеб", 9112: "Журналова Зина",
+             9113: "Объяснённов Юра", 9114: "Подаркова Эля"}
+    for uid, n in novye.items():
+        c.execute("INSERT INTO users (id, name, phone, balance, client_state_id, created_at, raw) VALUES (?,?,?,?,?,?,?)",
+                  (uid, n, tel(uid - 9000), 0, 125955, "2026-08-20", json.dumps({"name": n, "attributes": []}, ensure_ascii=False)))
+    c.commit()
+    c.close()
+    for i, (uid, cid) in enumerate([(9101, 202), (9102, 202), (9103, 202), (9104, 202), (9105, 203), (9106, 202),
+                                    (9109, 202), (9110, 202), (9107, 204), (9108, 204), (9114, 201)]):
+        zapis_v_gruppu(900 + i, uid, cid, 2)
+
+    # Р1: день, где не закрыто 5 занятий, — одна строка «день не закрыт»; 4 — по занятию
+    for i in range(5):
+        urok(700 + i, 201, "2026-10-13", t=f"{12 + i}:00", konec=f"{12 + i}:50", status=0, zapisi=[(7000 + i, 9101, {})])
+    for i in range(4):
+        urok(710 + i, 201, "2026-10-14", t=f"{12 + i}:00", konec=f"{12 + i}:50", status=0, zapisi=[(7100 + i, 9101, {})])
+    # сверка честности «подтвердила» удаление живой записи (404 на живую запись непроведённого
+    # занятия) — такой пометке для записей не верим; для абонементов — верим
+    abonement(520, 9111, 201, 8400, 8400)
+    abonement(521, 9111, 201, 8400, 0)              # «дубль», но сверка честности подтвердила удаление
+    db.set_state("sverka_chestnosti_udaleno", json.dumps({"lesson_records:7100": "2026-10-29",
+                                                          "user_subscriptions:521": "2026-10-15"}))
+
+    # Р3
+    def yav(d, lessons):
+        with db.get_conn() as conn:
+            conn.execute("INSERT OR REPLACE INTO yavka_sverka VALUES (?,?,?)",
+                         (d, "x", json.dumps({"day": d, "lessons": lessons}, ensure_ascii=False)))
+
+    def zap(rid, uid, note="", act="rashozhdenie"):
+        return {"record_id": rid, "uid": uid, "name": novye[uid], "crm_visit": act == "conflict_visit", "report": "был",
+                "note": note, "action": act}
+
+    urok(720, 202, "2026-10-15", t="18:00", konec="18:50", status=0, zapisi=[(7200, 9101, {})])      # не проведено
+    urok(721, 202, "2026-10-15", t="18:00", konec="18:50", zapisi=[(7210, 9102, {}), (7211, 9103, {}), (7212, 9104, {}),
+                                                                   (7213, 9110, {"visit": True})])
+    urok(722, 203, "2026-10-15", t="19:00", konec="19:50", zapisi=[(7220, 9103, {"visit": True}), (7221, 9105, {"visit": True})])
+    yav("2026-10-15", [
+        {"lesson_id": 720, "class_id": 202, "class": "ПШ Гр22", "time": "18:00", "reports": [{"ts": "x"}],
+         "records": [zap(7200, 9101)], "unmatched": [], "conflicts": []},
+        {"lesson_id": 721, "class_id": 202, "class": "ПШ Гр22", "time": "18:00", "reports": [{"ts": "x"}],
+         "records": [zap(7210, 9102, "не было"), zap(7211, 9103), zap(7212, 9104)],
+         "unmatched": [{"name": "Слотова Мия", "kind": "был", "note": ""},
+                       {"name": "Заморозкина Ида", "kind": "был", "note": "заморозка"},
+                       {"name": "Тёзкин Саша", "kind": "был", "note": ""},
+                       {"name": "Беззаписин Рома", "kind": "был", "note": "отработка"}],
+         "conflicts": ["Спорова Уля: в одном отчёте «был», в другом «не был»"]}])
+    urok(723, 202, "2026-11-05", t="18:00", konec="18:50", zapisi=[(7230, 9104, {}), (7231, 9110, {"visit": True})])
+    yav("2026-11-05", [
+        {"lesson_id": 723, "class_id": 202, "class": "ПШ Гр22", "time": "18:00", "reports": [{"ts": "x"}, {"ts": "y"}],
+         "records": [zap(7230, 9104), dict(zap(7231, 9110), action=None, crm_visit=True)], "unmatched": [],
+         "conflicts": ["Расхождин Тим: в одном отчёте «был», в другом «не был»",
+                       "Спорова Уля: в одном отчёте «был», в другом «не был»"]}])
+
+    # Р10: «эхо» цены абонемента, комментарий автоматики, объяснение человека накануне
+    platezh(1101, 9111, "2026-11-01", -8400, optype="debit", userSubscriptionId=520)
+    platezh(1102, 9112, "2026-11-08", 2500)
+    platezh(1103, 9113, "2026-11-08", 2500)
+    (SVERKA / "2026-11-09.json").write_text(json.dumps({"day": "2026-11-09", "nakhodki": [
+        {"level": "yellow", "kind": "правка: payments", "text": "Пересчётов Глеб: сумма -9450 → -8400 (замечено 09.11 07:02 МСК, автор строки —)",
+         "userId": 9111, "rid": 1101, "tbl": "payments", "extra": {"summa": [-9450, -8400]}},
+        {"level": "red", "kind": "правка: user_subscriptions",
+         "text": "Пересчётов Глеб: цена оплаченного абонемента снижена 9450 → 8400; занятий в абонементе 9 → 8",
+         "userId": 9111, "rid": 520, "tbl": "user_subscriptions", "extra": {"price": [9450, 8400]}},
+        {"level": "yellow", "kind": "правка: payments", "text": "Журналова Зина: тип нал → терминал",
+         "userId": 9112, "rid": 1102, "tbl": "payments", "extra": {"paymentTypeId": [1, 64725]}},
+        {"level": "yellow", "kind": "правка: payments", "text": "Объяснённов Юра: тип нал → терминал",
+         "userId": 9113, "rid": 1103, "tbl": "payments", "extra": {"paymentTypeId": [1, 64725]}},
+    ]}, ensure_ascii=False), encoding="utf-8")
+    # Р4б: «бесплатно» без объяснения; в карточке только журнал звонка автоматики с этой датой
+    urok(730, 201, "2026-11-06", t="18:00", konec="18:50", zapisi=[(7300, 9114, {"visit": True, "free": True})])
+    with db.get_conn() as conn:
+        conn.executemany("INSERT INTO crm_comments (id, user_id, ts, manager_id, text) VALUES (?,?,?,?,?)", [
+            (1, 9112, "2026-11-09T11:00:00", None, "09.11 13:55, исходящий, 2 мин 10 с: мама уточняла расписание"),
+            (2, 9113, "2026-11-08T15:00:00", 154181, "оплата была картой, тип исправила"),
+            (3, 9114, "2026-11-06T16:00:00", None, "06.11 18:40, входящий, 40 с: мама спрашивала про 06.11"),
+        ])
+
+    S, _ = stroki()
+    proverka("1: не закрыто 5 занятий за день — одна строка «день не закрыт»",
+             "r1:den:2026-10-13" in S and "5 из 5" in S["r1:den:2026-10-13"]["chto"])
+    proverka("1: … и поштучных строк за этот день нет", any(f"r1:{700 + i}" in S for i in range(5)), False)
+    proverka("1: строка дня ведёт на явку за день", S["r1:den:2026-10-13"]["ssylka"], "/yavka?day=2026-10-13")
+    proverka("1: не закрыто 4 занятия — четыре строки по занятию, строки дня нет",
+             (sum(f"r1:{710 + i}" in S for i in range(4)), "r1:den:2026-10-14" in S), (4, False))
+    proverka("1: «удалена» по сверке честности, а запись жива — строка остаётся", "r1:710" in S)
+    proverka("7а: абонемент, удаление которого подтвердила сверка честности, — не строка", "r7a:521" in S, False)
+    proverka("3: занятие не проведено — расхождения нет (это раздел 1)", "r3:rashozhdenie:9101:202" in S, False)
+    proverka("3: в пометке педагога «не было» — не «был», строки нет", "r3:rashozhdenie:9102:202" in S, False)
+    proverka("3: «был» стоит на соседнем занятии того же направления — строки нет", "r3:rashozhdenie:9103:202" in S, False)
+    proverka("3: настоящее расхождение — строка, дни склеены",
+             S.get("r3:rashozhdenie:9104:202", {}).get("fakty", {}).get("dni"), ["2026-10-15", "2026-11-05"])
+    proverka("3: «был без записи», а «был» стоит в соседней группе направления — строки нет",
+             any(k.startswith("r3u:9105") for k in S), False)
+    proverka("3: «был без записи» с пометкой «заморозка» — строки нет", any(k.startswith("r3u:9106") for k in S), False)
+    proverka("3: тёзки не из этой группы и направления — чью запись заводить, не понять; строки нет",
+             any(k.startswith(("r3u:9107", "r3u:9108")) for k in S), False)
+    proverka("3: «был без записи» у ребёнка этой группы — строка", "r3u:9109:202" in S)
+    proverka("3: спор двух отчётов о ребёнке, у которого уже есть строка расхождения, — без отдельной строки",
+             ("r3k:202:9104" in S, "расходятся" in S["r3:rashozhdenie:9104:202"]["chto"]), (False, True))
+    proverka("3: спор двух отчётов — строка только за последние 14 дней, ключ без имени",
+             S.get("r3k:202:9110", {}).get("fakty", {}).get("dni"), ["2026-11-05"])
+    proverka("10: списание пересчитано вслед за ценой абонемента — одна строка про абонемент",
+             ("r10:payments:1101" in S, "цена оплаченного абонемента снижена" in S.get("r10:user_subscriptions:520", {}).get("chto", "")),
+             (False, True))
+    proverka("10: комментарий автоматики (журнал звонка) строку не закрывает", "r10:payments:1102" in S)
+    proverka("10: объяснение человека накануне находки — строки нет", "r10:payments:1103" in S, False)
+    proverka("4б: дата занятия в журнале звонка автоматики — не объяснение, строка остаётся", "r4b:7300" in S)
+    with db.get_conn() as conn:
+        conn.execute("INSERT INTO crm_comments (id, user_id, ts, manager_id, text) VALUES (4, 9114, '2026-11-07T10:00:00', 154181, "
+                     "'06.11 бесплатно — подарок на день рождения')")
+    S, _ = stroki()
+    proverka("4б: админ написала строку с датой занятия — строка ушла", "r4b:7300" in S, False)
+
+
 def main():
-    for t in (test_razdely, test_zhizn, test_ne_oshibka, test_sredniy, test_pult, test_nastroyka, test_http):
+    for t in (test_razdely, test_zhizn, test_ne_oshibka, test_sredniy, test_pult, test_nastroyka, test_http, test_sverka_1211):
         t()
         print()
     if oshibok:
