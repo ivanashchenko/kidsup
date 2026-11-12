@@ -7,6 +7,13 @@
 таблицы маршрутов пропало только то, что убирали нарочно — всё, чем пользуются
 рутины ассистента и автопилот (/api/…, /export/raw/…, вебхуки), на месте.
 
+Раздел «Г» — сквозная проверка решения владельца целиком, записанного здесь отдельно от
+кода: каждый пункт меню открывается у того, кому показан, а пункты владельца у админа —
+401/403; каждый убранный и объединённый адрес ведёт 303 прямо на страницу, которая сама
+отвечает 200 (без цепочек и петель); на меню, пульте и рабочих страницах нет ссылок на
+убранное, архивное и объединённое, а в app/ убранные адреса остались только в таблице
+переходов; адреса рутин на месте и под прежним входом.
+
     python3 docs/rabota/nav_testy.py [--tree КОРЕНЬ] [--work ПАПКА] [--do ФАЙЛ.json]
 
   --tree  корень дерева, в котором лежит app/ (по умолчанию — этот репозиторий;
@@ -62,8 +69,9 @@ def test_perehody(c, m):
     for otkuda, kuda in m.UBRANO.items():
         kod, loc = lokaciya(c, otkuda)
         # RedirectResponse кодирует кириллицу сам: /pult?who=Лиза → /pult?who=%D0%9B…
-        zhdem = quote(kuda, safe="/?=&")
-        proverka(f"{otkuda} → 303 {kuda}", kod == 303 and loc == zhdem, (kod, loc))
+        # «/» в таблице — стартовая страница роли: админа ведём сразу на пульт, без второго перехода
+        zhdem = "/pult" if kuda == "/" else quote(kuda, safe="/?=&")
+        proverka(f"{otkuda} → 303 {zhdem}", kod == 303 and loc == zhdem, (kod, loc))
         proverka(f"{otkuda} без входа → 401, адрес замены не показан",
                  lokaciya(c, otkuda, kto=None) == (401, None), lokaciya(c, otkuda, kto=None))
         proverka(f"{otkuda}: замена есть в таблице маршрутов и сама не убрана",
@@ -557,6 +565,295 @@ def test_arhiv_dokumentov(c, m, work):
     proverka("склады раздельные: у владельца stend-x нет", not zapis(c, "/api/boris-docs", "stend-x"))
 
 
+# --- Г. Сквозные проверки решения владельца 12.11 -----------------------------------
+# Решение (итог аудита с поправками скептиков) записано здесь отдельно от кода: случайная
+# правка UBRANO или меню ломает тест, а не смену админов.
+
+DOMOY = "домой"            # «замены нет — на стартовую страницу роли»
+UBRANY_17 = {
+    "/groups": "/mesta", "/ask": DOMOY, "/makety": DOMOY, "/callaudit": "/obzvon-dnya",
+    "/suggest": "/waiting", "/plan311": "/mesta", "/bez-oplaty": "/voronka",
+    "/ne-oplatili": "/voronka",             # не /admin/docs — замечание скептика 8
+    "/vozvrat": "/obzvon-dnya", "/zapolnyaemost": "/mesta", "/zadachi-lizy": "/pult?who=Лиза",
+    "/mesta/sostav": "/blank-grupp", "/ochered": "/pult", "/nedozvony": "/obzvon-dnya", "/perepiska": "/waiting",
+}
+# + старая /sverka (только владельцу) и второй, мёртвый обработчик /spiski — проверяются отдельно.
+# Объединённые: переход ставим, только где цель закрывает главную нужду; остальные семь
+# открываются по адресу до шага 2 (nav.PEREEZD).
+OBEDINENY_PEREHOD = ("/", "/brief", "/boris", "/obeshchaniya")
+OBEDINENY_SHAG2 = {"/settings": "/owner", "/metrics": "/journal", "/segodnya": "/pult", "/spiski": "/blank-grupp",
+                   "/zayavki": "/blank-grupp", "/leads": "/istochniki", "/clicks": "/istochniki"}
+# Чего не должно быть ни в меню, ни на пульте, ни на рабочих страницах.
+ZAPRET = set(UBRANY_17) | {"/sverka"} | ARHIVNYE | set(OBEDINENY_PEREHOD[1:]) | set(OBEDINENY_SHAG2)
+# Пункты раздела «Владельцу», которые админ всё же открывает, — каждый с причиной.
+VLADELCU_I_ADMINU = {
+    "/pult?who=Борис": "это пульт — стартовая страница админов, колонку выбирают параметром",
+    "/promo": "решение Бориса 28.10 «промоутерами управляют админы»: «воронка и деньги по каждому» "
+              "(методичка promo_upravlenie, ссылка «← Эффективность промоутеров» с /promo/grafik)",
+}
+# Адреса из жёстких правил и рутин: всё, что было под этими началами, обязано остаться.
+NACHALA = ("/api/plan/inbox", "/api/pult/", "/api/waiting", "/api/gruppy/", "/api/kadry", "/api/mesta",
+           "/api/boris-docs", "/api/admin-docs", "/api/doc-state/", "/api/deploy", "/export/raw/", "/lk/", "/v/",
+           "/go/", "/mango/", "/events/", "/wazzup/", "/api/wazzup/", "/api/tg/webhook", "/marquiz/", "/kadry/file/")
+# API рутин ассистента и автопилота (опись рутин 12.11) и API страниц, закрытых 12.11 для
+# админа, — с тем входом, что был до шага 1 (снимок 277ac71). Вход строже — рутина упадёт.
+RUTINY_VHOD = {
+    "check_auth": """
+GET /api/plan/inbox · POST /api/plan/inbox · POST /api/plan/inbox/done · GET /api/promo/grafik · GET /api/calls/list
+GET /api/calls/recording · POST /api/gruppy/otvet · GET /api/gruppy/soobsheniya · GET /export/raw/{table}.json
+GET /api/sync/status · GET /api/day/firsts · GET /api/mesta · GET /api/oplata/plan · GET /api/waiting · GET /api/yavka
+POST /api/crm/comment · GET /api/crm/user · GET /api/pult/tasks · POST /api/pult/tasks · POST /api/pult/done
+GET /api/obzvon-dnya · GET /api/kadry · POST /api/kadry/ocenka · GET /kadry/file/{day}/{name}
+POST /api/crm/roistat-merge · POST /api/roistat/auto-cards · GET /api/duty · GET /api/dialogs · GET /api/zayavki
+GET /api/dolgi · GET /api/blank-grupp · POST /api/blank-grupp/edit · GET /api/perepiska/kto
+GET /api/sverka-chestnosti · GET /api/audit · GET /api/istochniki""",
+    "check_owner": """
+POST /api/boris-docs · GET /api/boris-docs · GET /api/admin-docs · POST /api/admin-docs · GET /api/doc-state/{doc}
+POST /api/doc-state/{doc} · POST /api/deploy · GET /api/tbank/get · GET /api/komtet/cheki · POST /api/ads/vk
+POST /api/ads/direct · GET /api/mkweb/history · GET /api/backup/db · POST /api/hooppy/post · GET /api/hooppy/posty
+POST /api/hooppy/udalit""",
+    "check_pedagog_or_admin": "GET /api/english/karta · POST /api/english/karta/video · POST /api/english/karta/video-upload",
+    "": "GET /api/health",
+}
+# Ссылка в HTML: href/action/адрес в кавычках (в том числе из скриптов) и app.kidsup.ru/… в тексте.
+SSYLKA = re.compile(r"""(?:(?:href|action)\s*=\s*["']?|["'`]|app\.kidsup\.ru)(?:https?://app\.kidsup\.ru)?(/[^"'`\s<>?#)]*)""")
+
+
+def domoy(kto) -> str:
+    """Стартовая страница роли — так её задал владелец."""
+    from app import boris_docs
+    if kto != VLADELEC:
+        return "/pult"
+    return "/boris/docs/start" if boris_docs.BORIS.get("start") is not None else "/boris/docs"
+
+
+def ssylki(html: str) -> set:
+    return set(SSYLKA.findall(html))
+
+
+def perehod_i_cel(c, adres, kto):
+    """(код, куда ведёт, код цели): цель открываем тем же входом и тоже без перехода —
+    так видна цепочка (303 → 303) или петля."""
+    kod, loc = lokaciya(c, adres, kto)
+    if kod != 303 or not loc:
+        return kod, loc, None
+    return kod, loc, c.get(loc, auth=kto, follow_redirects=False).status_code
+
+
+def _razdely_pulta(c, kto) -> str:
+    return c.get("/pult", auth=kto).text.split("id='razdely'", 1)[-1].split("</div>", 1)[0]
+
+
+def test_punkty_menu(c, m):
+    from app import nav
+    print("Г1. Каждый пункт меню открывается у того, кому показан")
+    for kto, rol in ((ADMIN, "admin"), (VLADELEC, "owner")):
+        for razdel, punkty in nav.menu(rol):
+            for imya, adres in punkty:
+                kod = c.get(adres, auth=kto, follow_redirects=False).status_code
+                proverka(f"{rol}: «{razdel} → {imya}» {adres} → 200", kod == 200, kod)
+    print("Г1. Пункты владельца у админа")
+    sh = shapka(c, "/liniya", ADMIN)
+    pult = _razdely_pulta(c, ADMIN)
+    for imya, adres in nav.OWNER[1]:
+        v_menu = f'href="{adres}"' in sh.split('id="nav-razdely"', 1)[-1] or f"href='{adres}'" in pult
+        put = adres.split("?")[0]
+        kod = c.get(adres, auth=ADMIN, follow_redirects=False).status_code
+        if adres in VLADELCU_I_ADMINU:
+            proverka(f"«{imya}» {adres}: в меню админа нет; открывается ({VLADELCU_I_ADMINU[adres][:60]}…)",
+                     not v_menu and kod == 200, (v_menu, kod))
+        else:
+            proverka(f"«{imya}» {adres}: в меню и на пульте админа нет, по адресу — 401/403",
+                     not v_menu and kod in (401, 403), (v_menu, kod))
+        proverka(f"«{imya}» {put}: не совпадает с пунктом админов (кроме пульта)",
+                 put == "/pult" or put not in {a.split("?")[0] for a in _adresa(nav.ADMIN)})
+    proverka("исключений ровно два, и оба — пункты владельца",
+             set(VLADELCU_I_ADMINU) <= set(_adresa([nav.OWNER])) and len(VLADELCU_I_ADMINU) == 2)
+
+
+def test_perehody_bez_cepochek(c, m):
+    print("Г2. Убранные и объединённые: 303 на ожидаемый адрес, цель сама отвечает 200")
+    proverka("таблица переходов в коде совпадает с решением",
+             {k: ("/" if v == DOMOY else v) for k, v in UBRANY_17.items()} == m.UBRANO,
+             sorted(set(UBRANY_17) ^ set(m.UBRANO)))
+    for kto, rol in ((ADMIN, "админ"), (VLADELEC, "владелец")):
+        for otkuda, kuda in UBRANY_17.items():
+            zhdem = domoy(kto) if kuda == DOMOY else quote(kuda, safe="/?=&")
+            kod, loc, cel = perehod_i_cel(c, otkuda, kto)
+            proverka(f"{rol}: {otkuda} → 303 {zhdem} → 200", (kod, loc, cel) == (303, zhdem, 200), (kod, loc, cel))
+        zhdem = {"/": domoy(kto), "/brief": "/liniya", "/boris": "/boris/docs" if kto == VLADELEC else "/pult",
+                 "/obeshchaniya": "/pult?who=" + quote("Лиза")}
+        for otkuda in OBEDINENY_PEREHOD:
+            kod, loc, cel = perehod_i_cel(c, otkuda, kto)
+            proverka(f"{rol}: {otkuda} → 303 {zhdem[otkuda]} → 200", (kod, loc, cel) == (303, zhdem[otkuda], 200),
+                     (kod, loc, cel))
+        kod, loc, cel = perehod_i_cel(c, f"/brief?phone={SEMYA}", kto)
+        proverka(f"{rol}: /brief?phone=… → «Линия» с номером → 200",
+                 (kod, loc, cel) == (303, f"/liniya?phone={SEMYA[-10:]}", 200), (kod, loc, cel))
+    kod, loc, cel = perehod_i_cel(c, "/sverka", VLADELEC)
+    proverka("владелец: /sverka → 303 на сверку оплат в его документах → 200",
+             kod == 303 and loc in ("/boris/docs/sverka-oplat", "/boris/docs") and cel == 200, (kod, loc, cel))
+    proverka("админ: /sverka → 401 (страница была только владельцу)", lokaciya(c, "/sverka")[0] == 401)
+    for adres in ZAPRET | set(OBEDINENY_PEREHOD):
+        proverka(f"{adres}: без входа — 401, адрес замены не виден",
+                 lokaciya(c, adres, kto=None) == (401, None), lokaciya(c, adres, kto=None))
+
+    print("Г2. Объединённые без перехода (перенос содержимого — шаг 2)")
+    from app import nav
+    pereezd = {a: kuda for a, _, _, kuda, _ in nav.PEREEZD}
+    proverka("все семь записаны на страницу «Архив» в блок «Переезжают» с той же целью", pereezd == OBEDINENY_SHAG2,
+             pereezd)
+    for adres in OBEDINENY_SHAG2:
+        if adres == "/zayavki":
+            # без ключа МойКласса на стенде страница падает — так было и до правок; смотрим маршрут
+            r = [x for x in m.app.routes if getattr(x, "path", "") == adres]
+            proverka(f"{adres}: маршрут — сама страница, не переход",
+                     len(r) == 1 and r[0].endpoint.__name__ == "zayavki_page", [x.endpoint.__name__ for x in r])
+            continue
+        kto = VLADELEC if adres == "/settings" else ADMIN        # /settings и раньше был только владельцу
+        kod = c.get(adres, auth=kto, follow_redirects=False).status_code
+        proverka(f"{adres} открывается по адресу (200), не переход", kod == 200, kod)
+
+
+def test_arhivnye(c, m):
+    from app import nav
+    print("Г3. Архивные страницы: открываются по адресу, в меню их нет")
+    for adres in sorted(ARHIVNYE):
+        kod = c.get(adres, auth=VLADELEC, follow_redirects=False).status_code
+        proverka(f"{adres}: владелец → 200", kod == 200, kod)
+    for kto, rol in ((ADMIN, "admin"), (VLADELEC, "owner")):
+        v_nav = ARHIVNYE & {a.split("?")[0] for a in _adresa(nav.menu(rol))}
+        razdely = shapka(c, "/liniya", kto).split('id="nav-razdely"', 1)[-1]
+        v_shapke = ARHIVNYE & ssylki(razdely)
+        v_pulte = ARHIVNYE & ssylki(c.get("/pult", auth=kto).text)
+        proverka(f"{rol}: архивных нет ни в меню, ни в шапке, ни на пульте",
+                 not (v_nav or v_shapke or v_pulte), (v_nav, v_shapke, v_pulte))
+    proverka("/arhiv только владельцу: админ → 401, владелец → 200",
+             c.get("/arhiv", auth=ADMIN).status_code == 401 and c.get("/arhiv", auth=VLADELEC).status_code == 200)
+
+
+def _stroki_strok(tree) -> list:
+    """(файл, строка, адрес) — каждое упоминание убранного адреса в app/, кроме
+    объявлений маршрутов, таблицы UBRANO, комментариев и докстрингов."""
+    import ast
+    rx = {a: re.compile(r"(?:^|(?<=[\"'\s(=`>])|(?<=kidsup\.ru))" + re.escape(a) + r"(?=$|[\"'?#\s)<&`])")
+          for a in set(UBRANY_17) | {"/sverka"}}
+    nashli = []
+    for papka, _, fajly in os.walk(os.path.join(tree, "app")):
+        for f in sorted(fajly):
+            p = os.path.join(papka, f)
+            rel = os.path.relpath(p, tree)
+            if f.endswith(".py"):
+                t = open(p, encoding="utf-8").read()
+                derevo = ast.parse(t)
+                mimo = set()
+                for n in ast.walk(derevo):
+                    tela = getattr(n, "body", None)
+                    if isinstance(tela, list) and tela and isinstance(tela[0], ast.Expr) \
+                            and isinstance(tela[0].value, ast.Constant):
+                        mimo.add(id(tela[0].value))                   # докстринг
+                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        for d in n.decorator_list:                    # @app.get("/sverka", …)
+                            mimo.update(id(x) for x in ast.walk(d))
+                    if isinstance(n, ast.Assign) and any(getattr(x, "id", "") == "UBRANO" for x in n.targets):
+                        mimo.update(id(x) for x in ast.walk(n.value))
+                for n in ast.walk(derevo):
+                    if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in mimo:
+                        nashli += [(rel, n.lineno, a) for a, r in rx.items() if r.search(n.value)]
+            elif f.endswith((".html", ".js", ".css")):
+                t = open(p, encoding="utf-8").read()
+                t = re.sub(r"\{#.*?#\}|<!--.*?-->", lambda x: "\n" * x.group().count("\n"), t, flags=re.S)
+                for i, stroka in enumerate(t.split("\n"), 1):
+                    nashli += [(rel, i, a) for a, r in rx.items() if r.search(stroka)]
+    return nashli
+
+
+def test_net_ssylok(c, m, tree):
+    from app import nav
+    print("Г4. Нет ссылок на убранные, архивные и объединённые адреса")
+    for kto, rol in ((ADMIN, "admin"), (VLADELEC, "owner")):
+        razdely = shapka(c, "/liniya", kto).split('id="nav-razdely"', 1)[-1]
+        lishnie = ZAPRET & ssylki(razdely)
+        proverka(f"{rol}: в меню шапки — ни одной", not lishnie, sorted(lishnie))
+        lishnie = ZAPRET & ssylki(c.get("/pult", auth=kto).text)
+        proverka(f"{rol}: на пульте (весь HTML) — ни одной", not lishnie, sorted(lishnie))
+    for imya, adres in [p for _, punkty in nav.ADMIN for p in punkty]:
+        lishnie = ZAPRET & ssylki(c.get(adres, auth=ADMIN).text)
+        proverka(f"admin: на странице «{imya}» {adres} — ни одной", not lishnie, sorted(lishnie))
+    # у владельца: /settings — из плашки «укажите ключ МойКласса» (на стенде ключа нет) и со
+    # страницы «Настройки»: только там ключ и меняется; /arhiv — сама страница архива
+    for imya, adres in nav.OWNER[1]:
+        if adres == "/arhiv":
+            continue
+        lishnie = (ZAPRET - {"/settings"}) & ssylki(c.get(adres, auth=VLADELEC).text)
+        proverka(f"owner: на странице «{imya}» {adres} — ни одной (кроме ключа МойКласса)", not lishnie,
+                 sorted(lishnie))
+    nashli = _stroki_strok(tree)
+    proverka("grep по app/: убранные адреса остались только в таблице переходов и объявлениях маршрутов",
+             not nashli, nashli[:10])
+    est = {a for a in set(UBRANY_17) | {"/sverka"} if re.search(re.escape(f'"{a}"'), open(
+        os.path.join(tree, "app", "main.py"), encoding="utf-8").read())}
+    proverka("…и сами строки таблицы на месте (grep их видит)", est == set(UBRANY_17) | {"/sverka"},
+             sorted(set(UBRANY_17) - est))
+
+
+def test_perepiska_send(c, m):
+    print("Г6. GET /perepiska?send=1 ничего не отправляет")
+    import app.perepiska as P
+    vyzovy = []
+    P.run = lambda *a, **k: vyzovy.append((a, k)) or {"всего": 0, "ответили": 0, "человеку": 0, "ночь": False,
+                                                      "строки": []}
+    bylo = list(lt.LOVUSHKI)
+    for kto in (ADMIN, VLADELEC):
+        r = c.get("/perepiska?send=1&dry=0", auth=kto, follow_redirects=False)
+        proverka("ответ — переход 303 на «Ответы», тело пустое",
+                 r.status_code == 303 and r.headers.get("location") == "/waiting" and not r.content.strip(),
+                 (r.status_code, r.headers.get("location")))
+    proverka("переписка не запускалась, ловушки отправки пусты", not vyzovy and lt.LOVUSHKI == bylo,
+             (vyzovy, lt.LOVUSHKI[len(bylo):]))
+    gde = [r for r in m.app.routes if getattr(r, "path", "") == "/perepiska"]
+    proverka("на адресе /perepiska один маршрут — переход", len(gde) == 1 and gde[0].endpoint.__name__ == "perehod",
+             [(r.path, r.endpoint.__name__) for r in gde])
+    proverka("отчёт для автопилота на месте: GET /api/perepiska (только чтение)",
+             "GET /api/perepiska" in marshruty(m) and "send" not in inspect.signature(m.perepiska_report).parameters)
+
+
+def test_marshruty_zhestkie(m, fajl_do):
+    print("Г8. Адреса из жёстких правил и рутин — на месте и под прежним входом")
+    do = set(json.load(open(fajl_do, encoding="utf-8")))
+    posle = marshruty(m)
+    for nachalo in NACHALA:
+        byli = {x for x in do if x.split(" ", 1)[1].startswith(nachalo)}
+        net = sorted(byli - posle)
+        proverka(f"всё под {nachalo}… ({len(byli)}) на месте", byli and not net, net or "в снимке «до» нет ни одного")
+    vhod = {}
+    for r in m.app.routes:
+        for metod in getattr(r, "methods", ()):
+            deps = getattr(getattr(r, "dependant", None), "dependencies", [])
+            vhod[f"{metod} {r.path}"] = {getattr(d.call, "__name__", "") for d in deps}
+    for nado, spisok in RUTINY_VHOD.items():
+        adresa = [x.strip() for x in spisok.replace("\n", " · ").split(" · ") if x.strip()]
+        net = [x for x in adresa if x not in posle]
+        drugoj = {x: sorted(vhod[x]) for x in adresa if x in vhod and vhod[x] != ({nado} if nado else set())}
+        proverka(f"{len(adresa)} адресов рутин под входом «{nado or 'без входа'}» — на месте, вход прежний",
+                 not net and not drugoj, (net, drugoj))
+    hooki = ("POST /mango/events", "POST /mango/{rest:path}", "POST /events/{rest:path}", "POST /wazzup/webhook",
+             "POST /marquiz/webhook", "POST /api/tg/webhook/{secret}")
+    proverka("вебхуки — без входа (их зовут Mango, Wazzup, Telegram, Марквиз)",
+             all(x in vhod and not vhod[x] for x in hooki), {x: vhod.get(x) for x in hooki})
+
+
+def _lovushki_na_vse():
+    """Страницы меню подгружают модули при первом открытии — ловушки отправки ставим и на них,
+    до первого запроса: сеть на стенде закрыта, но и попытки отправить быть не должно."""
+    import importlib
+    import pkgutil
+    import app
+    for mod in pkgutil.iter_modules(app.__path__):
+        importlib.import_module(f"app.{mod.name}")
+    lt._postavit_lovushki()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tree", default=ROOT)
@@ -573,6 +870,7 @@ def main():
     m.config.APP_USER, m.config.APP_PASSWORD = ADMIN
     m.db.set_setting("owner_password", VLADELEC[1])
     m.db.set_setting("pedagog_key", "stend-kluch")         # ключ педагога — только на стенде
+    _lovushki_na_vse()
     from fastapi.testclient import TestClient
     c = TestClient(m.app)
     test_perehody(c, m)
@@ -584,7 +882,15 @@ def main():
     test_glavnaya(c, m)
     test_arhiv(c, m)
     test_arhiv_dokumentov(c, m, work)
+    test_punkty_menu(c, m)
+    test_perehody_bez_cepochek(c, m)
+    test_arhivnye(c, m)
+    test_net_ssylok(c, m, tree)
+    test_perepiska_send(c, m)
+    test_marshruty_zhestkie(m, a.do)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
+    proverka("ни одной попытки выйти в сеть, кроме известных опросов Mango с пульта и «Ответов»",
+             all(any(f.startswith(("mango.py", "zayavki.py")) for f in otkuda) for _, otkuda in lt.SET), lt.SET[:5])
     print(f"\nИтого: {lt.proshlo} OK, {lt.oshibok} ошибок · стенд {work}")
     sys.exit(1 if lt.oshibok else 0)
 

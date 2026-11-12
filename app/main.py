@@ -234,9 +234,12 @@ UBRANO = {
 def _perehod(kuda: str):
     """Обработчик убранного адреса: 303 на замену. Именно 303 и именно RedirectResponse:
     301 и 308 браузер запомнит навсегда, а Location с кириллицей (/pult?who=Лиза),
-    собранный руками, упадёт."""
-    def perehod():
-        return RedirectResponse(kuda, status_code=303)
+    собранный руками, упадёт.
+
+    «/» в таблице значит «стартовая страница роли». Ведём на неё сразу, а не на «/»:
+    иначе выходит цепочка из двух переходов /ask → / → /pult (nav_testy, 12.11.2026)."""
+    def perehod(request: Request):
+        return RedirectResponse(_domoy(request) if kuda == "/" else kuda, status_code=303)
     return perehod
 
 
@@ -1772,7 +1775,10 @@ def base_doc(slug: str):
     return HTMLResponse(back + page)
 
 
-@app.get("/journal", response_class=HTMLResponse, dependencies=AUTH)
+# 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
+# «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
+# Ни рутины, ни автопилот эту страницу не открывают (проверено по списку рутин 12.11).
+@app.get("/journal", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def journal_page(request: Request, day: str = ""):
     """Кто что сделал: записи в группы, оплаты, комментарии — с автором.
 
@@ -3632,7 +3638,10 @@ def nezvonili_page(request: Request, since: str = "", until: str = ""):
     return render(request, "nezvonili.html", active="nezvonili", d=d)
 
 
-@app.get("/istochniki", response_class=HTMLResponse, dependencies=AUTH)
+# 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
+# «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
+# Ни рутины, ни автопилот её не открывают; /api/istochniki остаётся под общим входом.
+@app.get("/istochniki", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def istochniki_page(request: Request, since: str = "", until: str = ""):
     """Откуда заявки и что из них вышло."""
     from . import istochniki
@@ -4201,7 +4210,10 @@ def api_sverka_chestnosti_run(day: str = "", dry: int = 1):
         raise HTTPException(500, f"sverka_chestnosti: {type(e).__name__}: {str(e)[:300]}")
 
 
-@app.get("/sverka-chestnosti", response_class=HTMLResponse, dependencies=AUTH)
+# 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
+# «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
+# Ни рутины, ни автопилот её не открывают; /api/sverka-chestnosti остаётся под общим входом.
+@app.get("/sverka-chestnosti", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def sverka_chestnosti_page(day: str = ""):
     from . import sverka_chestnosti
     return HTMLResponse(sverka_chestnosti.html(_sverka_den(day, 404)))
@@ -10197,7 +10209,10 @@ async def api_audit_resolve(flag_id: int, status: str = "ok"):
     return {"ok": audit.resolve(flag_id, status)}
 
 
-@app.get("/audit", response_class=HTMLResponse, dependencies=AUTH)
+# 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
+# «Владельцу» — только под его входом: в меню админа её нет, и по прямому адресу тоже.
+# Ни рутины, ни автопилот её не открывают; /api/audit остаётся под общим входом.
+@app.get("/audit", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 async def audit_page():
     """Лента аномалий человеческим лицом: красное сверху, кнопки разбора."""
     from . import audit
