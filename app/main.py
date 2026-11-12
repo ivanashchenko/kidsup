@@ -4607,7 +4607,7 @@ def _wazzup_process(payload: dict) -> None:
 
 
 # 12.11.2026 — шаг 1 «скрыть старое»: по смене версии в /api/health видно, что новая сборка поднялась
-APP_VERSION = "2026-11-12.1"
+APP_VERSION = "2026-11-12.2"
 
 
 @app.get("/api/net")
