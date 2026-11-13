@@ -33,6 +33,13 @@ SKIP_COURSES = {"Праздник", "Заявки Roistat", "Набор на н�
 # Ира 04.11: мини-сад и нулевой класс — бланк по дням недели (один блок = один день)
 DAY_COURSE = "Английский детский сад"
 DAY_WD = [("пн", "mo", "ПН"), ("вт", "tu", "ВТ"), ("ср", "we", "СР"), ("чт", "th", "ЧТ"), ("пт", "fr", "ПТ")]
+# 13.11.2026, Ира: «В бланках подели мне отдельно робототехнику на тех, кто ходит по пт и вс.
+# Из-за того, что никто два раза в неделю не ходит, очень не удобно за ними по списку следить».
+# Группа с разным временем по дням («пт 16:00 + вс 14:30») — тоже вкладкой по дням.
+WD_LAT = {"пн": "mo", "вт": "tu", "ср": "we", "чт": "th", "пт": "fr", "сб": "sa", "вс": "su"}
+# Только робототехника: там каждый ребёнок ходит один раз в неделю — либо в пт, либо в вс.
+# У ПШ гр.12/13 и шахмат время по дням тоже разное, но дети ходят оба дня — их бланк не трогаем.
+PO_DNYAM_KURSY = {"Робототехника"}
 TRIAL_ST = (58132, 58131)               # записан на пробное / посетил пробное
 DAYS_CHOICES = ["пн", "вт", "ср", "чт", "пт", "сб", "вс", "пн-ср", "пн-чт", "пн-пт",
                 "вт-чт", "вт-пт", "ср-пт", "ср-сб", "пн-сб", "чт-сб"]
@@ -1019,13 +1026,33 @@ def _day_tabs(m: dict, E: dict) -> None:
                 if lab:
                     new.append((t, _day_tab(t, b, lab, E)))
                     continue
+            dni = _dni_s_raznym_vremenem(b)
+            if dni and b.get("kids"):
+                g = b.get("g") or {}
+                lab = " ".join(x for x in [b.get("course") or "", g.get("age") or ""] if x)
+                new.append((t, _day_tab(t, b, lab, E, dni=dni, s_probnymi=True)))
+                continue
             keep.append(b)
         t["blocks"] = keep
     for parent, nt in new:
         m["tabs"].insert(m["tabs"].index(parent), nt)
 
 
-def _day_tab(t: dict, b: dict, lab: str, E: dict) -> dict:
+def _dni_s_raznym_vremenem(b: dict) -> list:
+    """Группа, у которой в разные дни разное время («пт-вс», «16.00/14.30»): дни для вкладки
+    по дням — [("пт", "fr", "ПТ 16.00"), ("вс", "su", "ВС 14.30")]. Иначе — пусто."""
+    if b.get("kind") != "group" or b.get("course") not in PO_DNYAM_KURSY:
+        return []
+    g = b.get("g") or {}
+    dni = _wd_list(g.get("days"))
+    vremya = [x.strip() for x in str(g.get("time") or "").split("/") if x.strip()]
+    if len(dni) < 2 or len(dni) != len(vremya) or len(set(dni)) != len(dni):
+        return []
+    return [(d, WD_LAT[d], f"{d.upper()} {tm}") for d, tm in zip(dni, vremya)]
+
+
+def _day_tab(t: dict, b: dict, lab: str, E: dict, dni: list | None = None,
+             s_probnymi: bool = False) -> dict:
     """Блоки ПН ВТ СР | ЧТ ПТ (без дней) | лист ожидания, пусто, пусто — заполнение сверху вниз.
     Сверху блока дня — дети с абонементом по алфавиту: это строки бланка админов этой группы
     (правка имени, дней, «Отм.», заливки пишется туда же — одна строка на ребёнка).
@@ -1038,17 +1065,20 @@ def _day_tab(t: dict, b: dict, lab: str, E: dict) -> dict:
     subs = []
     for r in b["kids"]:
         uid = r.get("uid")
-        if uid and st.get(uid) in TRIAL_ST:
-            continue                               # пробники — ручные строки админа
-        if not uid and (r.get("mark") or "").strip().lower().startswith("п"):
-            continue
+        # 13.11.2026: у группы «по дням с разным временем» (робототехника) пробные остаются
+        # в списке своего дня — их туда ставит сам бланк, как в обычной группе
+        if not s_probnymi:
+            if uid and st.get(uid) in TRIAL_ST:
+                continue                           # пробники — ручные строки админа
+            if not uid and (r.get("mark") or "").strip().lower().startswith("п"):
+                continue
         if not (r.get("name") or "").strip():
             continue
         c = r.get("color") or ""
         subs.append({**r, "view": "" if c in ("", "-") else c, "src": b["key"]})
     subs.sort(key=lambda r: (r.get("name") or "").lower().replace("ё", "е"))
     blocks, seen = [], set()
-    for wd, lat, up in DAY_WD:
+    for wd, lat, up in (dni or DAY_WD):
         key = f"d{cid}{lat}"
         rows = []
         for r in subs:
