@@ -2466,7 +2466,15 @@ FAJLY_BEZ_TELEFONOV = ("app/autopilot.py", "app/ads_voronka.py", "app/main.py", 
                        "app/nadezhdalist.py", "app/nabormail.py", "app/dostavka.py", "app/wabatexts.py",
                        "app/naryad.py", "docs/rabota/pult_testy.py")
 # Номера центра (каналы Wazzup, их использование в коде не трогали) и запасной номер сводки владельцу.
-NOMERA_CENTRA = {"79160170918", "79165610077", "79199683507", "79104526673"}
+# Сами номера в тест не вписаны (репозиторий открытый) — только начала их хешей sha256.
+NOMERA_CENTRA_HESH = {"0f518dbb18416b69", "1b9227c9ca32311c", "87c8d23eda66d024", "95d7c0887ab6f156"}
+
+
+def _nomer_centra(n: str) -> bool:
+    import hashlib
+    return hashlib.sha256(n.encode()).hexdigest()[:16] in NOMERA_CENTRA_HESH
+
+
 # Действующее — должно остаться наверху базы знаний, не в свёрнутом архиве кампаний.
 BAZA_NAVERHU = ("pravila_kidsup", "shablony_wazzup", "skripty_nabora", "prodazhi_vozrazheniya", "tri_scenariya",
                 "pedagog_probnoe", "zapis_v_gruppy", "predmety_shpargalka", "promo_upravlenie", "karta_kabinetov",
@@ -2523,7 +2531,7 @@ def test_uborka_bezopasnost(c, m, tree, baza):
         tekst = open(os.path.join(tree, put), encoding="utf-8").read()
         nomera = set(re.findall(r"(?<![\d.])(?:\+?7|8)9\d{9}(?!\d)", tekst))
         chuzhie = sorted(n for n in nomera if not n.lstrip("+").startswith(("7999", "8999", "7900", "7916000"))
-                         and n.lstrip("+") not in NOMERA_CENTRA)
+                         and not _nomer_centra(n.lstrip("+")))
         proverka(f"{put}: только выдуманные номера и номера центра", not chuzhie, chuzhie[:5])
     dost = open(os.path.join(tree, "app/dostavka.py"), encoding="utf-8").read()
     # 13.11.2026, вечер (проверка «вечера 1»): ошибочный номер из опечатки здесь был вписан целиком —
