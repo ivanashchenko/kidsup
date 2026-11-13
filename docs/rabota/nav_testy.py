@@ -325,7 +325,10 @@ def test_uborka(tree):
         proverka(f"модуль app/{mod}.py на месте", os.path.exists(os.path.join(app_dir, f"{mod}.py")))
     rabota = os.path.join(tree, "docs", "rabota")
     if os.path.isdir(rabota):
-        ostalis = [f for f in os.listdir(os.path.join(rabota, "plan")) if f.startswith("311_")]
+        # 13.11.2026: папка docs/rabota/plan целиком ушла из репозитория вместе с выгрузками
+        # с телефонами клиентов (разбор 23.09, 311_*.json) — её отсутствие тоже «убрано».
+        plan_dir = os.path.join(rabota, "plan")
+        ostalis = [f for f in os.listdir(plan_dir) if f.startswith("311_")] if os.path.isdir(plan_dir) else []
         ostalis += [f for f in ("bez_oplaty.html", "ne_oplatili_oktyabr.html", "sverka.html")
                     if os.path.exists(os.path.join(rabota, "kontrol", f))]
         proverka("файлы с телефонами и суммами клиентов убраны из репозитория", not ostalis, ostalis)
