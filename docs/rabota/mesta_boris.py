@@ -9,6 +9,15 @@
 Без --data скачивает classes, joins, lessons, managers с сервера во временную папку.
 Пароль берётся только из переменной окружения и передаётся curl через stdin — не печатается.
 В выходной странице нет имён детей и телефонов: только числа по группам.
+
+13.11.2026, Борис (решение М2 «сколько свободных мест считать верным — как в вашем документе»):
+правило счёта вынесено в app/mesta_pravilo.py и здесь больше НЕ хранится копией. Его же берут
+страницы сервера «Места» (/mesta, /api/mesta/tablica), «Подбор группы» (/enrollment) и блок мест
+на пульте — поэтому числа документа и страниц совпадают до единицы. Менять правило (закрытые
+группы CLOSED, потолки сада MINISAD_CAP, статусы) — только там. Здесь остались выгрузка и вёрстка.
+Заодно документ перестал считать записи в группу, удалённые в МойКлассе: их список сервер отдаёт
+как /export/raw/mk_udaleno.json (на сервере старше 13.11 такого адреса нет — тогда считаем без него
+и пишем об этом на странице).
 """
 from __future__ import annotations
 
@@ -17,39 +26,25 @@ import datetime as dt
 import html
 import json
 import os
-import re
 import subprocess
 import tempfile
-from collections import Counter, defaultdict
+from collections import defaultdict
+
+import sys
+
+# Тонкая обёртка: правило лежит в приложении, документ запускается из копии репозитория вне
+# сервера. app/mesta_pravilo.py ничего из приложения не импортирует (ни базы, ни настроек).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+from app import mesta_pravilo as pravilo  # noqa: E402
 
 BASE = 'https://app.kidsup.ru'
 TABLES = ['classes', 'joins', 'lessons', 'managers']
-UCHITSYA = {2}                      # «Учится»
-PROBNYE = {58132, 58131}            # «Записался на пробное», «Посетил пробное» (как в бланках групп)
-WD = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
-# Мини-сад, решение Бориса 15.10.2026: пн и ср до 6 детей (комнату 3 занимает логопед), вт, чт, пт — до 8
-MINISAD_CAP = {'пн': 6, 'вт': 8, 'ср': 6, 'чт': 8, 'пт': 8}
-# Закрыты для записи (решения 13.10, 24.10 и 03.11): в статистику не входят
-CLOSED = [
-    (r'^ПШ.*\(Гр5\)', 'ПШ Гр5 — не набираем'),
-    (r'^ПШ.*\(Гр15\)', 'ПШ Гр15 — не набираем'),
-    (r'^МА_вс_12:00', 'Ментальная арифметика вс 12:00 — не набираем'),
-    (r'^ШАХ_Группа 1', 'Шахматы Гр1 — не набираем'),
-    (r'^Робототехника.*7-12', 'Робототехника 7–12 лет — группы по сути нет (Борис, 03.11)'),
-]
-NAPR = [('АЯ', 'Английский'), ('ПШ', 'Подготовка к школе'), ('Нулевой', 'Нулевой класс'), ('НК', 'Нулевой класс'),
-        ('РР.Первая школа', 'Первая школа'), ('РР.Музыка и речь', 'Музыка и речь'), ('РР.Лицей', 'Лицей для малышей'),
-        ('ИЗО', 'ИЗО'), ('МА', 'Ментальная арифметика'), ('ШАХ', 'Шахматы'), ('Шахматы', 'Шахматы'),
-        ('Робот', 'Робототехника'), ('Мини-сад', 'Мини-сад'), ('ЛГ', 'Логопед')]
+UDALENO = 'mk_udaleno'              # пометки «удалено в МойКлассе»; необязательная таблица выгрузки
+# Правило — одно, в app/mesta_pravilo.py; имена ниже оставлены для тех, кто читал этот файл раньше.
+UCHITSYA, PROBNYE, WD = pravilo.UCHITSYA, pravilo.PROBNYE, pravilo.WD
+MINISAD_CAP, CLOSED, NAPR, napr = pravilo.MINISAD_CAP, pravilo.CLOSED, pravilo.NAPR, pravilo.napr
 E = html.escape
-NB = ' '
-
-
-def napr(n: str) -> str:
-    for p, d in NAPR:
-        if n.startswith(p):
-            return d
-    return 'Прочее'
+NB = '\u202f'             # узкий неразрывный пробел в числах
 
 
 def download(dst: str) -> None:
@@ -66,75 +61,40 @@ def download(dst: str) -> None:
                 break
         else:
             raise SystemExit(f'не скачалась таблица {t}')
+    # пометки «удалено в МойКлассе» — необязательны: старый сервер ответит 404, документ соберётся без них
+    out = os.path.join(dst, UDALENO + '.json')
+    p = subprocess.run(['curl', '-sS', '-K', '-', '-m', '120', '-o', out, '-w', '%{http_code}',
+                        f'{BASE}/export/raw/{UDALENO}.json'], input=cfg, capture_output=True, text=True)
+    if p.stdout.strip() != '200' and os.path.exists(out):
+        os.remove(out)
 
 
 def load(d: str, t: str) -> list:
     return [r for r in json.load(open(os.path.join(d, t + '.json'), encoding='utf-8')) if r]
 
 
-def build(d: str, now: dt.datetime) -> tuple[str, dict]:
-    today = now.date()
-    C = {c['id']: c for c in load(d, 'classes')}
-    J = load(d, 'joins')
-    L = load(d, 'lessons')
-    M = {m['id']: m['name'] for m in load(d, 'managers')}
-    d0, d1 = today - dt.timedelta(days=7), today + dt.timedelta(days=13)
-    les = defaultdict(list)
-    for lsn in L:
-        if C.get(lsn.get('classId')) and d0.isoformat() <= lsn['date'] <= d1.isoformat():
-            les[lsn['classId']].append(lsn)
-    st = {(j['userId'], j['classId']): j.get('statusId') for j in J}
+def udaleno(d: str) -> set | None:
+    """id записей в группу, удалённых в МойКлассе; None — сервер пометок не отдал."""
+    try:
+        return {int(r['rid']) for r in load(d, UDALENO) if r.get('tbl') == 'joins'}
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
-    groups, closed_rows = [], []
-    for cid, c in C.items():
-        name = c.get('name') or ''
-        if not name.startswith('2627_') or c.get('status') == 'archive':
-            continue
-        n = name[5:]
-        if 'аявк' in n.lower() or n.startswith('Праздник'):
-            continue
-        dr = napr(n)
-        if dr in ('Логопед', 'Прочее'):
-            continue
-        why = next((w for rx, w in CLOSED if re.search(rx, n)), None)
-        js = [j for j in J if j['classId'] == cid]
-        busy = sum(1 for j in js if j.get('statusId') in UCHITSYA)
-        prob = sum(1 for j in js if j.get('statusId') in PROBNYE)
-        fut = [x for x in les.get(cid, []) if x['date'] >= today.isoformat()]
-        if not fut and not why:
-            why = 'нет занятий в расписании на 2 недели вперёд'
-        tk = Counter(t for x in fut for t in (x.get('teacherIds') or []))
-        teacher = M.get(tk.most_common(1)[0][0], '') if tk else ''
-        row = {'cid': cid, 'name': n.replace('_', ' ').strip(), 'dir': dr, 'cap': c.get('maxStudents') or 0,
-               'busy': busy, 'prob': prob, 'teacher': teacher}
-        row['left'] = row['cap'] - busy - prob
-        if why:
-            row['why'] = why
-            closed_rows.append(row)
-            continue
-        if dr in ('Мини-сад', 'Нулевой класс'):
-            # по дням: ребёнок «Учится» считается в день недели, если у него есть запись в этот день
-            # на прошлой или на следующей неделе; пробник — если записан на этот день вперёд
-            days = {w: {'busy': set(), 'prob': set()} for w in ('пн', 'вт', 'ср', 'чт', 'пт')}
-            w0, w1 = (today - dt.timedelta(days=7)).isoformat(), (today + dt.timedelta(days=6)).isoformat()
-            for x in les.get(cid, []):
-                w = WD[dt.date.fromisoformat(x['date']).weekday()]
-                if w not in days or not (w0 <= x['date'] <= w1):
-                    continue
-                for r in x.get('records') or []:
-                    if not r:
-                        continue
-                    s = st.get((r.get('userId'), cid))
-                    if s in UCHITSYA and not r.get('test'):
-                        days[w]['busy'].add(r['userId'])
-                    elif (s in PROBNYE or r.get('test')) and x['date'] >= today.isoformat():
-                        days[w]['prob'].add(r['userId'])
-            row['days'] = {}
-            for w, v in days.items():
-                cap = MINISAD_CAP[w] if dr == 'Мини-сад' else row['cap']
-                b, p = len(v['busy']), len(v['prob'] - v['busy'])
-                row['days'][w] = {'cap': cap, 'busy': b, 'prob': p, 'left': cap - b - p}
-        groups.append(row)
+
+def schet(d: str, today: dt.date) -> tuple[dict, bool]:
+    """Счёт мест по правилу app/mesta_pravilo.py из папки с выгрузкой. → (итог правила, были ли пометки)."""
+    ud = udaleno(d)
+    r = pravilo.poschitat(
+        [pravilo.gruppa_iz_mk(c) for c in load(d, 'classes')],
+        [pravilo.zapis_iz_mk(j) for j in load(d, 'joins')],
+        [pravilo.zanyatie_iz_mk(x) for x in load(d, 'lessons')],
+        today, managers={m['id']: m['name'] for m in load(d, 'managers')}, udaleno_joins=ud or ())
+    return r, ud is not None
+
+
+def build(d: str, now: dt.datetime) -> tuple[str, dict]:
+    r, est_pometki = schet(d, now.date())
+    groups, closed_rows, tot = r['groups'], r['closed'], r['tot']
 
     # ----------------------------------------------------------------- HTML
     def num(x, neg_red=False):
@@ -143,16 +103,11 @@ def build(d: str, now: dt.datetime) -> tuple[str, dict]:
             return f'<span class="neg">−{s[1:]}</span>'
         return s
 
-    order = ['Подготовка к школе', 'Английский', 'Музыка и речь', 'Первая школа', 'Лицей для малышей', 'ИЗО',
-             'Ментальная арифметика', 'Робототехника', 'Шахматы']
+    order = list(pravilo.PORYADOK_NAPR)
     reg = [g for g in groups if 'days' not in g]
     by = defaultdict(list)
     for g in reg:
         by[g['dir']].append(g)
-    tot = {k: sum(g[k] for g in reg) for k in ('cap', 'busy', 'prob')}
-    tot['left'] = tot['cap'] - tot['busy'] - tot['prob']
-    tot['free'] = sum(max(0, g['left']) for g in reg)
-    tot['over'] = sum(max(0, -g['left']) for g in reg)
 
     dir_rows, blocks = [], []
     anchor = {dr: f'd{i}' for i, dr in enumerate(order + sorted(set(by) - set(order)))}
@@ -191,6 +146,8 @@ def build(d: str, now: dt.datetime) -> tuple[str, dict]:
     closed_html = ''.join(f'<li>{E(g["name"])} — {E(g["why"])}; мест {g["cap"]}, учится {g["busy"]}, пробников {g["prob"]}</li>'
                           for g in sorted(closed_rows, key=lambda g: g['name']))
     stamp = now.strftime('%d.%m.%Y %H:%M')
+    udal_note = (' Записи, удалённые в МойКлассе, места не занимают.' if est_pometki else
+                 ' Список записей, удалённых в МойКлассе, сервер не отдал — они могут быть посчитаны.')
     page = f'''<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Места в группах</title>
@@ -233,11 +190,13 @@ table.g th,table.g td{{border:0;padding:0;text-align:left}}table.g th{{grid-colu
 <li>Всего мест — вместимость группы в МойКлассе. У мини-сада по дням: пн и ср — 6, вт, чт, пт — 8.</li>
 <li>Занято — дети в статусе «Учится». Пробники — «Записался на пробное» и «Посетил пробное».</li>
 <li>Мини-сад и нулевой класс: ребёнок занимает место в те дни недели, на которые у него есть запись на прошлой или следующей неделе. Пробник — если записан на этот день вперёд.</li>
+<li>Один ребёнок — одно место: две записи ребёнка в одну группу (пробное и «Учится») дважды не считаются.{udal_note}</li>
+<li>Тем же правилом считают страницы сервера «Места» и «Подбор группы» — числа совпадают.</li>
 <li>Не в статистике: логопеды (индивидуальные занятия), «Заявки», праздники и закрытые для записи группы:</li>
 </ul>
 <ul class="note">{closed_html or "<li>нет</li>"}</ul>
 </main></body></html>'''
-    summary = {'stamp': stamp, 'tot': tot, 'groups': len(groups), 'closed': len(closed_rows),
+    summary = {'stamp': stamp, 'tot': tot, 'groups': len(groups), 'closed': len(closed_rows), 'udaleno': est_pometki,
                'days': {g['dir']: g['days'] for g in groups if 'days' in g}}
     return page, summary
 

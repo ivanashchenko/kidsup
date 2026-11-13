@@ -1156,6 +1156,14 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
             LEFT JOIN joins j ON j.class_id = cl.id AND j.status_id NOT IN (1, 4)
             WHERE cl.name LIKE '2627%'
             GROUP BY cl.id ORDER BY co.name, cl.name""").fetchall()
+    # 13.11.2026, Борис (решение М2 «сколько свободных мест считать верным — как в вашем
+    # документе»): «записано / мест / свободно» у групп и табло наверху — по единому
+    # правилу (app/mesta_pravilo.py), тому же, что на «Местах» и в документе владельца.
+    # Прежде занятым местом считалась любая запись, кроме «Отказался» и «Завершил» —
+    # отработки, новые и старые заявки, «не пришёл на пробное», — и страница писала
+    # «мест нет» там, где места есть (на копии базы 12.11: 102 свободных вместо 93 и
+    # «мест нет» в 63 группах и слотах). Буферы «Заявки» считаются по-старому.
+    po_pravilu = _mesta_po_pravilu()
     groups = []
     for r in rows:
         name = r["name"] or ""
@@ -1165,6 +1173,9 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         buffer = "аявк" in name  # группы «Заявки» — буфер без лимита мест
         cap = r["max_students"] or 8
         enrolled = r["enrolled"] or 0
+        pp = None if buffer else po_pravilu.get(r["id"])
+        if pp:
+            cap, enrolled = pp["capacity"] or cap, pp["enrolled"]
         fill = 0 if buffer else (min(100, round(enrolled * 100 / cap)) if cap else 0)
         age_lo, age_hi = _group_ages(name)
         k_lo, k_hi = _group_klass(name)
@@ -1183,8 +1194,11 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
             "age": ((f"{k_lo}–{k_hi} класс" if k_lo != k_hi else f"{k_lo} класс") if k_lo
                     else (f"{age_lo:g}–{age_hi:g} лет" if age_lo else "—")),
             "enrolled": enrolled, "capacity": cap,
-            "free": max(0, cap - enrolled), "fresh": r["fresh"] or 0, "fill_pct": fill,
+            "free": pp["free"] if pp else max(0, cap - enrolled), "fresh": r["fresh"] or 0, "fill_pct": fill,
             "color": "#E5232A" if fill >= 100 else "#F5A81C" if fill >= 75 else "#5FB53B",
+            # вид группы по правилу: obychnaya / po_dnyam / zakryta / vne (логопеды); "" — буфер
+            "vid": pp["vid"] if pp else "", "zakryta": (pp["why"] if pp and pp["vid"] == "zakryta" else ""),
+            "po_dnyam": (pp["dni"] if pp and pp["vid"] == "po_dnyam" else ""),
         })
     all_groups = list(groups)          # до фильтров — для табло набора
     courses_list = sorted({g["course"] for g in groups})
@@ -1231,7 +1245,9 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         s = summary.setdefault(g["course"], {"course": g["course"], "groups": 0,
                                              "enrolled": 0, "capacity": 0, "free": 0})
         s["groups"] += 1; s["enrolled"] += g["enrolled"]
-        if not g["buffer"]:
+        # 13.11.2026: закрытые для записи группы и группы «по дням» (сад, нулевой) в места
+        # и свободные сводки не входят — как в итоге по центру
+        if not g["buffer"] and g["vid"] not in ("zakryta", "po_dnyam"):
             s["capacity"] += g["capacity"]; s["free"] += g["free"]
     for s in summary.values():
         s["fill_pct"] = round(s["enrolled"] * 100 / s["capacity"]) if s["capacity"] else 0
@@ -1251,6 +1267,10 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         # подсказка админу, чем давить: добор или последние места
         if g["buffer"]:
             g["urgency"] = ""
+        elif g["zakryta"]:
+            g["urgency"] = f"закрыта для записи: {g['zakryta']}"
+        elif g["po_dnyam"]:
+            g["urgency"] = f"мест по дням: {g['po_dnyam']}"
         elif g["free"] == 0:
             g["urgency"] = "мест нет — в лист ожидания"
         elif g["enrolled"] <= 3:
@@ -1283,7 +1303,22 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         "full": sum(1 for g in real if g["free"] <= 0),
         "empty": sum(1 for g in real if g["enrolled"] == 0),
         "groups": len(real),
+        "pravilo": "",
     }
+    # 13.11.2026 (М2): табло — итог единого правила, те же числа, что на «Местах»:
+    # открытые для записи группы без сада и нулевого; свободно — сумма по группам, где
+    # места есть (переполненная группа чужие места не съедает).
+    itog = po_pravilu.get(0)
+    if itog:
+        from . import mesta_pravilo
+        taken = itog["busy"] + itog["prob"]
+        board.update({
+            "places": itog["cap"], "taken": taken, "free": itog["free"],
+            "pct": round(taken * 100 / itog["cap"]) if itog["cap"] else 0,
+            "per_day": round(itog["free"] / days_left, 1) if days_left else 0,
+            "full": itog["full"], "empty": itog["empty"], "groups": itog["groups"],
+            "pravilo": mesta_pravilo.PRAVILO,
+        })
     return render(request, "enrollment.html", active="enrollment", board=board,
                   groups=groups, courses=courses_list, course=course,
                   days=days_list, day=day, free=free,
@@ -1475,8 +1510,26 @@ def api_hooppy_raspisanie(payload: dict = Body(...)):
         raise HTTPException(502 if isinstance(e, hooppy.HooppyError) else 400, str(e)[:300])
 
 
+def _mesta_po_pravilu() -> dict:
+    """Места по единому правилу для «Подбора группы»: {class_id: {...}}, ключ 0 — итог
+    (app/mesta.py, dlya_podbora). Не посчиталось — пустой словарь: страница покажет
+    прежний счёт, а не упадёт."""
+    try:
+        from . import mesta
+        return mesta.dlya_podbora()
+    except Exception:  # noqa: BLE001 — подбор группы должен открыться и без счёта по правилу
+        logging.getLogger("kidsup.mesta").exception("места по единому правилу")
+        return {}
+
+
 def _enrollment_groups() -> list[dict]:
-    """Группы 2026/27 с остатком мест и ценой — то же, что видит страница набора."""
+    """Группы 2026/27 с остатком мест и ценой — то же, что видит страница набора.
+
+    13.11.2026 (М2): «записано» и «свободно» — по единому правилу, как на странице
+    набора и на «Местах»: закрытая для записи группа — 0 свободных, сад и нулевой — мест
+    в самый свободный день. Вместимость (capacity) и буферы «Заявки» — как были: на них
+    опирается витрина сайта (_build_schedule), которая занятость считает сама."""
+    po_pravilu = _mesta_po_pravilu()
     with db.get_conn() as conn:
         rows = conn.execute("""
             SELECT cl.id, cl.name, cl.max_students, co.name course,
@@ -1499,6 +1552,9 @@ def _enrollment_groups() -> list[dict]:
         age_lo, age_hi = _group_ages(name)
         course = COURSE_ALIAS.get(r["course"] or "", r["course"] or "?")
         pr = PRICES.get(course)
+        pp = None if buffer else po_pravilu.get(r["id"])
+        if pp:
+            enrolled = pp["enrolled"]
         out.append({
             "id": r["id"], "name": name, "course": course, "buffer": buffer,
             "day": " · ".join(DAY_LABEL[d] for d in g_days) or "—",
@@ -1506,7 +1562,7 @@ def _enrollment_groups() -> list[dict]:
             "age_lo": age_lo, "age_hi": age_hi,
             "age": (f"{age_lo:g}–{age_hi:g} лет" if age_lo else "—"),
             "enrolled": enrolled, "capacity": cap,
-            "free": 0 if buffer else max(0, cap - enrolled),
+            "free": 0 if buffer else (pp["free"] if pp else max(0, cap - enrolled)),
             "price_new": _price_line(pr, name)[2] if pr else None,
             "price_label": _price_line(pr, name)[0] if pr else None,
         })
@@ -3746,6 +3802,19 @@ def export_raw(table: str):
     allowed = {"users", "joins", "payments", "invoices", "classes", "courses",
                "filials", "managers", "subscriptions", "user_subscriptions",
                "lessons", "lesson_records", "rooms"}
+    # 13.11.2026, Борис (М2, одно число свободных мест): документ «Места в группах»
+    # (docs/rabota/mesta_boris.py) считает по этой выгрузке, а страница «Места» — по базе
+    # без записей, удалённых в МойКлассе. Чтобы числа сошлись до единицы, отдаём и пометки
+    # удалённого: только имя таблицы и id строки, без данных клиентов.
+    if table == "mk_udaleno":
+        with db.get_conn() as conn:
+            try:
+                rows = conn.execute("SELECT tbl, rid FROM mk_udaleno").fetchall()
+            except sqlite3.OperationalError:      # таблицы ещё нет (старая база)
+                rows = []
+        return Response(json.dumps([{"tbl": r["tbl"], "rid": r["rid"]} for r in rows]),
+                        media_type="application/json",
+                        headers={"Content-Disposition": 'attachment; filename="mk_udaleno.json"'})
     if table not in allowed:
         raise HTTPException(404)
     with db.get_conn() as conn:
