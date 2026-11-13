@@ -85,14 +85,98 @@ def all_channels() -> list[dict]:
 
 OUR_HOOK = "https://app.kidsup.ru/wazzup/webhook"
 
+# 13.11.2026, Борис (безопасность, вечер 1): вебхук Wazzup не проверял отправителя — любой,
+# кто знает адрес, мог прислать «сообщение клиента» (оно попало бы в переписку, в пульт и в
+# МойКласс). Проверка необязательная: задана настройка wazzup_hook_key — адрес регистрируется
+# в Wazzup как OUR_HOOK?k=<ключ>, и вебхук принимает только запросы с этим ключом; не задана —
+# всё как раньше. Чтобы при включении не потерять ни одного сообщения, ключ начинает
+# требоваться только после первого события, пришедшего с верным ключом (hook_strogo): пока
+# Wazzup шлёт по старому адресу без ключа, принимаем как раньше. Так же безопасно, если Wazzup
+# ключ из адреса не передаст вовсе: проверка просто не включится, сообщения не пропадут.
+# Сам ключ нигде не печатается: наружу (журнал, ответы API, сообщение сторожа) адрес уходит
+# только через bez_klyucha().
+_HOOK_OK = "wazzup_hook_key_ok"     # отметка «событие с этим ключом уже приходило» (хеш ключа)
+
+
+def hook_klyuch() -> str:
+    """Ключ вебхука из настройки wazzup_hook_key или "" — проверка выключена."""
+    return (db.get_setting("wazzup_hook_key", "") or "").strip()
+
+
+def _hook_hesh(klyuch: str) -> str:
+    import hashlib
+    return hashlib.sha256(("wazzup-hook:" + klyuch).encode("utf-8")).hexdigest()[:24]
+
+
+def nash_hook() -> str:
+    """Адрес, который регистрируем в Wazzup. При заданном ключе СОДЕРЖИТ СЕКРЕТ: в журнал и
+    в ответы API — только через bez_klyucha()."""
+    from urllib.parse import quote
+    k = hook_klyuch()
+    return OUR_HOOK + ("?k=" + quote(k, safe="") if k else "")
+
+
+def bez_klyucha(uri: str) -> str:
+    """Адрес вебхука без значения ключа — для журнала, ответов API и сообщений."""
+    import re
+    return re.sub(r"([?&]k=)[^&#]*", r"\1…", str(uri or ""))
+
+
+def hook_strogo() -> bool:
+    """Ключ уже требуется: он задан, и событие с ним уже приходило."""
+    k = hook_klyuch()
+    return bool(k) and (db.get_setting(_HOOK_OK, "") or "") == _hook_hesh(k)
+
+
+def hook_prinyat(prislali: str) -> bool:
+    """Принимать ли запрос вебхука с ключом ?k=prislali.
+
+    Ключ не задан — принимаем всё, как раньше. Задан и ключ верный — принимаем и запоминаем,
+    что Wazzup уже шлёт с ключом. Задан, ключ неверный или его нет: до первого верного —
+    принимаем (переход без потерь), после — отказ."""
+    import secrets
+    k = hook_klyuch()
+    if not k:
+        return True
+    if secrets.compare_digest(str(prislali or "").encode("utf-8"), k.encode("utf-8")):
+        if not hook_strogo():
+            db.set_setting(_HOOK_OK, _hook_hesh(k))
+        return True
+    return not hook_strogo()
+
+
+def hook_sostoyanie() -> str:
+    """Одной строкой для владельца — без самого ключа."""
+    if not hook_klyuch():
+        return "ключ не задан: вебхук принимает всё, как раньше"
+    if hook_strogo():
+        return "ключ требуется: запросы без ключа отклоняются"
+    return "ключ задан, ждём первое событие с ключом: пока принимаем и без него"
+
 
 def webhook_uri() -> str:
+    """Адрес вебхука, записанный в Wazzup, — без значения ключа.
+
+    13.11.2026: наш адрес с действующим ключом возвращается как OUR_HOOK — сторож автопилота
+    и «вернуть вебхук» сравнивают ответ с OUR_HOOK, и для них это по-прежнему «адрес наш».
+    Значение ключа в ответ не попадает никогда. Наш адрес с другим ключом — «не наш»: сторож
+    перерегистрирует его с действующим. Наш адрес совсем без ключа при заданной настройке:
+    пока ключ ещё не требуется (hook_strogo() == False), это рабочее состояние первого
+    включения — отвечаем OUR_HOOK, сторож не тревожит владельца сообщением «вебхук
+    переписан», адрес с ключом ставит «вернуть вебхук» (POST /api/wazzup/webhook); когда же
+    ключ уже требуется, адрес без ключа значит, что события отклоняются, — отвечаем «не наш»,
+    и сторож чинит сам."""
     r = httpx.get(f"{API}/webhooks", headers=_headers(), timeout=30)
     r.raise_for_status()
-    return (r.json() or {}).get("webhooksUri") or ""
+    uri = (r.json() or {}).get("webhooksUri") or ""
+    if uri == nash_hook():
+        return OUR_HOOK
+    if uri == OUR_HOOK:                       # ключ задан, а в Wazzup адрес без него
+        return OUR_HOOK + " (без ключа)" if hook_strogo() else OUR_HOOK
+    return bez_klyucha(uri)
 
 
-def set_webhook(uri: str = OUR_HOOK) -> bool:
+def set_webhook(uri: str = "") -> bool:
     """Вернуть вебхук на наш портал.
 
     Wazzup хранит ровно ОДИН адрес. Интеграция МойКласс при пересохранении
@@ -100,7 +184,11 @@ def set_webhook(uri: str = OUR_HOOK) -> bool:
     рассылка перестаёт получать статусы доставки. Инцидент 19.08.2026:
     события пропали в 13:02 и не приходили 20 часов, пока не заметили.
     Наш эндпоинт пересылает всё в МойКласс сам, поэтому чаты в CRM
-    от возврата адреса не страдают."""
+    от возврата адреса не страдают.
+
+    13.11.2026: без аргумента регистрируется nash_hook() — при заданной настройке
+    wazzup_hook_key это адрес с ?k=<ключ> (до 13.11 умолчанием был OUR_HOOK без ключа)."""
+    uri = uri or nash_hook()
     r = httpx.patch(f"{API}/webhooks", headers=_headers(), timeout=40, json={
         "webhooksUri": uri,
         "subscriptions": {"messagesAndStatuses": True, "contactsAndDealsCreation": True,

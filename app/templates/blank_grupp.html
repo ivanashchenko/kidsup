@@ -126,7 +126,9 @@ async function op(p){
 }
 async function load(force){
   $('#st').textContent=force?'Обновляю проверки из МойКласса…':'Загружаю…';
-  const r=await fetch('/api/blank-grupp'+(force?'?refresh=1':''));const d=await r.json();
+  // 13.11.2026: пересчёт проверок — действие, поэтому POST /api/blank-grupp/obnovit (раньше GET ?refresh=1);
+  // простое открытие страницы — GET, только чтение
+  const r=await (force?fetch('/api/blank-grupp/obnovit',{method:'POST'}):fetch('/api/blank-grupp'));const d=await r.json();
   if(!d.model){$('#main').innerHTML='<p>'+(d.err||'Данные ещё загружаются, обновите страницу через минуту.')+'</p>';$('#st').textContent='';return}
   M=d.model;
   $('#dd').innerHTML=M.days_choices.map(x=>`<option value="${x}">`).join('');

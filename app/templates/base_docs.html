@@ -19,4 +19,27 @@
     </tbody>
   </table>
 {% endfor %}
+
+{#- 13.11.2026, Борис (уборка, вечер 1): планы, листы обзвона и итоги кампаний августа–сентября —
+    одним свёрнутым разделом внизу. Ничего не удалено, адреса /base/… прежние (список — в
+    app/main.py, ARHIV_KAMPANIY). -#}
+{% if arhiv %}
+  <details class="base-arhiv" id="arhiv-kampaniy" style="margin-top:28px">
+    <summary style="cursor:pointer;font-weight:700;font-size:1.15rem;padding:10px 0">{{ arhiv.title }}
+      <span class="muted small" style="font-weight:400">· {{ arhiv['items']|length }} — нажмите, чтобы раскрыть</span></summary>
+    <p class="muted small">Планы дня, листы и списки обзвона, День открытых дверей и праздник 29–31.08, стратегии и итоги
+    «к 30 сентября». В работе сейчас не нужны — оставлены для истории, открываются по прежним адресам.</p>
+    <table class="data">
+      <tbody>
+      {% for d in arhiv['items'] %}
+        <tr>
+          <td><a href="{{ d.href }}"><b>{{ d.name }}</b></a></td>
+          <td class="small muted">{{ d.note }}</td>
+          <td class="small muted">{{ d.size }} КБ</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+{% endif %}
 {% endblock %}

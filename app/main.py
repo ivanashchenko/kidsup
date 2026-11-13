@@ -1946,6 +1946,35 @@ DOC_GROUPS = [
     ]),
 ]
 
+# 13.11.2026, Борис (уборка, вечер 1): методички кампаний августа–сентября — планы дня,
+# листы и списки обзвона, «хвосты», ДОД и праздник 29–31.08, стратегии и итоги «к 30 сентября»,
+# бонусные гонки тех недель — на странице /base собраны в один свёрнутый раздел внизу.
+# Причина: из 77 документов «Каждый день на смене» 55 не менялись с августа–сентября, в десяти
+# названиях — сотрудница, уволенная 12.10; действующие правила, скрипты и методики занятий
+# среди них терялись. Ничего не удалено: DOC_GROUPS выше остаётся и белым списком адресов
+# /base/{slug}, и записью, в каком разделе документ стоял; адреса прежние. Здесь — только
+# перечень того, что показывается в архиве. Отбор — по названию и дате в подписи.
+ARHIV_KAMPANIY_IMYA = "Архив: кампании августа–сентября 2026"
+ARHIV_KAMPANIY = frozenset("""
+plan341 bonusy_avgust bonusy_raschet zadachi_lizy ostatok_ira ostatok_lena ostatok_anya
+zayavki_svezhie zayavki_leto blanki_obzvona list_lena list_irina list_anya_sad spisok_a spisok_b
+__url:/static/plakaty_kidsup.pdf __url:/static/forma_zapisi.pdf dod_gosti
+__url:/static/anketa_prazdnik.pdf anketa_prazdnik __url:/static/dod_rannee_razvitie.pdf
+angliyskiy gruppy_2627 __url:/static/banner_metro.png __url:/static/banner_metro_1900x1400.tif
+zameny_grupp_0809 kabinety_zamena_0809 gruppy_strategiya_0809 gruppy_analiz_0709
+plan_05sen plan_06sen yuz_keysy gruppy_reshenia strategiya_nedelya strategiya_sentyabr
+plan_04sen plan_03sen itog_3dnya plan_02sen zadachi_02sen plan_01sen plan_31avgusta
+bonusy_gonka nedelya_31avg plan_30avgusta __url:/static/dod_30avgusta.pdf dod_svod chek_sentyabr
+spisok_final spisok_ira spisok_anya spisok_lena spisok_b_lena spisok_b_ira spisok_c
+obzvon_aya_4_5 list_ira_4_7 list_lena_7_12 obzvon_vozrast
+megaplan strategiya_nabora sobytiya_29_31 kontent_plan
+blank_roditelya
+boris_itog smm_zhurnal
+list_burakov zadachi_kak_ispravil plan_nabora_21_30 mega_plan promo_status napisat_spisok
+obzvon_nadezhda obzvon_psh obzvon_21_08 utro_20_08 algoritm_obzvona plan_nabora_v2
+operativka_13_17 plan_del_borisa kontent_plan_13_30 plan_nabora
+""".split())
+
 
 
 # 13.11.2026, шаг 2: страница /settings переехала на /owner, раздел «МойКласс» (id="mk").
@@ -2058,6 +2087,9 @@ OWNER_FIELDS = [
     ("hooppy_token", "Hooppy — API-токен (Настройки → API): посты, истории, клипы в ВК/Telegram/Instagram", True),
     ("green_api_instance", "Green-API — idInstance (статусы WhatsApp с отдельного номера)", False),
     ("green_api_token", "Green-API — apiTokenInstance", True),
+    # 13.11.2026 (безопасность, вечер 1): ключи вебхуков — вместо секрета, зашитого в код
+    ("marquiz_key", "Марквиз — ключ вебхука (то, что стоит после ?key= в адресе вебхука в кабинете Марквиза; пока пусто — действует прежний ключ)", True),
+    ("wazzup_hook_key", "Wazzup — ключ вебхука (необязательный: после него принимаются только события Wazzup с этим ключом)", True),
     # 12.11.2026, личные входы: строки «Пароль владельца» (owner_password) здесь больше нет.
     # Пароли задаются в блоке «Входы» выше и хранятся только хешем в data/vhody.db.
 ]
@@ -2087,6 +2119,13 @@ def _owner_ctx(request: Request = None, msg: str = "", vhody: dict | None = None
     for key, label, secret in OWNER_FIELDS:
         val = db.get_setting(key)
         shown = ("задан, …" + val[-3:] + f" ({len(val)} симв.)" if secret and val else (val or "— не задан —"))
+        if secret and val and len(val) < 12:
+            # 13.11.2026: у короткого секрета (ключ вебхука, пароль камер) три знака — заметная
+            # его часть; хвост показываем только у длинных значений, как в _mask
+            shown = f"задан ({len(val)} симв.)"
+        if key == "wazzup_hook_key" and val:
+            from . import wazzup as _wz
+            shown += " · " + _wz.hook_sostoyanie()
         rows.append(f"<label><span>{html.escape(label)}</span><small>сейчас: {html.escape(shown)}</small>"
                     f"<input type='{'password' if secret else 'text'}' name='{key}' placeholder='вставьте новое значение, чтобы заменить' autocomplete='off'></label>")
     return f"""<!doctype html><html lang='ru'><head><meta charset='utf-8'><title>Настройки владельца</title>
@@ -2178,22 +2217,33 @@ def base_page(request: Request):
     """Все методички в одном месте, сгруппированные по моменту применения."""
     root = Path(__file__).resolve().parent.parent / "docs"
     groups = []
+    # 13.11.2026: кампании августа–сентября — одним свёрнутым разделом внизу (ARHIV_KAMPANIY).
+    # Один и тот же документ в архиве показываем один раз, под первым названием.
+    arhiv, v_arhive = [], set()
     for title, items in DOC_GROUPS:
         rows = []
         for slug, name, note in items:
+            kuda = rows
+            if slug in ARHIV_KAMPANIY:
+                if slug in v_arhive:
+                    continue
+                kuda = arhiv
             # «__url:/путь» — не методичка, а живая страница портала:
             # пульт и бланки групп собираются из живых данных, файла в docs у них нет
             if slug.startswith("__url:"):
-                rows.append({"slug": slug, "href": slug[6:], "name": name,
+                kuda.append({"slug": slug, "href": slug[6:], "name": name,
                              "note": note, "size": 0})
+                v_arhive.update({slug} & ARHIV_KAMPANIY)
                 continue
             f = root / f"{slug}.html"
             if f.exists():
-                rows.append({"slug": slug, "href": f"/base/{slug}", "name": name,
+                kuda.append({"slug": slug, "href": f"/base/{slug}", "name": name,
                              "note": note, "size": f.stat().st_size // 1024})
+                v_arhive.update({slug} & ARHIV_KAMPANIY)
         if rows:
             groups.append({"title": title, "items": rows})
-    return render(request, "base_docs.html", active="base", groups=groups)
+    return render(request, "base_docs.html", active="base", groups=groups,
+                  arhiv={"title": ARHIV_KAMPANIY_IMYA, "items": arhiv} if arhiv else None)
 
 
 
@@ -3583,7 +3633,12 @@ def export_leads():
 
 # --- API: синхронизация ----------------------------------------------------
 
-@app.post("/api/sync/start", dependencies=AUTH)
+# 13.11.2026, Борис (безопасность, вечер 1): запуск полной выгрузки МойКласса — под входом
+# владельца. Кнопка «Синхронизировать» с 13.11 есть только у владельца (base.html), а адрес
+# оставался открыт любому админу: полная выгрузка тяжёлая и на время занимает ключ МойКласса.
+# Автопилот зовёт sync.start_sync() сам, без HTTP; рутины этот адрес не зовут (проверено по
+# app/, docs/rabota и .claude) — им нужен только GET /api/sync/status, он остался под общим входом.
+@app.post("/api/sync/start", dependencies=OWNER_AUTH)
 def sync_start():
     if not sync.get_api_key():
         return JSONResponse({"ok": False, "error": "API-ключ не задан"}, status_code=400)
@@ -4434,9 +4489,26 @@ def api_obzvon_done(payload: dict = Body(...)):
 @app.get("/api/obzvon/audit", dependencies=AUTH)
 def api_obzvon_audit(vernut: int = 0, days: int = 7):
     """Проверить стоящие галочки по журналу звонков и переписке.
-    vernut=1 — снять те, за которыми нет ни разговора, ни заметки."""
+    vernut=1 — снять те, за которыми нет ни разговора, ни заметки.
+
+    13.11.2026, Борис (безопасность, вечер 1): GET только читает. С ?vernut=1 он стирал
+    отметки «обзвонили» (obzvon_done) — то есть запись делало обычное открытие ссылки:
+    достаточно было прислать такую ссылку вошедшему админу. Снятие пустых отметок теперь —
+    POST /api/obzvon/audit/vernut; на GET с vernut=1 отвечаем 405 с подсказкой, чтобы
+    старая привычка не выглядела как «снял», когда ничего не снято."""
     from . import obzvon
-    return obzvon.audit(vernut=bool(int(vernut)), days=days)
+    if int(vernut):
+        raise HTTPException(405, "Снятие пустых отметок — POST /api/obzvon/audit/vernut; GET только показывает",
+                            headers={"Allow": "POST"})
+    return obzvon.audit(vernut=False, days=days)
+
+
+@app.post("/api/obzvon/audit/vernut", dependencies=AUTH)
+def api_obzvon_audit_vernut(days: int = 7):
+    """Снять отметки «обзвонили», за которыми нет ни разговора, ни заметки (строки вернутся
+    в список). То же, что до 13.11.2026 делал GET /api/obzvon/audit?vernut=1."""
+    from . import obzvon
+    return obzvon.audit(vernut=True, days=days)
 
 
 @app.get("/api/obzvon", dependencies=AUTH)
@@ -4780,37 +4852,13 @@ def kadry_file(day: str, name: str):
     return Response(p.read_bytes(), media_type="image/png")
 
 
-def _bez_oplaty_status_init(conn) -> None:
-    conn.execute("CREATE TABLE IF NOT EXISTS bez_oplaty_status (key TEXT PRIMARY KEY, text TEXT, who TEXT, ts TEXT)")
-
-
-@app.get("/api/bez-oplaty/status", dependencies=AUTH)
-def api_bez_oplaty_status():
-    """Статусы по детям из списка /bez-oplaty («болел, вернётся чт», «ушли», «оплатят в пт»):
-    {key: {text, who, ts}}, key = "<uid>:<class_id>". 07.10.2026, Борис: «таблица, кто ещё
-    не был в октябре, и какой-то статус»."""
-    with db.get_conn() as conn:
-        _bez_oplaty_status_init(conn)
-        rows = conn.execute("SELECT key, text, who, ts FROM bez_oplaty_status").fetchall()
-    return {r[0]: {"text": r[1], "who": r[2], "ts": r[3]} for r in rows}
-
-
-@app.post("/api/bez-oplaty/status", dependencies=AUTH)
-def api_bez_oplaty_status_set(payload: dict = Body(...)):
-    """{"key": "uid:class_id", "text": "...", "who": "Аня"} — пустой text удаляет статус."""
-    from . import autopilot
-    key = str(payload.get("key") or "").strip()
-    if not key:
-        raise HTTPException(400, "key")
-    text = str(payload.get("text") or "").strip()[:300]
-    with db.get_conn() as conn:
-        _bez_oplaty_status_init(conn)
-        if text:
-            conn.execute("INSERT OR REPLACE INTO bez_oplaty_status (key, text, who, ts) VALUES (?,?,?,?)",
-                         (key, text, str(payload.get("who") or "")[:40], autopilot._now().isoformat(timespec="minutes")))
-        else:
-            conn.execute("DELETE FROM bez_oplaty_status WHERE key=?", (key,))
-    return {"ok": True, "key": key}
+# 13.11.2026, Борис (уборка, вечер 1): GET и POST /api/bez-oplaty/status убраны. Их звали
+# только две статичные страницы октября (/bez-oplaty и /ne-oplatili), снятые 12.11 — оба
+# адреса ведут на /voronka. Читателей не осталось ни в app/, ни в docs/rabota, ни в .claude;
+# списки админов на сервере этот адрес не звали (проверка 12.11), последняя отметка — 10.10.
+# Таблица bez_oplaty_status в базе не тронута: 42 статуса админов за 07–10.10 лежат как были
+# (key = "<uid>:<class_id>", text, who, ts — «болел, вернётся чт», «ушли», «оплатят в пт»;
+# заведена 07.10.2026 по словам Бориса: «таблица, кто ещё не был в октябре, и какой-то статус»).
 
 
 @app.post("/api/kontrol-oplat/run", dependencies=OWNER_AUTH)
@@ -5362,6 +5410,11 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             "anthropic_proxy_secret", "work_hours", "ext_by_day",
             "vk_token", "vk_group_id", "vk_ads_client_id", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "tg_bot_token", "tg_channel", "mango_ext_admins", "pedagog_key", "mk_web_login", "mk_web_password",
             "calls_parsed", "sms_on", "sms_sender_name", "lead_hook_key",
+            # 13.11.2026 (безопасность, вечер 1): секреты вебхуков. marquiz_key — ключ в адресе
+            # вебхука Марквиза (пока не задан, действует прежний ключ из кода); wazzup_hook_key —
+            # ключ ?k= в адресе вебхука Wazzup (пока не задан, вебхук принимает всё, как раньше).
+            # Оба — в SECRET_KEYS: целиком не отдаются.
+            "marquiz_key", "wazzup_hook_key",
             # сбор оплат за следующий месяц (app/oplata.py): включение, время старта и конец окна
             "oplata_on", "oplata_start", "oplata_do",
             # возврат «думает»/«недозвон»/база 2024/25 (app/vozvrat.py): сколько звонков в день и кому
@@ -5406,13 +5459,29 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
 # страница настроек открыта всем, у кого есть пароль администратора.
 SECRET_KEYS = {"cam_password", "anthropic_api_key", "anthropic_proxy_secret", "tbank_token", "ivideon_password", "komtet_password", "komtet_imap_password", "pochta_password", "komtet_code", "ivideon_code", "komtet_secret", "owner_password", "yandex_audience_token",
                "hooppy_token", "green_api_token", "tbank_terminal_password", "zenmoney_token",
-               "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password", "yandex_web_password"}
+               "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password", "yandex_web_password",
+               # 13.11.2026: ключи вебхуков — тот, кто их знает, может слать нам заявки и «сообщения
+               # клиентов». lead_hook_key до этого дня отдавался в /api/settings целиком.
+               "marquiz_key", "wazzup_hook_key", "lead_hook_key"}
 
 
 def _mask(key: str, value: str | None) -> str | None:
     if not value or key not in SECRET_KEYS:
         return value
+    # 13.11.2026: хвост из четырёх знаков показываем только у длинных значений. У короткого
+    # (ключ вебхука в 10 знаков, пароль камер) четыре знака — почти половина секрета.
+    if len(value) < 12:
+        return f"задано ({len(value)} симв.)"
     return f"…{value[-4:]} ({len(value)} симв.)"
+
+
+def _klyuch_veren(prislali: str, nash: str) -> bool:
+    """Ключ из адреса вебхука совпал с нашим. Пустой наш ключ не подходит никому. Сравнение
+    без утечки по времени и байтами: строку с русскими буквами secrets.compare_digest
+    не принимает (было бы 500 вместо отказа)."""
+    if not nash:
+        return False
+    return secrets.compare_digest(str(prislali or "").encode("utf-8"), nash.encode("utf-8"))
 
 
 @app.get("/api/settings", dependencies=OWNER_AUTH)
@@ -6181,7 +6250,10 @@ async def hook_lead(request: Request, key: str = ""):
     Настройка в Tilda: Сайт → Формы → Webhook, URL
     https://app.kidsup.ru/hook/lead?key=<секрет из настройки lead_hook_key>."""
     secret = db.get_setting("lead_hook_key", "")
-    if secret and key != secret:
+    # 13.11.2026 (безопасность, вечер 1): сравнение без утечки по времени (_klyuch_veren).
+    # Поведение прежнее: ключ задан (на сервере задан) — нужен он; не задан — принимаем без
+    # ключа, как раньше, чтобы заявки Тильды не терялись.
+    if secret and not _klyuch_veren(key, secret):
         return {"ok": False}
     try:
         payload = await request.json()
@@ -7268,8 +7340,15 @@ def api_wazzup_webhook_status():
             last = c.execute("SELECT MAX(ts) FROM wazzup_raw").fetchone()[0]
         except Exception:
             last = None
-    return {"http": r.status_code, "wazzup": (r.json() if r.status_code == 200 else r.text[:300]),
-            "ours": wazzup.OUR_HOOK, "last_event": last}
+    # 13.11.2026: ответ Wazzup содержит адрес вебхука целиком — при заданном wazzup_hook_key
+    # в нём ключ. Наружу адрес уходит без значения ключа; состояние проверки — строкой «klyuch».
+    otvet = r.json() if r.status_code == 200 else r.text[:300]
+    if isinstance(otvet, dict) and otvet.get("webhooksUri"):
+        otvet = {**otvet, "webhooksUri": wazzup.bez_klyucha(otvet["webhooksUri"])}
+    elif isinstance(otvet, str):
+        otvet = wazzup.bez_klyucha(otvet)
+    return {"http": r.status_code, "wazzup": otvet,
+            "ours": wazzup.OUR_HOOK, "last_event": last, "klyuch": wazzup.hook_sostoyanie()}
 
 
 @app.post("/api/wazzup/webhook", dependencies=OWNER_AUTH)
@@ -10414,8 +10493,27 @@ def blank_grupp_page(request: Request, vid: str = "", day: str = "", subject: st
 
 @app.get("/api/blank-grupp", dependencies=AUTH)
 def api_blank_grupp(refresh: int = 0):
+    """Бланки групп — чтение. 13.11.2026, Борис (безопасность, вечер 1): ?refresh=1 больше
+    ничего не запускает. С ним GET заново выкачивал из МойКласса занятия за шесть недель, все
+    записи и до 150 карточек и подменял общую для всех копию проверок — это действие, а не
+    чтение, и запускала его любая открытая ссылка. Кнопка «Обновить проверки из МойКласса»
+    зовёт POST /api/blank-grupp/obnovit. Параметр оставлен, чтобы вкладка, открытая до
+    выкладки, не получила ошибку: ей вернётся текущая копия (она и так обновляется сама раз
+    в час)."""
     from . import blank_grupp
-    st = blank_grupp.model(force=bool(refresh), wait=bool(refresh))
+    st = blank_grupp.model()
+    if st["model"]:
+        st["model"] = blank_grupp.with_edits(st["model"])
+    return st
+
+
+@app.post("/api/blank-grupp/obnovit", dependencies=AUTH)
+def api_blank_grupp_obnovit():
+    """Пересчитать проверки бланков по свежим данным МойКласса (кнопка на странице). Бланк,
+    который ведут админы, не меняется. Ответ — как у GET /api/blank-grupp. До 13.11.2026 это
+    делал GET /api/blank-grupp?refresh=1."""
+    from . import blank_grupp
+    st = blank_grupp.model(force=True, wait=True)
     if st["model"]:
         st["model"] = blank_grupp.with_edits(st["model"])
     return st
@@ -11967,6 +12065,18 @@ async def run_morning_now():
 
 
 MARQUIZ_KEY = "mqz-KdsUp-2026-hQ7rT"  # секрет в URL вебхука Марквиза
+# 13.11.2026, Борис (безопасность, вечер 1): ключ выше лежит в публичном репозитории, то есть
+# секретом уже не является — зная его, заявку в CRM и перезвон дежурной может прислать кто
+# угодно. Новый ключ задаётся настройкой marquiz_key (страница /owner или POST /api/settings).
+# Задана — принимается ТОЛЬКО она, ключ из кода перестаёт работать. Не задана — работает
+# прежний ключ: иначе заявки квизов терялись бы до того, как адрес поменяют в кабинете
+# Марквиза. Порядок смены: сначала вписать новый адрес в Марквизе, сразу после — настройку
+# (между двумя шагами заявка с новым ключом получит 403; Марквиз показывает её у себя).
+
+
+def _marquiz_klyuch() -> str:
+    """Действующий ключ вебхука Марквиза: настройка marquiz_key, а пока её нет — прежний из кода."""
+    return (db.get_setting("marquiz_key", "") or "").strip() or MARQUIZ_KEY
 
 
 @app.post("/marquiz/webhook")
@@ -11975,7 +12085,7 @@ async def marquiz_webhook(request: Request, key: str = ""):
 
     В панели Марквиза: Интеграции → Вебхук →
     https://app.kidsup.ru/marquiz/webhook?key=<секрет>"""
-    if key != MARQUIZ_KEY:
+    if not _klyuch_veren(key, _marquiz_klyuch()):
         raise HTTPException(403)
     try:
         payload = await request.json()
@@ -12092,8 +12202,16 @@ async def wazzup_webhook_check():
 
 
 @app.post("/wazzup/webhook")
-async def wazzup_webhook(request: Request):
-    """Принимаем событие, отвечаем 200 сразу; работа — в фоне."""
+async def wazzup_webhook(request: Request, k: str = ""):
+    """Принимаем событие, отвечаем 200 сразу; работа — в фоне.
+
+    13.11.2026, Борис (безопасность, вечер 1): необязательная проверка отправителя. Задана
+    настройка wazzup_hook_key — после первого события с верным ?k=<ключ> запросы без ключа
+    получают 403 (wazzup.hook_prinyat). Не задана — как раньше. Проверка стоит в самом
+    обработчике, а не зависимостью: вебхук остаётся адресом без входа."""
+    from . import wazzup
+    if not wazzup.hook_prinyat(k):
+        raise HTTPException(403)
     try:
         payload = await request.json()
     except Exception:
