@@ -4954,7 +4954,7 @@ def _wazzup_process(payload: dict) -> None:
 
 
 # 12.11.2026 — шаг 1 «скрыть старое»: по смене версии в /api/health видно, что новая сборка поднялась
-APP_VERSION = "2026-11-12.5"   # .5 — разбор отчётов педагогов о явке (замечание Лизы 23:45)
+APP_VERSION = "2026-11-13.1"   # .1 — хвосты главным блоком (Ира), контроль оплат без «МК»-семей
 
 
 @app.get("/api/net")
@@ -4998,6 +4998,8 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # страницу, «0» — пунктами в пульт, как раньше; и какие разделы страницы выключены
             # (номера через запятую, по умолчанию «5,11г»; «-» — показывать все)
             "proverka_mk_vmesto_punktov", "proverka_mk_vyklyucheny",
+            # пульт: хвосты прошлых дней — главный блок колонки на один день («Ира:2026-11-13»)
+            "pult_hvost_glavnoe",
             "wazzup_dry_run", "digest_phone", "digest_off", "wa_watch_skip", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps", "vk_lead_forms",
             "broadcast_until", "call_admins", "chat_admin", "moyklass_group_url",
             "admin_phones", "team_extra_phones", "anthropic_api_key", "assistant_model", "anthropic_base_url",

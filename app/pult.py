@@ -79,6 +79,17 @@ def today() -> str:
     return autopilot._today().isoformat()
 
 
+def _hvost_glavnoe(who: str) -> bool:
+    """Хвосты прошлых дней — главный блок колонки на один день: настройка pult_hvost_glavnoe,
+    «Ира:2026-11-13» (несколько — через запятую). Дата обязательна: на следующий день
+    колонка сама возвращается к обычному виду."""
+    try:
+        v = db.get_setting("pult_hvost_glavnoe", "") or ""
+    except Exception:  # noqa: BLE001
+        return False
+    return f"{who}:{today()}" in {x.strip() for x in v.split(",") if x.strip()}
+
+
 def duty(day: str) -> list[str]:
     """Короткие имена дежурных по admin_schedule; нет записи — все звонящие админы."""
     from . import autopilot
@@ -967,12 +978,24 @@ def _col(who: str, items: list[dict], onduty: bool, day: str = "", now_hm: str =
             podp = f"с {dn[3:5]}.{dn[0:2]}" if len(dn) == 5 else "без даты"
             vnutri += (f"<li style='margin:10px 0 2px;font-size:11.5px;font-weight:800;color:#a35f00'>"
                        f"{podp} · {len(po_dnyam[dn])}</li>" + "".join(po_dnyam[dn]))
-        body += (f"<div style='margin:16px 0 4px;border-top:2px solid #F59C00;padding-top:6px;"
-                 f"font-size:12.5px;color:#a35f00;font-weight:700'>"
-                 f"Хвосты прошлых дней: {len(staryj)}</div>"
-                 f"<details style='margin:2px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>"
-                 f"показать по датам — сначала самые свежие</summary>"
-                 f"<ol style='list-style:none;padding:0;margin:0'>{vnutri}</ol></details>")
+        if _hvost_glavnoe(who):
+            # 13.11.2026, Ира: «сделай „хвосты прошлых дней“ мне основным, чтобы когда я ставила
+            # галочку всё не исчезало, но только на сегодня». После галочки страница
+            # перезагружается, и свёрнутый блок закрывался — каждый следующий хвост приходилось
+            # открывать заново. В выбранный день у выбранного человека хвосты стоят первыми и
+            # раскрыты; дела дня — ниже, как обычно. Настройка pult_hvost_glavnoe.
+            body = (f"<li style='margin:6px 0 4px;border-bottom:2px solid #F59C00;padding-bottom:3px;"
+                    f"font-size:12.5px;color:#a35f00;font-weight:800;text-transform:uppercase;letter-spacing:.05em'>"
+                    f"Сегодня главное — хвосты прошлых дней · {len(staryj)}</li>{vnutri}"
+                    f"<li style='margin:16px 0 4px;font-size:12px;color:#6c6a86;font-weight:700'>"
+                    f"Дела на сегодня</li>") + body
+        else:
+            body += (f"<div style='margin:16px 0 4px;border-top:2px solid #F59C00;padding-top:6px;"
+                     f"font-size:12.5px;color:#a35f00;font-weight:700'>"
+                     f"Хвосты прошлых дней: {len(staryj)}</div>"
+                     f"<details style='margin:2px 0'><summary style='cursor:pointer;color:#6c6a86;font-size:13px'>"
+                     f"показать по датам — сначала самые свежие</summary>"
+                     f"<ol style='list-style:none;padding:0;margin:0'>{vnutri}</ol></details>")
     if moved_html:
         body += f"<details style='margin:6px 0'><summary style='cursor:pointer;color:#a35f00;font-size:13px'>перенесено на завтра</summary><ol style='list-style:none;padding:0;margin:0'>{moved_html}</ol></details>"
     if done_html:

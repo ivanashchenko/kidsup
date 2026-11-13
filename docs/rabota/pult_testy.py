@@ -648,11 +648,43 @@ def test_boris_desyat():
         pult._lenta, pult._paid_recently = st_lenta, st_paid
 
 
+def test_hvost_glavnoe():
+    # 13.11.2026, Ира: «сделай „хвосты прошлых дней“ мне основным, чтобы когда я ставила
+    # галочку всё не исчезало, но только на сегодня».
+    print("Хвосты прошлых дней — главным блоком на один день (pult_hvost_glavnoe)")
+    from app import pult, db
+    st_lenta, st_paid, st_today = pult._lenta, pult._paid_recently, pult.today
+    try:
+        pult._paid_recently = lambda days=30: {}
+        pult.today = lambda: "2026-11-13"
+        pult._lenta = lambda day, who, items: (
+            [{"kind": "inbox", "id": 7000 + n, "t": "", "text": f"Хвост {n}", "done": 0, "note": None,
+              "tag": "обещание", "phone": "", "tries": 0, "prio": None, "ves": 1, "staryj": True, "s_dnya": "11-10"}
+             for n in range(3)]
+            + [{"kind": "inbox", "id": 7100, "t": "", "text": "Дело дня", "done": 0, "note": None,
+                "tag": "обещание", "phone": "", "tries": 0, "prio": None, "ves": 1}])
+        db.set_setting("pult_hvost_glavnoe", "")
+        obych = pult._col("Ира", [], True, "2026-11-13", "12:00")
+        proverka("без настройки — хвосты свёрнуты внизу", ("показать по датам" in obych, "Сегодня главное" in obych), (True, False))
+        db.set_setting("pult_hvost_glavnoe", "Ира:2026-11-13")
+        kol = pult._col("Ира", [], True, "2026-11-13", "12:00")
+        proverka("с настройкой — хвосты первыми и раскрыты",
+                 ("Сегодня главное — хвосты прошлых дней · 3" in kol, "показать по датам" in kol), (True, False))
+        proverka("хвосты выше дел дня", kol.index("Хвост 0") < kol.index("Дело дня"), True)
+        proverka("у Лизы в этот день — как обычно", "Сегодня главное" in pult._col("Лиза", [], True, "2026-11-13", "12:00"), False)
+        pult.today = lambda: "2026-11-14"
+        proverka("на следующий день у Иры — как обычно", "Сегодня главное" in pult._col("Ира", [], True, "2026-11-14", "12:00"), False)
+    finally:
+        pult._lenta, pult._paid_recently, pult.today = st_lenta, st_paid, st_today
+        db.set_setting("pult_hvost_glavnoe", "")
+
+
 def main():
     for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_bloki, test_audit,
               test_data_gruppy, test_povtor,
               test_zayavki_odin_punkt, test_utro, test_boris_desyat,
-              test_vozvrat_1211, test_utro_1211, test_naryad_1211, test_audit_1211, test_zayavki_blok_1211):
+              test_vozvrat_1211, test_utro_1211, test_naryad_1211, test_audit_1211, test_zayavki_blok_1211,
+              test_hvost_glavnoe):
         t()
         print()
     if oshibok:
