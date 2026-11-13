@@ -235,6 +235,9 @@ UBRANY_VHOD = {"GET /docs", "GET /docs/oauth2-redirect", "GET /openapi.json", "G
 # 12.11.2026, правило 2 Бориса: страница «Проверка МойКласса» и её API — ровно эти пять.
 NOVYE_PROVERKA_MK = {"GET /proverka-mk", "GET /api/proverka-mk", "POST /api/proverka-mk/perepoverit",
                      "POST /api/proverka-mk/ne-oshibka", "POST /api/proverka-mk/zametka"}
+# 13.11.2026, шаг 2 (общая шапка): лёгкий счётчик для бейджа «ждут ответа» — шапка на каждой
+# странице опрашивает его, а не тяжёлый /api/waiting.
+NOVYE_SHAPKA = {"GET /api/waiting/schet"}
 # Не из шага 1: разовый просмотр «старых звонков» (решение Бориса 12.11), только чтение.
 NOVYE_ZVONKI_1211 = {"GET /api/hvost/staroe"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
@@ -266,9 +269,9 @@ def test_marshruty(m, fajl_do):
     proverka("пропали ровно пять — те, что звала только убранная страница (и перечень адресов: "
              "/openapi.json, /docs, /redoc)", do - posle == PROPALI | UBRANY_VHOD,
              sorted((do - posle) ^ (PROPALI | UBRANY_VHOD)))
-    vse_novye = NOVYE | NOVYE_ZVONKI_1211 | NOVYE_PROVERKA_MK | NOVYE_VHOD
+    vse_novye = NOVYE | NOVYE_ZVONKI_1211 | NOVYE_PROVERKA_MK | NOVYE_VHOD | NOVYE_SHAPKA
     proverka("появились ровно три: «Архив» и признак «архив» у документов (и просмотр старых звонков 12.11, "
-             "пять адресов страницы «Проверка МойКласса» и адреса личных входов)",
+             "пять адресов страницы «Проверка МойКласса», адреса личных входов и счётчик бейджа шапки 13.11)",
              posle - do == vse_novye, sorted((posle - do) ^ vse_novye))
     nuzhny = [x.strip() for x in NUZHNY.replace("\n", " · ").split(" · ") if x.strip()]
     net = [x for x in nuzhny if x not in posle]
@@ -331,7 +334,8 @@ NE_V_MENU = ARHIVNYE | {"/", "/brief", "/boris", "/obeshchaniya", "/sverka", "/s
 
 
 def shapka(c, adres, kto):
-    """HTML общей шапки страницы — всё, что до <main>."""
+    """HTML общей шапки страницы — всё, что до <main>. 13.11.2026: шапку собирает
+    app/nav.py (id="kidsup-nav", классы kn-), прежних header.topbar и nav-main нет."""
     return c.get(adres, auth=kto).text.split("<main", 1)[0]
 
 
@@ -360,9 +364,12 @@ def test_menu(c, m):
     h = shapka(c, "/liniya", ADMIN)
     net = [a for a in _adresa(nav.ADMIN) if f'href="{a}"' not in h]
     proverka("в шапке все 16 пунктов админов", not net, net)
-    proverka("подсвечена открытая страница", 'href="/liniya" class="active"' in h)
+    # 13.11.2026, шаг 2: ожидания поправлены под новую шапку — подсветка классом kn-tut,
+    # «☰ Разделы» — четвёртая кнопка нижней панели (значок и подпись в отдельных span).
+    proverka("подсвечена открытая страница", 'href="/liniya" class="kn-tut" aria-current="page"' in h)
     proverka("на телефоне меню сворачивается: кнопка «☰ Разделы»",
-             'id="nav-toggle"' in h and "☰ Разделы" in h and 'aria-controls="nav-razdely"' in h)
+             'id="nav-toggle"' in h and "☰" in h and ">Разделы<" in h and 'aria-controls="nav-razdely"' in h
+             and 'class="kn-panel"' in h)
     vladelcu = [a for a in _adresa([nav.OWNER]) if f'href="{a}"' in h]
     proverka("раздела владельца в шапке нет", "Владельцу" not in h and not vladelcu, vladelcu)
     t = c.get("/liniya", auth=ADMIN).text
@@ -388,15 +395,15 @@ def test_menu(c, m):
     r = c.get(f"/english/karta?k={kluch}")
     proverka("карточка речи по ключу без входа → 200", r.status_code == 200, r.status_code)
     proverka("…ни меню, ни поиска, ни бейджа «ждут», ни синхронизации",
-             all(x not in r.text for x in ('class="nav-main"', 'id="gs-input"', 'id="wait-badge"', 'id="sync-btn"',
+             all(x not in r.text for x in ('id="nav-razdely"', 'id="gs-input"', 'id="wait-badge"', 'id="sync-btn"',
                                            'id="nav-toggle"')))
     proverka("…виджеты админов не опрашиваются (флаг педагога от сервера)", "KIDSUP_PED = true;" in r.text)
     r = c.get(f"/english/karta?k={kluch}", auth=("boris", "chto-ugodno"))
     proverka("ключ и поддельный вход boris → педагог, не владелец",
-             r.status_code == 200 and "Владельцу" not in r.text and 'class="nav-main"' not in r.text)
+             r.status_code == 200 and "Владельцу" not in r.text and 'id="nav-razdely"' not in r.text)
     r = c.get(f"/english/karta?k={kluch}", auth=ADMIN)
     proverka("та же ссылка у админа — с его меню",
-             r.status_code == 200 and 'class="nav-main"' in r.text and "KIDSUP_PED = false;" in r.text)
+             r.status_code == 200 and 'id="nav-razdely"' in r.text and "KIDSUP_PED = false;" in r.text)
     proverka("неверный ключ без входа → 401", c.get("/english/karta?k=nevernyj").status_code == 401)
 
 
@@ -983,10 +990,13 @@ def test_popravki(c, m):
         r = c.get(adres, auth=ADMIN)
         proverka(f"рабочая страница «{imya}» — без плашки", 'plashka-arh' not in r.text)
 
-    print("Д5. Свои страницы меню: ссылка назад на пульт")
+    # 13.11.2026, шаг 2: временную строку «← Пульт · Разделы» заменила общая шапка — в ней
+    # есть и «Пульт», и кнопка «☰ Разделы». Ожидание поправлено нарочно: строки больше нет.
+    print("Д5. Свои страницы меню: путь назад на пульт — в общей шапке")
     for adres in ("/blank-grupp", "/dolgi", "/otkazy"):
         h = c.get(adres, auth=ADMIN).text
-        proverka(f"{adres}: «← Пульт» и «Разделы»", 'href="/pult"' in h and 'href="/pult#razdely"' in h)
+        proverka(f"{adres}: в шапке «Пульт» и «☰ Разделы», временной строки шага 1 нет",
+                 'href="/pult"' in _koren(h) and 'id="nav-toggle"' in _koren(h) and 'href="/pult#razdely"' not in h)
 
     print("Д6. Заголовки вкладок — как пункты меню")
     for adres, imya in (("/enrollment", "Подбор группы"), ("/courses", "Описания занятий"),
@@ -1010,6 +1020,192 @@ def test_popravki(c, m):
     proverka("у админа ссылка без ключа", 'href="/english/metodika#otchet"' in h)
     h = c.get(f"/english/metodika?k={kluch}").text
     proverka("методика переносит ?k= в ссылки на карточку", 'a[href^="/english/karta"]' in h and "encodeURIComponent(k)" in h)
+
+
+# --- Е. Шапка шага 2 (13.11.2026): одна шапка на всех рабочих страницах ---------------
+
+def _koren(html: str) -> str:
+    """Общая шапка страницы: от id="kidsup-nav" до подключения её скрипта (у педагога
+    скрипта нет — до конца первой строки шапки)."""
+    i = html.find('id="kidsup-nav"')
+    if i < 0:
+        return ""
+    j = html.find("/static/nav.js", i)
+    if j < 0:
+        j = html.find("</div></div>", i)
+    return html[i:j if j > 0 else len(html)]
+
+
+# Страницы со своим HTML и несколько страниц base.html: на каждой шапка ровно одна.
+S_SHAPKOJ_ADMIN = ["/pult", "/blank-grupp", "/promo/grafik", "/admin/docs", "/dolgi", "/otkazy", "/karta",
+                   "/pravila-kontrol", "/proverka-mk", "/spiski", "/mesta", "/waiting", "/liniya"]
+S_SHAPKOJ_VLADELEC = ["/boris/docs", "/owner", "/kontrol-oplat", "/sverka-chestnosti", "/audit",
+                      "/kamery/nastroyka", "/arhiv"]
+ADRESA_VLADELCA = ("/owner", "/arhiv", "/kontrol-oplat", "/boris/docs", "/sverka-chestnosti", "/audit")
+
+
+def test_shapka_shag2(c, m, work):
+    from app import nav
+    BRAUZER = {"Accept": "text/html,application/xhtml+xml"}
+
+    print("Е1. Шапка ровно одна — под админом")
+    for adres in S_SHAPKOJ_ADMIN:
+        r = c.get(adres, auth=ADMIN)
+        h = _koren(r.text)
+        proverka(f"{adres}: 200, шапка одна, стили и скрипт подключены",
+                 r.status_code == 200 and r.text.count('id="kidsup-nav"') == 1
+                 and "/static/nav.css" in h and r.text.count("/static/nav.js") == 1,
+                 (r.status_code, r.text.count('id="kidsup-nav"')))
+        vlad = [a for a in ADRESA_VLADELCA if f'href="{a}"' in h]
+        proverka(f"{adres}: в шапке админа нет раздела и адресов владельца", "Владельцу" not in h and not vlad, vlad)
+        proverka(f"{adres}: шапка — не <header> и стоит в теле страницы, после <body>",
+                 "<header" not in h and 0 <= r.text.lower().find("<body") < r.text.find('id="kidsup-nav"'))
+    h = _koren(c.get("/dolgi", auth=ADMIN).text)
+    proverka("нижняя панель админа: Пульт · Ответы · Линия · ☰ Разделы",
+             [x for x in re.findall(r'class="kn-podpis">([^<]+)<', h)] == ["Пульт", "Ответы", "Линия", "Разделы"])
+    proverka("у «Ответов» в панели место под число, бейдж берёт числа из /api/waiting/schet",
+             'id="kn-chislo"' in h and 'data-schet="/api/waiting/schet"' in h)
+    proverka("в шапке /dolgi подсвечен пункт «Долги», его раздел раскрыт",
+             'href="/dolgi" class="kn-tut" aria-current="page"' in h and "kn-raskryt kn-zdes" in h)
+
+    print("Е2. Шапка ровно одна — под владельцем")
+    for adres in S_SHAPKOJ_ADMIN + S_SHAPKOJ_VLADELEC:
+        r = c.get(adres, auth=VLADELEC)
+        h = _koren(r.text)
+        proverka(f"{adres}: 200, шапка одна, в ней раздел «Владельцу»",
+                 r.status_code == 200 and r.text.count('id="kidsup-nav"') == 1 and "Владельцу" in h
+                 and 'href="/kontrol-oplat"' in h, (r.status_code, r.text.count('id="kidsup-nav"')))
+    h = _koren(c.get("/owner", auth=VLADELEC).text)
+    proverka("нижняя панель владельца: Главная · Мои дела · Контроль оплат · ☰ Разделы",
+             [x for x in re.findall(r'class="kn-podpis">([^<]+)<', h)] == ["Главная", "Мои дела", "Контроль оплат", "Разделы"])
+    t = c.get("/pult", auth=ADMIN).text
+    proverka("/pult: блок «Разделы» внизу остался", "id='razdely'" in t)
+    t = c.get("/otkazy", auth=ADMIN).text
+    proverka("/otkazy: у страницы появился <body>", "<body>" in t and t.lstrip().lower().startswith("<!doctype"))
+
+    print("Е3. Педагог по ключу")
+    kluch = m.db.get_setting("pedagog_key")
+    for adres in ("/english/karta", "/pedagog"):
+        r = c.get(f"{adres}?k={kluch}")
+        h = _koren(r.text)
+        proverka(f"{adres}: шапка педагога одна — «KidsUP · педагогам», один пункт",
+                 r.status_code == 200 and r.text.count('id="kidsup-nav"') == 1 and "педагогам" in h
+                 and "Карточка речи" in h and h.count("<a ") == 2, (r.status_code, h[:200]))
+        proverka(f"{adres}: ни меню админов, ни поиска, ни бейджа, ни панели, ни скрипта шапки",
+                 all(x not in r.text for x in ('id="nav-razdely"', 'id="gs-input"', 'id="wait-badge"', "kn-panel",
+                                               "/static/nav.js", "Владельцу", 'href="/pult"', 'href="/liniya"')))
+        proverka(f"{adres}: шапка не опрашивает /api/waiting", "/api/waiting" not in h and "data-schet" not in h)
+        proverka(f"{adres}: ключ — в ссылках шапки", h.count(f'href="/english/karta?k={kluch}"') == 2)
+    r = c.get("/pedagog?k=chuzhoy-kluch")
+    proverka("/pedagog с чужим ключом: шапки нет, ключ в ссылки не попал",
+             'id="kidsup-nav"' not in r.text and "chuzhoy-kluch" not in r.text)
+    r = c.get("/english/karta?k=chuzhoy-kluch", auth=ADMIN)
+    proverka("админ с чужим ключом в адресе: шапка админа, чужой ключ в шапку не попал",
+             r.status_code == 200 and 'id="nav-razdely"' in r.text and "chuzhoy-kluch" not in _koren(r.text))
+    plohoy = 'a b"<i>&k=\'x'
+    m.db.set_setting("pedagog_key", plohoy)
+    try:
+        for adres in ("/english/karta", "/pedagog"):
+            r = c.get(adres, params={"k": plohoy})
+            h = _koren(r.text)
+            proverka(f"{adres}: ключ в ссылках шапки экранирован",
+                     r.status_code == 200 and f'href="/english/karta?k={quote(plohoy, safe="")}"' in h
+                     and "<i>" not in h and 'b"' not in h and "'x" not in h, h[:300])
+    finally:
+        m.db.set_setting("pedagog_key", kluch)
+    proverka("nav.shapka педагогу без ключа — ссылка без ?k=",
+             'href="/english/karta"' in nav.shapka("pedagog", "/english/karta"))
+
+    print("Е4. Документы: тонкая строка только браузеру, <!doctype — первым")
+    slug = next(s for _, punkty in m.DOC_GROUPS for s, _, _ in punkty
+                if not s.startswith("plan_") and os.path.exists(os.path.join(ROOT, "docs", f"{s}.html")))
+    fajl = open(os.path.join(ROOT, "docs", f"{slug}.html"), encoding="utf-8").read()
+    r = c.get(f"/base/{slug}", auth=ADMIN, headers=BRAUZER)
+    proverka(f"/base/{slug} браузеру: начинается с <!doctype, строка «← База знаний» одна, полной шапки нет",
+             r.text.lstrip()[:9].lower() == "<!doctype" and r.text.count('id="kidsup-doc-bar"') == 1
+             and "← База знаний" in r.text and 'href="/base"' in r.text and 'id="kidsup-nav"' not in r.text,
+             r.text[:80])
+    proverka("…строка стоит после <body>, а не перед <!doctype>",
+             0 <= r.text.lower().find("<body") < r.text.find('id="kidsup-doc-bar"'))
+    r = c.get(f"/base/{slug}", auth=ADMIN)
+    proverka(f"/base/{slug} без Accept: text/html — тело методички без изменений",
+             r.text == fajl and 'id="kidsup-doc-bar"' not in r.text)
+    telo = "<!doctype html><html><head><meta charset=utf-8><title>стенд</title></head><body><h1>Список стенда</h1></body></html>"
+    for put, api, nazad in (("/boris/docs", "/api/boris-docs", "Мои документы"), ("/admin/docs", "/api/admin-docs", "Списки")):
+        rr = c.post(api, auth=VLADELEC, json={"slug": "shapka-stend", "title": "Стенд шапки", "html": telo})
+        proverka(f"{api}: документ стенда выложен", rr.status_code == 200, rr.text[:120])
+        r = c.get(f"{put}/shapka-stend", auth=VLADELEC, headers=BRAUZER)
+        proverka(f"{put}/…: браузеру — строка «← {nazad}» сразу после <body>, полной шапки нет",
+                 r.status_code == 200 and f'<body><div id="kidsup-doc-bar"' in r.text and f"← {nazad}" in r.text
+                 and f'href="{put}"' in r.text and r.text.startswith("<!doctype") and 'id="kidsup-nav"' not in r.text,
+                 r.text[:200])
+        r = c.get(f"{put}/shapka-stend", auth=VLADELEC)
+        proverka(f"{put}/…: без Accept: text/html тело байт в байт то, что выложено", r.text == telo, r.text[:120])
+        c.post(f"{api}/remove", auth=VLADELEC, json={"slug": "shapka-stend"})
+
+    print("Е5. Счётчик бейджа /api/waiting/schet")
+    proverka("без входа → 401", c.get("/api/waiting/schet").status_code == 401)
+    proverka("педагогу по ключу → 401", c.get(f"/api/waiting/schet?k={kluch}").status_code == 401)
+    raschetov = []
+    nastoyashchiy = m.api_waiting
+
+    async def schitaem(min_minutes: int = 15):
+        raschetov.append(1)
+        return await nastoyashchiy(min_minutes)
+    m.api_waiting = schitaem
+    m._SCHET.update(ts=0.0, dannye=None, zadacha=None)
+    try:
+        r = c.get("/api/waiting/schet", auth=ADMIN)
+        d = r.json() if r.status_code == 200 else {}
+        proverka("под админом → 200, числа переписки и звонков",
+                 r.status_code == 200 and all(isinstance(d.get(k), int) for k in ("perepiska", "bez_nomera", "zvonki"))
+                 and isinstance(d.get("goryacho"), bool), r.text[:200])
+        for _ in range(5):
+            c.get("/api/waiting/schet", auth=ADMIN)
+        proverka("шесть опросов подряд — один расчёт /api/waiting (остальные из кэша)", len(raschetov) == 1, len(raschetov))
+        w = c.get("/api/waiting", auth=ADMIN).json()
+        d = c.get("/api/waiting/schet", auth=VLADELEC).json()
+        proverka("числа счётчика совпадают с /api/waiting",
+                 (d["perepiska"], d["bez_nomera"], d["zvonki"]) == (w["count"], len(w["nophone"]), w["calls_count"]), (d, w["count"]))
+    finally:
+        m.api_waiting = nastoyashchiy
+    t = c.get("/mesta", auth=ADMIN).text
+    proverka("страницы base.html больше не опрашивают /api/waiting сами", "fetch('/api/waiting')" not in t)
+
+    print("Е6. nav.wrap, стили и скрипт")
+    S = "<i id=sh></i>"
+    proverka("wrap: сразу после первого <body…>",
+             nav.wrap("<!doctype html><html><head></head><body class='a'><p>x</p></body></html>", S)
+             == "<!doctype html><html><head></head><body class='a'>" + S + "<p>x</p></body></html>")
+    proverka("wrap: без <body> — после <meta charset…> и заголовочного, не перед <!doctype>",
+             nav.wrap("<!doctype html><meta charset=utf-8><title>т</title><style>a{}</style><h1>x</h1>", S)
+             == "<!doctype html><meta charset=utf-8><title>т</title><style>a{}</style>" + S + "<h1>x</h1>")
+    proverka("wrap: нет ни <body>, ни <meta> — после <!doctype>/<html>",
+             nav.wrap("<!doctype html><html><h1>x</h1>", S) == "<!doctype html><html>" + S + "<h1>x</h1>"
+             and nav.wrap("<h1>x</h1>", S) == S + "<h1>x</h1>")
+    raz = nav.wrap("<body><p>x</p>", {"rol": "admin", "path": "/dolgi"})
+    proverka("wrap: шапка уже есть — вторую не ставит", raz.count('id="kidsup-nav"') == 1
+             and nav.wrap(raz, {"rol": "owner", "path": "/dolgi"}) == raz)
+    proverka("doc_bar: адрес и подпись экранированы",
+             "<b>" not in nav.doc_bar('/x"><b>', "<b>Списки") and "window.print()" in nav.doc_bar("/base", "База знаний"))
+    for fajl_ in ("nav.css", "nav.js"):
+        proverka(f"/static/{fajl_} отдаётся", c.get(f"/static/{fajl_}").status_code == 200)
+    css = open(os.path.join(ROOT, "app/static/nav.css"), encoding="utf-8").read()
+    proverka("nav.css: печать (шапка, панель и строка документа скрыты) и тёмная тема",
+             re.search(r"@media print\s*\{\s*#kidsup-nav, #kidsup-doc-bar[^}]*display: none !important", css) is not None
+             and "prefers-color-scheme: dark" in css and "env(safe-area-inset-bottom)" in css)
+    bez_komm = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    selektory = [x.strip() for kusok in re.findall(r"(?:^|[{}])\s*([^{}@]+?)\s*\{", bez_komm) for x in kusok.split(",")]
+    chuzhie = [x for x in selektory if not x.startswith(("#kidsup-nav", "#kidsup-doc-bar", ".kn-", "body.kn-", "html.kn-"))]
+    proverka("nav.css: все правила — внутри шапки или с префиксом kn-, глобальных (a{}, body{}) нет",
+             selektory and not chuzhie, chuzhie[:5])
+    js = open(os.path.join(ROOT, "app/static/nav.js"), encoding="utf-8").read()
+    proverka("nav.js: бейдж опрашивает только счётчик из data-schet, не /api/waiting",
+             "/api/waiting" not in re.sub(r"/\*.*?\*/|//[^\n]*", "", js, flags=re.S) and "data-schet" in js)
+    proverka("nav.js: «назад» закрывает лист разделов (pushState / popstate)", "pushState" in js and "popstate" in js)
+    bl = open(os.path.join(ROOT, "app/templates/blank_grupp.html"), encoding="utf-8").read()
+    proverka("/blank-grupp: подсказка .toast на телефоне поднята над панелью",
+             ".toast{bottom:calc(64px + env(safe-area-inset-bottom))}" in bl)
 
 
 def _lovushki_na_vse():
@@ -1066,6 +1262,7 @@ def main():
     test_perepiska_send(c, m)
     test_popravki(c, m)
     test_marshruty_zhestkie(m, a.do)
+    test_shapka_shag2(c, m, work)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     proverka("ни одной попытки выйти в сеть, кроме известных опросов Mango с пульта и «Ответов»",
              all(any(f.startswith(("mango.py", "zayavki.py")) for f in otkuda) for _, otkuda in lt.SET), lt.SET[:5])
