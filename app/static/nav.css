@@ -1,0 +1,177 @@
+/* Общая шапка app.kidsup.ru (app/nav.py, shapka). 13.11.2026, шаг 2.
+   Шапку вставляют и в страницы со своим HTML, поэтому:
+   • все классы — с префиксом kn-, правила — только внутри #kidsup-nav / #kidsup-doc-bar;
+   • глобальных правил (a{}, h1{}, body{}) нет, кроме отступа снизу под панель на телефоне
+     и запрета прокрутки под открытым листом разделов;
+   • палитра бренда: индиго #312783, голубой #1DA7E0. */
+
+#kidsup-nav, #kidsup-doc-bar {
+  --kn-fon: #fff; --kn-fon2: #f4f3fa; --kn-tekst: #15132e; --kn-tih: #6c6a86;
+  --kn-linia: #e4e2f0; --kn-indigo: #312783; --kn-blue: #1DA7E0; --kn-na-indigo: #fff;
+  --kn-krasnyy: #E30613;
+  all: initial; display: block; box-sizing: border-box; margin: 0; padding: 0;
+  background: var(--kn-fon); color: var(--kn-tekst);
+  font: 14px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-text-size-adjust: 100%; text-align: left;
+}
+@media (prefers-color-scheme: dark) {
+  #kidsup-nav, #kidsup-doc-bar {
+    --kn-fon: #17152b; --kn-fon2: #24213f; --kn-tekst: #eceaf8; --kn-tih: #a7a4c4;
+    --kn-linia: #34315a; --kn-indigo: #b9b3ff; --kn-blue: #5cc4f0; --kn-na-indigo: #17152b;
+  }
+}
+#kidsup-nav { border-bottom: 1px solid var(--kn-linia); position: relative; z-index: 90; }
+#kidsup-nav *, #kidsup-nav *::before, #kidsup-nav *::after,
+#kidsup-doc-bar *, #kidsup-doc-bar *::before, #kidsup-doc-bar *::after { box-sizing: border-box; }
+#kidsup-nav a, #kidsup-doc-bar a { color: var(--kn-indigo); text-decoration: none; font: inherit; background: none; border: 0; }
+#kidsup-nav button, #kidsup-doc-bar button {
+  font: inherit; color: inherit; background: none; border: 0; margin: 0; padding: 0; cursor: pointer;
+  border-radius: 0; box-shadow: none; text-transform: none; letter-spacing: normal; width: auto; min-height: 0;
+  -webkit-appearance: none; appearance: none;
+}
+#kidsup-nav img { border: 0; max-width: none; margin: 0; }
+#kidsup-nav a:focus-visible, #kidsup-nav button:focus-visible, #kidsup-nav input:focus-visible,
+#kidsup-doc-bar a:focus-visible, #kidsup-doc-bar button:focus-visible { outline: 2px solid var(--kn-blue); outline-offset: 2px; }
+
+/* --- полоска «кто вошёл» (vhod.shapka) --------------------------------- */
+#kidsup-nav .kn-kto { display: block; }
+@media (prefers-color-scheme: dark) {
+  #kidsup-nav .kn-kto:not(.kn-kto-vazhno) .kto-polosa { background: var(--kn-fon) !important; color: var(--kn-tekst) !important; border-color: var(--kn-linia) !important; }
+}
+
+/* --- верхняя строка ----------------------------------------------------- */
+#kidsup-nav .kn-verh { display: flex; align-items: center; gap: 14px; padding: 8px 16px; min-height: 48px; }
+#kidsup-nav .kn-logo { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; line-height: 1; color: var(--kn-indigo); white-space: nowrap; }
+#kidsup-nav .kn-logo img { width: 30px; height: 30px; display: block; }
+#kidsup-nav .kn-poisk { position: relative; flex: 1 1 260px; max-width: 440px; min-width: 0; }
+#kidsup-nav .kn-poisk-pole {
+  display: block; width: 100%; height: 36px; margin: 0; padding: 0 12px; font: inherit; font-size: 14px;
+  color: var(--kn-tekst); background: var(--kn-fon2); border: 1px solid var(--kn-linia); border-radius: 10px;
+  box-shadow: none; -webkit-appearance: none; appearance: none;
+}
+#kidsup-nav .kn-poisk-pole::placeholder { color: var(--kn-tih); }
+#kidsup-nav .kn-poisk-pole:focus { outline: none; border-color: var(--kn-blue); box-shadow: 0 0 0 3px rgba(29, 167, 224, .22); }
+#kidsup-nav .kn-drop {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 95; max-height: 70vh; overflow-y: auto;
+  background: var(--kn-fon); border: 1px solid var(--kn-linia); border-radius: 12px; box-shadow: 0 14px 34px -16px rgba(21, 19, 46, .5);
+}
+#kidsup-nav .kn-drop[hidden] { display: none; }
+#kidsup-nav .kn-gs-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; padding: 9px 12px; border-bottom: 1px solid var(--kn-linia); color: var(--kn-tekst); }
+#kidsup-nav .kn-gs-item:last-child { border-bottom: 0; }
+#kidsup-nav .kn-gs-item:hover, #kidsup-nav .kn-gs-item.kn-vybran { background: var(--kn-fon2); }
+#kidsup-nav .kn-gs-type { grid-row: 1 / span 2; align-self: center; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--kn-fon2); color: var(--kn-tih); white-space: nowrap; }
+#kidsup-nav .kn-gs-title { font-weight: 650; overflow-wrap: anywhere; }
+#kidsup-nav .kn-gs-sub { font-size: 12.5px; color: var(--kn-tih); overflow-wrap: anywhere; }
+#kidsup-nav .kn-lupa { display: none; }
+#kidsup-nav .kn-badge {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: auto; padding: 6px 12px; border-radius: 999px;
+  background: #fff1d6; color: #5a3d00; font-weight: 700; font-size: 13px; white-space: nowrap;
+}
+#kidsup-nav .kn-badge[hidden] { display: none; }
+#kidsup-nav .kn-badge.kn-goryacho { background: var(--kn-krasnyy); color: #fff; }
+
+/* --- разделы: на компьютере строкой под шапкой ------------------------- */
+#kidsup-nav .kn-razdely { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; padding: 0 16px 8px; }
+#kidsup-nav .kn-list-verh, #kidsup-nav .kn-panel { display: none; }
+#kidsup-nav .kn-razdel { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; min-width: 0; }
+#kidsup-nav .kn-razdel:first-of-type, #kidsup-nav .kn-razdel.kn-vlad { flex: 1 1 100%; }
+#kidsup-nav .kn-razdel-imya {
+  pointer-events: none; cursor: default; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--kn-tih); padding: 0 4px 0 0;
+}
+#kidsup-nav .kn-vlad .kn-razdel-imya { color: var(--kn-indigo); }
+#kidsup-nav .kn-punkty { display: flex; flex-wrap: wrap; gap: 2px; }
+#kidsup-nav .kn-punkty a { display: inline-block; padding: 5px 9px; border-radius: 8px; font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+#kidsup-nav .kn-razdel:first-of-type .kn-punkty a { font-size: 14.5px; padding: 6px 11px; }
+#kidsup-nav .kn-punkty a:hover { background: var(--kn-fon2); }
+#kidsup-nav .kn-punkty a.kn-tut { background: var(--kn-indigo); color: var(--kn-na-indigo); }
+
+/* --- педагог: одна строка ---------------------------------------------- */
+#kidsup-nav.kn-ped .kn-verh { gap: 10px 18px; flex-wrap: wrap; }
+#kidsup-nav .kn-ped-podpis { font-weight: 500; color: var(--kn-tih); font-size: 15px; }
+#kidsup-nav .kn-ped-punkt { padding: 8px 12px; border-radius: 8px; font-weight: 600; }
+#kidsup-nav .kn-ped-punkt.kn-tut { background: var(--kn-fon2); }
+
+/* --- строка «Синхр.: … · Синхронизировать» под шапкой (base.html) ------- */
+.kn-sync { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 6px 16px 0; }
+.kn-sync:empty { display: none; }
+
+/* --- тонкая строка над документом --------------------------------------- */
+#kidsup-doc-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 7px 16px; border-bottom: 1px solid var(--kn-linia); font-size: 14px; }
+#kidsup-doc-bar .kn-doc-nazad { font-weight: 700; padding: 6px 0; }
+#kidsup-doc-bar .kn-doc-podpis { color: var(--kn-tih); }
+#kidsup-doc-bar .kn-doc-pechat { margin-left: auto; padding: 6px 14px; border: 1px solid var(--kn-linia); border-radius: 999px; background: var(--kn-fon); color: var(--kn-tekst); font-weight: 700; font-size: 12.5px; }
+
+/* --- телефон и узкое окно ------------------------------------------------ */
+@media (max-width: 919.98px) {
+  #kidsup-nav .kn-verh { gap: 8px; padding: 6px 12px; height: 56px; min-height: 0; }
+  #kidsup-nav.kn-ped .kn-verh { height: auto; min-height: 56px; }
+  /* «Вы: Лена · Выйти / сменить» на телефоне живёт в листе разделов (туда её переносит
+     nav.js): верх — одна строка. Жёлтое предупреждение общего входа остаётся наверху. */
+  #kidsup-nav > .kn-kto:not(.kn-kto-vazhno) { display: none; }
+  #kidsup-nav .kn-list-kto .kn-kto { display: block; }
+  #kidsup-nav .kn-poisk { display: none; }
+  #kidsup-nav .kn-poisk-pole { font-size: 16px; height: 44px; }   /* 16px: iPhone не увеличивает страницу при вводе */
+  #kidsup-nav .kn-lupa { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 44px; margin-left: auto; font-size: 20px; border-radius: 10px; }
+  #kidsup-nav .kn-badge { margin-left: 0; font-size: 12.5px; padding: 6px 10px; }
+  #kidsup-nav.kn-poisk-otkryt .kn-logo, #kidsup-nav.kn-poisk-otkryt .kn-badge { display: none; }
+  #kidsup-nav.kn-poisk-otkryt .kn-poisk { display: block; flex: 1 1 auto; max-width: none; }
+  #kidsup-nav.kn-poisk-otkryt .kn-lupa { margin-left: 0; }
+
+  /* лист разделов на весь экран */
+  #kidsup-nav .kn-razdely {
+    display: none; position: fixed; left: 0; top: 0; right: 0; bottom: 0; z-index: 2147483000; background: var(--kn-fon);
+    overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding: 0 0 calc(24px + env(safe-area-inset-bottom)); gap: 0;
+  }
+  #kidsup-nav.kn-otkryt .kn-razdely { display: block; }
+  #kidsup-nav .kn-list-verh {
+    display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 1; min-height: 56px; padding: 4px 4px 4px 16px;
+    background: var(--kn-fon); border-bottom: 1px solid var(--kn-linia); font-size: 18px; color: var(--kn-indigo);
+  }
+  #kidsup-nav .kn-list-kto { flex: 1 1 auto; min-width: 0; }
+  #kidsup-nav .kn-list-kto .kto-polosa { padding: 0 !important; border: 0 !important; background: none !important; }
+  #kidsup-nav .kn-zakryt { margin-left: auto; width: 48px; height: 48px; font-size: 30px; line-height: 1; color: var(--kn-tekst); flex: 0 0 auto; }
+  #kidsup-nav .kn-razdel, #kidsup-nav .kn-razdel:first-of-type, #kidsup-nav .kn-razdel.kn-vlad { display: block; border-bottom: 1px solid var(--kn-linia); }
+  #kidsup-nav .kn-razdel-imya {
+    pointer-events: auto; cursor: pointer; display: flex; align-items: center; justify-content: space-between; width: 100%;
+    min-height: 54px; padding: 0 16px; font-size: 17px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--kn-tekst); text-align: left;
+  }
+  #kidsup-nav .kn-razdel-imya::after { content: "▾"; color: var(--kn-tih); font-size: 16px; transition: transform .15s; }
+  #kidsup-nav .kn-raskryt .kn-razdel-imya::after { transform: rotate(180deg); }
+  #kidsup-nav .kn-zdes .kn-razdel-imya { color: var(--kn-indigo); }
+  #kidsup-nav .kn-zdes .kn-razdel-imya::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--kn-blue); margin-right: 8px; flex: 0 0 auto; order: -1; }
+  #kidsup-nav .kn-zdes .kn-razdel-imya { justify-content: flex-start; }
+  #kidsup-nav .kn-zdes .kn-razdel-imya::after { margin-left: auto; }
+  #kidsup-nav .kn-punkty { display: none; padding: 0 8px 8px; }
+  #kidsup-nav .kn-raskryt .kn-punkty { display: block; }
+  #kidsup-nav .kn-punkty a, #kidsup-nav .kn-razdel:first-of-type .kn-punkty a {
+    display: flex; align-items: center; min-height: 50px; padding: 0 14px 0 20px; font-size: 17px; font-weight: 500; border-radius: 10px; white-space: normal;
+  }
+
+  /* нижняя панель */
+  #kidsup-nav .kn-panel {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 2147482000; background: var(--kn-fon);
+    border-top: 1px solid var(--kn-linia); padding: 0 4px env(safe-area-inset-bottom); box-shadow: 0 -8px 22px -18px rgba(21, 19, 46, .55);
+  }
+  #kidsup-nav .kn-knopka {
+    position: relative; flex: 1 1 0; min-width: 0; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; padding: 4px 2px; color: var(--kn-tih); font-size: 11.5px; font-weight: 600; line-height: 1.15; text-align: center;
+  }
+  #kidsup-nav .kn-knopka .kn-znak { font-size: 19px; line-height: 1.1; }
+  #kidsup-nav .kn-knopka .kn-podpis { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #kidsup-nav .kn-knopka.kn-tut, #kidsup-nav.kn-otkryt #nav-toggle { color: var(--kn-indigo); }
+  #kidsup-nav .kn-knopka.kn-tut::before { content: ""; position: absolute; top: 0; left: 22%; right: 22%; height: 3px; border-radius: 0 0 3px 3px; background: var(--kn-blue); }
+  #kidsup-nav .kn-chislo { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--kn-krasnyy); color: #fff; font-size: 11.5px; font-weight: 800; }
+  #kidsup-nav .kn-chislo[hidden] { display: none; }
+
+  /* место под панель: содержимое страницы не должно прятаться за ней */
+  body.kn-s-panelyu { padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important; }
+  html.kn-zamok, html.kn-zamok body { overflow: hidden !important; }
+  .kn-sync { justify-content: flex-start; padding: 6px 12px 0; }
+}
+
+@media print {
+  #kidsup-nav, #kidsup-doc-bar, .kn-sync { display: none !important; }
+  body.kn-s-panelyu { padding-bottom: 0 !important; }
+}

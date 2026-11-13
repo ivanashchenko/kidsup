@@ -17,6 +17,8 @@
 from __future__ import annotations
 
 import html
+import re
+from urllib.parse import quote
 
 # Разделы админов: (название, [(пункт, адрес), …]). Порядок — как идёт смена:
 # сначала то, что открыто весь день, потом группы, деньги и справка.
@@ -197,3 +199,177 @@ def stroka(rol: str) -> str:
 def eshche() -> str:
     """Вторая строка на пульте: нужные изредка страницы, которым не нашлось места в меню."""
     return _ssylki(ESHCHE)
+
+
+# ---------------------------------------------------------------------------
+# Шаг 2, 13.11.2026: одна шапка на всех рабочих страницах.
+#
+# Причина: после шага 1 меню было только на страницах через base.html. Около 16 страниц
+# рисуют свой HTML (пульт, бланки групп, долги, стоп-лист, контроль оплат…) — на них
+# стояла временная строка «← Пульт · Разделы» либо не было ничего, и с телефона с такой
+# страницы некуда было уйти. Владелец 12.11 одобрил «новое меню и общую шапку» и нижнюю
+# панель на телефоне.
+#
+# Шапка — <div id="kidsup-nav">, а не <header>: у /blank-grupp свой header{position:sticky},
+# на /promo/grafik и /kamery свои <header>. Все классы — с префиксом kn-, стили и скрипт —
+# в /static/nav.css и /static/nav.js. «Кто я» — полоска личного входа vhod.shapka()
+# (её передаёт main.py готовой строкой): выбор «Я — …» через cookie не делаем, имя
+# вошедшего сервер уже знает.
+# ---------------------------------------------------------------------------
+
+VERSIYA = "1"          # ?v= у nav.css и nav.js: менять вместе с файлами
+KOREN = 'id="kidsup-nav"'
+
+# Нижняя панель на телефоне: три частые страницы и «☰ Разделы». У «Ответов» — число
+# ждущих (ставит nav.js из /api/waiting/schet). Пятая, «личная» кнопка по роли админа
+# отложена до решения владельца о ролях (PLAN.md, риск 4).
+PANEL = {
+    "admin": [("Пульт", "/pult", "📋"), ("Ответы", "/waiting", "💬"), ("Линия", "/liniya", "📞")],
+    "owner": [("Главная", "/", "🏠"), ("Мои дела", "/pult?who=Борис", "✅"),
+              ("Контроль оплат", "/kontrol-oplat", "₽")],
+}
+
+
+def _e(s) -> str:
+    return html.escape(str(s), quote=True)
+
+
+def _tut(adres: str, path: str) -> bool:
+    """Пункт — текущая страница. Сравнение точное: «/promo» и «/promo/grafik» — разные
+    пункты, а «Мои дела» (/pult?who=Борис) не подсвечивается на общем пульте."""
+    return adres == path
+
+
+def _css() -> str:
+    return f'<link rel="stylesheet" href="/static/nav.css?v={VERSIYA}">'
+
+
+def _shapka_pedagoga(path: str, k: str) -> str:
+    """Педагог открыл страницу по ключу из ссылки: одна строка, один пункт. Ни поиска,
+    ни бейджа, ни панели, ни скрипта — шапка ничего не опрашивает (опросы /api без входа
+    давали окно пароля каждые три минуты, 08.11). Ключ — только в ссылках и только
+    проверенный: main.py передаёт его, если он совпал с настройкой pedagog_key."""
+    adres = "/english/karta" + (f"?k={quote(str(k), safe='')}" if k else "")
+    tut = " kn-tut" if path == "/english/karta" else ""
+    tekushchaya = ' aria-current="page"' if tut else ""
+    return (f'<div {KOREN} class="kn kn-ped">{_css()}<div class="kn-verh">'
+            f'<a class="kn-logo" href="{_e(adres)}"><img src="/static/logo.svg" alt="" width="30" height="30">'
+            f'<span>KidsUP</span><span class="kn-ped-podpis">· педагогам</span></a>'
+            f'<a class="kn-ped-punkt{tut}" href="{_e(adres)}"'
+            f'{tekushchaya}>Карточка речи</a></div></div>')
+
+
+def shapka(rol: str, path: str, k: str = "", kto_html: str = "",
+           schet_url: str = "/api/waiting/schet") -> str:
+    """Общая шапка страницы под роль: "owner", "admin" или "pedagog".
+
+    path — адрес страницы (request.url.path), по нему подсвечивается пункт и раскрывается
+    раздел в листе на телефоне. kto_html — готовая полоска «Вы: Лена · Выйти / сменить»
+    (vhod.shapka). schet_url — откуда бейдж берёт числа: только лёгкий счётчик из кэша,
+    не /api/waiting (тот идёт в Mango до минуты; опрос с каждой вкладки положил бы сервер).
+
+    Компьютер (от 920 px): строка с логотипом, поиском и бейджем, под ней разделы строкой.
+    Телефон: одна строка сверху (не липкая), внизу панель из четырёх кнопок; «☰ Разделы»
+    открывает лист на весь экран. Раскладку делает nav.css, разметка одна."""
+    if rol == "pedagog":
+        return _shapka_pedagoga(path, k)
+    razdely = menu(rol)
+    if not razdely:
+        return ""
+    # какой раздел раскрыть в листе: тот, где текущая страница; иначе первый
+    tekushchiy = next((i for i, (_, punkty) in enumerate(razdely)
+                       if any(_tut(a, path) for _, a in punkty)), 0)
+    bloki = []
+    for i, (nazvanie, punkty) in enumerate(razdely):
+        vlad = rol == "owner" and i == len(razdely) - 1
+        ssylki = "".join(
+            f'<a href="{_e(a)}"' + (' class="kn-tut" aria-current="page"' if _tut(a, path) else "") + f">{_e(n)}</a>"
+            for n, a in punkty)
+        klass = "kn-razdel" + (" kn-vlad" if vlad else "") + (" kn-raskryt" if i == tekushchiy else "") \
+                + (" kn-zdes" if any(_tut(a, path) for _, a in punkty) else "")
+        bloki.append(
+            f'<div class="{klass}"><button type="button" class="kn-razdel-imya" '
+            f'aria-expanded="{"true" if i == tekushchiy else "false"}">{_e(nazvanie)}</button>'
+            f'<div class="kn-punkty">{ssylki}</div></div>')
+    knopki = "".join(
+        f'<a class="kn-knopka{" kn-tut" if _tut(a, path) else ""}" href="{_e(a)}">'
+        f'<span class="kn-znak" aria-hidden="true">{z}</span><span class="kn-podpis">{_e(n)}</span>'
+        + ('<span class="kn-chislo" id="kn-chislo" hidden></span>' if a == "/waiting" else "") + "</a>"
+        for n, a, z in PANEL.get(rol, PANEL["admin"]))
+    kto = ""
+    if kto_html:
+        # жёлтую полосу общего входа на телефоне не прячем в лист: это предупреждение
+        vazhno = " kn-kto-vazhno" if "obshchiy" in kto_html else ""
+        kto = f'<div class="kn-kto{vazhno}">{kto_html}</div>'
+    return (
+        f'<div {KOREN} class="kn kn-rol-{_e(rol)}" data-schet="{_e(schet_url)}">{_css()}{kto}'
+        '<div class="kn-verh">'
+        '<a class="kn-logo" href="/" title="На свою главную"><img src="/static/logo.svg" alt="" width="30" height="30">'
+        '<span>KidsUP</span></a>'
+        '<div class="kn-poisk"><input type="search" id="gs-input" class="kn-poisk-pole" '
+        'placeholder="Поиск: группа, ребёнок, телефон…" autocomplete="off" spellcheck="false" '
+        'aria-label="Поиск по группам, детям и телефонам">'
+        '<div id="gs-drop" class="kn-drop" hidden></div></div>'
+        '<button type="button" class="kn-lupa" id="kn-lupa" aria-label="Поиск" aria-expanded="false">🔍</button>'
+        '<a id="wait-badge" class="kn-badge" href="/waiting" hidden></a>'
+        '</div>'
+        '<div id="nav-razdely" class="kn-razdely">'
+        '<div class="kn-list-verh"><b>Разделы</b><span class="kn-list-kto" id="kn-list-kto"></span>'
+        '<button type="button" class="kn-zakryt" id="kn-zakryt" aria-label="Закрыть разделы">×</button></div>'
+        + "".join(bloki) +
+        '</div>'
+        f'<nav class="kn-panel" aria-label="Быстрые кнопки">{knopki}'
+        '<button type="button" class="kn-knopka" id="nav-toggle" aria-expanded="false" aria-controls="nav-razdely">'
+        '<span class="kn-znak" aria-hidden="true">☰</span><span class="kn-podpis">Разделы</span></button></nav>'
+        f'<script src="/static/nav.js?v={VERSIYA}" defer></script>'
+        '</div>')
+
+
+def doc_bar(nazad_url: str, nazad_label: str, podpis: str = "") -> str:
+    """Тонкая строка над документом (/boris/docs/…, /admin/docs/…, /base/…): «← Списки ·
+    🖨 Печать». Полной шапки и нижней панели документам не даём: это листы, которые читают
+    и печатают, а у части свой скрипт (doc-state в «Пульте внедрения»). При печати скрыта."""
+    return (f'<div id="kidsup-doc-bar" class="kn-doc">{_css()}'
+            f'<a class="kn-doc-nazad" href="{_e(nazad_url)}">← {_e(nazad_label)}</a>'
+            f'<span class="kn-doc-podpis">{_e(podpis or "KidsUP")}</span>'
+            '<button type="button" class="kn-doc-pechat" onclick="window.print()">🖨 Печать</button></div>')
+
+
+_BODY = re.compile(r"<body\b[^>]*>", re.I)
+# Всё, что стоит до содержимого страницы, когда тега <body> в ней нет: doctype, html, head,
+# meta, title, стили и скрипты. Шапку ставим сразу за этим — то есть после <meta charset…>
+# и остального «заголовочного», а без них — сразу после <!doctype>/<html>.
+_DO_TELA = re.compile(
+    r"\s+|<!--.*?-->|<!doctype[^>]*>|</?html\b[^>]*>|</?head\b[^>]*>|<meta\b[^>]*>|<link\b[^>]*>|<base\b[^>]*>"
+    r"|<title\b[^>]*>.*?</title>|<style\b[^>]*>.*?</style>|<script\b[^>]*>.*?</script>", re.I | re.S)
+
+
+def vstavit(stranica: str, kusok: str) -> str:
+    """Вставить кусок в начало тела страницы: сразу после первого <body…>; тега нет —
+    после <meta charset…> и прочего заголовочного; нет и его — после <!doctype>/<html>.
+    Перед <!doctype> не ставим никогда: браузер уйдёт в режим совместимости (так было
+    на /base/{slug} с полосой «← Все методички»)."""
+    if not kusok:
+        return stranica
+    m = _BODY.search(stranica)
+    if m:
+        i = m.end()
+    else:
+        i = 0
+        while True:
+            m = _DO_TELA.match(stranica, i)
+            if not m or m.end() == i:
+                break
+            i = m.end()
+    return stranica[:i] + kusok + stranica[i:]
+
+
+def wrap(stranica: str, chto) -> str:
+    """Страница со своим HTML → она же с общей шапкой. chto — готовая шапка строкой или
+    словарь параметров shapka() (rol, path, k, kto_html, schet_url). Вызывается явно в
+    маршруте (не прослойкой на все ответы: документам, JSON и публичным страницам шапка
+    не нужна). Если шапка на странице уже есть, вторую не ставим."""
+    if not isinstance(stranica, str) or KOREN in stranica:
+        return stranica
+    kusok = shapka(**chto) if isinstance(chto, dict) else (chto or "")
+    return vstavit(stranica, kusok)
