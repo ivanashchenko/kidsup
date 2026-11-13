@@ -274,8 +274,8 @@ document.addEventListener('change', function (e) {
       <td>{{ s.course }}</td><td class="num">{{ s.groups }}</td><td class="num">{{ s.enrolled }}</td>
       {# 13.11.2026, вечер: у групп «по дням» (мини-сад, нулевой класс) — не «0 мест / 0 свободно / 0 %»,
          а «по дням» и число мест в самый свободный день; раскладка по дням — в строке группы #}
-      <td class="num">{% if s.po_dnyam %}{% if s.capacity %}{{ s.capacity }} + {% endif %}по дням{% else %}{{ s.capacity }}{% endif %}</td>
-      <td class="num">{% if s.po_dnyam %}{% if s.capacity %}<b>{{ s.free }}</b> + {% endif %}<b>до {{ s.po_dnyam_free }} в день</b>{% else %}<b>{{ s.free }}</b>{% endif %}</td>
+      <td class="num">{% if s.po_dnyam %}{% if s.capacity %}{{ s.capacity }} + {% endif %}по дням{% elif s.capacity %}{{ s.capacity }}{% else %}—{% endif %}</td>
+      <td class="num">{% if s.po_dnyam %}{% if s.capacity %}<b>{{ s.free }}</b> + {% endif %}<b>до {{ s.po_dnyam_free }} в день</b>{% elif s.capacity %}<b>{{ s.free }}</b>{% else %}—{% endif %}</td>
       <td class="num">{% if s.fill_pct is none %}—{% else %}{{ s.fill_pct }}%{% endif %}</td>
       <td>{% if s.price %}{{ "{:,}".format(s.price.lines[0][2]).replace(",", " ") }} ₽
           {% if sezon.starye_ceny %}<span class="muted small">(было {{ "{:,}".format(s.price.lines[0][1]).replace(",", " ") }})</span>{% endif %}{% else %}—{% endif %}</td>
@@ -283,7 +283,8 @@ document.addEventListener('change', function (e) {
     {% endfor %}
   </table>
   <p class="muted small" style="margin:8px 0 0">«Всего мест», «Свободно» и «Заполненность» — без закрытых для записи групп и буферов «Заявки» (в «Записано» они входят).
-  Мини-сад и нулевой класс считаются по дням: «до N в день» — мест в самый свободный день, раскладка по дням — в строке группы.</p>
+  Мини-сад и нулевой класс считаются по дням: «до N в день» — мест в самый свободный день, раскладка по дням — в строке группы.
+  Прочерк — у предмета только «Заявки» или закрытые группы: мест для записи там нет.</p>
 </div>
 
 <script>

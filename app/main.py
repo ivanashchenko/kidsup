@@ -10646,6 +10646,9 @@ def api_mesta_voronka():
         lst[:] = keep
         lst.sort(key=lambda r: (r.get("дней_тишины") is None, -(r.get("дней_тишины") or 0)))
     snoozed.sort(key=lambda r: r["отложено_до"])
+    DENEZHNYE = ("учится без оплаты", "абонемент закончился")
+    v_denezhnyh_spiskah = ({r["uid"] for k in DENEZHNYE for r in out.get(k, [])}
+                           | {r.get("uid") for r in done_rows + snoozed + removed + ghosts if r.get("стадия") in DENEZHNYE})
     # 13.11.2026: сегодняшние «ходят / оплатили месяц» — теми же числами, что на «Местах»
     try:
         mi = mesta.tablica(segodnya)["итого"]
@@ -10657,7 +10660,11 @@ def api_mesta_voronka():
     return {"оплачено_в_группах_сезона": len(first_sell),
             "оплачено_уникальных_всего": len(paid_users),
             "сейчас": seychas, "с_даты_месяц": max(start, mes0), "сегодня": today,
-            "оплачен_в_другой_группе": sorted(v_drugoj_gruppe.values(), key=lambda r: r["name"] or ""),
+            # только те, кого нет ни в одном из «денежных» списков (в работе, сделано, отложено):
+            # ребёнок с двумя местами может быть и там, и тут — второй раз его не называем
+            "оплачен_в_другой_группе": sorted(
+                (r for u, r in v_drugoj_gruppe.items() if u not in v_denezhnyh_spiskah),
+                key=lambda r: r["name"] or ""),
             "без_оплаты": {k: len(v) for k, v in out.items()},
             "ждём_на_пробное": len(waiting),
             "сделано": done_n, "сделанные": done_rows,
