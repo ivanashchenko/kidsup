@@ -35,6 +35,7 @@
 Значения есть в последней копии базы (таблица `settings`); названия:
 `moyklass_api_key`, `mk_web_login` / `mk_web_password`, `wazzup_key`,
 `mango_key`, `hooppy_token`, `roistat_key`, `tilda_secret`, `lead_hook_key`,
+`marquiz_key` и `wazzup_hook_key` (ключи вебхуков Марквиза и Wazzup, с 13.11.2026 — если заданы),
 `tbank_token`, `komtet_*`, `yandex_*` (Директ, Метрика, вебмастер),
 `vk_ads_*`, `ivideon_*`, `cam_password`, `pochta_password`, `tg_webhook_secret`,
 `anthropic_api_key` / `anthropic_proxy_secret`, `pedagog_key`.
