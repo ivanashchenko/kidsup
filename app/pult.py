@@ -1154,7 +1154,10 @@ def _pervye_blok() -> str:
         stroki = ""
         for r in g["дети"]:
             t = _tel(r["телефон"])
-            nomer = (f"<a href='tel:+{t}'>+{t}</a>{_liniya(t)}" if t else html.escape(str(r["телефон"] or "—")))
+            crm = (f"<a href='https://app.moyklass.com/user/{int(r['uid'])}' target='_blank' rel='noopener' "
+                   f"style='font-size:12px;color:#6c6a86'>CRM</a>")
+            nomer = (f"<a href='tel:+{t}'>+{t}</a>{_liniya(t)} {crm}" if t
+                     else f"{html.escape(str(r['телефон'] or '—'))} {crm}")
             if r["звонили"]:
                 kasanie = "✅ звонили"
             elif r["писали"]:
@@ -1163,9 +1166,8 @@ def _pervye_blok() -> str:
                 kasanie = "<b style='color:#E30613'>не касались</b>"
             if not r["галочка"]:
                 kasanie += " · <span style='color:#a35f00'>нет галочки «Пробное»</span>"
-            stroki += (f"<tr><td>{html.escape(r['имя'] or '')}</td><td style='white-space:nowrap'>{nomer}</td>"
-                       f"<td>{kasanie}</td><td><a href='https://app.moyklass.com/user/{int(r['uid'])}' "
-                       f"target='_blank' rel='noopener'>CRM</a></td></tr>")
+            # три колонки, не четыре: на телефоне четвёртая («CRM») уезжала за край
+            stroki += (f"<tr><td>{html.escape(r['имя'] or '')}</td><td>{nomer}</td><td>{kasanie}</td></tr>")
         ne = (f" — <span style='color:#E30613'>не прозвонено: {g['без_касания']}</span>" if g["без_касания"] else "")
         telo += (f"<p style='margin:12px 0 2px'><b>{_ddmm(g['дата'])} {html.escape(g['время'])}</b> · "
                  f"{html.escape(g['группа'])} · {_sklon(g['детей'], 'ребёнок', 'ребёнка', 'детей')}{ne}</p>"

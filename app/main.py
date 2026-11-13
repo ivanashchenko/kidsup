@@ -4201,7 +4201,8 @@ def istochniki_page(request: Request, since: str = "", until: str = ""):
     return render(request, "istochniki.html", active="istochniki",
                   d=istochniki.otchet(since, until),
                   leads_stats=leads.stats_by_source(), leads_rows=leads.recent(),
-                  leads_sources=leads.SOURCES, kliki=kliki)
+                  # вебхук Марквиза пишет источник «marquiz», в справочнике каналов его нет
+                  leads_sources={**leads.SOURCES, "marquiz": "Квиз Марквиз"}, kliki=kliki)
 
 
 @app.get("/api/tvoyklass/plan", dependencies=AUTH)
@@ -5109,8 +5110,10 @@ def _kliki_stroki() -> list:
 @app.get("/clicks", dependencies=OWNER_AUTH)
 def clicks_page(request: Request):
     """13.11.2026, шаг 2: «Клики по мессенджерам» переехали на «Откуда заявки», раздел
-    «Клики по ссылкам» (id="clicks"). Вход — как был, владельца."""
-    return RedirectResponse("/istochniki#clicks", status_code=303)
+    «Клики по ссылкам» (id="clicks"). Вход — как был, владельца. Общий admin на переходный
+    срок сюда ещё проходит (vhod.PEREHOD_ADMIN), но «Откуда заявки» ему закрыта и раздел кликов
+    рисуется только владельцу — его ведём на пульт сразу, а не цепочкой через /istochniki."""
+    return _vladelcu(request) or RedirectResponse("/istochniki#clicks", status_code=303)
 
 
 

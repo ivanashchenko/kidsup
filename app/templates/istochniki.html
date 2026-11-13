@@ -57,10 +57,10 @@
 <div class="scroll"><table>
   <tr><th>Источник</th><th>Промокод</th><th class="num">заявок</th><th class="num">в CRM</th><th>Первая</th><th>Последняя</th></tr>
   {% for s in leads_stats %}
-  <tr><td>{{ s.source_label }}</td><td class="muted">{{ s.promo or "—" }}</td>
+  <tr><td>{{ leads_sources.get(s.source, s.source_label) }}</td><td class="muted">{{ s.promo or "—" }}</td>
       <td class="num"><b>{{ s.c }}</b></td><td class="num">{{ s.pushed or 0 }}</td>
-      <td class="muted small">{{ (s.first_at or "")[:16].replace("T", " ") }}</td>
-      <td class="muted small">{{ (s.last_at or "")[:16].replace("T", " ") }}</td></tr>
+      <td class="muted small" style="white-space:nowrap">{{ (s.first_at or "")[:16].replace("T", " ") }}</td>
+      <td class="muted small" style="white-space:nowrap">{{ (s.last_at or "")[:16].replace("T", " ") }}</td></tr>
   {% endfor %}
 </table></div>
 {% endif %}
@@ -69,7 +69,7 @@
 <div class="scroll"><table>
   <tr><th>Дата</th><th>Источник</th><th>Родитель</th><th>Телефон</th><th>Ребёнок</th><th>Интересы</th><th>CRM</th></tr>
   {% for r in leads_rows %}
-  <tr><td class="muted small">{{ (r.created_at or "")[:16].replace("T", " ") }}</td>
+  <tr><td class="muted small" style="white-space:nowrap">{{ (r.created_at or "")[:16].replace("T", " ") }}</td>
       <td>{{ leads_sources.get(r.source, r.source) }}{% if r.promo %} <span class="muted small">/ {{ r.promo }}</span>{% endif %}</td>
       <td>{{ r.parent_name }}</td><td style="white-space:nowrap">{{ r.phone }}</td>
       <td>{{ r.child_name }}{% if r.child_age %} <span class="muted small">({{ r.child_age }})</span>{% endif %}</td>

@@ -1504,7 +1504,13 @@ def test_pereezdy_pyati(c, m, baza):
     kod, loc, cel = perehod_i_cel(c, "/clicks", VLADELEC)
     proverka("владелец: /clicks → 303 /istochniki#clicks → 200, без цепочки",
              (kod, loc, cel) == (303, "/istochniki#clicks", 200), (kod, loc, cel))
-    proverka("админ: /clicks → 401, как и было (страница под входом владельца)", lokaciya(c, "/clicks")[0] == 401)
+    # общий admin на переходный срок проходит вход владельца на /clicks (vhod.PEREHOD_ADMIN, пока ключ
+    # рутин ни разу не сработал), после — 401. В обоих случаях до кликов он не доходит и цепочки нет.
+    kod, loc, cel = perehod_i_cel(c, "/clicks", ADMIN)
+    proverka("админ: /clicks → сразу на /pult (переходный срок) или 401 — не цепочка через /istochniki",
+             (kod, loc, cel) == (303, "/pult", 200) or kod == 401, (kod, loc, cel))
+    proverka("личный админ (X-Kak: admin): /clicks закрыт — 403, без перехода",
+             c.get("/clicks", auth=VLADELEC, headers={"X-Kak": "admin"}, follow_redirects=False).status_code == 403)
     proverka("/clicks без входа → 401", lokaciya(c, "/clicks", kto=None) == (401, None))
     proverka("вход у старых адресов прежний: /clicks — владельца, остальные четыре — общий",
              _vhod_marshruta(m, "GET", "/clicks") == {"check_owner"}
@@ -1670,12 +1676,14 @@ def test_pereezdy_pyati(c, m, baza):
              <= set(c.get("/api/segodnya", auth=ADMIN).json()))
     proverka("/api/spiski отвечает списком групп", "groups" in c.get("/api/spiski", auth=ADMIN).json())
     proverka("/api/zayavki отвечает (вечерний контроль 21:00)", c.get("/api/zayavki", auth=ADMIN).status_code == 200)
-    proverka("/export/leads.csv: владельцу — 200, админу — 401",
-             c.get("/export/leads.csv", auth=VLADELEC).status_code == 200
-             and c.get("/export/leads.csv", auth=ADMIN).status_code == 401)
-    proverka("/api/clicks/summary: владельцу — 200, админу — 401",
-             c.get("/api/clicks/summary", auth=VLADELEC).status_code == 200
-             and c.get("/api/clicks/summary", auth=ADMIN).status_code == 401)
+    # вход владельца у этих двух — прежний (проверено выше по зависимостям маршрута); общий admin на
+    # переходный срок проходит по списку vhod.PEREHOD_ADMIN — это правило личных входов, здесь не менялось
+    for put in ("/export/leads.csv", "/api/clicks/summary"):
+        proverka(f"{put}: владельцу — 200, без входа — 401, личному админу (X-Kak) — 403",
+                 c.get(put, auth=VLADELEC).status_code == 200 and c.get(put).status_code == 401
+                 and c.get(put, auth=VLADELEC, headers={"X-Kak": "admin"}).status_code == 403,
+                 (c.get(put, auth=VLADELEC).status_code, c.get(put).status_code,
+                  c.get(put, auth=VLADELEC, headers={"X-Kak": "admin"}).status_code))
 
 
 def _lovushki_na_vse():

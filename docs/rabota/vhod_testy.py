@@ -2086,7 +2086,9 @@ def test_prava_v_den_vykladki():
     proverka("пульт под общим admin: ни жёлтой полосы, ни «Вы: …», ни «ваша колонка»",
              "kto-polosa" not in t and "Вы под общим входом" not in t and "ваша колонка" not in t
              and "сейчас в системе" not in t)
-    t = c.get("/leads", auth=OBSHCHIY, headers=STR).text
+    # 13.11.2026, шаг 2: /leads переехала на «Откуда заявки» и стала переходом (админа ведёт на пульт) —
+    # страницу с общей шапкой base.html здесь и ниже (п. 44) теперь представляет «Подбор группы».
+    t = c.get("/enrollment", auth=OBSHCHIY, headers=STR).text
     # 13.11.2026, шаг 2: шапка теперь <div id="kidsup-nav"> из app/nav.py (не <header>) — ожидание поправлено
     proverka("страница с общей шапкой под общим admin: полосы нет", "kto-polosa" not in t and 'id="kidsup-nav"' in t)
     proverka("/obeshchaniya под общим входом ведёт в колонку Лизы, как раньше; who из адреса остаётся",
@@ -2288,10 +2290,10 @@ def test_kto_voshel():
     proverka("под общим входом, когда личные входы заведены, — жёлтая полоса с датой и ссылкой на /vhod",
              f"Вы под общим входом. Он отключится {do.day:02d}.{do.month:02d}" in t and "войдите под своим именем" in t
              and "href='/vhod?next=/pult'" in t and "ваша колонка" not in t, t[t.find("kto-polosa"):][:200] if "kto-polosa" in t else "нет")
-    t = lena.get("/leads", headers=STR).text
+    t = lena.get("/enrollment", headers=STR).text
     proverka("общая шапка (base.html): «Вы: Лена», кнопка выхода — над меню",
              "Вы: <b style='color:#7DB928'>Лена</b>" in t and "action='/vyhod'" in t and t.index('id="kidsup-nav"') < t.index("kto-polosa") < t.index('id="nav-razdely"'))   # 13.11: полоска — внутри новой шапки, над меню
-    t = kl().get("/leads", auth=OBSHCHIY, headers=STR).text
+    t = kl().get("/enrollment", auth=OBSHCHIY, headers=STR).text
     proverka("…под общим входом — жёлтая полоса", "Вы под общим входом" in t and "kto-polosa obshchiy" in t)
     r = vyyti_s_next(lena, "/pult")
     proverka("«Выйти / сменить» из шапки: сеанс закрыт, форма входа вернёт на пульт",

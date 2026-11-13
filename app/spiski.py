@@ -176,6 +176,9 @@ def page(day: str | None, subject: str | None, print_mode: bool) -> str:
     tr.empty td{height:22px;border-bottom:1px dashed #cfd3e6}
     .sum{padding:6px 16px 0;color:#444;font-size:13px}
     .full{border-top:4px solid #7DB928}.thin{border-top:4px solid #E30613}
+    /* 13.11.2026: на телефоне карточка была шире экрана (минимум 420px) — страница ездила вбок;
+       панель дней и предметов занимает пол-экрана, поэтому там она не липнет к верху */
+    @media (max-width:700px){.wrap{grid-template-columns:1fr;padding:10px}.top{position:static}.g{overflow-x:auto}}
     @media print{.top,.sum{display:none}body{background:#fff}.wrap{display:block;padding:0}.g{box-shadow:none;border:1px solid #bbb;margin:0 0 10px;border-radius:6px}}
     </style>"""
     from urllib.parse import quote
