@@ -2878,11 +2878,18 @@ def _otkazy_staraya_tablica(m) -> bool:
                         ts TEXT, text TEXT, source TEXT DEFAULT '', released INTEGER DEFAULT 0)""")
         conn.execute("INSERT INTO otkazy (chat, phone, ts, text, source) VALUES ('9990003003', '9990003003', "
                      "'2026-10-01T10:00:00+03:00', 'снимите бронь, пожалуйста', 'телефон чата')")
+    def kolonki():
+        with m.db.get_conn() as conn:
+            return [r[1] for r in conn.execute("PRAGMA table_info(otkazy)")]
     try:
         do = otkaz.is_refused("9990003003")
+        # проверка перед отправкой (is_refused) таблицу не правит: при ошибке она отвечает «отказа
+        # нет», и правка таблицы на этом пути могла бы пропустить письмо семье из стоп-листа
+        ne_tronuta = "snyal_kto" not in kolonki()
         lenta = otkaz.feed()
         itog = otkaz.snyat(phone="9990003003", prichina="проверка старой таблицы", kto="стенд")
-        return bool(do) and len(lenta) == 1 and lenta[0]["снял"] == "" and itog["snyato"] == 1 \
+        return bool(do) and ne_tronuta and len(lenta) == 1 and lenta[0]["снял"] == "" and itog["snyato"] == 1 \
+            and kolonki()[-3:] == ["snyal_kto", "snyal_kogda", "snyal_prichina"] \
             and otkaz.is_refused("9990003003") is None and otkaz.feed()[0]["снял"] == "стенд"
     finally:
         with m.db.get_conn() as conn:
@@ -3055,6 +3062,10 @@ def test_ustarevshee(c, m, tree, baza):
         proverka("/api/dolgi отдаёт тот же снимок: ключи прежние (ready, as_of, rows, nobill, totals) и «snimok»",
                  len(zvali) == 1 and {"ready", "as_of", "rows", "nobill", "totals", "snimok", "snimok_oshibka"} == set(j)
                  and j["totals"] == _dolgi_otchet()["totals"] and len(j["rows"]) == 6 and j["snimok_oshibka"] == "", sorted(j))
+        proverka("время снимка — московское, что бы ни показывали часы сервера (и на странице, и в /api/dolgi)",
+                 j["snimok"].endswith("+03:00") and abs((dt.datetime.fromisoformat(j["snimok"])
+                                                         - dt.datetime.now(dt.timezone.utc)).total_seconds()) < 120
+                 and dt.datetime.fromisoformat(j["snimok"]).strftime("%d.%m %H:%M") in t, j["snimok"])
         c.get("/dolgi?fresh=1", auth=ADMIN)
         c.get("/dolgi?refresh=1", auth=ADMIN)
         proverka("GET с ?fresh=1 или ?refresh=1 пересчёт не запускает — только кнопка (POST)", len(zvali) == 1, len(zvali))
@@ -3116,7 +3127,8 @@ def test_ustarevshee(c, m, tree, baza):
                  "Собрать — 3 на 14 200 ₽" in vne and "Разобрать руками — 1 на 900 ₽" in vne and "Занятия без счёта — 1" in vne
                  and t.index("Собрать — 3") < t.index("Разобрать руками — 1") < t.index("Занятия без счёта") < t.index('<details id="starye-scheta">'))
         proverka("в блоке сказано, чьё это решение, и что админам с этими счетами делать нечего",
-                 "Списывать или взыскивать — решает владелец" in blok and "проданные до 1 сентября 2025 года" in blok)
+                 "Списывать или взыскивать — решает владелец" in blok and "выставленные до 1 сентября 2025 года" in blok
+                 and "ничего делать не нужно" in blok)
         proverka("наверху: «всего» по-прежнему считает все счета, старые — отдельной карточкой",
                  "<b>45 100 ₽</b><span>всего, 6 счетов</span>" in t
                  and "<b>30 000 ₽</b><span>старые счета — 2, ждут решения владельца</span>" in t
@@ -3168,6 +3180,9 @@ def test_ustarevshee(c, m, tree, baza):
              "Стоп-лист: 5 семей" in t and t.count("<details class=snyat>") == 5 and t.count("name=prichina required") == 5
              and "<details id=snyatye><summary>Сняты — 1</summary>" in t and "причина не записана" in t
              and "<details id=snyatye open" not in t, t.count("<details class=snyat>"))
+    proverka("даты — «29.10.2026 14:44», а не «2026-10-29T14:44»; на телефоне запись идёт карточкой — кнопка «снять» не за краем экрана",
+             "29.10.2026 14:44" in t and "2026-10-29T14:44" not in t and "@media (max-width:700px)" in t
+             and ".tabl table,.tabl tbody,.tabl tr,.tabl td{display:block" in t)
     proverka("кнопка шлёт телефон семьи, у чата без телефона — номер записи; старой подсказки про запрос в адресной строке нет",
              t.count(f'data-phone="{semya}"') == 2 and t.count("data-id=") == 1 and "fetch('/api/otkazy/snyat'" in t
              and "/api/otkazy/release" not in t)
@@ -3179,7 +3194,8 @@ def test_ustarevshee(c, m, tree, baza):
     print("Н5. «Линия»: семья в стоп-листе — плашка с причиной и датой")
     pl = plashka_linii(semya)
     proverka("семья в стоп-листе: плашка «В стоп-листе с 30.10.2026: «…»» (последняя запись семьи) и ссылка на стоп-лист",
-             "В стоп-листе с 30.10.2026" in pl and "Не сможем водить Тестову Еву, снимите бронь" in pl and 'href="/otkazy"' in pl, pl[:200])
+             "В стоп-листе с 30.10.2026" in pl and "Не сможем водить Тестову Еву, снимите бронь" in pl and 'href="/otkazy"' in pl
+             and "Автоматика этой семье не пишет — только живые ответы администратора" in pl, pl[:200])
     proverka("плашка — в карточке «Кто на линии», красной полосой (класс ln-stop), до списка детей",
              (lambda s: 'class="ln-stop" id="ln-stop-list"' in s and s.index("Кто на линии") < s.index('id="ln-stop-list"') < s.index("Тестова Ева"))(
                  c.get(f"/liniya?phone={semya}", auth=ADMIN).text))
@@ -3286,8 +3302,11 @@ def test_ustarevshee(c, m, tree, baza):
              and "Стоп-лист: 1 семей" in c.get("/otkazy", auth=ADMIN).text)
     with m.db.get_conn() as conn:
         conn.execute("DELETE FROM otkazy")
-    proverka("таблица стоп-листа старого вида (без новых колонок) дополняется сама, записи целы",
+    proverka("таблица стоп-листа старого вида (без новых колонок) дополняется сама при открытии страницы или снятии, записи "
+             "целы; проверка перед отправкой (is_refused) таблицу не правит и работает на старой",
              _otkazy_staraya_tablica(m))
+    proverka("is_refused и _tables — как были: новых колонок не читают и не создают",
+             "snyal" not in inspect.getsource(otkaz.is_refused) and "ALTER" not in inspect.getsource(otkaz._tables))
 
 
 if __name__ == "__main__":

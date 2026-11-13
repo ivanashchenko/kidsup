@@ -145,7 +145,7 @@
     <div class="ln-row"><h2>Кто на линии</h2><a class="ln-tel" href="tel:+{{ t.tel }}">{{ t.pokaz }}</a></div>
     {% if d.nashli_po %}<p class="muted small">Нашли по последним цифрам …{{ d.nashli_po }}.</p>{% endif %}
     {#- 13.11.2026, вечер 1: семья в стоп-листе (app/otkaz.py) — плашка с причиной и датой; снятые записи не в счёт -#}
-    {% if d.stop_list %}<div class="ln-stop" id="ln-stop-list">⛔ В стоп-листе с {{ d.stop_list.kogda }}: «{{ d.stop_list.prichina }}». Автоматика этой семье не пишет; сами пишем и звоним только в ответ. <a href="/otkazy">Стоп-лист</a></div>{% endif %}
+    {% if d.stop_list %}<div class="ln-stop" id="ln-stop-list">⛔ В стоп-листе с {{ d.stop_list.kogda }}: «{{ d.stop_list.prichina }}». Автоматика этой семье не пишет — только живые ответы администратора. <a href="/otkazy">Стоп-лист</a></div>{% endif %}
     {% if not d.v_crm %}
     <p><span class="chip warn">нет в CRM</span> Номера нет в нашей копии CRM — новый контакт.
       <span class="muted small">Копия обновляется раз в 5 минут{% if d.sinhro %} (последний раз {{ d.sinhro }}){% endif %}: если карточку завели только что, она появится чуть позже.</span></p>

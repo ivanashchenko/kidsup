@@ -22,6 +22,9 @@
 Отказ снимается только человеком: если клиент передумал и написал сам,
 администратор убирает его из стоп-листа кнопкой на /otkazy. Автоматика
 себе такого права не даёт — цена ошибки здесь несимметрична.
+
+13.11.2026: кнопка на /otkazy появилась на самом деле (snyat(): причина
+обязательна, запись не удаляется — видно, кто снял, когда и почему).
 """
 
 from __future__ import annotations
@@ -107,12 +110,26 @@ def _tables(conn) -> None:
         released INTEGER DEFAULT 0 -- 1 = снят человеком, можно писать снова
     )""")
     conn.execute("CREATE INDEX IF NOT EXISTS otkaz_phone ON otkazy (phone)")
-    # 13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1): у снятой записи видно, кто её
-    # снял, когда и почему. Сама запись не удаляется — released=1, как и раньше.
+
+
+def _kolonki_snyatiya(conn) -> None:
+    """Колонки «кто снял, когда, почему» — дополняем таблицу, если их ещё нет.
+
+    13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1): у снятой записи видно, кто её
+    снял, когда и почему. Сама запись не удаляется — released=1, как и раньше.
+    Нарочно НЕ в _tables(): её зовёт is_refused() перед каждой отправкой, а он при любой ошибке
+    отвечает «отказа нет». Правка таблицы на этом пути (занятая база, два потока разом) могла бы
+    один раз пропустить письмо семье из стоп-листа. Поэтому колонки добавляются только там, где
+    работает человек: страница, снятие, старый адрес снятия. is_refused() читает прежние колонки."""
+    import sqlite3
     est = {r[1] for r in conn.execute("PRAGMA table_info(otkazy)")}
     for kol in ("snyal_kto", "snyal_kogda", "snyal_prichina"):
         if kol not in est:
-            conn.execute(f"ALTER TABLE otkazy ADD COLUMN {kol} TEXT DEFAULT ''")
+            try:
+                conn.execute(f"ALTER TABLE otkazy ADD COLUMN {kol} TEXT DEFAULT ''")
+            except sqlite3.OperationalError as e:          # колонку только что добавил сосед
+                if "duplicate column" not in str(e).lower():
+                    raise
 
 
 def _digits(x) -> str:
@@ -329,6 +346,7 @@ def release(chat: str, kto: str = "") -> bool:
     иначе повторный вызов затёр бы автора и причину первого снятия."""
     with db.get_conn() as conn:
         _tables(conn)
+        _kolonki_snyatiya(conn)
         conn.execute("UPDATE otkazy SET released=1, snyal_kto=?, snyal_kogda=? "
                      "WHERE chat=? AND released=0",
                      ((kto or "").strip()[:60], datetime.now(MSK).isoformat(timespec="seconds"),
@@ -368,6 +386,7 @@ def snyat(phone: str = "", id=0, prichina: str = "", kto: str = "") -> dict:
     kogda = datetime.now(MSK).isoformat(timespec="seconds")
     with db.get_conn() as conn:
         _tables(conn)
+        _kolonki_snyatiya(conn)
         if p:
             gde, arg = "(phone=? OR chat=?) AND released=0", (p, p)
         else:
@@ -443,6 +462,7 @@ def feed() -> list[dict]:
     """Список отказов для страницы и для задач администраторам."""
     with db.get_conn() as conn:
         _tables(conn)
+        _kolonki_snyatiya(conn)
         rows = conn.execute(
             "SELECT chat, phone, name, ts, text, source, released, "
             "rowid, snyal_kto, snyal_kogda, snyal_prichina "

@@ -7589,6 +7589,7 @@ def otkazy_page(request: Request):
         return f"{_h.escape(who)}<br>{ph}"
 
     def den(ts):
+        """«2026-10-29T14:44:58+03:00» → «29.10.2026 14:44»."""
         ts = str(ts or "")
         return f"{ts[8:10]}.{ts[5:7]}.{ts[:4]} {ts[11:16]}".strip() if len(ts) >= 10 else "—"
 
@@ -7600,19 +7601,19 @@ def otkazy_page(request: Request):
     for r in rows:
         if r["снят"]:
             snyatye.append(
-                f"<tr><td>{_h.escape(str(r['когда'])[:16])}</td>"
+                f"<tr><td data-l='Отказ'>{den(r['когда'])}</td>"
                 f"<td>{kto_i_nomer(r)}</td>"
                 f"<td class=q>«{_h.escape(str(r['цитата'])[:220])}»</td>"
-                f"<td>{_h.escape(r['снял'] or '—')}<br>{den(r['снят когда']) if r['снят когда'] else 'дата не записана'}</td>"
-                f"<td>{_h.escape(r['причина снятия']) if r['причина снятия'] else '<span class=mut>причина не записана</span>'}</td></tr>")
+                f"<td data-l='Снял'>{_h.escape(r['снял'] or '—')}<br>{den(r['снят когда']) if r['снят когда'] else 'дата не записана'}</td>"
+                f"<td data-l='Причина'>{_h.escape(r['причина снятия']) if r['причина снятия'] else '<span class=mut>причина не записана</span>'}</td></tr>")
             continue
         # по телефону снимаются все действующие записи семьи; у чата без телефона — одна, по номеру записи
         komu = (f'data-phone="{_h.escape(r["телефон"])}"' if r["телефон"] else f'data-id="{int(r["id"])}"')
         body.append(
-            f"<tr><td>{_h.escape(str(r['когда'])[:16])}</td>"
+            f"<tr><td data-l='Отказ'>{den(r['когда'])}</td>"
             f"<td>{kto_i_nomer(r)}</td>"
             f"<td class=q>«{_h.escape(str(r['цитата'])[:220])}»</td>"
-            f"<td>{_h.escape(r['как связали'] or '—')}</td>"
+            f"<td data-l='Связали'>{_h.escape(r['как связали'] or '—')}</td>"
             f"<td class=dej>не пишем"
             f"<details class=snyat><summary>снять</summary>"
             f"<form {komu} onsubmit=\"return snyat(this)\">"
@@ -7653,7 +7654,16 @@ details.snyat .osh{{color:#E30613;font-size:13px}}
 details#snyatye{{margin-top:28px;border-top:1px solid #e6e6ef;padding-top:14px}}
 details#snyatye > summary{{cursor:pointer;font-size:17px;font-weight:700;padding:6px 0}}
 details#snyatye .sub{{margin:6px 0 10px}}
-@media (max-width:700px){{body{{margin:14px}}}}
+/* 13.11.2026: на телефоне таблица из пяти колонок уезжала вбок, и кнопка «снять» оказывалась за
+   краем экрана — на узком экране каждая запись идёт карточкой, кнопка всегда на виду */
+@media (max-width:700px){{body{{margin:14px}}
+  .tabl table,.tabl tbody,.tabl tr,.tabl td{{display:block;width:auto}}
+  .tabl tr:first-child{{display:none}}
+  .tabl tr{{border-bottom:1px solid #e6e6ef;padding:10px 0}}
+  .tabl td{{border:0;padding:2px 0}}
+  .tabl td[data-l]::before{{content:attr(data-l) ": ";color:#888;font-size:13px}}
+  td.dej{{min-width:0;margin-top:4px}}
+  details.snyat form{{min-width:0}}}}
 </style></head><body>
 <h1>Стоп-лист: {n_live} семей, которым автоматика не пишет</h1>
 <div class=sub>Сюда попадает всё, где клиент письменно просил снять бронь.
@@ -11820,6 +11830,12 @@ def _dolgi_snimok(obnovit: bool = False) -> dict:
         return {"d": novyj, "ts": ts, "oshibka": "", "pereschitan": True}
 
 
+def _dolgi_kogda(ts: datetime | None):
+    """Время снимка по Москве: часы сервера могут идти не по московскому времени, а на странице
+    и в /api/dolgi время читают люди. Срок годности снимка считается по часам сервера как есть."""
+    return ts.astimezone(autopilot.MSK) if ts else None
+
+
 def _dolgi_krasnyh() -> int | None:
     """Сколько красных находок утренней проверки денег за 14 дней (раздел 13 «Проверки
     МойКласса») — для строки на «Долгах». Лента не читается — None, строка без числа."""
@@ -11840,7 +11856,7 @@ async def api_dolgi():
         raise HTTPException(502, sn["oshibka"] or "МойКласс не ответил, снимка ещё нет")
     if not sn["d"].get("ready"):
         return sn["d"]
-    return {**sn["d"], "snimok": sn["ts"].isoformat(timespec="seconds"), "snimok_oshibka": sn["oshibka"]}
+    return {**sn["d"], "snimok": _dolgi_kogda(sn["ts"]).isoformat(timespec="seconds"), "snimok_oshibka": sn["oshibka"]}
 
 
 @app.post("/api/dolgi/obnovit", dependencies=AUTH)
@@ -11852,7 +11868,7 @@ async def api_dolgi_obnovit():
     d = sn["d"] or {}
     return {"ok": bool(d.get("ready")) and not sn["oshibka"], "oshibka": sn["oshibka"],
             "pereschitan": sn["pereschitan"],
-            "snimok": sn["ts"].isoformat(timespec="seconds") if sn["ts"] else None,
+            "snimok": _dolgi_kogda(sn["ts"]).isoformat(timespec="seconds") if sn["ts"] else None,
             "vsego": (d.get("totals") or {}).get("всего")}
 
 
@@ -11923,9 +11939,9 @@ def _dolgi_stranica(sn: dict, krasnyh: int | None = None) -> str:
             starye = (
                 f'<section><details id="starye-scheta"><summary><span class="chip" style="background:{color}"></span>'
                 f'Старые счета — ждут решения владельца — {len(sel)} на {money(sum(r["debt"] for r in sel))}</summary>'
-                f'<p class="sub">Абонементы, проданные до 1 сентября 2025 года, у семей, которые сейчас '
-                f'не в работе. {why} Списывать или взыскивать — решает владелец; до его решения '
-                f'админам с этими счетами ничего делать не нужно.</p>'
+                f'<p class="sub">Счета, выставленные до 1 сентября 2025 года, у семей, которые сейчас '
+                f'не в работе. Пока они висят, баланс врёт. Списывать или взыскивать — решает владелец; '
+                f'до его решения админам с этими счетами ничего делать не нужно.</p>'
                 f'{tablica(sel)}</details></section>')
             continue
         blocks.append(
@@ -11944,7 +11960,7 @@ def _dolgi_stranica(sn: dict, krasnyh: int | None = None) -> str:
                         f'<td class="w">{x["date"]}</td>'
                         f'<td>{html.escape(str(x["class"] or ""))}</td></tr>'
                         for x in nobill) + '</table></div></section>')
-    snyat = sn["ts"].strftime("%d.%m %H:%M") if sn.get("ts") else str(d.get("as_of") or "")
+    snyat = _dolgi_kogda(sn["ts"]).strftime("%d.%m %H:%M") if sn.get("ts") else str(d.get("as_of") or "")
     oshibka = (f'<p class="oshibka" id="snimok-oshibka">{html.escape(sn["oshibka"])} — показан прежний снимок, '
                f'на {snyat}.</p>') if sn.get("oshibka") else ""
     kart_starye = (f'<div class="n"><b>{money(t["списать"]["sum"])}</b><span>старые счета — {t["списать"]["n"]}, '
@@ -11997,10 +12013,12 @@ a{{color:inherit}}
   background:var(--card);color:var(--ink);cursor:pointer;margin:.3rem .4rem .3rem 0}}
 #obn:disabled{{opacity:.55;cursor:default}}
 .oshibka{{color:#A3282B;font-size:.92rem;margin:0 0 .9rem;max-width:46rem}}
-details#starye-scheta > summary{{cursor:pointer;font-size:1.12rem;font-weight:700;display:flex;align-items:center;
-  gap:.5rem;flex-wrap:wrap;margin:0 0 .3rem}}
+details#starye-scheta > summary{{cursor:pointer;font-size:1.12rem;font-weight:700;margin:0 0 .3rem;list-style:none;
+  padding:.35rem 0}}
+details#starye-scheta > summary::-webkit-details-marker{{display:none}}
+details#starye-scheta > summary .chip{{margin-right:.5rem}}
 details#starye-scheta > summary::after{{content:"показать";font-size:.8rem;font-weight:400;color:var(--muted);
-  text-decoration:underline}}
+  text-decoration:underline;margin-left:.6rem;white-space:nowrap}}
 details#starye-scheta[open] > summary::after{{content:"свернуть"}}
 details#starye-scheta .sub{{margin-top:.5rem}}
 </style></head><body><div class="wrap">
