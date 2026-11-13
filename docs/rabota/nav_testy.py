@@ -18,6 +18,11 @@
 убранное, архивное и объединённое, а в app/ убранные адреса остались только в таблице
 переходов; адреса рутин на месте и под прежним входом.
 
+Раздел «М» (13.11.2026, вечер 1) — уборка и безопасность: в коде нет телефонов клиентов, мёртвый
+код убран, кампании августа–сентября в базе знаний свёрнуты, полная выгрузка МойКласса — только
+владельцу, ключи вебхуков Марквиза и Wazzup задаются настройкой и наружу не отдаются, ни один
+изменяющий адрес под входом не принимает запрос с чужого сайта, запись через GET убрана.
+
     python3 docs/rabota/nav_testy.py [--tree КОРЕНЬ] [--work ПАПКА] [--do ФАЙЛ.json]
 
   --tree  корень дерева, в котором лежит app/ (по умолчанию — этот репозиторий;
@@ -2570,6 +2575,11 @@ def test_uborka_bezopasnost(c, m, tree, baza):
              and NOVYY not in stranica and NOVYY[-4:] not in stranica and NOVYY[:-3] not in stranica
              and "name='marquiz_key'" in stranica and "name='wazzup_hook_key'" in stranica, nastr.json().get("marquiz_key"))
     proverka("админу настройки по-прежнему закрыты", c.get("/api/settings", auth=ADMIN).status_code in (401, 403))
+    r = c.post("/owner", data={"marquiz_key": NOVYY + "-forma"}, auth=VLADELEC)
+    proverka("ключ можно вписать и на странице «Настройки»; в ответе после сохранения его значения нет",
+             r.status_code == 200 and m.db.get_setting("marquiz_key") == NOVYY + "-forma" and NOVYY not in r.text
+             and "Сохранено: Марквиз" in r.text and mq(NOVYY + "-forma").status_code == 200 and mq(NOVYY).status_code == 403,
+             r.status_code)
     m.db.set_setting("marquiz_key", "  ")
     proverka("пустая настройка (пробелы) — снова прежний ключ, а не «подходит любой»",
              mq(m.MARQUIZ_KEY).status_code == 200 and mq("").status_code == 403 and mq(" ").status_code == 403)
