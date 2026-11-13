@@ -3433,10 +3433,17 @@ def test_posle_proverki_vechera1(c, m, tree, baza):
              and z["snyal_prichina"] == "мама написала, что передумали" and zapis("5139000001")["released"] == 1, z)
     proverka("действующую запись повтор отказа не трогает — как и раньше",
              otkaz.note(SEMYA, NOVYY + "!", pozzhe) is False and zapis(semya)["text"] == NOVYY)
-    proverka("запись, снятая до 13.11 (время снятия не писалось): то же старое сообщение её не возвращает, более позднее — возвращает",
+    # 13.11.2026, вторая проверка «вечера 1»: у записи, снятой до 13.11, времени снятия нет.
+    # Второе «отказное» сообщение семьи, пришедшее ещё до снятия (через 5 минут после первого),
+    # при повторном разборе входящих не должно возвращать запись, которую человек снял позже.
+    # Граница у таких записей — не раньше otkaz.STARYE_SNYATIYA_DO.
+    proverka("запись, снятая до 13.11 (время снятия не писалось): старое сообщение и второе, пришедшее до снятия, её не возвращают",
              otkaz.note("79990003001", "больше не пишите", "2026-08-24T17:00:40+03:00") is False
-             and zapis("9990003001")["released"] == 1
-             and otkaz.note("79990003001", "больше не пишите нам, пожалуйста", "2026-11-13T12:00:00+03:00") is True
+             and otkaz.note("79990003001", "больше не пишите нам, пожалуйста", "2026-08-24T17:05:40+03:00") is False
+             and otkaz.note("79990003001", "больше не пишите нам, пожалуйста", "2026-11-13T12:00:00+03:00") is False
+             and zapis("9990003001")["released"] == 1 and otkaz.is_refused("9990003001") is None)
+    proverka("…а отказ, пришедший после появления правила возврата, — возвращает",
+             otkaz.note("79990003001", "больше не пишите нам, пожалуйста", "2026-11-14T12:00:00+03:00") is True
              and zapis("9990003001")["released"] == 0 and otkaz.is_refused("9990003001"))
     t = c.get("/otkazy", auth=ADMIN).text
     proverka("страница: у вернувшейся записи сказано, что семью снимали и она отказалась снова; правило названо в шапке",
@@ -3465,6 +3472,18 @@ def test_posle_proverki_vechera1(c, m, tree, baza):
         c.post("/api/otkazy/scan?hours=9000&rebuild=true", auth=ADMIN, headers=SVOYA_STRANICA)
         proverka("…и пересборка стоп-листа (rebuild) тоже: решение человека не отменяется",
                  zapis(nomer)["released"] == 1 and otkaz.is_refused(nomer) is None)
+        # 13.11.2026, вторая проверка «вечера 1»: пересборка стирала все действующие записи,
+        # а собрать заново может только то, что есть во входящих за период. Запись, внесённая
+        # руками (отказ голосом), и запись старше периода должны пережить пересборку.
+        c.post("/api/otkazy/add?phone=79990009996&text=" + quote("по телефону: просила не писать"), auth=ADMIN, headers=SVOYA_STRANICA)
+        with m.db.get_conn() as conn:
+            conn.execute("INSERT OR REPLACE INTO otkazy (chat, phone, name, ts, text, source) VALUES (?,?,?,?,?,?)",
+                         ("9990009995", "9990009995", "Стенд Давний", "2026-01-10T10:00:00+03:00", "не пишите нам", "по телефону чата"))
+        c.post("/api/otkazy/scan?hours=24&rebuild=true", auth=ADMIN, headers=SVOYA_STRANICA)
+        proverka("пересборка не стирает запись, внесённую руками, и запись старше периода разбора",
+                 bool(otkaz.is_refused("9990009996")) and bool(otkaz.is_refused("9990009995")))
+        with m.db.get_conn() as conn:
+            conn.execute("DELETE FROM otkazy WHERE phone IN ('9990009996', '9990009995')")
         cherez_chas = (dt.datetime.fromisoformat(zapis(nomer)["snyal_kogda"]) + dt.timedelta(hours=1)).isoformat(timespec="seconds")
         with m.db.get_conn() as conn:
             conn.execute("INSERT INTO wazzup_inbox (ts, phone, chat_type, text, message_id) VALUES (?,?,?,?,?)",

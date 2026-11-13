@@ -220,11 +220,15 @@ def _vremya(ts) -> datetime | None:
     return d if d.tzinfo else d.replace(tzinfo=MSK)
 
 
+# Записи, снятые раньше этого времени, не хранят «когда сняли» — см. _posle_snyatiya.
+STARYE_SNYATIYA_DO = "2026-11-14T00:00:00+03:00"
+
+
 def _posle_snyatiya(conn, key: str, ts_zapisi, kogda: str) -> bool:
     """Отказ со временем kogda пришёл ПОЗЖЕ, чем запись key сняли со стоп-листа?
 
     Граница — snyal_kogda; у записей, снятых до 13.11.2026 (время снятия не писалось), —
-    время самого отказа в записи. Сравнение обязательно: scan() перечитывает входящие за
+    время самого отказа в записи, но не раньше STARYE_SNYATIYA_DO. Сравнение обязательно: scan() перечитывает входящие за
     месяц, и без него разбор вернул бы только что снятую запись по её же старому сообщению.
     Колонку snyal_kogda только читаем, если она есть: таблицу здесь не правим (note() зовёт
     живой вебхук входящих). Границу или время сообщения не разобрать — считаем «позже»:
@@ -233,8 +237,17 @@ def _posle_snyatiya(conn, key: str, ts_zapisi, kogda: str) -> bool:
     if "snyal_kogda" in {r[1] for r in conn.execute("PRAGMA table_info(otkazy)")}:
         r = conn.execute("SELECT snyal_kogda FROM otkazy WHERE chat=?", (key,)).fetchone()
         snyal = (r[0] if r else "") or ""
-    granica, prishlo = _vremya(snyal) or _vremya(ts_zapisi), _vremya(kogda)
-    if granica is None or prishlo is None:
+    granica, prishlo = _vremya(snyal), _vremya(kogda)
+    if granica is None:
+        # 13.11.2026, вторая проверка «вечера 1»: у записей, снятых до этого дня, времени
+        # снятия нет. Если брать границей время первого отказа, второе «отказное» сообщение
+        # той же семьи, пришедшее ещё ДО снятия, при повторном разборе входящих вернуло бы
+        # запись, которую человек снял уже после него. Поэтому граница у таких записей —
+        # не раньше дня, когда появилось само правило возврата.
+        nachalo = _vremya(STARYE_SNYATIYA_DO)
+        staraya = _vremya(ts_zapisi)
+        granica = max(staraya, nachalo) if staraya else nachalo
+    if prishlo is None:
         return True
     return prishlo > granica
 
@@ -565,8 +578,14 @@ def scan(hours: int = 720, rebuild: bool = False) -> dict:
         _tables(conn)
         if rebuild:
             # снятые человеком не трогаем: это решение администратора,
-            # и перезапуск разбора не должен его отменять
-            conn.execute("DELETE FROM otkazy WHERE released=0")
+            # и перезапуск разбора не должен его отменять.
+            # 13.11.2026, вторая проверка «вечера 1»: пересборка стирала ВСЕ действующие
+            # записи, а восстановить может только то, что есть во входящих за период.
+            # Записи, внесённые руками (клиент отказался голосом), и записи старше
+            # периода пропадали бы насовсем — семье снова пошли бы сообщения. Стираем
+            # только то, что разбор соберёт заново.
+            conn.execute("DELETE FROM otkazy WHERE released=0 "
+                         "AND COALESCE(source,'')!='руками' AND ts>=?", (since,))
         try:
             rows = conn.execute(
                 "SELECT ts, phone, text FROM wazzup_inbox WHERE ts >= ? "
