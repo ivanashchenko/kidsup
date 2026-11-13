@@ -2174,7 +2174,7 @@ OWNER_FIELDS = [
     ("green_api_instance", "Green-API — idInstance (статусы WhatsApp с отдельного номера)", False),
     ("green_api_token", "Green-API — apiTokenInstance", True),
     # 13.11.2026 (безопасность, вечер 1): ключи вебхуков — вместо секрета, зашитого в код
-    ("marquiz_key", "Марквиз — ключ вебхука (то, что стоит после ?key= в адресе вебхука в кабинете Марквиза; пока пусто — действует прежний ключ)", True),
+    ("marquiz_key", "Марквиз — ключ вебхука (то, что стоит после ?key= в адресе вебхука в кабинете Марквиза; пока пусто — действует прежний ключ). Только латинские буквы, цифры, «-» и «_», от 16 знаков. Сначала сохранить здесь, сразу после — вписать адрес в Марквизе", True),
     ("wazzup_hook_key", "Wazzup — ключ вебхука (необязательный: после него принимаются только события Wazzup с этим ключом)", True),
     # 12.11.2026, личные входы: строки «Пароль владельца» (owner_password) здесь больше нет.
     # Пароли задаются в блоке «Входы» выше и хранятся только хешем в data/vhody.db.
@@ -2212,6 +2212,10 @@ def _owner_ctx(request: Request = None, msg: str = "", vhody: dict | None = None
         if key == "wazzup_hook_key" and val:
             from . import wazzup as _wz
             shown += " · " + _wz.hook_sostoyanie()
+        if key == "marquiz_key":
+            # 13.11.2026, вечер: у Марквиза, как у Wazzup, видно состояние — раньше неверный
+            # ключ отклонял заявки без единого следа
+            shown += " · " + _marquiz_sostoyanie()
         rows.append(f"<label><span>{html.escape(label)}</span><small>сейчас: {html.escape(shown)}</small>"
                     f"<input type='{'password' if secret else 'text'}' name='{key}' placeholder='вставьте новое значение, чтобы заменить' autocomplete='off'></label>")
     return f"""<!doctype html><html lang='ru'><head><meta charset='utf-8'><title>Настройки владельца</title>
@@ -2242,16 +2246,53 @@ def owner_page(request: Request, mk: str = ""):
     return HTMLResponse(_s_shapkoy(request, _owner_ctx(request, mk=_mk_itog_svezhiy() if mk else None)))
 
 
+MARQUIZ_KLYUCH_MIN = 16
+
+
+def _nastroyka_ne_goditsya(key: str, value: str) -> str:
+    """Почему значение настройки сохранять нельзя; пустая строка — можно.
+
+    13.11.2026, вечер (проверка «вечера 1», проверено на стенде): ключ Марквиза человек сам
+    вписывает в адрес вебхука в кабинете Марквиза (…/marquiz/webhook?key=<ключ>). Ключ с «+»,
+    «&», «#», «%» или пробелом сохранялся без предупреждения, а адрес с ним ломался («+» —
+    пробел, «&» и «#» обрезают значение): вебхук молча отвечал 403 на все заявки квиза.
+    Поэтому — только латинские буквы, цифры, «-» и «_», не короче 16 знаков. Пустое значение
+    (вернуться к прежнему ключу) сохранять можно. Ключа Wazzup это не касается: его адрес
+    регистрирует само приложение и кодирует ключ (wazzup.nash_hook)."""
+    if key == "marquiz_key" and value and not re.fullmatch(r"[A-Za-z0-9_-]{%d,}" % MARQUIZ_KLYUCH_MIN, value):
+        return (f"Марквиз — ключ не сохранён: в нём могут быть только латинские буквы, цифры, «-» и «_», "
+                f"не короче {MARQUIZ_KLYUCH_MIN} знаков. Ключ стоит в адресе вебхука — другие знаки адрес ломают, "
+                f"и заявки квиза перестают приходить.")
+    return ""
+
+
+def _nastroyku_zapisat(key: str, value: str) -> None:
+    """Сохранить настройку. Одно место для страницы /owner и POST /api/settings: у ключа
+    вебхука Wazzup при смене стирается отметка «ключ уже требуется» (wazzup.hook_klyuch_zapisat)."""
+    if key == "wazzup_hook_key":
+        from . import wazzup
+        wazzup.hook_klyuch_zapisat(value)
+        return
+    db.set_setting(key, value)
+
+
 @app.post("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 async def owner_save(request: Request):
     form = await request.form()
-    saved = []
+    saved, otkazy = [], []
     for key, label, _secret in OWNER_FIELDS:
         v = (form.get(key) or "").strip()
         if v:
-            db.set_setting(key, v)
+            pochemu = _nastroyka_ne_goditsya(key, v)
+            if pochemu:
+                otkazy.append(pochemu)
+                continue
+            _nastroyku_zapisat(key, v)
             saved.append(label.split(" — ")[0])
-    return HTMLResponse(_owner_ctx(request, "Сохранено: " + ", ".join(saved) if saved else "Ничего не изменено."))
+    msg = "Сохранено: " + ", ".join(saved) if saved else "Ничего не изменено."
+    if otkazy:
+        msg = " ".join(otkazy) + (" " + msg if saved else "")
+    return HTMLResponse(_owner_ctx(request, msg))
 
 
 @app.post("/owner/vhody", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -5599,7 +5640,12 @@ async def api_set_setting(payload: dict):
     key, value = (payload.get("key") or "").strip(), payload.get("value")
     if key not in SETTABLE or value is None:
         raise HTTPException(400, f"key должен быть одним из {sorted(SETTABLE)}")
-    db.set_setting(key, str(value).strip())
+    # 13.11.2026, вечер: то же, что на странице /owner, — ключ Марквиза только из знаков,
+    # которые не ломают адрес; смена ключа вебхука Wazzup стирает отметку «ключ требуется»
+    pochemu = _nastroyka_ne_goditsya(key, str(value).strip())
+    if pochemu:
+        raise HTTPException(400, pochemu)
+    _nastroyku_zapisat(key, str(value).strip())
     return {"ok": True, key: _mask(key, db.get_setting(key))}
 
 
@@ -7521,20 +7567,12 @@ def api_otkazy_scan(hours: int = 720, rebuild: bool = False):
 @app.post("/api/otkazy/add", dependencies=AUTH)
 def api_otkazy_add(phone: str, text: str, name: str = ""):
     """Внести отказ руками — когда клиент попросил голосом (в звонке), а не
-    текстом: сканеру переписки такой отказ увидеть неоткуда."""
-    from datetime import datetime as _dt
+    текстом: сканеру переписки такой отказ увидеть неоткуда.
+
+    13.11.2026, вечер: запись с этим телефоном, внесённая раньше (в том числе снятая), не
+    стирается, а обновляется — «кто, когда, почему снял» остаются (otkaz.dobavit)."""
     from . import otkaz
-    p = "".join(ch for ch in phone if ch.isdigit())[-10:]
-    if len(p) != 10:
-        return {"ok": False, "почему": "нужен телефон из 10-11 цифр"}
-    with db.get_conn() as conn:
-        otkaz._tables(conn)
-        conn.execute(
-            "INSERT OR REPLACE INTO otkazy (chat, phone, name, ts, text, source) "
-            "VALUES (?,?,?,?,?,?)",
-            ("7" + p, p, name, _dt.now().isoformat(timespec="seconds"),
-             (text or "")[:400], "руками"))
-    return {"ok": True, "phone": p, "стоп": otkaz.is_refused(p)}
+    return otkaz.dobavit(phone, text, name)
 
 
 @app.post("/api/otkazy/release", dependencies=AUTH)
@@ -7553,25 +7591,55 @@ def api_otkazy_release(request: Request, chat: str):
     return {"ok": True, "чат": chat, "статус": "снят со стоп-листа"}
 
 
+def _otkazy_kto(request: Request, prislano: str = "") -> str:
+    """Чьим именем подписать снятие со стоп-листа.
+
+    13.11.2026, вечер (проверка «вечера 1», два проверяющих): под общим входом имя бралось из
+    запроса — админ мог записать в «Кто снял» «Борис», владелец — «Лена» (проверено на стенде).
+    Страница это поле не шлёт вовсе, а смысл колонки — «видно, кто снял». Теперь присланное
+    имя читается только у ключа рутин («Клод за Лизу»); вошедшему через форму — его имя
+    (vhod.podpis); общему входу — по роли: «Борис» или «админ», как в api_otkazy_release."""
+    ot_imeni = prislano if vhod.iz(request).get("sposob") == "klyuch" else ""
+    return vhod.podpis(request, ot_imeni) or ("Борис" if _rol(request) == "owner" else "админ")
+
+
 @app.post("/api/otkazy/snyat", dependencies=AUTH)
 def api_otkazy_snyat(request: Request, payload: dict = Body(...)):
-    """{"phone": "79990001001", "prichina": "…"} или {"id": 12, "prichina": "…"} — снять семью
-    со стоп-листа. Запись не удаляется: помечается снятой (кто, когда, причина) и перестаёт
+    """{"phone": "79990001001", "prichina": "…"} или {"chat": "5139000002", "prichina": "…"} — снять
+    семью со стоп-листа. Запись не удаляется: помечается снятой (кто, когда, причина) и перестаёт
     действовать — письма этой семье снова проходят предохранитель. По телефону снимаются все
-    действующие записи семьи; id — одна запись (для чатов без телефона). Причина обязательна.
+    действующие записи семьи; chat — одна запись (для чатов без телефона); {"id": 12} — то же по
+    номеру записи, для запросов руками. Причина обязательна.
 
     13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1): на странице «Стоп-лист» не было
-    ни одной кнопки. Кто снял — решает сервер (vhod.podpis), как у галочек пульта: вошедшему
-    через форму — его имя, что бы ни стояло в запросе; под общим входом — «админ» или «Борис»."""
+    ни одной кнопки. Кто снял — решает сервер (_otkazy_kto): вошедшему через форму — его имя,
+    что бы ни стояло в запросе; под общим входом — «админ» или «Борис» по роли."""
     from . import otkaz
-    kto = (vhod.podpis(request, str(payload.get("kto") or ""))
-           or ("Борис" if _rol(request) == "owner" else "админ"))
+    kto = _otkazy_kto(request, str(payload.get("kto") or ""))
     try:
         r = otkaz.snyat(phone=str(payload.get("phone") or ""), id=payload.get("id") or 0,
-                        prichina=str(payload.get("prichina") or ""), kto=kto)
+                        prichina=str(payload.get("prichina") or ""), kto=kto,
+                        chat=str(payload.get("chat") or ""))
     except ValueError as e:
         raise HTTPException(400, str(e))
     request.state.chto = f"стоп-лист: снято записей {r['snyato']} — {r['prichina'][:80]}"
+    return r
+
+
+@app.post("/api/otkazy/vernut", dependencies=AUTH)
+def api_otkazy_vernut(request: Request, payload: dict = Body(...)):
+    """{"chat": "…"} — вернуть снятую запись в стоп-лист (кнопка «вернуть» в списке «Сняты»).
+
+    13.11.2026, вечер (проверка «вечера 1»): сняли не ту строку — вернуть её со страницы было
+    нельзя. Запись снова действует; дата и цитата отказа прежние, «кто, когда, почему снял»
+    остаются. Это шаг в безопасную сторону (автоматика семье снова не пишет), причину не
+    спрашиваем; кто вернул — в журнале действий."""
+    from . import otkaz
+    try:
+        r = otkaz.vernut(str(payload.get("chat") or ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    request.state.chto = f"стоп-лист: запись возвращена в действие ({_otkazy_kto(request)})"
     return r
 
 
@@ -7597,7 +7665,27 @@ def otkazy_page(request: Request):
     # «снять» с обязательной причиной; снятые ушли в свёрнутый список «Сняты» внизу — с тем,
     # кто снял, когда и почему. Раньше снятые стояли в общей таблице бледными строками, а снять
     # можно было только запросом POST /api/otkazy/release?chat=… (он остался для рутин).
-    body, snyatye = [], []
+    # 13.11.2026, вечер (проверка «вечера 1»):
+    #  · у чата без телефона кнопка шлёт ключ записи chat, а не её номер (rowid): номера
+    #    меняются при пересборке списка, и старая вкладка сняла бы чужую семью;
+    #  · в «Сняты» — кнопка «вернуть»: сняли не ту строку — возвращаем со страницы;
+    #  · запись, которую снимали и которая снова действует, говорит об этом в строке:
+    #    семья отказалась повторно (otkaz.note) или запись вернул человек;
+    #  · заголовок считает семьи (разные телефоны + чаты без телефона), а не записи: у семьи
+    #    их бывает две, и «снять» по семье уменьшало число сразу на два.
+    def snimali(r):
+        """Действующая запись, которую раньше снимали: что произошло."""
+        if not r["снят когда"]:
+            return ""
+        kto = _h.escape(r["снял"] or "—")
+        pr = f" — «{_h.escape(r['причина снятия'])}»" if r["причина снятия"] else ""
+        if str(r["когда"] or "") > str(r["снят когда"]):
+            chto = "семья отказалась снова после снятия"
+        else:
+            chto = "возвращена в стоп-лист после снятия"
+        return (f"<div class=vozvr>{chto} (снимал(а) {kto} {den(r['снят когда'])}{pr})</div>")
+
+    body, snyatye, semyi = [], [], set()
     for r in rows:
         if r["снят"]:
             snyatye.append(
@@ -7605,25 +7693,35 @@ def otkazy_page(request: Request):
                 f"<td>{kto_i_nomer(r)}</td>"
                 f"<td class=q>«{_h.escape(str(r['цитата'])[:220])}»</td>"
                 f"<td data-l='Снял'>{_h.escape(r['снял'] or '—')}<br>{den(r['снят когда']) if r['снят когда'] else 'дата не записана'}</td>"
-                f"<td data-l='Причина'>{_h.escape(r['причина снятия']) if r['причина снятия'] else '<span class=mut>причина не записана</span>'}</td></tr>")
+                f"<td data-l='Причина'>{_h.escape(r['причина снятия']) if r['причина снятия'] else '<span class=mut>причина не записана</span>'}"
+                f"<form class=vernut data-chat=\"{_h.escape(str(r['чат']))}\" onsubmit=\"return vernut(this)\">"
+                f"<button type=submit>вернуть в стоп-лист</button><div class=osh></div></form></td></tr>")
             continue
-        # по телефону снимаются все действующие записи семьи; у чата без телефона — одна, по номеру записи
-        komu = (f'data-phone="{_h.escape(r["телефон"])}"' if r["телефон"] else f'data-id="{int(r["id"])}"')
+        semyi.add(r["телефон"] or f"чат:{r['чат']}")
+        # по телефону снимаются все действующие записи семьи; у чата без телефона — одна, по ключу записи
+        komu = (f'data-phone="{_h.escape(r["телефон"])}"' if r["телефон"]
+                else f'data-chat="{_h.escape(str(r["чат"]))}"')
         body.append(
             f"<tr><td data-l='Отказ'>{den(r['когда'])}</td>"
             f"<td>{kto_i_nomer(r)}</td>"
             f"<td class=q>«{_h.escape(str(r['цитата'])[:220])}»</td>"
             f"<td data-l='Связали'>{_h.escape(r['как связали'] or '—')}</td>"
-            f"<td class=dej>не пишем"
+            f"<td class=dej>не пишем{snimali(r)}"
             f"<details class=snyat><summary>снять</summary>"
             f"<form {komu} onsubmit=\"return snyat(this)\">"
             f"<input name=prichina required minlength=3 maxlength=300 autocomplete=off "
             f"placeholder=\"причина: почему снова можно писать\">"
             f"<button type=submit>снять со стоп-листа</button><div class=osh></div></form></details></td></tr>")
-    n_live = len(body)
+    n_live, n_semey = len(body), len(semyi)
+    semey = ("семья" if n_semey % 10 == 1 and n_semey % 100 != 11
+             else "семьи" if n_semey % 10 in (2, 3, 4) and n_semey % 100 not in (12, 13, 14) else "семей")
+    komu_ne_pishet = "которой" if semey == "семья" else "которым"
+    zapisej = (f" Записей — {n_live}: у семьи их бывает две (отказ с телефона и из чата мессенджера)."
+               if n_live != n_semey else "")
     blok_snyatye = (
         f"<details id=snyatye><summary>Сняты — {len(snyatye)}</summary>"
-        f"<p class=sub>Этим семьям автоматика снова пишет. Запись остаётся здесь: кто снял, когда и почему.</p>"
+        f"<p class=sub>Этим семьям автоматика снова пишет. Запись остаётся здесь: кто снял, когда и почему. "
+        f"Сняли по ошибке — «вернуть в стоп-лист».</p>"
         f"<div class=tabl><table><tr><th>Когда отказ</th><th>Кто</th><th>Что написали</th>"
         f"<th>Кто и когда снял</th><th>Причина снятия</th></tr>{''.join(snyatye)}</table></div></details>"
     ) if snyatye else ""
@@ -7654,6 +7752,11 @@ details.snyat .osh{{color:#E30613;font-size:13px}}
 details#snyatye{{margin-top:28px;border-top:1px solid #e6e6ef;padding-top:14px}}
 details#snyatye > summary{{cursor:pointer;font-size:17px;font-weight:700;padding:6px 0}}
 details#snyatye .sub{{margin:6px 0 10px}}
+.vozvr{{font-size:13px;color:#a35f00;margin-top:4px}}
+form.vernut{{margin-top:8px}}
+form.vernut button{{font:inherit;font-size:13px;padding:6px 10px;min-height:36px;border:1px solid #c9c9dd;border-radius:8px;background:#fff;color:#312783;cursor:pointer}}
+form.vernut button:disabled{{opacity:.5}}
+form.vernut .osh{{color:#E30613;font-size:13px}}
 /* 13.11.2026: на телефоне таблица из пяти колонок уезжала вбок, и кнопка «снять» оказывалась за
    краем экрана — на узком экране каждая запись идёт карточкой, кнопка всегда на виду */
 @media (max-width:700px){{body{{margin:14px}}
@@ -7665,12 +7768,14 @@ details#snyatye .sub{{margin:6px 0 10px}}
   td.dej{{min-width:0;margin-top:4px}}
   details.snyat form{{min-width:0}}}}
 </style></head><body>
-<h1>Стоп-лист: {n_live} семей, которым автоматика не пишет</h1>
+<h1>Стоп-лист: {n_semey} {semey}, {komu_ne_pishet} автоматика не пишет</h1>
 <div class=sub>Сюда попадает всё, где клиент письменно просил снять бронь.
 Пока строка активна, ни одна рассылка этому телефону не уходит — только
 живые ответы администратора. Снять стоп-лист может только человек:
 кнопка «снять» в строке, причина обязательна. Снимаются все записи этой семьи;
-снятая запись не удаляется — остаётся в списке «Сняты» внизу.</div>
+снятая запись не удаляется — остаётся в списке «Сняты» внизу.{zapisej}
+Если снятая семья после этого снова письменно откажется, запись сама вернётся
+сюда — с новой датой и цитатой.</div>
 <div class=tabl><table><tr><th>Когда</th><th>Кто</th><th>Что написали</th>
 <th>Как связали с семьёй</th><th>Статус</th></tr>
 {''.join(body) or '<tr><td colspan=5>Пока пусто</td></tr>'}</table></div>
@@ -7680,7 +7785,7 @@ function snyat(f) {{
   var p = f.prichina.value.trim(), osh = f.querySelector('.osh'), b = f.querySelector('button');
   if (p.length < 3) {{ osh.textContent = 'Напишите причину: почему семье снова можно писать.'; return false; }}
   var telo = {{prichina: p}};
-  if (f.dataset.phone) telo.phone = f.dataset.phone; else telo.id = parseInt(f.dataset.id, 10);
+  if (f.dataset.phone) telo.phone = f.dataset.phone; else telo.chat = f.dataset.chat;
   b.disabled = true; osh.textContent = '';
   fetch('/api/otkazy/snyat', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(telo)}})
     .then(function (r) {{ return r.json().then(function (j) {{ return [r.ok, j]; }}); }})
@@ -7689,6 +7794,19 @@ function snyat(f) {{
       osh.textContent = x[1].detail || 'Не получилось снять.'; b.disabled = false;
     }})
     .catch(function () {{ osh.textContent = 'Нет связи с сервером — запись не снята.'; b.disabled = false; }});
+  return false;
+}}
+function vernut(f) {{
+  var osh = f.querySelector('.osh'), b = f.querySelector('button');
+  if (!confirm('Вернуть запись в стоп-лист? Автоматика снова не будет писать этой семье.')) return false;
+  b.disabled = true; osh.textContent = '';
+  fetch('/api/otkazy/vernut', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify({{chat: f.dataset.chat}})}})
+    .then(function (r) {{ return r.json().then(function (j) {{ return [r.ok, j]; }}); }})
+    .then(function (x) {{
+      if (x[0] && x[1].ok) {{ location.reload(); return; }}
+      osh.textContent = x[1].detail || 'Не получилось вернуть.'; b.disabled = false;
+    }})
+    .catch(function () {{ osh.textContent = 'Нет связи с сервером — запись не возвращена.'; b.disabled = false; }});
   return false;
 }}
 </script></body></html>""")
@@ -11542,11 +11660,25 @@ async def api_audit_run(day: str = ""):
 
 
 # Остаётся под общим входом: кнопки «принято / исправлено» жмут админы на /pravila-kontrol.
+#
+# 13.11.2026, вечер (проверка «вечера 1», проверено на копии базы): адрес принимал номер ЛЮБОЙ
+# находки. Админ под общим входом запросом ?flag_id=…&status=ok снимал красную находку
+# «честность» (сверка правок оплаченного — отчёт о самих админах, ему её и не показывают) —
+# и она пропадала из раздела 13 «Проверки МойКласса» у владельца: было 63, стало 62. Номера
+# идут подряд, подобрать можно вслепую. В обосновании меню это стояло в «Попутно найдено»
+# («тот, кого проверяют, может сам снять замечание»); с разделом 13 дыра перешла в новое место.
+# Теперь не владельцу — только вид «правила» (единственный, у которого есть кнопки на
+# /pravila-kontrol); остальное — 403. Номера нет в ленте — как было: {"ok": false}.
 @app.post("/api/audit/resolve", dependencies=AUTH)
-async def api_audit_resolve(flag_id: int, status: str = "ok"):
+async def api_audit_resolve(request: Request, flag_id: int, status: str = "ok"):
     from . import audit
     if status not in ("ok", "violation", "new"):
         raise HTTPException(400, "status: ok | violation | new")
+    if _rol(request) != "owner":
+        vid = audit.vid_nahodki(flag_id)
+        if vid is not None and vid != "правила":
+            request.state.chto = f"отказ: находку «{vid}» снимает только владелец"
+            raise HTTPException(403, "Эту находку разбирает только владелец")
     return {"ok": audit.resolve(flag_id, status)}
 
 
@@ -12508,6 +12640,42 @@ MARQUIZ_KEY = "mqz-KdsUp-2026-hQ7rT"  # секрет в URL вебхука Ма�
 # прежний ключ: иначе заявки квизов терялись бы до того, как адрес поменяют в кабинете
 # Марквиза. Порядок смены: сначала вписать новый адрес в Марквизе, сразу после — настройку
 # (между двумя шагами заявка с новым ключом получит 403; Марквиз показывает её у себя).
+#
+# 13.11.2026, вечер (проверка «вечера 1»): порядок смены — ОДИН, тот же, что в инструкции
+# владельцу и на странице /owner: 1) /owner → «Марквиз — ключ вебхука» → «Сохранить»;
+# 2) сразу после — адрес …/marquiz/webhook?key=<ключ> в кабинете Марквиза. (Строка выше
+# называла обратный порядок; в любом порядке между шагами заявка получает 403 и остаётся в
+# кабинете Марквиза, поэтому шаги делаются подряд, в тихое время.)
+# Отказ по ключу больше не молчит: строка в журнале сервера (без значения ключа) и счёт на
+# /owner — «принято / отклонено по ключу» с запуска сервера (_MARQUIZ_SLED, только в памяти:
+# писать в базу по каждому чужому запросу без входа нельзя).
+
+_MARQUIZ_SLED = {"s": "", "prinyato": 0, "prinyato_kogda": "", "otkloneno": 0, "otkloneno_kogda": ""}
+
+
+def _marquiz_sled(prinyato: bool) -> None:
+    from . import autopilot as _ap
+    seychas = _ap._now().strftime("%d.%m %H:%M")
+    _MARQUIZ_SLED["s"] = _MARQUIZ_SLED["s"] or seychas
+    k = "prinyato" if prinyato else "otkloneno"
+    _MARQUIZ_SLED[k] += 1
+    _MARQUIZ_SLED[k + "_kogda"] = seychas
+
+
+def _marquiz_sostoyanie() -> str:
+    """Одной строкой для владельца на /owner: какой ключ действует и что было с запросами."""
+    svoy = bool((db.get_setting("marquiz_key", "") or "").strip())
+    chto = ("действует ключ из настройки" if svoy
+            else "настройка пуста — действует прежний ключ из кода (он в публичном репозитории)")
+    sl = _MARQUIZ_SLED
+    if not sl["s"]:
+        sled = "запросов Марквиза с запуска сервера не было"
+    else:
+        sled = (f"с {sl['s']}: принято {sl['prinyato']}"
+                + (f" (последняя {sl['prinyato_kogda']})" if sl["prinyato"] else "")
+                + f", отклонено по ключу {sl['otkloneno']}"
+                + (f" (последний раз {sl['otkloneno_kogda']})" if sl["otkloneno"] else ""))
+    return (f"{chto} · адрес для кабинета Марквиза: https://app.kidsup.ru/marquiz/webhook?key=<ключ> · {sled}")
 
 
 def _marquiz_klyuch() -> str:
@@ -12522,7 +12690,13 @@ async def marquiz_webhook(request: Request, key: str = ""):
     В панели Марквиза: Интеграции → Вебхук →
     https://app.kidsup.ru/marquiz/webhook?key=<секрет>"""
     if not _klyuch_veren(key, _marquiz_klyuch()):
+        # 13.11.2026, вечер: отказ оставляет след — без значения ключа, только его длина
+        _marquiz_sled(False)
+        logging.getLogger("kidsup.marquiz").warning(
+            "вебхук Марквиза: запрос отклонён — ключ не подошёл (прислано знаков: %d). "
+            "Если это заявки квиза — сверить адрес в кабинете Марквиза с настройкой marquiz_key", len(key or ""))
         raise HTTPException(403)
+    _marquiz_sled(True)
     try:
         payload = await request.json()
     except Exception:

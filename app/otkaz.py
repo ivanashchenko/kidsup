@@ -25,6 +25,12 @@
 
 13.11.2026: кнопка на /otkazy появилась на самом деле (snyat(): причина
 обязательна, запись не удаляется — видно, кто снял, когда и почему).
+
+13.11.2026, вечер (проверка «вечера 1»): право автоматики осталось прежним — она
+не снимает. Но ВЕРНУТЬ снятую запись в действие она теперь может: если семья после
+снятия снова письменно отказалась, note() возвращает запись (см. там). Это та же
+несимметричная цена ошибки: лишний раз промолчать дешевле, чем написать семье,
+которая отказалась дважды. Человек возвращает запись кнопкой «вернуть» (vernut()).
 """
 
 from __future__ import annotations
@@ -205,8 +211,46 @@ def _family_phone(chat: str, text: str) -> tuple[str, str, str]:
     return "", who, ""
 
 
+def _vremya(ts) -> datetime | None:
+    """Время из записи стоп-листа или входящего: ISO с поясом; без пояса — московское."""
+    try:
+        d = datetime.fromisoformat(str(ts or "").strip())
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=MSK)
+
+
+def _posle_snyatiya(conn, key: str, ts_zapisi, kogda: str) -> bool:
+    """Отказ со временем kogda пришёл ПОЗЖЕ, чем запись key сняли со стоп-листа?
+
+    Граница — snyal_kogda; у записей, снятых до 13.11.2026 (время снятия не писалось), —
+    время самого отказа в записи. Сравнение обязательно: scan() перечитывает входящие за
+    месяц, и без него разбор вернул бы только что снятую запись по её же старому сообщению.
+    Колонку snyal_kogda только читаем, если она есть: таблицу здесь не правим (note() зовёт
+    живой вебхук входящих). Границу или время сообщения не разобрать — считаем «позже»:
+    промолчать дешевле, чем написать отказавшейся семье."""
+    snyal = ""
+    if "snyal_kogda" in {r[1] for r in conn.execute("PRAGMA table_info(otkazy)")}:
+        r = conn.execute("SELECT snyal_kogda FROM otkazy WHERE chat=?", (key,)).fetchone()
+        snyal = (r[0] if r else "") or ""
+    granica, prishlo = _vremya(snyal) or _vremya(ts_zapisi), _vremya(kogda)
+    if granica is None or prishlo is None:
+        return True
+    return prishlo > granica
+
+
 def note(chat: str, text: str, ts: str = "") -> bool:
-    """Записать отказ. True — если это новый отказ."""
+    """Записать отказ. True — если это новый отказ (или запись вернулась в действие).
+
+    13.11.2026, проверка «вечера 1» (два проверяющих, сценарий на стенде): до этого дня
+    чат, у которого запись уже есть, пропускался всегда — даже если запись снята. Пока
+    снять можно было только запросом (три снятия за всё время), это не мешало. С кнопкой
+    «снять» на /otkazy получалось так: семью сняли, она второй раз пишет «снимите бронь,
+    больше не пишите» — отказ не записывается, автоматика продолжает ей писать.
+    Теперь: запись снята и отказ пришёл позже снятия (_posle_snyatiya) — запись
+    возвращается в действие с новой датой и цитатой. «Кто, когда, почему снял» не
+    стираем: на странице видно, что семью снимали и она отказалась снова.
+    Действующую запись не трогаем, как и раньше. is_refused() не менялся."""
     t = (text or "")
     moved = (bool(MOVED.search(t)) and not NOT_MOVED.search(t)
              and len(t.strip()) >= 8)
@@ -220,17 +264,33 @@ def note(chat: str, text: str, ts: str = "") -> bool:
             log.warning("статус «переехал» не поставился %s: %s",
                         phone, str(e)[:80])
     key = _is_phone(chat) or str(chat)
+    kogda = ts or datetime.now(MSK).isoformat(timespec="seconds")
+    vernulas = False
     with db.get_conn() as conn:
         _tables(conn)
-        cur = conn.execute("SELECT released FROM otkazy WHERE chat=?", (key,)).fetchone()
+        cur = conn.execute("SELECT released, ts FROM otkazy WHERE chat=?", (key,)).fetchone()
         if cur is not None:
-            return False
-        conn.execute(
-            "INSERT OR REPLACE INTO otkazy (chat, phone, name, ts, text, source) "
-            "VALUES (?,?,?,?,?,?)",
-            (key, phone, name, ts or datetime.now(MSK).isoformat(timespec="seconds"),
-             (text or "")[:400], how))
-    log.info("отказ записан: %s (%s) %s", key, phone or "телефон не связан", how)
+            if not cur[0] or not _posle_snyatiya(conn, key, cur[1], kogda):
+                return False
+            # телефон, имя и способ связи обновляем, только если в новом сообщении они нашлись
+            conn.execute(
+                "UPDATE otkazy SET released=0, ts=?, text=?, "
+                "phone=CASE WHEN ?!='' THEN ? ELSE phone END, "
+                "name=CASE WHEN ?!='' THEN ? ELSE name END, "
+                "source=CASE WHEN ?!='' THEN ? ELSE source END "
+                "WHERE chat=? AND released=1",
+                (kogda, (text or "")[:400], phone, phone, name, name, how, how, key))
+            vernulas = True
+        else:
+            conn.execute(
+                "INSERT OR REPLACE INTO otkazy (chat, phone, name, ts, text, source) "
+                "VALUES (?,?,?,?,?,?)",
+                (key, phone, name, kogda, (text or "")[:400], how))
+    if vernulas:
+        log.info("повторный отказ после снятия — запись вернулась в стоп-лист: %s (%s)",
+                 key, phone or "телефон не связан")
+    else:
+        log.info("отказ записан: %s (%s) %s", key, phone or "телефон не связан", how)
     return True
 
 
@@ -347,7 +407,9 @@ def release(chat: str, kto: str = "") -> bool:
     with db.get_conn() as conn:
         _tables(conn)
         _kolonki_snyatiya(conn)
-        conn.execute("UPDATE otkazy SET released=1, snyal_kto=?, snyal_kogda=? "
+        # snyal_prichina='': у записи, которую снимали, вернули и снимают снова этим адресом,
+        # причина прежнего снятия не должна выдаваться за причину нового
+        conn.execute("UPDATE otkazy SET released=1, snyal_kto=?, snyal_kogda=?, snyal_prichina='' "
                      "WHERE chat=? AND released=0",
                      ((kto or "").strip()[:60], datetime.now(MSK).isoformat(timespec="seconds"),
                       str(chat)))
@@ -357,7 +419,7 @@ def release(chat: str, kto: str = "") -> bool:
 PRICHINA_MIN = 3        # «ок», «.» — не причина
 
 
-def snyat(phone: str = "", id=0, prichina: str = "", kto: str = "") -> dict:
+def snyat(phone: str = "", id=0, prichina: str = "", kto: str = "", chat: str = "") -> dict:
     """Снять семью со стоп-листа кнопкой на /otkazy: причина обязательна, автор — с сервера.
 
     13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1). На странице не было ни одной
@@ -369,26 +431,40 @@ def snyat(phone: str = "", id=0, prichina: str = "", kto: str = "") -> dict:
 
     phone — телефон семьи: снимаются ВСЕ её действующие записи (у семьи их бывает две: отказ с
     телефона и отказ из чата мессенджера, связанный по имени ребёнка, — пока жива хоть одна,
-    письма не уходят). id — номер одной записи (rowid): для чатов без телефона.
+    письма не уходят). chat — одна запись по её ключу (колонка chat): для чатов без телефона.
+    id — номер одной записи (rowid) — оставлен для запросов руками.
+
+    13.11.2026, вечер (проверка «вечера 1»): страница шлёт chat, а не id. rowid непостоянен:
+    пересборка стоп-листа (scan(rebuild=True)) удаляет действующие записи и вставляет заново,
+    и вкладка, открытая до неё, по старому номеру сняла бы чужую семью (проверено на стенде).
+    chat — первичный ключ, он при пересборке не меняется. Присланы и chat, и id, а запись с
+    этим номером уже другая — отказ, ничего не снимаем.
     ValueError — если причины нет или снимать нечего."""
     prichina = " ".join(str(prichina or "").split())[:300]
     if len(prichina) < PRICHINA_MIN:
         raise ValueError("нужна причина: почему семье снова можно писать")
     p = _digits(phone)[-10:] if phone else ""
+    chat = str(chat or "").strip()
     try:
         rid = int(id or 0)
     except (TypeError, ValueError):
         rid = 0
     if phone and len(p) != 10:
         raise ValueError("нужен телефон из 10–11 цифр")
-    if not p and not rid:
-        raise ValueError("нужен phone или id записи")
+    if not p and not rid and not chat:
+        raise ValueError("нужен phone, chat или id записи")
     kogda = datetime.now(MSK).isoformat(timespec="seconds")
     with db.get_conn() as conn:
         _tables(conn)
         _kolonki_snyatiya(conn)
         if p:
             gde, arg = "(phone=? OR chat=?) AND released=0", (p, p)
+        elif chat:
+            if rid:
+                r = conn.execute("SELECT chat FROM otkazy WHERE rowid=?", (rid,)).fetchone()
+                if not r or str(r[0]) != chat:
+                    raise ValueError("список изменился, пока страница была открыта — обновите её и снимите запись заново")
+            gde, arg = "chat=? AND released=0", (chat,)
         else:
             gde, arg = "rowid=? AND released=0", (rid,)
         n = conn.execute(f"UPDATE otkazy SET released=1, snyal_kto=?, snyal_kogda=?, snyal_prichina=? "
@@ -396,12 +472,60 @@ def snyat(phone: str = "", id=0, prichina: str = "", kto: str = "") -> dict:
         if not n:
             raise ValueError("действующей записи стоп-листа с таким телефоном или номером нет")
         if not p:
-            r = conn.execute("SELECT phone FROM otkazy WHERE rowid=?", (rid,)).fetchone()
+            r = (conn.execute("SELECT phone FROM otkazy WHERE chat=?", (chat,)).fetchone() if chat
+                 else conn.execute("SELECT phone FROM otkazy WHERE rowid=?", (rid,)).fetchone())
             p = (r[0] if r else "") or ""
-    log.info("стоп-лист: снято записей %d (%s), кто: %s", n, p or f"запись {rid}", kto or "—")
+    log.info("стоп-лист: снято записей %d (%s), кто: %s", n, p or (f"чат {chat}" if chat else f"запись {rid}"), kto or "—")
     # если у семьи осталась другая действующая запись (сняли по номеру одну из двух) — говорим прямо
     return {"ok": True, "snyato": n, "phone": p, "kto": kto, "kogda": kogda, "prichina": prichina,
             "eshche_dejstvuet": is_refused(p) if p else None}
+
+
+def vernut(chat: str) -> dict:
+    """Вернуть снятую запись в стоп-лист — кнопка «вернуть» в списке «Сняты» на /otkazy.
+
+    13.11.2026, вечер (проверка «вечера 1»): сняли не ту строку — вернуть её можно было только
+    запросом POST /api/otkazy/add, а он для записи, внесённой руками, стирал «кто, когда,
+    почему снял». Здесь запись просто снова действует: дата и цитата отказа прежние, сведения
+    о снятии остаются (на странице видно, что её снимали). Кто вернул — в журнале действий.
+    ValueError — если снятой записи с таким ключом нет."""
+    chat = str(chat or "").strip()
+    if not chat:
+        raise ValueError("нужен chat записи")
+    with db.get_conn() as conn:
+        _tables(conn)
+        n = conn.execute("UPDATE otkazy SET released=0 WHERE chat=? AND released=1", (chat,)).rowcount
+        if not n:
+            raise ValueError("снятой записи стоп-листа с таким ключом нет")
+        r = conn.execute("SELECT phone FROM otkazy WHERE chat=?", (chat,)).fetchone()
+    p = (r[0] if r else "") or ""
+    log.info("стоп-лист: запись возвращена в действие (%s)", p or f"чат {chat}")
+    return {"ok": True, "chat": chat, "phone": p, "dejstvuet": is_refused(p) if p else None}
+
+
+def dobavit(phone: str, text: str, name: str = "", kogda: str = "") -> dict:
+    """Внести отказ руками (клиент попросил голосом) — тело адреса POST /api/otkazy/add.
+
+    13.11.2026, вечер (проверка «вечера 1»): раньше здесь был INSERT OR REPLACE. Для семьи,
+    у которой ручная запись уже была и снята, он стирал строку целиком — вместе с «кто,
+    когда, почему снял», хотя страница обещает, что снятая запись не удаляется. Теперь
+    запись с этим ключом обновляется: снова действует, дата и текст — новые, сведения о
+    прежнем снятии остаются. Ключ записи прежний — «7» + десять цифр."""
+    p = _digits(phone)[-10:]
+    if len(p) != 10:
+        return {"ok": False, "почему": "нужен телефон из 10-11 цифр"}
+    kogda = kogda or datetime.now(MSK).isoformat(timespec="seconds")
+    with db.get_conn() as conn:
+        _tables(conn)
+        n = conn.execute(
+            "UPDATE otkazy SET released=0, phone=?, ts=?, text=?, source='руками', "
+            "name=CASE WHEN ?!='' THEN ? ELSE name END WHERE chat=?",
+            (p, kogda, (text or "")[:400], name, name, "7" + p)).rowcount
+        if not n:
+            conn.execute(
+                "INSERT INTO otkazy (chat, phone, name, ts, text, source) VALUES (?,?,?,?,?,?)",
+                ("7" + p, p, name, kogda, (text or "")[:400], "руками"))
+    return {"ok": True, "phone": p, "стоп": is_refused(p)}
 
 
 def v_stop_liste(phone: str, conn=None) -> dict | None:

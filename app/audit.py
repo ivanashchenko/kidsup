@@ -434,6 +434,15 @@ def feed(status: str = "new", limit: int = 200) -> list[dict]:
         return [dict(r) for r in conn.execute(q, (status, limit)).fetchall()]
 
 
+def vid_nahodki(flag_id: int) -> str | None:
+    """Вид находки (kind) по её номеру; None — такой находки нет.
+    13.11.2026: по виду /api/audit/resolve решает, можно ли её снять не владельцу."""
+    with db.get_conn() as conn:
+        _ensure(conn)
+        r = conn.execute("SELECT kind FROM audit_flags WHERE id=?", (flag_id,)).fetchone()
+    return None if r is None else (r[0] or "")
+
+
 def resolve(flag_id: int, status: str = "ok") -> bool:
     with db.get_conn() as conn:
         _ensure(conn)
