@@ -252,8 +252,16 @@ NOVYE_SHAPKA = {"GET /api/waiting/schet"}
 NOVYE_PEREEZDY = {"GET /api/blank-grupp/budushchie"}
 # Не из шага 1: разовый просмотр «старых звонков» (решение Бориса 12.11), только чтение.
 NOVYE_ZVONKI_1211 = {"GET /api/hvost/staroe"}
+# 13.11.2026, Борис — уборка и безопасность (вечер 1). Убраны два адреса статусов «Без оплаты»:
+# их звали только страницы /bez-oplaty и /ne-oplatili, снятые 12.11 (последняя отметка — 10.10).
+UBRANY_VECHER1 = {"GET /api/bez-oplaty/status", "POST /api/bez-oplaty/status"}
+# Появились два POST вместо записи через GET: снятие пустых отметок обзвона (было
+# GET /api/obzvon/audit?vernut=1) и пересчёт проверок бланков (было GET /api/blank-grupp?refresh=1).
+NOVYE_VECHER1 = {"POST /api/obzvon/audit/vernut", "POST /api/blank-grupp/obnovit"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
 # чтобы пропажа была видна и без снимка «до».
+# 13.11.2026, Борис (уборка, вечер 1): из списка вышли GET и POST /api/bez-oplaty/status —
+# они стояли здесь с шага 1 «до проверки на сервере»; читателей не осталось (UBRANY_VECHER1).
 NUZHNY = """
 GET /api/health · POST /api/deploy · GET /api/settings · GET /api/backup/db
 GET /export/raw/{table}.json · GET /api/plan/inbox · POST /api/plan/inbox · POST /api/plan/inbox/done
@@ -265,8 +273,8 @@ GET /api/doc-state/{doc} · GET /api/zayavki · GET /api/dolgi · GET /api/obzvo
 GET /api/calls/list · GET /api/calls/recording · GET /api/crm/user · POST /api/crm/comment
 GET /api/day/firsts · GET /api/oplata/plan · GET /api/yavka · GET /api/english/karta
 POST /api/hooppy/post · GET /api/hooppy/posty · POST /api/hooppy/udalit · GET /api/promo/grafik
-GET /api/perepiska · GET /api/perepiska/kto · GET /api/vozvrat/spiski · GET /api/bez-oplaty/status
-POST /api/bez-oplaty/status · GET /api/spiski · GET /api/segodnya · GET /api/nezvonili · GET /api/ai/probe
+GET /api/perepiska · GET /api/perepiska/kto · GET /api/vozvrat/spiski
+GET /api/spiski · GET /api/segodnya · GET /api/nezvonili · GET /api/ai/probe
 POST /api/callplan/done · GET /export/leads.csv · POST /leads/push/{lead_id} · GET /go/{channel}
 GET /boris/docs · GET /boris/docs/{slug} · GET /admin/docs · GET /admin/docs/{slug} · GET /base/{slug}
 GET /pult · GET /liniya · GET /waiting · GET /obzvon-dnya · GET /mesta · GET /voronka · GET /blank-grupp
@@ -278,13 +286,17 @@ def test_marshruty(m, fajl_do):
     do = set(json.load(open(fajl_do, encoding="utf-8")))
     posle = marshruty(m)
     proverka("снимок «до» — 471 маршрут", len(do) == 471, len(do))
+    # 13.11.2026 (вечер 1): к пропавшим добавились два адреса статусов «Без оплаты» (UBRANY_VECHER1),
+    # к новым — два POST вместо записи через GET (NOVYE_VECHER1). Причины — у самих списков.
     proverka("пропали ровно пять — те, что звала только убранная страница (и перечень адресов: "
-             "/openapi.json, /docs, /redoc)", do - posle == PROPALI | UBRANY_VHOD,
-             sorted((do - posle) ^ (PROPALI | UBRANY_VHOD)))
-    vse_novye = NOVYE | NOVYE_ZVONKI_1211 | NOVYE_PROVERKA_MK | NOVYE_VHOD | NOVYE_SHAPKA | NOVYE_PEREEZDY
+             "/openapi.json, /docs, /redoc; 13.11 — два адреса статусов «Без оплаты»)",
+             do - posle == PROPALI | UBRANY_VHOD | UBRANY_VECHER1,
+             sorted((do - posle) ^ (PROPALI | UBRANY_VHOD | UBRANY_VECHER1)))
+    vse_novye = (NOVYE | NOVYE_ZVONKI_1211 | NOVYE_PROVERKA_MK | NOVYE_VHOD | NOVYE_SHAPKA | NOVYE_PEREEZDY
+                 | NOVYE_VECHER1)
     proverka("появились ровно три: «Архив» и признак «архив» у документов (и просмотр старых звонков 12.11, "
              "пять адресов страницы «Проверка МойКласса», адреса личных входов, счётчик бейджа шапки и лист "
-             "«Будущие направления» для бланков 13.11)",
+             "«Будущие направления» для бланков 13.11; два POST вместо записи через GET — вечер 1)",
              posle - do == vse_novye, sorted((posle - do) ^ vse_novye))
     nuzhny = [x.strip() for x in NUZHNY.replace("\n", " · ").split(" · ") if x.strip()]
     net = [x for x in nuzhny if x not in posle]
@@ -2000,6 +2012,7 @@ def main():
     test_pravki_1311(c, m, tree, baza)
     test_posle_proverki(c, m, tree, baza)
     test_vecher1(c, m, tree, baza)
+    test_uborka_bezopasnost(c, m, tree, baza)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     proverka("ни одной попытки выйти в сеть, кроме известных опросов Mango с пульта и «Ответов»",
              all(any(f.startswith(("mango.py", "zayavki.py")) for f in otkuda) for _, otkuda in lt.SET), lt.SET[:5])
@@ -2382,6 +2395,385 @@ def test_vecher1(c, m, tree, baza):
              c.get("/api/audit", auth=ADMIN).status_code == 401 and lokaciya(c, "/audit") == (303, "/pult")
              and c.get("/audit", auth=VLADELEC).status_code == 200)
 
+
+# --- М. Уборка и безопасность (13.11.2026, вечер 1) --------------------------------------
+# Борис, 13.11.2026: «М, П, Т — по рекомендациям». Здесь зафиксировано: в коде нет телефонов
+# клиентов; мёртвый код убран, а то, что убирать рано, на месте; кампании августа–сентября в
+# базе знаний свёрнуты в один раздел; полная выгрузка МойКласса — только владельцу; секреты
+# вебхуков задаются настройкой и наружу не отдаются; чужой сайт не может послать изменяющий
+# запрос ни на один адрес под входом; запись через GET убрана.
+
+# Файлы, пройденные 13.11 на телефоны клиентов. В них остаются только выдуманные номера
+# (7999…, 7900…, 7916000…), заглушки и номера самого центра.
+FAJLY_BEZ_TELEFONOV = ("app/autopilot.py", "app/ads_voronka.py", "app/main.py", "app/wazzup.py",
+                       "app/nadezhdalist.py", "app/nabormail.py", "app/dostavka.py", "app/wabatexts.py",
+                       "app/naryad.py", "docs/rabota/pult_testy.py")
+# Номера центра (каналы Wazzup, их использование в коде не трогали) и запасной номер сводки владельцу.
+NOMERA_CENTRA = {"79160170918", "79165610077", "79199683507", "79104526673"}
+# Действующее — должно остаться наверху базы знаний, не в свёрнутом архиве кампаний.
+BAZA_NAVERHU = ("pravila_kidsup", "shablony_wazzup", "skripty_nabora", "prodazhi_vozrazheniya", "tri_scenariya",
+                "pedagog_probnoe", "zapis_v_gruppy", "predmety_shpargalka", "promo_upravlenie", "karta_kabinetov",
+                "diagnostika", "english_standard", "pamyatka_pedagoga", "roditeli_vidyat", "tablichka_skidka")
+# Изменяющие адреса без зависимости входа — заморожены вместе с тем, чем каждый защищён.
+BEZ_VHODA_IZM = {
+    "POST /vhod": "форма входа: принимается только со своей страницы (vhod.svoy_zapros)",
+    "POST /vyhod": "выход: только со своей страницы",
+    "POST /mango/events": "подпись Mango (ключ и соль АТС)",
+    "POST /mango/{rest:path}": "подпись Mango",
+    "POST /events/{rest:path}": "подпись Mango",
+    "POST /events/sms": "подпись Mango: без неё статус пишется с пометкой «подпись не сошлась»",
+    "POST /api/pedagog/save": "ключ педагога в теле запроса",
+    "POST /api/tg/webhook/{secret}": "секрет в адресе",
+    "POST /hook/lead": "ключ ?key= (настройка lead_hook_key)",
+    "POST /marquiz/webhook": "ключ ?key= (настройка marquiz_key, до неё — прежний ключ)",
+    "POST /wazzup/webhook": "ключ ?k= (настройка wazzup_hook_key; пока не задана — без проверки)",
+    "POST /api/public/lead": "форма заявки на сайте — открыта нарочно",
+    "POST /kamery": "пароль камер для родителей",
+}
+CHUZHOY_FON = {"sec-fetch-site": "cross-site", "sec-fetch-mode": "cors"}       # fetch/форма с чужого сайта
+CHUZHOY_ORIGIN = {"origin": "https://chuzhoy.example"}                          # старый браузер: только Origin
+SVOYA_STRANICA = {"sec-fetch-site": "same-origin", "sec-fetch-mode": "cors"}    # запрос со своей страницы
+
+
+class _OtvetWazzup:
+    """Ответ Wazzup на стенде: сеть закрыта, вместо неё — эта заглушка."""
+
+    def __init__(self, dannye, kod=200):
+        self._d, self.status_code, self.text = dannye, kod, json.dumps(dannye)
+
+    def json(self):
+        return self._d
+
+    def raise_for_status(self):
+        pass
+
+
+def test_uborka_bezopasnost(c, m, tree, baza):
+    import datetime as dt
+    import app.autopilot as ap
+    from app import blank_grupp, wazzup as wz
+
+    print("М1. Телефонов клиентов в коде нет; миграция с номерами — пустая метка")
+    src = inspect.getsource(ap._migrations)
+    proverka("миграция replied_requeue_v1: списка номеров и тела нет, метка ставится",
+             '_mark("migration", "replied_requeue_v1")' in src and "replied_phones" not in src
+             and 'if _mark("migration", "replied_requeue_v1")' not in src and not re.findall(r"\b[78]9\d{9}\b", src))
+    kusok = src.split('_mark("migration", "replied_requeue_v1")', 1)[1].split('if _mark("migration", "anna_away_v1")', 1)[0]
+    proverka("…между этой меткой и следующей миграцией нет ни одной строки кода", not kusok.strip(), kusok[:200])
+    proverka("requeue и ручные «ответы 12.08» из миграций никто не зовёт",
+             "broadcast_requeue_undelivered" not in src and "wazzup_inbox" not in src)
+    for put in FAJLY_BEZ_TELEFONOV:
+        tekst = open(os.path.join(tree, put), encoding="utf-8").read()
+        nomera = set(re.findall(r"(?<![\d.])(?:\+?7|8)9\d{9}(?!\d)", tekst))
+        chuzhie = sorted(n for n in nomera if not n.lstrip("+").startswith(("7999", "8999", "7900", "7916000"))
+                         and n.lstrip("+") not in NOMERA_CENTRA)
+        proverka(f"{put}: только выдуманные номера и номера центра", not chuzhie, chuzhie[:5])
+    dost = open(os.path.join(tree, "app/dostavka.py"), encoding="utf-8").read()
+    proverka("запасной номер тревоги о канале — тот же, что у сводки автопилота (была опечатка в двух цифрах)",
+             'get_setting("digest_phone") or "79104526673"' in dost and "79104936673" not in dost)
+
+    print("М2. Мёртвый код убран, а то, что убирать рано, — на месте")
+    est = marshruty(m)
+    kod = {}
+    for papka, _, fajly in os.walk(os.path.join(tree, "app")):
+        for fl in fajly:
+            if fl.endswith(".py"):
+                kod[fl] = open(os.path.join(papka, fl), encoding="utf-8").read()
+    gde = [fl for fl, t in kod.items() if re.search(r"^\s*(?:from\s+(?:\.|app)\s+import\s+[^\n]*\bmeganplan\b|"
+                                                   r"from\s+(?:\.|app\.)meganplan\s+import|import\s+app\.meganplan\b)", t, re.M)]
+    proverka("app/meganplan.py удалён и нигде не импортируется",
+             not os.path.exists(os.path.join(tree, "app", "meganplan.py")) and not gde, gde)
+    proverka("документ /base/megaplan, который он когда-то собрал, открывается как раньше",
+             c.get("/base/megaplan", auth=ADMIN).status_code == 200)
+    proverka("адреса /api/bez-oplaty/status (GET и POST) убраны, кода при них не осталось",
+             not UBRANY_VECHER1 & est and "_bez_oplaty_status_init(" not in kod["main.py"]
+             and c.get("/api/bez-oplaty/status", auth=ADMIN).status_code == 404)
+    proverka("старые адреса /bez-oplaty и /ne-oplatili по-прежнему ведут на «Без оплаты»",
+             lokaciya(c, "/bez-oplaty") == (303, "/voronka") and lokaciya(c, "/ne-oplatili") == (303, "/voronka"))
+    proverka("таблицу bez_oplaty_status код не трогает: ни создания, ни удаления, ни записи",
+             not re.search(r"(DROP TABLE|DELETE FROM|INSERT[^\n]*INTO|CREATE TABLE[^\n]*)\s+bez_oplaty_status", "\n".join(kod.values())))
+    proverka("app/boris.py и /api/boris/* не тронуты (сначала перенос пунктов на сервере)",
+             os.path.exists(os.path.join(tree, "app", "boris.py"))
+             and {"GET /api/boris/tasks", "POST /api/boris/tasks", "POST /api/boris/status"} <= est)
+    proverka("autopilot.evening_recall не тронут (ждёт решения владельца)",
+             callable(getattr(ap, "evening_recall", None)) and "evening_recall(mk)" in inspect.getsource(ap))
+
+    print("М3. База знаний: кампании августа–сентября — одним свёрнутым разделом внизу")
+    vse = [sl for _, punkty in m.DOC_GROUPS for sl, _, _ in punkty]
+    proverka("в списке архива нет опечаток: каждый адрес есть в белом списке DOC_GROUPS",
+             m.ARHIV_KAMPANIY <= set(vse), sorted(m.ARHIV_KAMPANIY - set(vse)))
+    proverka("действующие правила, скрипты и методики занятий в архив не попали",
+             not set(BAZA_NAVERHU) & m.ARHIV_KAMPANIY and not [x for x in m.ARHIV_KAMPANIY if x.startswith("__url:/") and "/static/" not in x],
+             sorted(set(BAZA_NAVERHU) & m.ARHIV_KAMPANIY))
+    kampanii = [sl for sl in vse if re.match(r"(plan_\d|spisok_|obzvon_|list_|ostatok_|dod_|zadachi_|utro_)", sl)]
+    proverka("все планы дня, списки, листы, обзвоны, хвосты, ДОД и задачи тех недель — в архиве",
+             kampanii and set(kampanii) <= m.ARHIV_KAMPANIY, sorted(set(kampanii) - m.ARHIV_KAMPANIY))
+    h = c.get("/base", auth=ADMIN).text.split("<main", 1)[-1]
+    verh, razdel, niz = h.partition('<details class="base-arhiv"')
+    proverka("раздел «Архив: кампании августа–сентября 2026» есть, он свёрнут (<details> без open) и стоит последним",
+             razdel and m.ARHIV_KAMPANIY_IMYA in niz.split("</summary>", 1)[0] and not re.match(r"[^>]*\bopen\b", niz)
+             and "<h2>" not in niz and niz.count("</details>") == 1, niz[:200])
+    ssylki_verh, ssylki_niz = set(re.findall(r'href="/base/([^"]+)"', verh)), set(re.findall(r'href="/base/([^"]+)"', niz))
+    proverka("наверху нет ни одного документа из архива кампаний, внизу — только они",
+             not ssylki_verh & m.ARHIV_KAMPANIY and ssylki_niz and ssylki_niz <= m.ARHIV_KAMPANIY,
+             sorted(ssylki_verh & m.ARHIV_KAMPANIY)[:5])
+    proverka("действующее — наверху: правила, шаблоны Wazzup, скрипты, памятки",
+             set(BAZA_NAVERHU) <= ssylki_verh, sorted(set(BAZA_NAVERHU) - ssylki_verh))
+    proverka("наверху — четыре рабочих раздела и прежний «Архив — устаревшее», ссылки на пульт и бланки на месте",
+             re.findall(r"<h2>([^<]+)</h2>", verh) == [t for t, _ in m.DOC_GROUPS]
+             and 'href="/pult"' in verh and 'href="/blank-grupp"' in verh, re.findall(r"<h2>([^<]+)</h2>", verh))
+    docs = os.path.join(tree, "docs")
+    s_fajlom = [sl for sl in dict.fromkeys(vse) if os.path.exists(os.path.join(docs, f"{sl}.html"))]
+    proverka("ни один документ со страницы не пропал: сколько файлов в белом списке — столько ссылок на странице",
+             ssylki_verh | ssylki_niz == set(s_fajlom), sorted(set(s_fajlom) ^ (ssylki_verh | ssylki_niz))[:5])
+    plohie = [sl for sl in s_fajlom if c.get(f"/base/{sl}", auth=ADMIN).status_code != 200]
+    proverka(f"адреса не менялись: все {len(s_fajlom)} документов открываются по /base/<имя>, архивные тоже", not plohie, plohie[:5])
+    proverka("чужое имя по-прежнему не открывается (белый список на месте)",
+             c.get("/base/net_takogo", auth=ADMIN).status_code == 404 and c.get("/base/..%2Fapp%2Fmain", auth=ADMIN).status_code == 404)
+    print(f"        наверху {len(ssylki_verh)} документов и {verh.count('<tr>') - len(ssylki_verh)} ссылок на страницы и файлы, "
+          f"в свёрнутом архиве {niz.count('<tr>')} (в списке архива {len(m.ARHIV_KAMPANIY)} имён)")
+
+    print("М4. Полная выгрузка МойКласса — только владельцу")
+    vhod = {f"{metod} {r.path}": {getattr(d.call, "__name__", "") for d in getattr(getattr(r, "dependant", None), "dependencies", [])}
+            for r in m.app.routes for metod in getattr(r, "methods", ())}
+    proverka("POST /api/sync/start — под входом владельца, GET /api/sync/status — под общим (его опрашивают рутины)",
+             vhod["POST /api/sync/start"] == {"check_owner"} and vhod["GET /api/sync/status"] == {"check_auth"})
+    r_a, r_v = c.post("/api/sync/start", auth=ADMIN), c.post("/api/sync/start", auth=VLADELEC)
+    proverka("админу запуск закрыт (401/403), владельца пускает (на стенде ключа МойКласса нет — «API-ключ не задан»)",
+             r_a.status_code in (401, 403) and r_v.status_code == 400 and r_v.json()["ok"] is False, (r_a.status_code, r_v.status_code))
+    proverka("кнопка «Синхронизировать» — только у владельца",
+             'id="sync-btn"' not in c.get("/mesta", auth=ADMIN).text and 'id="sync-btn"' in c.get("/mesta", auth=VLADELEC).text)
+    proverka("автопилот запускает выгрузку сам, без HTTP",
+             "_sync.start_sync()" in inspect.getsource(ap) and "/api/sync/start" not in inspect.getsource(ap))
+
+    print("М5. Марквиз и заявки старого сайта: ключ — настройкой, наружу не отдаётся")
+    # Запросы идут без телефона: обработчик после проверки ключа отвечает «нет телефона» и
+    # ничего не создаёт — ни заявки, ни карточки в CRM.
+    def mq(klyuch=None):
+        return c.post("/marquiz/webhook", params={} if klyuch is None else {"key": klyuch}, json={})
+    proverka("настройки нет — действует прежний ключ из кода, заявки не теряются",
+             not m.db.get_setting("marquiz_key") and mq(m.MARQUIZ_KEY).status_code == 200
+             and mq(m.MARQUIZ_KEY).json() == {"ok": False, "error": "нет телефона"})
+    proverka("без ключа, с чужим ключом и с ключом русскими буквами — 403, не 500",
+             [mq().status_code, mq("").status_code, mq("чужой").status_code, mq("mqz-chuzhoy").status_code] == [403] * 4)
+    NOVYY = "stend-marquiz-novyy-klyuch-QZXW"
+    r = c.post("/api/settings", json={"key": "marquiz_key", "value": NOVYY}, auth=VLADELEC)
+    proverka("ключ задаётся настройкой marquiz_key; ответ на сохранение значения не содержит",
+             r.status_code == 200 and NOVYY not in r.text and "marquiz_key" in m.SETTABLE and "marquiz_key" in m.SECRET_KEYS, r.text[:120])
+    proverka("настройка задана — принимается ТОЛЬКО она: прежний ключ из кода больше не подходит",
+             mq(NOVYY).status_code == 200 and mq(m.MARQUIZ_KEY).status_code == 403 and mq().status_code == 403)
+    nastr = c.get("/api/settings", auth=VLADELEC)
+    stranica = c.get("/owner", auth=VLADELEC).text
+    proverka("значение не отдаётся ни в /api/settings, ни на странице «Настройки» (видны только хвост и длина); "
+             "поле для ключа на странице есть",
+             NOVYY not in nastr.text and nastr.json()["marquiz_key"] == f"…QZXW ({len(NOVYY)} симв.)"
+             and NOVYY not in stranica and NOVYY[-4:] not in stranica and NOVYY[:-3] not in stranica
+             and "name='marquiz_key'" in stranica and "name='wazzup_hook_key'" in stranica, nastr.json().get("marquiz_key"))
+    proverka("админу настройки по-прежнему закрыты", c.get("/api/settings", auth=ADMIN).status_code in (401, 403))
+    m.db.set_setting("marquiz_key", "  ")
+    proverka("пустая настройка (пробелы) — снова прежний ключ, а не «подходит любой»",
+             mq(m.MARQUIZ_KEY).status_code == 200 and mq("").status_code == 403 and mq(" ").status_code == 403)
+    m.db.set_setting("marquiz_key", "")
+    proverka("короткий секрет в /api/settings — без хвоста, длинный — последние четыре знака",
+             m._mask("lead_hook_key", "abcdef1234") == "задано (10 симв.)" and m._mask("marquiz_key", "x" * 20 + "ABCD") == "…ABCD (24 симв.)"
+             and m._mask("digest_off", "1") == "1" and m._mask("marquiz_key", "") == "")
+    proverka("сравнение ключей — secrets.compare_digest, пустой наш ключ не подходит никому",
+             "secrets.compare_digest" in inspect.getsource(m._klyuch_veren) and not m._klyuch_veren("", "") and not m._klyuch_veren("x", "")
+             and m._klyuch_veren("ключ-1", "ключ-1") and not m._klyuch_veren("ключ-1", "ключ-2"))
+
+    def lead(klyuch=None):
+        return c.post("/hook/lead", params={} if klyuch is None else {"key": klyuch}, json={})
+    m.db.set_setting("lead_hook_key", "stend-lead-key")
+    proverka("/hook/lead: с заданным ключом чужой запрос отклоняется, свой проходит проверку (дальше — «нет телефона»)",
+             lead("чужой").json() == {"ok": False} and lead().json() == {"ok": False}
+             and lead("stend-lead-key").json() == {"ok": False, "error": "no phone"}
+             and "lead_hook_key" in m.SECRET_KEYS and "stend-lead-key" not in c.get("/api/settings", auth=VLADELEC).text)
+    m.db.set_setting("lead_hook_key", "")
+    proverka("/hook/lead без настройки — как раньше, принимает без ключа (на сервере ключ задан)",
+             lead().json() == {"ok": False, "error": "no phone"})
+
+    print("М6. Вебхук Wazzup: необязательный ключ ?k=")
+    # Тело запроса пустое: обработчик отвечает сразу и разбор сообщений не запускает.
+    def wh(klyuch=None):
+        return c.post("/wazzup/webhook", params={} if klyuch is None else {"k": klyuch}, json={}).status_code
+    proverka("ключ не задан — вебхук принимает всё, как раньше; регистрируется прежний адрес",
+             not wz.hook_klyuch() and [wh(), wh("lyuboy")] == [200, 200] and wz.nash_hook() == wz.OUR_HOOK
+             and not wz.hook_strogo())
+    K1, K2 = "stend-wazzup-klyuch-odin", "stend-wazzup-klyuch-dva"
+    m.db.set_setting("wazzup_hook_key", K1)
+    proverka("ключ задан, но Wazzup ещё шлёт по старому адресу — сообщения не теряются: принимаем и без ключа",
+             [wh(), wh("nevernyy")] == [200, 200] and not wz.hook_strogo() and "ждём первое событие" in wz.hook_sostoyanie())
+    proverka("первое событие с верным ключом — и дальше ключ обязателен: без ключа, с чужим, русскими буквами — 403",
+             wh(K1) == 200 and wz.hook_strogo() and [wh(), wh("nevernyy"), wh("ключ"), wh(K1)] == [403, 403, 403, 200]
+             and "ключ требуется" in wz.hook_sostoyanie())
+    proverka("проверочный GET /wazzup/webhook отвечает, как раньше", c.get("/wazzup/webhook").json() == {"ok": True})
+    proverka("адрес для регистрации — с ключом; для журнала и ответов — без его значения",
+             wz.nash_hook() == f"{wz.OUR_HOOK}?k={K1}" and K1 not in wz.bez_klyucha(wz.nash_hook())
+             and wz.bez_klyucha(wz.nash_hook()) != wz.OUR_HOOK and wz.bez_klyucha("https://drugoy.example/hook") == "https://drugoy.example/hook")
+    import httpx
+    v_wazzup, zvali = [wz.OUR_HOOK], []
+
+    def _get(url, **kw):
+        zvali.append(("GET", url))
+        return _OtvetWazzup({"webhooksUri": v_wazzup[0], "subscriptions": {}})
+
+    def _patch(url, **kw):
+        zvali.append(("PATCH", url, kw.get("json")))
+        v_wazzup[0] = kw["json"]["webhooksUri"]
+        return _OtvetWazzup({})
+    bylo = (httpx.get, httpx.patch)
+    httpx.get, httpx.patch = _get, _patch          # сеть закрыта: вместо Wazzup — заглушка, сама регистрация не идёт
+    try:
+        proverka("ключ уже требуется, а в Wazzup адрес без ключа — это «не наш адрес»: сторож его перерегистрирует",
+                 wz.webhook_uri() != wz.OUR_HOOK and K1 not in wz.webhook_uri())
+        r = c.post("/api/wazzup/webhook", auth=VLADELEC)
+        proverka("«вернуть вебхук» регистрирует адрес с ключом; в ответе ключа нет, адрес считается нашим",
+                 r.status_code == 200 and r.json() == {"ok": True, "uri": wz.OUR_HOOK} and v_wazzup[0] == f"{wz.OUR_HOOK}?k={K1}"
+                 and zvali[-2][0] == "PATCH" and zvali[-2][1].endswith("/webhooks"), (r.text[:120], v_wazzup))
+        proverka("сторож автопилота сравнивает адрес с OUR_HOOK и чинит через set_webhook() — адрес с ключом для него «наш»",
+                 wz.webhook_uri() == wz.OUR_HOOK and "uri != wz.OUR_HOOK" in inspect.getsource(ap.wazzup_watchdog)
+                 and "wz.set_webhook()" in inspect.getsource(ap.wazzup_watchdog))
+        r = c.get("/api/wazzup/webhook", auth=VLADELEC)
+        proverka("состояние вебхука владельцу: ключа в ответе нет, есть строка о проверке",
+                 r.status_code == 200 and K1 not in r.text and "ключ требуется" in r.json()["klyuch"]
+                 and r.json()["wazzup"]["webhooksUri"] == f"{wz.OUR_HOOK}?k=…", r.text[:200])
+        proverka("ключа нет ни в /api/settings, ни на странице «Настройки»",
+                 K1 not in c.get("/api/settings", auth=VLADELEC).text and K1 not in c.get("/owner", auth=VLADELEC).text
+                 and "wazzup_hook_key" in m.SETTABLE and "wazzup_hook_key" in m.SECRET_KEYS)
+        v_wazzup[0] = "https://api.moyklass.com/v1/hooks/wazzupEvents/stend"
+        proverka("чужой адрес (вебхук переписала интеграция МойКласса) виден как есть — сторож вернёт наш",
+                 wz.webhook_uri() == v_wazzup[0])
+        # смена ключа: пока Wazzup шлёт со старым, ничего не теряется; новый начинает требоваться с первого события с ним
+        m.db.set_setting("wazzup_hook_key", K2)
+        v_wazzup[0] = f"{wz.OUR_HOOK}?k={K1}"
+        proverka("смена ключа: старый адрес — «не наш» и без значения ключа; события со старым ключом пока принимаются",
+                 wz.webhook_uri() not in (wz.OUR_HOOK,) and K1 not in wz.webhook_uri() and not wz.hook_strogo()
+                 and [wh(K1), wh()] == [200, 200])
+        proverka("…после первого события с новым ключом старый ключ и запросы без ключа — 403",
+                 wh(K2) == 200 and wz.hook_strogo() and [wh(K1), wh(), wh(K2)] == [403, 403, 200])
+        proverka("set_webhook() без адреса берёт адрес с действующим ключом",
+                 wz.set_webhook() is True and v_wazzup[0] == f"{wz.OUR_HOOK}?k={K2}" and wz.webhook_uri() == wz.OUR_HOOK)
+        m.db.set_setting("wazzup_hook_key", "")
+        proverka("ключ убран — снова как раньше: принимаем всё, регистрируем адрес без ключа, старый адрес с ключом — «не наш»",
+                 [wh(), wh(K2)] == [200, 200] and not wz.hook_strogo() and wz.nash_hook() == wz.OUR_HOOK
+                 and wz.webhook_uri() != wz.OUR_HOOK and K2 not in wz.webhook_uri())
+        m.db.set_setting("wazzup_hook_key", K1)
+        v_wazzup[0] = wz.OUR_HOOK
+        m.db.set_setting(wz._HOOK_OK, "")
+        proverka("первое включение: ключ задан, событий с ним ещё не было, в Wazzup прежний адрес — сторож владельца не тревожит",
+                 wz.webhook_uri() == wz.OUR_HOOK and not wz.hook_strogo())
+    finally:
+        httpx.get, httpx.patch = bylo
+        m.db.set_setting("wazzup_hook_key", "")
+        m.db.set_setting(wz._HOOK_OK, "")
+    proverka("вебхуки остались адресами без входа (проверка ключа — внутри обработчика)",
+             all(not vhod[x] for x in ("POST /wazzup/webhook", "POST /marquiz/webhook", "POST /hook/lead")))
+
+    print("М7. Чужой сайт не может послать изменяющий запрос (сделано 12.11 в vhod.kto — здесь зафиксировано по всем адресам)")
+    pod_vhodom, bez_vhoda = [], set()
+    for r in m.app.routes:
+        for metod in getattr(r, "methods", ()) or ():
+            if metod in ("GET", "HEAD", "OPTIONS"):
+                continue
+            zavis = vhod[f"{metod} {r.path}"]
+            if zavis & {"check_auth", "check_owner", "check_pedagog_or_admin"}:
+                pod_vhodom.append((metod, r.path, VLADELEC if "check_owner" in zavis else ADMIN))
+            else:
+                bez_vhoda.add(f"{metod} {r.path}")
+    proverka("изменяющих адресов без зависимости входа — ровно тринадцать известных (вебхуки, сайт, вход); новый ломает тест",
+             bez_vhoda == set(BEZ_VHODA_IZM), sorted(bez_vhoda ^ set(BEZ_VHODA_IZM)))
+    for imya, zag in (("фоновый запрос с чужого сайта (Sec-Fetch-Site: cross-site)", CHUZHOY_FON),
+                      ("переход-форма с чужого сайта (cross-site, navigate)", {"sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate"}),
+                      ("соседний поддомен (Sec-Fetch-Site: same-site)", {"sec-fetch-site": "same-site", "sec-fetch-mode": "cors"}),
+                      ("чужой Origin без Sec-Fetch-*", CHUZHOY_ORIGIN)):
+        ne403 = [(metod, put) for metod, put, kto in pod_vhodom
+                 if c.request(metod, re.sub(r"\{[^}]+\}", "1", put), json={}, headers=zag, auth=kto).status_code != 403]
+        proverka(f"{imya}: все {len(pod_vhodom)} изменяющих адресов под входом отвечают 403, хотя пароль верный", not ne403, ne403[:5])
+    proverka("таких адресов — не меньше 190 (AUTH, OWNER_AUTH и вход педагога)", len(pod_vhodom) >= 190, len(pod_vhodom))
+    with m.db.get_conn() as conn:
+        nastr_do = conn.execute("SELECT COUNT(*) FROM settings").fetchone()[0]
+    r1 = c.post("/api/blank-grupp/edit", json={"k": "u:stend:m7", "v": "чужой"}, headers=CHUZHOY_FON, auth=ADMIN)
+    r2 = c.post("/api/settings", json={"key": "pult_hvost_glavnoe", "value": "чужой"}, headers=CHUZHOY_ORIGIN, auth=VLADELEC)
+    proverka("отказ — до обработчика: правка бланка и настройка с чужого сайта не записаны",
+             (r1.status_code, r2.status_code) == (403, 403) and "u:stend:m7" not in blank_grupp.edits()
+             and m.db.get_setting("pult_hvost_glavnoe") != "чужой")
+    r1 = c.post("/api/blank-grupp/edit", json={"k": "u:stend:m7", "v": "своя"}, headers=SVOYA_STRANICA, auth=ADMIN)
+    r2 = c.post("/api/blank-grupp/edit", json={"k": "u:stend:m7", "v": ""}, headers={"origin": "https://app.kidsup.ru"}, auth=ADMIN)
+    proverka("со своей страницы под общим входом — проходит (Sec-Fetch-Site: same-origin; Origin https://app.kidsup.ru)",
+             (r1.status_code, r2.status_code) == (200, 200) and "u:stend:m7" not in blank_grupp.edits(), (r1.status_code, r2.status_code))
+    stare = m.db.get_setting("pult_hvost_glavnoe") or ""
+    r1 = c.post("/api/settings", json={"key": "pult_hvost_glavnoe", "value": stare}, headers=SVOYA_STRANICA, auth=VLADELEC)
+    r2 = c.post("/api/sync/start", headers=SVOYA_STRANICA, auth=VLADELEC)
+    proverka("со своей страницы под входом владельца — проходит (настройка сохранена; запуск выгрузки дошёл до обработчика)",
+             (r1.status_code, r2.status_code) == (200, 400), (r1.status_code, r2.status_code))
+    proverka("скрипт рутины (без Origin и Sec-Fetch-*) под служебным входом — проходит, как раньше",
+             c.post("/api/blank-grupp/edit", json={"k": "u:stend:m7", "v": ""}, auth=ADMIN).status_code == 200)
+    proverka("фоновый GET с чужого сайта (картинка, fetch) — тоже 403; переход по ссылке из чата страницу открывает",
+             c.get("/api/blank-grupp/budushchie", headers=CHUZHOY_FON, auth=ADMIN).status_code == 403
+             and c.get("/liniya", headers={"sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate", "accept": "text/html"},
+                       auth=ADMIN).status_code == 200)
+    with m.db.get_conn() as conn:
+        proverka("число настроек за проверки не выросло больше чем на одну (pult_hvost_glavnoe)",
+                 conn.execute("SELECT COUNT(*) FROM settings").fetchone()[0] - nastr_do <= 1)
+
+    print("М8. Запись через GET убрана: обзвон и бланки групп")
+    from app import obzvon
+    segodnya = dt.date.today().isoformat()          # obzvon.audit считает окно от настоящей даты
+    with m.db.get_conn() as conn:
+        obzvon._done_init(conn)
+        conn.execute("DELETE FROM obzvon_done")
+        conn.execute("INSERT INTO obzvon_done (uid, ts, who, note) VALUES (987654, ?, 'Стенд', '')", (segodnya + "T10:00:00",))
+
+    def otmetok():
+        with m.db.get_conn() as conn:
+            return conn.execute("SELECT COUNT(*) FROM obzvon_done").fetchone()[0]
+    r = c.get("/api/obzvon/audit", auth=ADMIN)
+    proverka("GET /api/obzvon/audit показывает пустую отметку и ничего не снимает",
+             r.status_code == 200 and [x["uid"] for x in r.json()["пустые"]] == [987654] and "вернули" not in r.json() and otmetok() == 1,
+             r.text[:200])
+    r = c.get("/api/obzvon/audit?vernut=1", auth=ADMIN)
+    proverka("GET …?vernut=1 — 405 с подсказкой про POST, отметка на месте (раньше открытие такой ссылки её стирало)",
+             r.status_code == 405 and "POST /api/obzvon/audit/vernut" in r.json()["detail"] and r.headers.get("allow") == "POST"
+             and otmetok() == 1, (r.status_code, otmetok()))
+    proverka("…и переход по такой ссылке с чужого сайта её не снимает",
+             c.get("/api/obzvon/audit?vernut=1", auth=ADMIN,
+                   headers={"sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate"}).status_code == 405 and otmetok() == 1)
+    proverka("POST /api/obzvon/audit/vernut с чужого сайта — 403, отметка на месте",
+             c.post("/api/obzvon/audit/vernut", auth=ADMIN, headers=CHUZHOY_FON).status_code == 403 and otmetok() == 1)
+    r = c.post("/api/obzvon/audit/vernut", auth=ADMIN, headers=SVOYA_STRANICA)
+    proverka("POST /api/obzvon/audit/vernut снимает пустую отметку — то, что раньше делал GET",
+             r.status_code == 200 and r.json().get("вернули") == 1 and otmetok() == 0, r.text[:200])
+    proverka("без входа — 401", c.post("/api/obzvon/audit/vernut").status_code == 401
+             and c.post("/api/blank-grupp/obnovit").status_code == 401)
+
+    zvali_model = []
+    nast = blank_grupp.model
+
+    def _model(force=False, wait=False):
+        zvali_model.append((bool(force), bool(wait)))
+        return {"model": None, "busy": False, "err": "", "age_min": None}
+    blank_grupp.model = _model          # МойКласс на стенде недоступен: смотрим, с чем зовут пересчёт
+    try:
+        r = c.get("/api/blank-grupp?refresh=1", auth=ADMIN)
+        proverka("GET /api/blank-grupp?refresh=1 пересчёт из МойКласса больше не запускает (только чтение)",
+                 r.status_code == 200 and zvali_model == [(False, False)], zvali_model)
+        proverka("…в том числе по ссылке с чужого сайта",
+                 c.get("/api/blank-grupp?refresh=1", auth=ADMIN, headers={"sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate"}
+                       ).status_code == 200 and zvali_model == [(False, False)] * 2, zvali_model)
+        proverka("POST /api/blank-grupp/obnovit с чужого сайта — 403, пересчёт не начат",
+                 c.post("/api/blank-grupp/obnovit", auth=ADMIN, headers=CHUZHOY_FON).status_code == 403 and len(zvali_model) == 2)
+        r = c.post("/api/blank-grupp/obnovit", auth=ADMIN, headers=SVOYA_STRANICA)
+        proverka("POST /api/blank-grupp/obnovit запускает пересчёт и ждёт его — как раньше кнопка через GET",
+                 r.status_code == 200 and zvali_model[-1] == (True, True) and set(r.json()) == {"model", "busy", "err", "age_min"},
+                 zvali_model)
+    finally:
+        blank_grupp.model = nast
+    shablon = open(os.path.join(tree, "app/templates/blank_grupp.html"), encoding="utf-8").read()
+    proverka("кнопка «Обновить проверки из МойКласса» на странице зовёт POST, адреса ?refresh=1 в странице нет",
+             "fetch('/api/blank-grupp/obnovit',{method:'POST'})" in shablon and "?refresh=1'" not in shablon
+             and "$('#refresh').onclick=()=>load(true)" in shablon)
+    roli = open(os.path.join(tree, "docs/rabota/roli.md"), encoding="utf-8").read()
+    proverka("в описании ролей записан новый способ снять пустые отметки", "POST /api/obzvon/audit/vernut" in roli)
 
 if __name__ == "__main__":
     main()
