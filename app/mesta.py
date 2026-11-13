@@ -21,6 +21,13 @@ classes (норма max_students) и joins (живые записи). Тольк
 и где он проверен своими тестами: rows() (подсказки «Линии», /api/mesta для рутин) и
 razrez() (предложения возврата, обзвон дня) — их числа от страницы «Места» могут
 отличаться, пока эти места не переведены на правило отдельным решением.
+
+13.11.2026, вечер (проверка «вечера 1»): «Линия» и список групп возврата предлагали группы,
+закрытые для записи, — это прямо против решения М2. Поправлено точечно: «Линия» берёт
+закрытые группы, свободные места и раскладку сада и нулевого по дням из правила
+(dlya_linii); предложения возврата (vozvrat.gruppy) пропускают группы из списка закрытых
+решениями владельца (mesta_pravilo.zakryta). Сами rows() и razrez() считают как считали:
+/api/mesta читают рутины, razrez — обзвон дня и страница «Разрез».
 """
 from __future__ import annotations
 
@@ -323,6 +330,45 @@ def dlya_podbora(today: date | None = None) -> dict[int, dict]:
     return out
 
 
+BEZ_ZANYATIY_SBOJ = 3      # столько групп без занятий на две недели — это уже расписание или синк, не набор
+
+
+def dlya_linii(today: date | None = None) -> dict[int, dict]:
+    """Места по единому правилу — для подсказок «Линии»: {class_id: {...}}.
+
+    13.11.2026, вечер (проверка «вечера 1», копия базы 12.11). После решения М2 «Линия» —
+    страница, с которой админ говорит с родителем, — продолжала считать по-старому (rows) и
+    предлагала группы, закрытые для записи: «ПШ Гр15 — 8 мест» (в правиле — «не набираем»),
+    группу-отработку без занятий на две недели; нулевой класс — «1 место» при 5–7 местах в
+    день на «Местах». Здесь — то, чем «Линия» теперь поправляет прежний счёт:
+      «zakryta» — причина, если группа закрыта для записи (такую не предлагаем вовсе);
+      «free», «cap», «live» — свободно, мест и занято по правилу, как на «Местах»;
+      «dni» — у мини-сада и нулевого класса: «пн 0 · вт 5 · …», free — мест в самый
+               свободный день.
+    Группы нет в ответе — правило о ней ничего не говорит, остаётся прежний счёт.
+    Осторожность: «нет занятий на две недели вперёд» закрывает группу, только если таких групп
+    меньше BEZ_ZANYATIY_SBOJ. Если их три и больше, дело скорее в расписании или синхронизации
+    (каникулы, сбой), чем в наборе — «Места» в этом случае показывают предупреждение, а
+    «Линия» не должна в один день остаться без единой группы: по таким группам — прежний счёт.
+    Только чтение; ошибку отдаёт наверх — «Линия» при сбое остаётся на прежнем счёте."""
+    s = svod(today)
+    bez_zanyatiy = sum(1 for g in s["closed"] if g["why"] == mesta_pravilo.NET_ZANYATIY)
+    out: dict[int, dict] = {}
+    for g in s["closed"]:
+        if g["why"] == mesta_pravilo.NET_ZANYATIY and bez_zanyatiy >= BEZ_ZANYATIY_SBOJ:
+            continue
+        out[g["cid"]] = {"zakryta": g["why"], "free": 0, "cap": g["cap"], "live": g["busy"] + g["prob"], "dni": ""}
+    for g in s["groups"]:
+        if "days" in g:
+            out[g["cid"]] = {"zakryta": "", "cap": g["cap"], "live": g["busy"] + g["prob"],
+                             "free": max([max(0, v["left"]) for v in g["days"].values()] or [0]),
+                             "dni": mesta_pravilo.svobodno_po_dnyam(g["days"])}
+        else:
+            out[g["cid"]] = {"zakryta": "", "cap": g["cap"], "live": g["busy"] + g["prob"],
+                             "free": max(0, g["left"]), "dni": ""}
+    return out
+
+
 def rows() -> list[dict]:
     with db.get_conn() as conn:
         cls = conn.execute("SELECT id, name, max_students FROM classes WHERE name LIKE '2627_%' "
@@ -562,19 +608,32 @@ def block() -> str:
                    "dni": mesta_pravilo.svobodno_po_dnyam(g["days"]) if "days" in g else ""})
     rs.sort(key=lambda r: _poryadok(r["name"]))
 
+    # 13.11.2026, вечер (проверка «вечера 1», копия базы 12.11): у групп с пометкой
+    # «полная» / «пауза» / «не записывать» вместо числа мест стояла одна пометка, а заголовок
+    # считал эти места свободными: из 93 свободных 32 в таблице блока найти было нельзя
+    # (16 в «полных», 9 на «паузе», 7 в «не записывать»), заголовок называл только 7.
+    # Пометки — сентябрьские подсказки админам, на счёт не влияют (как и на /mesta, где у
+    # таких групп видны и число, и пометка). Теперь число по счёту стоит перед пометкой, а
+    # заголовок называет сумму по всем трём видам пометок.
+    def po_schetu(r):
+        if not r["free"]:
+            return ""
+        return (f"<span style='font-weight:700'>{r['free']} " + ("место" if r["free"] == 1 else "места" if r["free"] < 5 else "мест")
+                + " по счёту</span> · ")
+
     def td(r):
         if r["why"]:
             st = (f"<span style='color:#b00010;font-weight:700'>закрыта для записи</span> "
                   f"<span style='color:#6c6a86'>{html.escape(r['why'])} — в счёт не входит</span>")
         elif r["merge"]:
-            st = f"<span style='color:#b00010;font-weight:700'>не записывать</span> <span style='color:#6c6a86'>{html.escape(r['merge'])}</span>"
+            st = f"{po_schetu(r)}<span style='color:#b00010;font-weight:700'>не записывать</span> <span style='color:#6c6a86'>{html.escape(r['merge'])}</span>"
         elif r["dni"]:
             st = (f"<span style='color:#4e8a12;font-weight:700'>по дням: {html.escape(r['dni'])}</span> "
                   f"<span style='color:#6c6a86'>— в общий счёт не входит</span>")
         elif r["wait"]:
-            st = f"<span style='color:#a35f00;font-weight:700'>полная</span> <span style='color:#6c6a86'>{html.escape(r['wait'])}</span>"
+            st = f"{po_schetu(r)}<span style='color:#a35f00;font-weight:700'>полная</span> <span style='color:#6c6a86'>{html.escape(r['wait'])}</span>"
         elif r.get("hold"):
-            st = f"<span style='color:#b00010;font-weight:700'>⛔ пауза</span> <span style='color:#6c6a86'>{html.escape(r['hold'])}</span>"
+            st = f"{po_schetu(r)}<span style='color:#b00010;font-weight:700'>⛔ пауза</span> <span style='color:#6c6a86'>{html.escape(r['hold'])}</span>"
         elif r["free"] >= 4:
             st = f"<span style='color:#E30613;font-weight:800'>{r['free']} мест — сюда первыми</span>"
         elif r["free"] > 0:
@@ -593,15 +652,31 @@ def block() -> str:
     # владельца); места в группах с пометкой «не записывать» называем отдельно, как и раньше.
     tot = sv["tot"]
     reg = [g for g in sv["groups"] if "days" not in g]
-    free_merge = sum(r["free"] for r in rs if r["merge"] and not r["why"] and not r["dni"])
-    free_hint = (f" · из них {free_merge} в группах с пометкой «не записывать»" if free_merge else "")
-    paid_total = sum(r["paid"] for r in rs)
+    # 13.11.2026, вечер: в заголовке — сумма свободных мест по всем трём видам пометок
+    # («не записывать», «полная», «пауза»), а не только по первой (см. po_schetu выше)
+    free_pometki = sum(r["free"] for r in rs
+                       if (r["merge"] or r["wait"] or r.get("hold")) and not r["why"] and not r["dni"])
+    free_hint = (f" · из них {free_pometki} в группах с пометкой «не записывать», «полная» или «пауза»"
+                 if free_pometki else "")
+    # 13.11.2026, вечер (проверка «вечера 1», копия базы 12.11): заголовок говорил «занято 252 …
+    # оплатили ноябрь 240» — «занято» по 45 открытым группам, «оплатили» по всем 53 строкам
+    # (с садом, нулевым и закрытыми). Читатель вычитал и получал 12 неоплаченных мест, а в тех же
+    # 45 группах оплачено 225 из 252 — не оплачено 27 (так и на /mesta). Теперь оба числа — по
+    # одним и тем же открытым группам; сад, нулевой и закрытые — в своих строках таблицы.
+    reg_ids = {g["cid"] for g in reg}
+    paid_reg = sum(len(_oplata_gruppy(opl, g["cid"], g["_uch"])[0]) for g in reg)
+    paid_ostalnye = sum(len(_oplata_gruppy(opl, g["cid"], g["_uch"])[0])
+                        for g in sv["groups"] + sv["closed"] if g["cid"] not in reg_ids)
+    ostalnye = (f" Ещё {paid_ostalnye} оплативших — в строках мини-сада, нулевого класса и закрытых групп: "
+                f"они в заголовок не входят, как и их места." if paid_ostalnye else "")
     return (f"<details class='card' style='border-left:4px solid #7DB928;margin:14px 0'>"
-            f"<summary style='cursor:pointer;font-size:17px;font-weight:800'>Места сейчас: свободно {tot['free']} в {len(reg)} группах{free_hint} · занято {tot['busy']} · пробников {tot['prob']} · оплатили {opl['mesyac']} {paid_total}</summary>"
+            f"<summary style='cursor:pointer;font-size:17px;font-weight:800'>Места сейчас: свободно {tot['free']} в {len(reg)} группах{free_hint} · занято {tot['busy']}, из них оплатили {opl['mesyac']} {paid_reg} · пробников {tot['prob']}</summary>"
             f"<div style='font-size:12.5px;color:#6c6a86;margin:4px 0 8px'>Считаем так: {html.escape(mesta_pravilo.PRAVILO)} — то же число на странице <a href='/mesta'>«Места»</a> и в документе владельца. "
             f"Считается по записям CRM при каждом открытии (синхронизация раз в 5 минут). "
             f"Красным — группы, куда записываем первыми. В колонке «занято / мест» — «Учится» и пробники. "
-            f"Мини-сад — пн и ср до 6 детей в день, вт, чт, пт — до 8; нулевой класс — по дням. «Оплатили» — дети с оплаченным абонементом на {opl['mesyac']}, по всем строкам таблицы.</div>"
+            f"Мини-сад — пн и ср до 6 детей в день, вт, чт, пт — до 8; нулевой класс — по дням. «Оплатили» — дети с оплаченным абонементом на {opl['mesyac']}; "
+            f"в заголовке — по тем же {len(reg)} открытым группам, что и «занято».{ostalnye} "
+            f"Пометки «не записывать», «полная», «пауза» — подсказки сентября–октября, на счёт мест не влияют: число по счёту стоит перед пометкой.</div>"
             f"<div class='scroll'><table><tr><th>Группа</th><th class='num'>занято / мест</th><th class='num'>оплатили {opl['mesyac']}</th><th>места</th></tr>"
             + "".join(td(r) for r in rs) + "</table></div></details>")
 

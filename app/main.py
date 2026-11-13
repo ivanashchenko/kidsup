@@ -1267,14 +1267,26 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
     summary = {}
     for g in groups:
         s = summary.setdefault(g["course"], {"course": g["course"], "groups": 0,
-                                             "enrolled": 0, "capacity": 0, "free": 0})
+                                             "enrolled": 0, "capacity": 0, "free": 0,
+                                             "v_schete": 0, "po_dnyam": []})
         s["groups"] += 1; s["enrolled"] += g["enrolled"]
         # 13.11.2026: закрытые для записи группы и группы «по дням» (сад, нулевой) в места
         # и свободные сводки не входят — как в итоге по центру
         if not g["buffer"] and g["vid"] not in ("zakryta", "po_dnyam"):
             s["capacity"] += g["capacity"]; s["free"] += g["free"]
+            s["v_schete"] += g["enrolled"]
+        # 13.11.2026, вечер (проверка «вечера 1», копия базы 12.11): у «Мини-сада» сводка
+        # писала «всего мест 0, свободно 0, заполненность 0 %» при 23 записанных — группы «по
+        # дням» из мест исключены, а «записано» по ним суммировалось; строка читалась как «в
+        # саду мест нет», хотя в строках групп — до 5 и до 7 мест в день. Теперь у таких
+        # групп сводка говорит «по дням» и называет, сколько мест в самый свободный день.
+        elif g["vid"] == "po_dnyam":
+            s["po_dnyam"].append({"name": g["name"], "free": g["free"], "dni": g["po_dnyam"]})
     for s in summary.values():
-        s["fill_pct"] = round(s["enrolled"] * 100 / s["capacity"]) if s["capacity"] else 0
+        # заполненность — по тем же группам, что и «всего мест» (без закрытых, «по дням» и
+        # буферов «Заявки»): иначе записанные из них завышали процент
+        s["fill_pct"] = round(s["v_schete"] * 100 / s["capacity"]) if s["capacity"] else None
+        s["po_dnyam_free"] = max([x["free"] for x in s["po_dnyam"]] or [0])
         s["price"] = PRICES.get(s["course"])
     # цены: показываем блок целиком либо только по выбранному направлению
     # 13.11.2026: прайс летнего лагеря «до 28.08» после срока не показываем (SEZON_SROKI) —
@@ -1355,7 +1367,7 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
                   features=features_list, feature=feature, q=q,
                   prices=price_blocks, pitches=pitches, waitlist=_waitlist_rows(),
                   sezon=sezon,
-                  summary=sorted(summary.values(), key=lambda x: -x["free"]))
+                  summary=sorted(summary.values(), key=lambda x: -(x["free"] + x["po_dnyam_free"])))
 
 
 
@@ -10491,6 +10503,7 @@ def api_mesta_voronka():
     out["был на пробном, записи нет"] = []
     out["абонемент закончился"] = []
     seen = set()
+    v_drugoj_gruppe: dict[int, dict] = {}     # «Учится», месяц оплачен тем же предметом в другой группе
     for uid, cid, st, name, phone in rows:
         cname = cls.get(cid)
         if not cname or "Заявк" in cname or cname.startswith("2627_ЛГ") or skip(name):
@@ -10502,6 +10515,12 @@ def api_mesta_voronka():
         if st == 2:
             # 13.11.2026: «Учится» — смотрим оплату ТЕКУЩЕГО месяца (см. докстринг)
             if paid_month(uid, cid):
+                # 13.11.2026, вечер (проверка «вечера 1»): здесь оплатой считается и абонемент
+                # того же предмета, привязанный к ДРУГОЙ группе; «Места» такое место считают
+                # неоплаченным. Карточка «ходят, месяц не оплачен» берёт число с «Мест» (на копии
+                # базы 24), а в списках этих детей нет (21) — разницу называем на странице.
+                if not (uid in opl_mes["oplatili"].get(cid, set()) or uid in opl_mes["lyubaya"]):
+                    v_drugoj_gruppe.setdefault(uid, {"uid": uid, "name": name, "group": cname.replace("2627_", "")[:50]})
                 continue
             if platil_ranshe(uid, cid):
                 # платили раньше, а на этот месяц оплаченного абонемента нет — продление
@@ -10638,6 +10657,7 @@ def api_mesta_voronka():
     return {"оплачено_в_группах_сезона": len(first_sell),
             "оплачено_уникальных_всего": len(paid_users),
             "сейчас": seychas, "с_даты_месяц": max(start, mes0), "сегодня": today,
+            "оплачен_в_другой_группе": sorted(v_drugoj_gruppe.values(), key=lambda r: r["name"] or ""),
             "без_оплаты": {k: len(v) for k, v in out.items()},
             "ждём_на_пробное": len(waiting),
             "сделано": done_n, "сделанные": done_rows,

@@ -25,11 +25,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import date, timedelta
 
 from . import db
 from . import liniya_teksty as teksty
+
+log = logging.getLogger("kidsup.liniya")
 
 # Живая запись в группе — как на /mesta (app/mesta.py, LIVE).
 LIVE = (2, 58132, 83760, 58131)
@@ -317,10 +320,27 @@ def vse_gruppy() -> list[dict]:
     записям; «po_dnyam» — мини-сад, места по дням (сверить в CRM); «list» —
     группа в WAITLIST: «полная», не дописываем, место не обещаем. Пометка
     WAITLIST вида «добирать 10–12 лет» — не «полная», а набор с условием:
-    такая группа «est», условие — в пометке (dobor)."""
+    такая группа «est», условие — в пометке (dobor).
+
+    13.11.2026, вечер (проверка «вечера 1»; решение Бориса М2: «без закрытых для записи
+    групп, сад и нулевой класс по дням»). С 13.11 «Места» считают единым правилом
+    (app/mesta_pravilo.py), а эта функция осталась на прежнем счёте — и слова «тот же
+    счёт, что на /mesta» стали неправдой: на копии базы «Линия» предлагала «ПШ Гр15 —
+    8 мест» (группа закрыта для записи) и «Нулевой класс — 1 место» (на «Местах» —
+    5–7 мест в день). Теперь поверх прежних строк кладётся правило (mesta.dlya_linii):
+      · zakryta — причина, если группа закрыта для записи: podobrat() её не предлагает;
+      · free, cap, live — по правилу, как на «Местах»;
+      · мини-сад и нулевой класс — «po_dnyam» с раскладкой «пн 0 · вт 5 · …» вместо
+        «сверить в CRM»; free — мест в самый свободный день (нет ни в один — не предлагаем).
+    Правило не посчиталось или о группе молчит — остаётся прежний счёт."""
     from . import mesta
     from .main import COURSE_ALIAS, PRICES, _group_ages, _group_klass, _name_days, _price_line
     rows = mesta.rows()
+    try:
+        po_pravilu = mesta.dlya_linii()
+    except Exception:  # noqa: BLE001 — правило не посчиталось: «Линия» работает на прежнем счёте
+        log.exception("линия: места по правилу не посчитались — остаётся прежний счёт")
+        po_pravilu = {}
     with db.get_conn() as conn:
         info = {r[0]: (r[1] or "", r[2] or "") for r in conn.execute(
             "SELECT cl.id, cl.name, co.name FROM classes cl "
@@ -373,10 +393,16 @@ def vse_gruppy() -> list[dict]:
             programma = ""
         ekran, rech = _kogda(short, sad)
         free = max(0, int(r["free"] or 0))
+        pp = po_pravilu.get(r["id"])
+        cap, live = r["cap"], r["live"]
+        if pp:
+            free, cap, live = pp["free"], pp["cap"] or cap, pp["live"]
         wait = r.get("wait") or ""
         dobor = wait if _DOBOR.match(wait) else ""
         if wait and not dobor:
             mesto, free_text = "list", "полная"
+        elif pp and pp["dni"]:
+            mesto, free_text = "po_dnyam", f"по дням: {pp['dni']}"
         elif predmet == "Мини-сад":
             mesto, free_text = "po_dnyam", "по дням — сверить в CRM"
         else:
@@ -391,7 +417,8 @@ def vse_gruppy() -> list[dict]:
             "uroven": uroven, "vozrast": vozr, "lo": lo, "hi": hi, "sad": sad,
             "kogda": ekran, "kogda_rech": rech, "free": free, "free_text": free_text,
             "mesto": mesto, "dobor": dobor,
-            "cap": r["cap"], "live": r["live"],
+            "zakryta": (pp["zakryta"] if pp else ""),
+            "cap": cap, "live": live,
             "cena": cena, "cena_menshe": cena_menshe, "raz_v_nedelyu": raz_v_nedelyu,
             "probnoe": probnoe, "wait": wait, "merge": r.get("merge") or "",
             "hold": r.get("hold") or "", "zametka": "; ".join(zametki),
@@ -418,7 +445,9 @@ def podobrat(age: float | None, vse: list[dict]) -> tuple[list[dict], list[dict]
     методички, где мест больше) и остальные подходящие по возрасту.
     «Не записывать» и «пауза» не показываем вовсе, «полная» — только во втором
     списке, со своей пометкой; набор с условием («добирать 10–12») — после
-    групп без условий."""
+    групп без условий.
+    13.11.2026, вечер: закрытые для записи по единому правилу мест (zakryta) не
+    показываем вовсе — как «не записывать» и «паузу»."""
     if age is None:
         return [], []
     rangi = _rangi(age)
@@ -429,7 +458,7 @@ def podobrat(age: float | None, vse: list[dict]) -> tuple[list[dict], list[dict]
 
     fit = [g for g in vse
            if g["lo"] is not None and g["lo"] - 0.5 <= age <= g["hi"] + 0.5
-           and g["free"] > 0 and not g["merge"] and not g["hold"]]
+           and g["free"] > 0 and not g["merge"] and not g["hold"] and not g.get("zakryta")]
     fit.sort(key=lambda g: (rang(g), g["mesto"] == "list", bool(g["dobor"]), -g["free"], g["kogda"]))
     top, bylo = [], set()
     for g in fit:
