@@ -191,8 +191,10 @@ button.b:hover{background:#3b2f9b}
 .how b{color:var(--indigo)}
 @media (max-width:640px){h1{font-size:19px} td.who,th.who{min-width:130px}}
 </style></head><body><div class=wrap>
-<header><img src="/static/logo_color.png" alt="KidsUP"><b>KidsUP</b>
-<a href="/promo">← Эффективность промоутеров</a> · <a href="/pult">Пульт</a></header>"""
+<header><a href="/promo">← Эффективность промоутеров</a></header>"""
+# 13.11.2026, проверка шага 2: из строки страницы убраны логотип и ссылка «Пульт» — они есть
+# в общей шапке, на странице стояло два логотипа друг под другом. «Итоги промоутеров»
+# (/promo) админы смотрят каждый день (решение 28.10) — ссылка остаётся всем.
 
 FOOT = "</div></body></html>"
 

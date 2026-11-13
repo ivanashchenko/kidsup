@@ -144,7 +144,8 @@ def test_perehody(c, m):
     # «Бланки групп» (вид «Все группы дня»), сам адрес — переход; списки открываются на новом месте.
     r = c.get("/spiski", auth=ADMIN)
     proverka("/spiski ведёт на «Все группы дня» на бланках: списки по группам открываются там",
-             r.status_code == 200 and str(r.url).endswith("/blank-grupp?vid=den") and "Все группы дня" in r.text,
+             # 13.11.2026, проверка шага 2: без параметров — вся неделя (day=vse), как было на /spiski
+             r.status_code == 200 and str(r.url).endswith("/blank-grupp?vid=den&day=vse") and "Все группы дня" in r.text,
              (r.status_code, str(r.url)))
 
 
@@ -1115,8 +1116,11 @@ def test_shapka_shag2(c, m, work):
                  r.status_code == 200 and r.text.count('id="kidsup-nav"') == 1 and "Владельцу" in h
                  and 'href="/kontrol-oplat"' in h, (r.status_code, r.text.count('id="kidsup-nav"')))
     h = _koren(c.get("/owner", auth=VLADELEC).text)
-    proverka("нижняя панель владельца: Главная · Мои дела · Контроль оплат · ☰ Разделы",
-             [x for x in re.findall(r'class="kn-podpis">([^<]+)<', h)] == ["Главная", "Мои дела", "Контроль оплат", "Разделы"])
+    # 13.11.2026, проверка шага 2: было «Контроль оплат» — на телефоне 320–360 px подпись
+    # обрезалась («Контроль оп…»); на кнопке теперь «Оплаты», адрес тот же
+    proverka("нижняя панель владельца: Главная · Мои дела · Оплаты · ☰ Разделы",
+             [x for x in re.findall(r'class="kn-podpis">([^<]+)<', h)] == ["Главная", "Мои дела", "Оплаты", "Разделы"]
+             and 'class="kn-knopka" href="/kontrol-oplat"' in h)
     t = c.get("/pult", auth=ADMIN).text
     proverka("/pult: блок «Разделы» внизу остался", "id='razdely'" in t)
     t = c.get("/otkazy", auth=ADMIN).text
@@ -1425,8 +1429,10 @@ def test_schetchik_i_pereezdy(c, m, baza):
     proverka("владелец: GET /metrics → 303 /journal#schetchiki → 200, без цепочки",
              (kod, loc, cel) == (303, "/journal#schetchiki", 200), (kod, loc, cel))
     kod, loc, cel = perehod_i_cel(c, "/metrics", ADMIN)
-    proverka("админ: /metrics → 303 сразу на /pult → 200 («Журнал» — страница владельца, цепочки нет)",
-             (kod, loc, cel) == (303, "/pult", 200), (kod, loc, cel))
+    # 13.11.2026, проверка шага 2: было «→ /pult» молча; до шага 2 «Дисциплина» открывалась
+    # админам, поэтому теперь переход на пульт с пояснением (?bylo=/metrics)
+    proverka("админ: /metrics → 303 сразу на пульт с пояснением → 200 («Журнал» — страница владельца, цепочки нет)",
+             (kod, loc, cel) == (303, "/pult?bylo=%2Fmetrics", 200), (kod, loc, cel))
     proverka("/metrics без входа → 401", lokaciya(c, "/metrics", kto=None) == (401, None))
     den = m.autopilot._today().isoformat()
     con = sqlite3.connect(baza)
@@ -1491,10 +1497,12 @@ def test_pereezdy_pyati(c, m, baza):
     print("З1. Старые адреса: 303 сразу на страницу, которая сама отвечает 200")
     zhdem = {  # адрес: (владельцу, админу)
         "/segodnya": ("/pult#pervye", "/pult#pervye"),
-        "/spiski": ("/blank-grupp?vid=den", "/blank-grupp?vid=den"),
+        # 13.11.2026, проверка шага 2: без параметров /spiski показывал всю неделю — day=vse
+        "/spiski": ("/blank-grupp?vid=den&day=vse", "/blank-grupp?vid=den&day=vse"),
         "/zayavki": ("/blank-grupp#budushchie", "/blank-grupp#budushchie"),
         # «Откуда заявки» — страница владельца: админа с /leads ведём на пульт сразу, без цепочки
-        "/leads": ("/istochniki#leads", "/pult"),
+        # 13.11.2026, проверка шага 2: не молча, а с пояснением на пульте (?bylo=/leads)
+        "/leads": ("/istochniki#leads", "/pult?bylo=%2Fleads"),
     }
     for adres, (vl, ad) in zhdem.items():
         for kto, rol, kuda in ((VLADELEC, "владелец", vl), (ADMIN, "админ", ad)):
@@ -1795,7 +1803,7 @@ def test_pravki_1311(c, m, tree, baza):
         hodili.append((k.get("params") or {}).get("offset"))
         if hodili[-1] == 0 and not pusto[0]:
             return _Otvet([{"id": 501, "name": "Стендова Мама",
-                            "contactData": [{"chatId": "5113895858", "chatType": "telegram"}]}])
+                            "contactData": [{"chatId": "9990001095", "chatType": "telegram"}]}])
         return _Otvet([])
     pusto = [False]
     try:
@@ -1805,7 +1813,7 @@ def test_pravki_1311(c, m, tree, baza):
         n1 = len(hodili)
         vtoroj = wazzup.contacts()
         proverka("первый вызов ходит в Wazzup и отдаёт карту chatId → имя",
-                 n1 == 2 and pervyj.get("5113895858", {}).get("name") == "Стендова Мама", (n1, pervyj))
+                 n1 == 2 and pervyj.get("9990001095", {}).get("name") == "Стендова Мама", (n1, pervyj))
         proverka("второй вызов в тот же день в сеть не ходит и отдаёт то же", len(hodili) == n1 and vtoroj == pervyj,
                  (len(hodili), vtoroj))
         proverka("кэш лежит файлом (папка создана сама)", os.path.isfile(wazzup._CONTACTS_CACHE))
@@ -1964,11 +1972,148 @@ def main():
     test_schetchik_i_pereezdy(c, m, baza)
     test_pereezdy_pyati(c, m, baza)
     test_pravki_1311(c, m, tree, baza)
+    test_posle_proverki(c, m, tree, baza)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     proverka("ни одной попытки выйти в сеть, кроме известных опросов Mango с пульта и «Ответов»",
              all(any(f.startswith(("mango.py", "zayavki.py")) for f in otkuda) for _, otkuda in lt.SET), lt.SET[:5])
     print(f"\nИтого: {lt.proshlo} OK, {lt.oshibok} ошибок · стенд {work}")
     sys.exit(1 if lt.oshibok else 0)
+
+
+
+# --- К. Правки после проверки шага 2 (13.11.2026) ---------------------------------------
+
+def test_posle_proverki(c, m, tree, baza):
+    import asyncio
+    import time
+    from app import nav
+    BR = {"Accept": "text/html,application/xhtml+xml", "Sec-Fetch-Dest": "document"}
+
+    print("К1. Админ на переехавших к владельцу /metrics и /leads: пояснение на пульте")
+    for adres, imya, kuda in (("/metrics", "Дисциплина", "Журнал"), ("/leads", "Лиды", "Откуда заявки")):
+        r = c.get(adres, auth=ADMIN)
+        proverka(f"админ: {adres} → пульт, на нём строка «Страница «{imya}» переехала в «{kuda}»»",
+                 r.status_code == 200 and "id='pereehala'" in r.text
+                 and f"Страница «{imya}» переехала в «{kuda}»" in r.text, (r.status_code, str(r.url)))
+    t = c.get("/pult", auth=ADMIN).text
+    proverka("обычный пульт: пояснения нет", "id='pereehala'" not in t)
+    t = c.get("/pult?bylo=" + quote("/metrics"), auth=VLADELEC).text
+    proverka("владельцу пояснение не показывается", "id='pereehala'" not in t)
+    t = c.get("/pult?bylo=" + quote("<script>alert(1)</script>"), auth=ADMIN).text
+    proverka("чужая строка из ?bylo= в страницу не попадает", "id='pereehala'" not in t and "alert(1)" not in t)
+
+    print("К2. Счётчик открытий: увод на пульт, /pedagog, чистка")
+    do = _hity(baza)
+    kody = [c.get(a, auth=ADMIN, headers=BR, follow_redirects=False).status_code
+            for a in ("/journal", "/audit", "/istochniki", "/students", "/metrics", "/leads")]
+    proverka("админа увели со страницы владельца на пульт (303) — открытием не считается",
+             kody == [303] * 6 and _hity(baza) == do, (kody, _hity(baza) - do))
+    do = _hity(baza, "/spiski", "admin")
+    c.get("/spiski", auth=ADMIN, headers=BR, follow_redirects=False)
+    proverka("переход со старого адреса на новое место (/spiski) считается, как раньше",
+             _hity(baza, "/spiski", "admin") == do + 1)
+    kluch = m.db.get_setting("pedagog_key")
+    do, do_q = _hity(baza, "/pedagog", "pedagog"), _hity(baza, "/pedagog", "?")
+    r = c.get(f"/pedagog?k={kluch}", headers=BR)
+    proverka("/pedagog с верным ключом пишется с ролью pedagog, а не «?»",
+             r.status_code == 200 and _hity(baza, "/pedagog", "pedagog") == do + 1
+             and _hity(baza, "/pedagog", "?") == do_q, (do, _hity(baza, "/pedagog", "pedagog")))
+    c.get("/pedagog?k=ne-tot-kluch", headers=BR)
+    proverka("/pedagog с неверным ключом — роль не pedagog", _hity(baza, "/pedagog", "pedagog") == do + 1)
+    den = m.autopilot._today()
+    staryy = (den - __import__("datetime").timedelta(days=m.db.PAGE_HITS_HRANIT + 5)).isoformat()
+    nedavniy = (den - __import__("datetime").timedelta(days=m.db.PAGE_HITS_HRANIT - 5)).isoformat()
+    con = sqlite3.connect(baza)
+    con.execute("INSERT INTO page_hits (day, path, rol, n) VALUES (?,?,?,1)", (staryy, "/stend-staryy", "admin"))
+    con.execute("INSERT INTO page_hits (day, path, rol, n) VALUES (?,?,?,1)", (nedavniy, "/stend-nedavniy", "admin"))
+    con.commit()
+    con.close()
+    m.db._page_hits_chistka = ""
+    m.db.page_hit(den.isoformat(), "/pult", "admin")
+    proverka(f"строки старше {m.db.PAGE_HITS_HRANIT} дней стираются при записи (раз в сутки), свежие остаются",
+             _hity(baza, "/stend-staryy") == 0 and _hity(baza, "/stend-nedavniy") == 1
+             and m.db._page_hits_chistka == den.isoformat())
+    con = sqlite3.connect(baza)
+    con.execute("DELETE FROM page_hits WHERE path='/stend-nedavniy'")
+    con.commit()
+    con.close()
+
+    print("К3. Бейдж: после упавшего пересчёта числа не выдаются за свежие")
+    zapas = dict(m._SCHET)
+    staryy_raschet = m.api_waiting
+
+    async def padaet(*a, **k):
+        raise RuntimeError("стенд: расчёт упал")
+    try:
+        m._SCHET.update({"dannye": {"perepiska": 3, "bez_nomera": 0, "zvonki": 0, "dengi": False,
+                                    "goryacho": False, "max_wait": 5},
+                         "ts": time.time() - 500, "ts_ok": time.time() - 500, "oshibka": False, "zadacha": None})
+        m.api_waiting = padaet
+        asyncio.run(m._schet_obnovit())
+        j = c.get("/api/waiting/schet", auth=ADMIN).json()
+        proverka("кэш есть, пересчёт упал: прежние числа, vozrast — от удачного расчёта, oshibka: true",
+                 j.get("perepiska") == 3 and j.get("vozrast", 0) >= 499 and j.get("oshibka") is True, j)
+        proverka("упавший расчёт не повторяется на каждый опрос (время попытки обновлено)",
+                 time.time() - m._SCHET["ts"] < 50)
+        m._schet_zapomnit({"count": 1})
+        j = c.get("/api/waiting/schet", auth=ADMIN).json()
+        proverka("после удачного расчёта: vozrast около нуля, oshibka нет",
+                 j.get("perepiska") == 1 and j.get("vozrast", 99) < 5 and "oshibka" not in j, j)
+    finally:
+        m.api_waiting = staryy_raschet
+        m._SCHET.clear()
+        m._SCHET.update(zapas)
+
+    print("К4. Пульт: мусор в ?day=, полоска «кто вошёл» — в шапке")
+    r = c.get("/pult?day=" + quote('"><script>x</script>'), auth=ADMIN)
+    proverka("/pult?day=<мусор> → 200 с сегодняшним днём (было 500)",
+             r.status_code == 200 and "<script>x</script>" not in r.text, r.status_code)
+    proverka("/pult?day=2026-13-40 и ?day=20261113 → 200",
+             c.get("/pult?day=2026-13-40", auth=ADMIN).status_code == 200
+             and c.get("/pult?day=20261113", auth=ADMIN).status_code == 200)
+    polosa = "<div class='kto-polosa'>Вы: Стенд</div>"
+    h = nav.shapka("admin", "/liniya", kto_html=polosa)
+    proverka("«Вы: … · Выйти» — внутри верхней строки шапки (после бейджа), не отдельной строкой",
+             h.index('class="kn-verh"') < h.index('id="wait-badge"') < h.index("kto-polosa") < h.index('id="nav-razdely"'))
+    zh = "<div class='kto-polosa obshchiy'>Вы под общим входом</div>"
+    h = nav.shapka("admin", "/liniya", kto_html=zh)
+    proverka("жёлтое предупреждение общего входа — отдельной строкой над верхней",
+             h.index("kn-kto-vazhno") < h.index('class="kn-verh"') and h.count("kto-polosa") == 1)
+    isx = inspect.getsource(m.pult_page)
+    proverka("пульт: полоску рисует общая шапка, своей у пульта нет (polosa=False)",
+             "polosa=False" in isx and "kto=False" not in isx.split('"""')[-1])
+
+    print("К5. Шапка: светлая на страницах без тёмной темы, «назад» после листа, узкий телефон")
+    t = c.get("/pult", auth=ADMIN).text
+    proverka("/pult (своей тёмной темы нет): шапка с классом kn-svetlaya", 'class="kn kn-svetlaya kn-rol-admin"' in t)
+    t = c.get("/liniya", auth=ADMIN).text
+    proverka("/liniya (base.html, своя тёмная тема): шапка без kn-svetlaya", 'class="kn kn-rol-admin"' in t)
+    css = open(os.path.join(tree, "app/static/nav.css"), encoding="utf-8").read()
+    js = open(os.path.join(tree, "app/static/nav.js"), encoding="utf-8").read()
+    proverka("nav.css: тёмная палитра не применяется к .kn-svetlaya; бейдж на телефоне сжимается с многоточием",
+             "#kidsup-nav:not(.kn-svetlaya), #kidsup-doc-bar" in css and "text-overflow: ellipsis" in css.split(".kn-badge:not([hidden])")[1][:200])
+    proverka("nav.js: переход из листа заменяет запись листа (location.replace), после перезагрузки запись убирается",
+             "location.replace(a.href)" in js and "history.state.knList" in js)
+    proverka("версия nav.css/nav.js поднята — браузеры не возьмут старые файлы из кэша",
+             nav.VERSIYA != "1" and f"nav.js?v={nav.VERSIYA}" in t)
+
+    print("К6. Методички: viewport браузеру, /promo/grafik без второго логотипа")
+    slug = "english_standard"
+    fajl = open(os.path.join(tree, "docs", f"{slug}.html"), encoding="utf-8").read()
+    r = c.get(f"/base/{slug}", auth=ADMIN, headers=BR)
+    proverka(f"/base/{slug} (в файле нет viewport) браузеру: viewport добавлен один раз, <!doctype — первым",
+             "viewport" not in fajl[:4000] and r.text.count('name="viewport"') == 1
+             and r.text.lstrip()[:9].lower() == "<!doctype"
+             and r.text.find('name="viewport"') < r.text.find('id="kidsup-doc-bar"'), r.text[:120])
+    r2 = c.get(f"/base/{slug}", auth=ADMIN)
+    proverka("…а скрипту (без Accept: text/html) viewport не добавляется", 'name="viewport"' not in r2.text)
+    proverka("vstavit_v_nachalo: после <!doctype>/<html>/<head>/<meta>; без них — в начало",
+             nav.vstavit_v_nachalo("<!doctype html><html><head><meta charset=utf-8><title>т</title>", "V")
+             == "<!doctype html><html><head><meta charset=utf-8>V<title>т</title>"
+             and nav.vstavit_v_nachalo("<title>т</title><p>x", "V") == "V<title>т</title><p>x")
+    t = c.get("/promo/grafik", auth=ADMIN).text
+    proverka("/promo/grafik: логотип один (в общей шапке), ссылка «← Эффективность промоутеров» на месте",
+             t.count("logo_color.png") == 0 and t.count("/static/logo.svg") == 1 and 'href="/promo"' in t, t.count("logo"))
 
 
 if __name__ == "__main__":

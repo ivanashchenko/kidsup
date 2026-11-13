@@ -571,6 +571,8 @@ def table_counts() -> dict:
 _PAGE_HITS_SQL = ("CREATE TABLE IF NOT EXISTS page_hits (day TEXT, path TEXT, rol TEXT, n INTEGER, "
                   "PRIMARY KEY (day, path, rol))")
 _page_hits_est = False
+_page_hits_chistka = ""      # день, за который старые строки уже стёрты
+PAGE_HITS_HRANIT = 90        # дней
 
 
 def page_hit(day: str, path: str, rol: str) -> bool:
@@ -578,11 +580,18 @@ def page_hit(day: str, path: str, rol: str) -> bool:
     (синхронизация пишет большую пачку) — запись пропускаем и возвращаем False, а не держим
     страницу: счётчик — справка, а не учёт. Прочие ошибки уходят наверх, их глотает
     вызывающий (main._schetchik_otkrytiy)."""
-    global _page_hits_est
+    global _page_hits_est, _page_hits_chistka
     conn = sqlite3.connect(config.DB_PATH, timeout=0)
     try:
         if not _page_hits_est:
             conn.execute(_PAGE_HITS_SQL)
+        if _page_hits_chistka != day:
+            # 13.11.2026, проверка шага 2: таблица росла без конца (строка на день, адрес и
+            # роль), а показ берёт 30 дней. Раз в сутки (и при запуске) стираем старше 90 дней.
+            from datetime import date as _date, timedelta as _td
+            conn.execute("DELETE FROM page_hits WHERE day < ?",
+                         ((_date.fromisoformat(day) - _td(days=PAGE_HITS_HRANIT)).isoformat(),))
+            _page_hits_chistka = day
         conn.execute(
             "INSERT INTO page_hits (day, path, rol, n) VALUES (?,?,?,1) "
             "ON CONFLICT(day, path, rol) DO UPDATE SET n = n + 1", (day, path, rol))

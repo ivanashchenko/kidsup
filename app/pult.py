@@ -1243,7 +1243,7 @@ def _shapka_vhoda(kto: dict | None, day: str, who: str, on: list) -> tuple[str, 
         return "", "", ""
 
 
-def page(day: str = "", who: str = "", rol: str = "admin", kto: dict | None = None) -> str:
+def page(day: str = "", who: str = "", rol: str = "admin", kto: dict | None = None, polosa: bool = True) -> str:
     """rol — кто открыл пульт ("admin" или "owner"): от роли зависит блок «Разделы»,
     раздел владельца админу не рисуется.
     kto — кто вошёл (vhod.iz(request), 12.11.2026): колонка вошедшего через форму стоит первой
@@ -1286,7 +1286,12 @@ def page(day: str = "", who: str = "", rol: str = "admin", kto: dict | None = No
     except Exception:
         pass
     extra = [w for w in sorted(komu) if w not in order and w not in skryt]  # не в смене — показываем свёрнуто внизу
+    # 13.11.2026, проверка шага 2: polosa=False — полоску «Вы: … · Выйти / сменить» рисует общая
+    # шапка (main.pult_page), на пульте второй не нужно; «сейчас в системе» и «ваша колонка» — тут.
+    risovat_polosu = polosa
     polosa, v_sisteme, ya = _shapka_vhoda(kto, day, who, on)
+    if not risovat_polosu:
+        polosa = ""
     if ya in skryt:   # личный вход с именем владельца, но без его роли — колонку не открываем
         ya = ""
     if ya and not who and ya in COLOR and ya not in UVOLENY:

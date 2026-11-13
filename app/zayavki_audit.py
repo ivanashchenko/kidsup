@@ -26,7 +26,7 @@ import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from . import db, sync, zayavki
+from . import config, db, sync, zayavki
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +76,9 @@ _CACHE: dict = {"ts": None, "data": None, "busy": False}
 # одиннадцать раз, и каждый раз пульт на несколько минут возвращался к сырому
 # списку на 68 строк — админы видели работу, которой нет. Поэтому результат
 # лежит ещё и на диске.
-CACHE_FILE = Path(__file__).resolve().parent.parent / "data" / "zayavki_audit.json"
+# 13.11.2026: путь — от папки данных (config.DATA_DIR, слушает KIDSUP_DATA_DIR), как у базы:
+# стенд с отдельной рабочей папкой писал этот файл в data/ самого репозитория.
+CACHE_FILE = config.DATA_DIR / "zayavki_audit.json"
 
 
 def _load_disk() -> None:

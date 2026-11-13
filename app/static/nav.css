@@ -14,8 +14,10 @@
   font: 14px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-text-size-adjust: 100%; text-align: left;
 }
+/* 13.11.2026, проверка: .kn-svetlaya ставит main._s_shapkoy страницам со своим HTML без
+   тёмной темы (пульт, долги, бланки) — шапка на белой странице остаётся светлой. */
 @media (prefers-color-scheme: dark) {
-  #kidsup-nav, #kidsup-doc-bar {
+  #kidsup-nav:not(.kn-svetlaya), #kidsup-doc-bar {
     --kn-fon: #17152b; --kn-fon2: #24213f; --kn-tekst: #eceaf8; --kn-tih: #a7a4c4;
     --kn-linia: #34315a; --kn-indigo: #b9b3ff; --kn-blue: #5cc4f0; --kn-na-indigo: #17152b;
   }
@@ -35,8 +37,13 @@
 
 /* --- полоска «кто вошёл» (vhod.shapka) --------------------------------- */
 #kidsup-nav .kn-kto { display: block; }
+/* 13.11.2026, проверка: «Вы: Лена · Выйти / сменить» — в верхней строке справа, а не отдельной
+   строкой над логотипом; инлайновые отступы и рамку полоски vhod.shapka здесь снимаем. */
+#kidsup-nav .kn-verh > .kn-kto { flex: 0 0 auto; margin-left: 0; }
+#kidsup-nav .kn-verh > .kn-badge[hidden] + .kn-kto { margin-left: auto; }
+#kidsup-nav .kn-verh > .kn-kto .kto-polosa { padding: 0 !important; border: 0 !important; background: none !important; flex-wrap: nowrap !important; white-space: nowrap; }
 @media (prefers-color-scheme: dark) {
-  #kidsup-nav .kn-kto:not(.kn-kto-vazhno) .kto-polosa { background: var(--kn-fon) !important; color: var(--kn-tekst) !important; border-color: var(--kn-linia) !important; }
+  #kidsup-nav:not(.kn-svetlaya) .kn-kto:not(.kn-kto-vazhno) .kto-polosa { background: var(--kn-fon) !important; color: var(--kn-tekst) !important; border-color: var(--kn-linia) !important; }
 }
 
 /* --- верхняя строка ----------------------------------------------------- */
@@ -107,12 +114,16 @@
   #kidsup-nav.kn-ped .kn-verh { height: auto; min-height: 56px; }
   /* «Вы: Лена · Выйти / сменить» на телефоне живёт в листе разделов (туда её переносит
      nav.js): верх — одна строка. Жёлтое предупреждение общего входа остаётся наверху. */
-  #kidsup-nav > .kn-kto:not(.kn-kto-vazhno) { display: none; }
+  #kidsup-nav > .kn-kto:not(.kn-kto-vazhno), #kidsup-nav .kn-verh > .kn-kto { display: none; }
   #kidsup-nav .kn-list-kto .kn-kto { display: block; }
   #kidsup-nav .kn-poisk { display: none; }
   #kidsup-nav .kn-poisk-pole { font-size: 16px; height: 44px; }   /* 16px: iPhone не увеличивает страницу при вводе */
   #kidsup-nav .kn-lupa { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 44px; margin-left: auto; font-size: 20px; border-radius: 10px; }
   #kidsup-nav .kn-badge { margin-left: 0; font-size: 12.5px; padding: 6px 10px; }
+  /* 13.11.2026, проверка: на 320 px полный бейдж («🔥 💬 12 · 📨 3 · ☎ 5 ждут») выталкивал
+     страницу вбок на 16 px — бейдж сжимается с многоточием, логотип и лупа не сжимаются */
+  #kidsup-nav .kn-badge:not([hidden]) { display: block; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  #kidsup-nav .kn-logo, #kidsup-nav .kn-lupa { flex: 0 0 auto; }
   #kidsup-nav.kn-poisk-otkryt .kn-logo, #kidsup-nav.kn-poisk-otkryt .kn-badge { display: none; }
   #kidsup-nav.kn-poisk-otkryt .kn-poisk { display: block; flex: 1 1 auto; max-width: none; }
   #kidsup-nav.kn-poisk-otkryt .kn-lupa { margin-left: 0; }

@@ -46,6 +46,8 @@
     var zakryt = document.getElementById('kn-zakryt');
     var kto = koren.querySelector('.kn-kto');
     var mestoKto = document.getElementById('kn-list-kto');
+    var ktoDom = kto ? kto.parentNode : null;   // 13.11.2026: полоска живёт в верхней строке (.kn-verh) — туда и возвращаем
+    if (ktoDom === koren) ktoDom = null;
     var vIstorii = false;   // открытие листа положено в историю — «назад» его закроет
 
     function pokazat(da) {
@@ -54,7 +56,7 @@
       knopka.setAttribute('aria-expanded', da ? 'true' : 'false');
       // «Вы: Лена · Выйти / сменить» на телефоне показываем в листе, а не над страницей
       if (kto && mestoKto && !kto.classList.contains('kn-kto-vazhno')) {
-        if (da) mestoKto.appendChild(kto); else koren.insertBefore(kto, koren.firstChild);
+        if (da) mestoKto.appendChild(kto); else if (ktoDom) ktoDom.appendChild(kto); else koren.insertBefore(kto, koren.firstChild);
       }
       if (da && zakryt) { try { zakryt.focus({ preventScroll: true }); } catch (e) {} }
     }
@@ -80,10 +82,23 @@
       if (e.key === 'Escape' && koren.classList.contains('kn-otkryt')) svernut();
     });
     // переход по пункту: лист прячем сразу, запись в истории остаётся под новой страницей
+    // 13.11.2026, проверка шага 2: запись листа оставалась в истории — после каждого перехода
+    // через меню «назад» один раз не делал ничего. Обычный клик теперь заменяет запись листа
+    // новой страницей (location.replace); Ctrl/Shift/средняя кнопка и target — как у браузера.
     list.addEventListener('click', function (e) {
       var a = e.target.closest ? e.target.closest('a') : null;
-      if (a && koren.classList.contains('kn-otkryt')) { vIstorii = false; pokazat(false); }
+      if (!a || !koren.classList.contains('kn-otkryt')) return;
+      var obychnyy = !e.defaultPrevented && !e.button && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey
+        && (!a.target || a.target === '_self') && a.href && !a.hasAttribute('download');
+      var byloVIstorii = vIstorii;
+      vIstorii = false; pokazat(false);
+      if (byloVIstorii && obychnyy) { e.preventDefault(); location.replace(a.href); }
     });
+    // страницу перезагрузили при открытом листе (пульт обновляется сам каждые 5 минут): лист
+    // закрыт, а его запись в истории осталась — убираем её, иначе «назад» один раз холостой
+    try {
+      if (history.state && history.state.knList && !koren.classList.contains('kn-otkryt')) history.back();
+    } catch (e) {}
     // окно растянули до компьютерной ширины — лист не должен остаться поверх страницы
     if (telefon.addEventListener) telefon.addEventListener('change', function (e) {
       if (!e.matches && koren.classList.contains('kn-otkryt')) svernut();

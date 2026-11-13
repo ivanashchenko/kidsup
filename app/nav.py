@@ -232,7 +232,7 @@ def eshche() -> str:
 # вошедшего сервер уже знает.
 # ---------------------------------------------------------------------------
 
-VERSIYA = "1"          # ?v= у nav.css и nav.js: менять вместе с файлами
+VERSIYA = "2"          # ?v= у nav.css и nav.js: менять вместе с файлами (2 — правки после проверки 13.11)
 KOREN = 'id="kidsup-nav"'
 
 # Нижняя панель на телефоне: три частые страницы и «☰ Разделы». У «Ответов» — число
@@ -241,7 +241,9 @@ KOREN = 'id="kidsup-nav"'
 PANEL = {
     "admin": [("Пульт", "/pult", "📋"), ("Ответы", "/waiting", "💬"), ("Линия", "/liniya", "📞")],
     "owner": [("Главная", "/", "🏠"), ("Мои дела", "/pult?who=Борис", "✅"),
-              ("Контроль оплат", "/kontrol-oplat", "₽")],
+              # 13.11.2026, проверка: «Контроль оплат» на телефонах 320–360 px обрезалось до
+              # «Контроль оп…» — на кнопке короткое «Оплаты», в меню название прежнее
+              ("Оплаты", "/kontrol-oplat", "₽")],
 }
 
 
@@ -311,13 +313,16 @@ def shapka(rol: str, path: str, k: str = "", kto_html: str = "",
         f'<span class="kn-znak" aria-hidden="true">{z}</span><span class="kn-podpis">{_e(n)}</span>'
         + ('<span class="kn-chislo" id="kn-chislo" hidden></span>' if a == "/waiting" else "") + "</a>"
         for n, a, z in PANEL.get(rol, PANEL["admin"]))
-    kto = ""
+    kto = vazhno = ""
     if kto_html:
         # жёлтую полосу общего входа на телефоне не прячем в лист: это предупреждение
         vazhno = " kn-kto-vazhno" if "obshchiy" in kto_html else ""
         kto = f'<div class="kn-kto{vazhno}">{kto_html}</div>'
     return (
-        f'<div {KOREN} class="kn kn-rol-{_e(rol)}" data-schet="{_e(schet_url)}">{_css()}{kto}'
+        # 13.11.2026, проверка шага 2: «Вы: Лена · Выйти / сменить» стояла отдельной строкой над
+        # логотипом (+43 px к шапке) — теперь в верхней строке справа, после бейджа. Жёлтое
+        # предупреждение общего входа — по-прежнему отдельной строкой сверху.
+        f'<div {KOREN} class="kn kn-rol-{_e(rol)}" data-schet="{_e(schet_url)}">{_css()}{kto if vazhno else ""}'
         '<div class="kn-verh">'
         '<a class="kn-logo" href="/" title="На свою главную"><img src="/static/logo.svg" alt="" width="30" height="30">'
         '<span>KidsUP</span></a>'
@@ -327,6 +332,7 @@ def shapka(rol: str, path: str, k: str = "", kto_html: str = "",
         '<div id="gs-drop" class="kn-drop" hidden></div></div>'
         '<button type="button" class="kn-lupa" id="kn-lupa" aria-label="Поиск" aria-expanded="false">🔍</button>'
         '<a id="wait-badge" class="kn-badge" href="/waiting" hidden></a>'
+        + ("" if vazhno else kto) +
         '</div>'
         '<div id="nav-razdely" class="kn-razdely">'
         '<div class="kn-list-verh"><b>Разделы</b><span class="kn-list-kto" id="kn-list-kto"></span>'
@@ -376,6 +382,22 @@ def vstavit(stranica: str, kusok: str) -> str:
             if not m or m.end() == i:
                 break
             i = m.end()
+    return stranica[:i] + kusok + stranica[i:]
+
+
+_V_GOLOVE = re.compile(r"\s+|<!--.*?-->|<!doctype[^>]*>|<html\b[^>]*>|<head\b[^>]*>|<meta\b[^>]*>", re.I | re.S)
+
+
+def vstavit_v_nachalo(stranica: str, kusok: str) -> str:
+    """Вставить кусок в «голову» страницы: после <!doctype>, <html>, <head> и уже стоящих
+    <meta> (13.11.2026 — для <meta name=viewport> методичкам без него). Нет ничего из
+    этого — в самое начало."""
+    i = 0
+    while True:
+        m = _V_GOLOVE.match(stranica, i)
+        if not m or m.end() == i:
+            break
+        i = m.end()
     return stranica[:i] + kusok + stranica[i:]
 
 

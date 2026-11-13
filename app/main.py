@@ -207,6 +207,12 @@ def _schet_chto_pisat(request, kod: int):
     # без параметров и хвостового «/»; /boris/docs/<slug> остаётся со slug. 120 знаков —
     # чтобы длинный мусорный адрес не раздувал таблицу (404 сюда и так не доходит)
     path = (path.rstrip("/") or "/")[:120]
+    # 13.11.2026, проверка шага 2: админа, которого увели со страницы владельца на пульт
+    # (_vladelcu), открывшим страницу не считаем — он её не видел, а случайный заход по
+    # старой закладке держал бы архивную страницу «живой» (решение «удалить через 30 дней,
+    # если заходов нет»).
+    if kod == 303 and getattr(request.state, "uveli_na_pult", False):
+        return None
     rol = getattr(request.state, "rol", "") or "?"
     if rol not in _SCHET_ROLI:
         if kod == 303:
@@ -451,7 +457,20 @@ def _vladelcu(request: Request):
     читается как «сайт сломался». Это скрытие страницы, не защита данных: их API на
     шаге 1 частью под общим входом (см. комментарии у /api/audit и /export/raw)."""
     if _rol(request) != "owner":
+        request.state.uveli_na_pult = True      # 13.11.2026: счётчик открытий такой переход не пишет
         return RedirectResponse("/pult", status_code=303)
+
+
+def _vladelcu_pereehala(request: Request, bylo: str):
+    """13.11.2026, проверка шага 2: «Дисциплина» (/metrics) и «Лиды» (/leads) до шага 2
+    открывались админам, а переехали на страницы владельца. Молчаливый переход на пульт
+    читался как «сайт сломался», поэтому админа ведём на пульт с пояснением (pult_page,
+    ?bylo=): страница переехала к владельцу. Вернуть ли её админам — решает владелец."""
+    r = _vladelcu(request)
+    if r is not None:
+        from urllib.parse import quote
+        return RedirectResponse("/pult?bylo=" + quote(bylo, safe=""), status_code=303)
+    return None
 
 
 def _kto_shapka(request: Request):
@@ -490,7 +509,13 @@ def _s_shapkoy(request: Request, stranica: str, kto: bool = True) -> str:
     """Страница со своим HTML → она же с общей шапкой (nav.wrap). Зовётся явно в каждом
     маршруте, а не прослойкой на все ответы: документам, JSON, выгрузкам и публичным
     страницам kidsup.ru шапка не нужна."""
-    return nav.wrap(stranica, _shapka(request, kto))
+    shapka = _shapka(request, kto)
+    # 13.11.2026, проверка шага 2: у телефона с тёмной темой шапка была тёмной, а страница со
+    # своим HTML — белой (пульт, долги, бланки, настройки): две темы на одном экране. Если у
+    # страницы своей тёмной темы нет — шапка остаётся светлой (класс kn-svetlaya, nav.css).
+    if isinstance(stranica, str) and "prefers-color-scheme" not in stranica:
+        shapka = shapka.replace('class="kn kn-rol-', 'class="kn kn-svetlaya kn-rol-', 1)
+    return nav.wrap(stranica, shapka)
 
 
 def _doc_s_polosoy(request: Request, stranica: str, nazad: str, nazvanie: str, podpis: str = "") -> str:
@@ -509,6 +534,11 @@ def _s_doctype(stranica: str) -> str:
     половины файлов docs/*.html — куски без <!doctype> и <body> (сразу <title><style>…),
     браузер открывал их в режиме совместимости. Сам файл не меняем: рутинам и скриптам
     (без Accept: text/html) он уходит как лежит."""
+    # 13.11.2026, проверка шага 2: у большинства методичек нет и <meta name=viewport> — телефон
+    # рисовал их шириной 980 px и сжимал, строка «← База знаний · 🖨 Печать» выходила высотой
+    # 5 px, пальцем не попасть. Добавляем viewport (тоже только браузеру), если его нет.
+    if not re.search(r"<meta[^>]+name=[\"']?viewport", stranica[:4000], re.I):
+        stranica = nav.vstavit_v_nachalo(stranica, '<meta name="viewport" content="width=device-width, initial-scale=1">')
     if stranica.lstrip()[:9].lower() == "<!doctype":
         return stranica
     return "<!doctype html>\n" + stranica
@@ -2410,7 +2440,7 @@ def metrics_page(request: Request):
     сроки (SLA) и «нагрузка» выброшены — ими не пользовались. «Журнал» — страница
     владельца, админа с него уводят на пульт (_vladelcu), поэтому админа ведём на пульт
     сразу, одним переходом, а не цепочкой /metrics → /journal → /pult."""
-    return _vladelcu(request) or RedirectResponse("/journal#schetchiki", status_code=303)
+    return _vladelcu_pereehala(request, "/metrics") or RedirectResponse("/journal#schetchiki", status_code=303)
 
 
 @app.post("/waitlist/add", dependencies=AUTH)
@@ -2931,6 +2961,9 @@ def pedagog_page(request: Request, k: str = ""):
     # 13.11.2026: шапка педагога («KidsUP · педагогам», один пункт) — только при верном ключе.
     # Маршрут без входа, поэтому шапка всегда педагогическая: меню админов сюда не попадает.
     if pedagog.key_ok(k):
+        # 13.11.2026, проверка шага 2: у маршрута нет зависимости входа, роль никто не ставил —
+        # счётчик открытий писал «?», и в сводке «Всего» не сходилось с колонками.
+        request.state.rol = "pedagog"
         stranica = nav.wrap(stranica, nav.shapka("pedagog", request.url.path, k=k))
     return HTMLResponse(stranica)
 
@@ -3137,12 +3170,43 @@ def api_boris_status(payload: dict = Body(...)):
     return {"ok": boris.set_status(int(payload.get("id") or 0), str(payload.get("status") or ""), str(payload.get("note") or ""))}
 
 
+def _pult_pereehala(bylo: str, rol: str) -> str:
+    """Пояснение на пульте админу, которого увели с переехавшей к владельцу страницы
+    (/metrics, /leads — _vladelcu_pereehala). Адрес — только из списка nav.PEREEHALI:
+    чужую строку из ?bylo= в страницу не переносим."""
+    if rol == "owner" or not bylo:
+        return ""
+    for adres, nazvanie, kuda_imya, *_ in nav.PEREEHALI:
+        if adres == bylo:
+            return ("<div class='card' id='pereehala' style='border-color:#F59C00;background:#fff8e6;margin-top:12px'>"
+                    f"Страница «{html.escape(nazvanie)}» переехала в «{html.escape(kuda_imya)}» — это раздел "
+                    "владельца, поэтому вы на пульте. Если она нужна вам в работе — скажите Борису. "
+                    "<a href='/pult'>Понятно</a></div>")
+    return ""
+
+
 @app.get("/pult", response_class=HTMLResponse, dependencies=AUTH)
 def pult_page(request: Request, day: str = "", who: str = ""):
     """Пульт смены: задачи по тем, кто сегодня работает, + Лиза и Борис, живые блоки (06.09)."""
     from . import pult
     # 13.11.2026: общая шапка. Полоску «Вы: …» пульт рисует сам (с «ваша колонка») — в шапке её нет.
-    return HTMLResponse(_s_shapkoy(request, pult.page(day, who, rol=_rol(request), kto=vhod.iz(request)), kto=False))
+    # 13.11.2026, проверка шага 2: полоска стояла на пульте ПОД шапкой, а на остальных страницах
+    # — в шапке, и при переходе Пульт ↔ Линия прыгала. Теперь она в шапке везде (polosa=False —
+    # пульт свою не рисует; «ваша колонка» и «сейчас в системе» остаются на пульте).
+    # Мусор в ?day= давал 500 (ValueError в pult.kpi) — берём сегодняшний день.
+    if day:
+        try:
+            date.fromisoformat(day)
+            if len(day) != 10:
+                raise ValueError(day)
+        except ValueError:
+            day = ""
+    rol = _rol(request)
+    stranica = pult.page(day, who, rol=rol, kto=vhod.iz(request), polosa=False)
+    zametka = _pult_pereehala(request.query_params.get("bylo") or "", rol)
+    if zametka:
+        stranica = stranica.replace("<div class='wrap'>", "<div class='wrap'>" + zametka, 1)
+    return HTMLResponse(_s_shapkoy(request, stranica))
 
 
 @app.get("/obeshchaniya", dependencies=AUTH)
@@ -3395,9 +3459,9 @@ def spiski_page(request: Request, day: str = "", subject: str = "", print: int =
     открывается сегодняшний, а старое «вся неделя» — это day=vse (нужно, когда в адресе
     был только предмет)."""
     from urllib.parse import urlencode
-    q = {"vid": "den"}
-    if day or subject:
-        q["day"] = day or "vse"
+    # 13.11.2026, проверка шага 2: закладка /spiski без параметров раньше показывала всю
+    # неделю — ведём на day=vse и без параметров, а не на сегодняшний день.
+    q = {"vid": "den", "day": day or "vse"}
     if subject:
         q["subject"] = subject
     return RedirectResponse("/blank-grupp?" + urlencode(q), status_code=303)
@@ -3465,7 +3529,7 @@ def leads_page(request: Request):
     на пульт (_vladelcu), поэтому админа ведём на пульт сразу, одним переходом, как у
     /metrics. Отправка в CRM (POST /leads/push/{id}) и выгрузка /export/leads.csv не менялись;
     кнопки отправки на старой странице не было — на новой её тоже нет."""
-    return _vladelcu(request) or RedirectResponse("/istochniki#leads", status_code=303)
+    return _vladelcu_pereehala(request, "/leads") or RedirectResponse("/istochniki#leads", status_code=303)
 
 
 @app.post("/leads/push/{lead_id}", dependencies=AUTH)
@@ -11746,7 +11810,10 @@ async def api_waiting(min_minutes: int = 15):
 # пульте, бланках и долгах таких вкладок стало кратно больше (PLAN.md, риск 7). Теперь
 # шапка берёт только числа из кэша последнего расчёта.
 SCHET_TTL = 100          # секунд: свежее — отдаём как есть
-_SCHET: dict = {"ts": 0.0, "dannye": None, "zadacha": None}
+# 13.11.2026, проверка шага 2: "ts" — время последней ПОПЫТКИ (чтобы не считать чаще
+# SCHET_TTL), "ts_ok" — время последнего удачного расчёта (от него «vozrast»), "oshibka" —
+# последний расчёт упал: раньше после сбоя старые числа уходили как свежие.
+_SCHET: dict = {"ts": 0.0, "ts_ok": 0.0, "oshibka": False, "dannye": None, "zadacha": None}
 
 
 def _schet_zapomnit(w: dict) -> dict:
@@ -11761,6 +11828,7 @@ def _schet_zapomnit(w: dict) -> dict:
                           or np_dengi or any((x.get("wait_min") or 0) > 30 for x in np)),
          "max_wait": int(w.get("max_wait") or 0)}
     _SCHET["dannye"], _SCHET["ts"] = d, time.time()
+    _SCHET["ts_ok"], _SCHET["oshibka"] = _SCHET["ts"], False
     return d
 
 
@@ -11775,6 +11843,7 @@ async def _schet_obnovit() -> None:
         if _SCHET["dannye"] is None:
             _SCHET["dannye"] = {"perepiska": 0, "bez_nomera": 0, "zvonki": 0, "dengi": False,
                                 "goryacho": False, "max_wait": 0, "oshibka": True}
+        _SCHET["oshibka"] = True
         _SCHET["ts"] = time.time()   # не повторять упавший расчёт на каждый опрос
 
 
@@ -11798,7 +11867,10 @@ async def api_waiting_schet():
         await asyncio.shield(zapustit())
     elif time.time() - c["ts"] >= SCHET_TTL:
         zapustit()
-    return JSONResponse({**(c["dannye"] or {}), "vozrast": int(time.time() - c["ts"])},
+    otvet = {**(c["dannye"] or {}), "vozrast": int(time.time() - (c.get("ts_ok") or c["ts"]))}
+    if c.get("oshibka"):
+        otvet["oshibka"] = True
+    return JSONResponse(otvet,
                         headers={"Cache-Control": "no-store"})
 
 
