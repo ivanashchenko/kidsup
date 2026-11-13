@@ -560,15 +560,29 @@ def test_nastroyka():
         proverka("явка «1», пункт Лизе: про занятия без отчёта педагога — пункт остаётся",
                  len(punkty) == 1 and "без отчёта педагога" in punkty[0][1] and "расхождений" not in punkty[0][1])
         # проверка скептика 12.11: пункт о явке идёт Лене, закрытие дня — её работа; его не глушим
+        # 13.11.2026, Борис (М4, «по рекомендациям»): «Кому идёт пункт о незакрытой явке? — Лизе,
+        # явку ведёт она». Было: yavka.nightly() без who клал Лене прежний полный пункт. Теперь по
+        # умолчанию пункт идёт Лизе — при «1» коротким (только «без отчёта педагога»); полный текст
+        # остаётся для явного who="Лена" и для настройки «0».
         punkty.clear()
         yavka.nightly("2026-11-11")
-        proverka("явка «1», пункт Лене: прежний текст — «не проведено», «отметок поставить», ссылка на /yavka",
+        proverka("явка «1», без who: пункт идёт Лизе, короткий — «без отчёта педагога», расхождения на странице",
+                 (len(punkty), punkty[0][0] if punkty else "", "без отчёта педагога 1 занятий" in (punkty[0][1] if punkty else ""),
+                  "app.kidsup.ru/proverka-mk, раздел 3" in (punkty[0][1] if punkty else ""),
+                  any(x in (punkty[0][1] if punkty else "") for x in ("не проведено", "отметок поставить"))),
+                 (1, "Лиза", True, True, False))
+        punkty.clear()
+        yavka.nightly("2026-11-11", who="Лена")
+        proverka("явка «1», явно Лене: прежний текст — «не проведено», «отметок поставить», ссылка на /yavka",
                  (len(punkty), punkty[0][0] if punkty else "", all(x in (punkty[0][1] if punkty else "") for x in (
                      "не проведено 1", "отметок поставить 2", "app.kidsup.ru/yavka?day=2026-11-11"))), (1, "Лена", True))
         db.set_setting("proverka_mk_vmesto_punktov", "0")
         punkty.clear()
         yavka.nightly("2026-11-11")
-        proverka("явка «0»: прежний пункт с расхождениями", len(punkty) == 1 and "расхождений с CRM 2" in punkty[0][1])
+        proverka("явка «0»: прежний пункт с расхождениями — тоже Лизе (решение 13.11)",
+                 len(punkty) == 1 and punkty[0][0] == "Лиза" and "расхождений с CRM 2" in punkty[0][1])
+        from app.pult_proverka import liza_mozhno as _lm
+        proverka("явка «0»: сторож пульта не называет этот пункт «не тому»", _lm(punkty[0][1] if punkty else ""))
         # качество карточек
         class Mk:
             def fetch_all(self, *a, **k):
@@ -593,8 +607,15 @@ def test_nastroyka():
         ap.card_quality()
         proverka("качество карточек «0»: пункт как раньше", len(zadachi), 1)
         # выключатель возвращает и прежнее правило «явка и проведено — не Лизе»
+        # 13.11.2026, Борис (М4): явку ведёт Лиза — было «„0“: пункт со словом „явка“ Лизе снова
+        # нельзя». Теперь «явка» Лизе можно при любой настройке; «проведено» без слова «явка» при
+        # «0» — по-прежнему чужой пункт, как и закрытие занятий за день.
         from app.pult_proverka import liza_mozhno
-        proverka("«0»: пункт со словом «явка» Лизе снова нельзя", liza_mozhno("Поставить явку по отчёту педагога"), False)
+        proverka("«0»: пункт со словом «явка» Лизе можно и при выключателе (решение 13.11)",
+                 liza_mozhno("Поставить явку по отчёту педагога"))
+        proverka("«0»: «проведено» без слова «явка» Лизе по-прежнему нельзя",
+                 liza_mozhno("Вернуть «не проведено» у занятия 12.11"), False)
+        proverka("«0»: закрытие занятий за день Лизе нельзя", liza_mozhno("Закрыть занятия за вчера, 40 штук"), False)
         proverka("«0»: пункт про долг Лизе можно", liza_mozhno("Долг 2 500 ₽ у семьи Тестовых"))
         db.set_setting("proverka_mk_vmesto_punktov", "1")
         proverka("«1»: пункт со словом «явка» Лизе можно", liza_mozhno("Поставить явку по отчёту педагога"))
@@ -914,9 +935,159 @@ def test_skeptik2():
         ap._mark = st_mark
 
 
+# ── 10. М3 (13.11.2026): красные находки «Аномалий» — раздел 13; жёлтые в ленту не пишутся ──
+
+def test_anomalii():
+    print("М3: лента «Аномалии» — красные разделом 13 на странице, остальное выключено настройкой")
+    from app import audit, rules, crmcheck
+    import app.main as m
+
+    def v_lente(usl="1=1"):
+        with db.get_conn() as conn:
+            audit._ensure(conn)
+            return conn.execute(f"SELECT COUNT(*) FROM audit_flags WHERE {usl}").fetchone()[0]
+
+    def vruchnuyu(kind, key, level, title, detail, uid, sozdano, status="new"):
+        with db.get_conn() as conn:
+            audit._ensure(conn)
+            conn.execute("INSERT INTO audit_flags (kind, key, level, title, detail, user_id, day, status, created_at) "
+                         "VALUES (?,?,?,?,?,?,?,?,?)", (kind, key, level, title, detail, uid, sozdano[:10], status, sozdano))
+
+    ostalos_do = pm.sobrat(CHASY)["itog"]["ostalos"]
+    # 1. выключатель: по умолчанию в ленту пишутся только красные
+    proverka("настройка anomalii_ne_krasnye меняется через /api/settings (откат без выкладки)",
+             "anomalii_ne_krasnye" in m.SETTABLE)
+    proverka("по умолчанию настройка не задана — «выключено»", (db.get_setting("anomalii_ne_krasnye"), audit.ne_krasnye_pishem()),
+             ("", False))
+    bylo = v_lente()
+    proverka("жёлтая находка не пишется", audit.add_flag("деньги", "test:mid", audit.MID, "Долг клиента 5 000 ₽",
+                                                          "Остаткова Нина · баланс −5 000 ₽", user_id=9005), False)
+    proverka("серая — тоже", audit.add_flag("правила", "test:low", audit.LOW, "Отработка задним числом", "Тестова Ева"), False)
+    proverka("красная пишется", audit.add_flag("деньги", "neg-balance:9004:2026-11", audit.HIGH, "Долг клиента 25 000 ₽",
+                                               "Образцова Мила · баланс −25 000 ₽. Разобрать.", user_id=9004,
+                                               day="2026-11-12"), True)
+    proverka("повтор красной с тем же ключом — не вторая запись",
+             audit.add_flag("деньги", "neg-balance:9004:2026-11", audit.HIGH, "Долг клиента 25 000 ₽", "", user_id=9004), False)
+    proverka("в ленте прибавилась ровно одна запись — красная", (v_lente() - bylo, v_lente("level != 'high'")), (1, 0))
+    # сами проверки не тронуты: считают и возвращают то же, пишут только красное
+    st_subs = rules._subs
+    try:
+        rules._subs = lambda since=None: [
+            {"id": 801, "userId": 9001, "price": 8000, "payed": 0, "visitedCount": 4, "statusId": 2, "sellDate": "2026-11-03", "managerId": 154181},
+            {"id": 802, "userId": 9002, "price": 8000, "payed": 6000, "visitedCount": 1, "statusId": 2, "sellDate": "2026-11-03", "managerId": 154181}]
+        nashli = rules.unpaid_subscriptions("2026-09-01")
+    finally:
+        rules._subs = st_subs
+    proverka("проверка денег находит оба неоплаченных абонемента, как раньше", sorted(x["id"] for x in nashli), [801, 802])
+    proverka("…а в ленту идёт только красный (долг от 10 000 ₽ или 3 занятия)",
+             (v_lente("key='sub-unpaid:801' AND level='high'"), v_lente("key='sub-unpaid:802'")), (1, 0))
+    proverka("код проверок на месте: аудит дня, правила, деньги, состав групп",
+             all(callable(f) for f in (audit.daily_audit, audit.unsigned_payments, audit.off_price, audit.ghost_paying_clients,
+                                       rules.check, rules.money_check, crmcheck.fit_check, ap.audit_yesterday,
+                                       ap.rules_check, ap.money_check)))
+    db.set_setting("anomalii_ne_krasnye", "1")
+    try:
+        proverka("настройка «1»: жёлтая и серая пишутся, как до 13.11",
+                 (audit.add_flag("деньги", "test:mid", audit.MID, "Долг клиента 5 000 ₽", "Остаткова Нина", user_id=9005),
+                  audit.add_flag("правила", "test:low", audit.LOW, "Отработка задним числом", "Тестова Ева")), (True, True))
+    finally:
+        db.set_setting("anomalii_ne_krasnye", "0")
+    proverka("настройка «0»: снова только красные", audit.add_flag("скидка", "test:mid2", audit.MID, "Оплата ниже обычной"), False)
+
+    # 2. раздел 13: красные за 14 дней (30.10–12.11), сняты «не нарушение» и старые — нет
+    tekst = "Тестова Ева: оплачено уменьшено 9450 → 8400; цена оплаченного абонемента снижена (замечено 11.11)"
+    audit.add_flag("честность", "chest:user_subscriptions:801:правка: user", audit.HIGH, tekst[:120], tekst, user_id=9001, day="2026-11-11")
+    audit.add_flag("честность", "chest:invoices:901:правка: invoi", audit.HIGH, "Тестова Ева: оплачено по счёту уменьшено 9450 → 8400",
+                   "Тестова Ева: оплачено по счёту уменьшено 9450 → 8400", user_id=9001, day="2026-11-11")
+    vruchnuyu("правила", "disc-noreason:803", "high", "Скидка 35% без объяснения", "Тестов Марк · 5 200 ₽ вместо 8 000 ₽",
+              9002, "2026-10-30T09:31:00+03:00")                                   # первый день окна
+    vruchnuyu("деньги", "neg-balance:9016:2026-10", "high", "Долг клиента 21 000 ₽", "Минусов Лев", 9016,
+              "2026-10-29T09:41:00+03:00")                                         # на день старше окна
+    vruchnuyu("возврат", "ref901", "high", "Возврат 4 000 ₽", "Возвратова Ия · без причины", 9025,
+              "2026-11-11T09:01:00+03:00", status="ok")                            # владелец снял: «не нарушение»
+    vruchnuyu("оплата без подписи", "pay902", "high", "Оплата 7 000 ₽ без менеджера", "Пробная Алиса", 9003,
+              "2026-11-10T09:01:00+03:00", status="violation")                     # владелец подтвердил
+    vruchnuyu("группы", "fit:9007:2627_ПШ", "high", "Удалёнов Ян: 3 лет в группе 5–7", "ребёнок младше вилки группы", 9007,
+              "2026-11-09T09:51:00+03:00")                                         # карточка удалена в МойКлассе
+    vruchnuyu("речь", "звонок 1:без чека", "high", "оплата без чека", "звонок 1 · «…без чека…»", None,
+              "2026-11-08T12:00:00+03:00")                                         # без карточки
+    lenta_do = (v_lente(), v_lente("status='new'"))
+    V = pm.krasnye(vladelec=True, seychas=CHASY)
+    A = pm.krasnye(vladelec=False, seychas=CHASY)
+    proverka("владельцу: красных за 14 дней 8 — по видам",
+             (V["vsego"], V["po_vidam"], V["s_dnya"], V["dney"]),
+             (8, {"деньги": 2, "честность": 2, "правила": 1, "оплата без подписи": 1, "группы": 1, "речь": 1}, "2026-10-30", 14))
+    vidy = lambda R: sorted({g["vid"] for g in R["gruppy"]})                       # noqa: E731
+    proverka("админу: только то, что админские страницы показывают и так, — деньги, правила, группы",
+             (A["vsego"], vidy(A)), (4, ["группы", "деньги", "правила"]))
+    vse_a = json.dumps(A, ensure_ascii=False)
+    proverka("админу не попадают сверка честности, оплаты без подписи, стоп-фразы (отчёты о самих админах)",
+             any(x in vse_a for x in ("оплачено уменьшено", "без менеджера", "без чека", "честность")), False)
+    kl = {(g["vid"], g["uid"]): g for g in V["gruppy"]}
+    proverka("две находки сверки честности об одном ребёнке за день — одна строка с двумя пунктами",
+             (len(kl[("честность", 9001)]["punkty"]), len(V["gruppy"])), (2, 7))
+    proverka("название сверки честности — обрезанный текст: показываем текст целиком, без повтора",
+             (kl[("честность", 9001)]["punkty"][-1]["chto"], kl[("честность", 9001)]["punkty"][-1]["podrobno"]), (tekst, ""))
+    proverka("ссылка на карточку МойКласса и имя ребёнка",
+             (kl[("деньги", 9004)]["ssylka"], kl[("деньги", 9004)]["rebenok"], kl[("деньги", 9004)]["naydeno"]),
+             ("https://app.moyklass.com/user/9004", "Образцова Мила", "2026-11-12"))
+    proverka("находка на первый день окна (30.10) — есть, на день старше (29.10) — нет",
+             (("правила", 9002) in kl, ("деньги", 9016) in kl), (True, False))
+    proverka("снятая владельцем («не нарушение») — нет; подтверждённая — есть, с пометкой",
+             (("возврат", 9025) in kl, kl[("оплата без подписи", 9003)]["podtverzhdeno"]), (False, True))
+    proverka("карточка удалена в МойКлассе — строка без ссылки, с пометкой",
+             (kl[("группы", 9007)]["ssylka"], kl[("группы", 9007)]["ssylka_tekst"]), ("", "карточка удалена в МойКлассе"))
+    proverka("находка без карточки — отдельной строкой, без ссылки",
+             [(g["rebenok"], g["ssylka"]) for g in V["gruppy"] if g["vid"] == "речь"], [("", "")])
+    proverka("жёлтые и серые в раздел не попадают", any(g["vid"] == "скидка" for g in V["gruppy"]), False)
+    proverka("раздел только читает: лента после сборки та же", (v_lente(), v_lente("status='new'")), lenta_do)
+
+    # 3. в «осталось N» и в строки страницы раздел не входит
+    res = pm.sobrat(CHASY)
+    with db.get_conn() as conn:
+        v_strokah = conn.execute("SELECT COUNT(*) FROM proverka_mk_stroki WHERE razdel LIKE '13%' OR key LIKE '%audit%'").fetchone()[0]
+    proverka("тринадцатого раздела среди строк страницы нет: в «осталось N» и в proverka_mk_stroki он не входит",
+             ("13" in [rz["nomer"] for rz in res["razdely"]], [rz["nomer"] for rz in res["razdely"]][-1],
+              res["itog"]["ostalos"] == ostalos_do, v_strokah), (False, "12", True, 0))
+    proverka("строка вечернего саммари Бориса не изменилась по форме",
+             pm.stroka_dlya_borisa(CHASY).startswith("Проверка МК: осталось "))
+
+    # 4. страница и API (режим без входа — роль владельца)
+    from fastapi.testclient import TestClient
+    c = TestClient(m.app)
+    h = c.get("/proverka-mk").text
+    r13 = h.split('id="r13"', 1)[-1].split("</section>", 1)[0] if 'id="r13"' in h else ""
+    proverka("на странице раздел 13 «Красные находки „Аномалий“ за 14 дней», помечен «только чтение»",
+             "Красные находки «Аномалий» за 14 дней" in r13 and "только чтение" in r13 and ">8 · только чтение<" in r13)
+    proverka("в разделе ссылка на карточку МойКласса, текст находки и пометка «подтверждено владельцем»",
+             'href="https://app.moyklass.com/user/9004"' in r13 and "Долг клиента 25 000 ₽" in r13
+             and "подтверждено владельцем" in r13)
+    proverka("в разделе нет ни кнопок, ни галочек — только чтение",
+             any(x in r13 for x in ("<button", "onclick", "checkbox", "<form", "<input")), False)
+    proverka("в сводке Бориса — строка раздела 13 с числом и разбивкой по видам, ссылка на «Аномалии»",
+             "13. Красные находки «Аномалий» за 14 дней" in h and "честность 2" in h and 'href="/audit"' in h)
+    d = c.get("/api/proverka-mk").json()
+    k = pm.dannye()                                    # то, что отдаёт страница (кэш последней сборки)
+    proverka("API: разделы и итог — те же, что без красных; красные — отдельным ключом krasnye",
+             ([rz["nomer"] for rz in d["razdely"]] == [rz["nomer"] for rz in k["razdely"]], d["itog"]["ostalos"] == k["itog"]["ostalos"],
+              "13" in [rz["nomer"] for rz in d["razdely"]], d["krasnye"]["vsego"]), (True, True, False, 8))
+    proverka("API kratko=1 — как раньше, без красных", "krasnye" in c.get("/api/proverka-mk?kratko=1").json(), False)
+    proverka("страница «Аномалии» на месте", c.get("/audit").status_code, 200)
+    # лента сломана — страница жива
+    st_conn = db.get_conn
+    try:
+        def padaet():
+            raise sqlite3.OperationalError("база занята (тест)")
+        db.get_conn = padaet
+        R = pm.krasnye(vladelec=True, seychas=CHASY)
+    finally:
+        db.get_conn = st_conn
+    proverka("лента не прочиталась — раздел пустой с пометкой, без падения", (R["vsego"], bool(R["oshibka"])), (0, True))
+
+
 def main():
     for t in (test_razdely, test_zhizn, test_ne_oshibka, test_sredniy, test_pult, test_nastroyka, test_http, test_sverka_1211,
-              test_skeptik2):
+              test_skeptik2, test_anomalii):
         t()
         print()
     if oshibok:

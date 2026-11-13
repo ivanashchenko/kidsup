@@ -67,6 +67,8 @@
 #kidsup-nav .kn-gs-item:last-child { border-bottom: 0; }
 #kidsup-nav .kn-gs-item:hover, #kidsup-nav .kn-gs-item.kn-vybran { background: var(--kn-fon2); }
 #kidsup-nav .kn-gs-type { grid-row: 1 / span 2; align-self: center; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--kn-fon2); color: var(--kn-tih); white-space: nowrap; }
+/* 13.11.2026, вечер 1: страница из меню в результатах поиска — метка цветом шапки */
+#kidsup-nav .kn-gs-razdel .kn-gs-type { background: var(--kn-indigo); color: var(--kn-na-indigo); }
 #kidsup-nav .kn-gs-title { font-weight: 650; overflow-wrap: anywhere; }
 #kidsup-nav .kn-gs-sub { font-size: 12.5px; color: var(--kn-tih); overflow-wrap: anywhere; }
 #kidsup-nav .kn-lupa { display: none; }

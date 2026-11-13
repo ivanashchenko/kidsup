@@ -28,6 +28,9 @@ pravila1211 (stranica_lizy.md, stranica_lizy_proverka.md); правила раз
 Сверка строк на копии базы 12.11 (что оказалось ложным и как поправлено) — в комментариях
 у r1, r3, r10 и в тесте test_sverka_1211.
 
+13.11.2026 — раздел 13 «Красные находки „Аномалий“ за 14 дней» (krasnye): только чтение,
+в «осталось N» не входит и в proverka_mk_stroki не пишется — см. комментарий у krasnye().
+
 Строки живут в таблице proverka_mk_stroki (ключ, раздел, впервые, последний раз,
 закрыта, заметка): по ней считаются «новых и закрыто за сутки», возраст строки и
 сводка Бориса. «Не ошибка» с обязательной причиной — только там, где правило —
@@ -1761,6 +1764,99 @@ def stroka_dlya_borisa(seychas: datetime | None = None) -> str:
     if it.get("zhdut_resheniya"):
         s += f"; ждёт решения: {len(it['zhdut_resheniya'])}"
     return s + ". app.kidsup.ru/proverka-mk"
+
+
+# ── Р13. Красные находки «Аномалий» за 14 дней — только чтение ────────────
+#
+# 13.11.2026, Борис (М3, «по рекомендациям»): три ежедневные проверки автопилота (аудит
+# вчерашнего дня, контроль правил, проверка денег) и копии сверки честности и состава групп
+# пишут в ленту «Аномалии» (audit_flags) по 50–100 записей в день; её никто не разбирает с
+# 20.08, а пункт «Аномалии» из меню владельца ушёл. Решение: красные находки показываем
+# здесь, остальное в ленту больше не пишется (app/audit.py, настройка anomalii_ne_krasnye).
+#
+# Красная — та, у которой проверка сама поставила высший уровень (audit.HIGH, «деньги:
+# разбираем в тот же день»). По видам это:
+#   «честность»          — красная находка сверки честности: правка или удаление оплаченного
+#                          (сумма оплаты, цена оплаченного абонемента, счёт);
+#   «правила»            — скидка от 30 % без объяснения в комментарии абонемента;
+#   «деньги»             — долг клиента от 20 000 ₽; абонемент не оплачен с долгом от
+#                          10 000 ₽ или уже с тремя использованными занятиями;
+#   «оплата без подписи» — оплата не онлайн, под которой нет менеджера;
+#   «возврат»            — возврат от 3 000 ₽;
+#   «группы»             — ребёнок на полтора года и больше вне возраста группы;
+#   «речь»               — стоп-фраза в разговоре («переведите мне на карту», «без чека»).
+# На копии базы 12.11 за 30.10–12.11 красных 63: честность 47, правила 7, деньги 9.
+#
+# Раздел только читает ленту: галочек и кнопок нет, в «осталось N» и в число на пульте он
+# не входит (находка не пропадает сама, когда данные исправили, — это запись на день
+# проверки). Убрать находку может владелец кнопкой «не нарушение» на /audit.
+#
+# Кому что видно. С 12.11 отчёты о самих админах — только владельцу (/api/audit и
+# /api/sverka-chestnosti отвечают админу 401, nav_testy «Д2»). Поэтому админам здесь
+# показываются только виды, которые админские страницы показывают и так: «деньги» (/dolgi),
+# «правила» (/pravila-kontrol), «группы» (бланки). Остальное — владельцу.
+
+KRASNYE_DNEY = 14
+KRASNYE_ADMINAM = {"деньги", "правила", "группы"}
+KRASNYE_VIDY = {
+    "честность": "правка оплаченного (сверка честности)",
+    "правила": "скидка от 30 % без объяснения",
+    "деньги": "долг или неоплаченный абонемент",
+    "оплата без подписи": "оплата без менеджера",
+    "возврат": "возврат от 3 000 ₽",
+    "группы": "не по возрасту группы",
+    "речь": "стоп-фраза в разговоре",
+}
+
+
+def krasnye(vladelec: bool = False, seychas: datetime | None = None, dney: int = KRASNYE_DNEY) -> dict:
+    """Красные находки ленты «Аномалии», записанные за последние dney дней, кроме снятых
+    владельцем («не нарушение»). Находки одного ребёнка одного вида за один день склеены в
+    одну строку (сверка честности пишет по две: абонемент и счёт). vladelec=False — только
+    виды из KRASNYE_ADMINAM. Лента не читается — пустой раздел с пометкой, страница жива."""
+    seychas = seychas or _now()
+    s_dnya = (seychas.date() - timedelta(days=max(1, dney) - 1)).isoformat()
+    itog = {"dney": dney, "s_dnya": s_dnya, "gruppy": [], "vsego": 0, "po_vidam": {}, "oshibka": ""}
+    try:
+        with db.get_conn() as conn:
+            if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='audit_flags'").fetchone():
+                return itog
+            udal = db.udalennye("users", conn)
+            rows = [dict(r) for r in conn.execute(
+                "SELECT f.id, f.kind, f.title, f.detail, f.user_id, f.day, f.status, f.created_at, u.name "
+                "FROM audit_flags f LEFT JOIN users u ON u.id = f.user_id "
+                "WHERE f.level = 'high' AND COALESCE(f.status, 'new') != 'ok' AND substr(f.created_at, 1, 10) >= ? "
+                "ORDER BY substr(f.created_at, 1, 10) DESC, f.kind, f.id DESC", (s_dnya,))]
+    except Exception as e:  # noqa: BLE001 — раздел только для чтения страницу не роняет
+        log.exception("проверка МК: красные находки «Аномалий» не прочитались")
+        itog["oshibka"] = f"{type(e).__name__}: {str(e)[:160]}"
+        return itog
+    gruppy: dict[tuple, dict] = {}
+    for r in rows:
+        vid = r["kind"] or ""
+        if not vladelec and vid not in KRASNYE_ADMINAM:
+            continue
+        naydeno = str(r["created_at"] or "")[:10]
+        uid = r["user_id"]
+        g = gruppy.get((vid, uid, naydeno)) if uid else None
+        if g is None:
+            g = {"vid": vid, "vid_tekst": KRASNYE_VIDY.get(vid, vid), "uid": uid, "rebenok": r["name"] or "",
+                 "naydeno": naydeno, "data": str(r["day"] or "")[:10], "punkty": [], "podtverzhdeno": False,
+                 "ssylka": "", "ssylka_tekst": "", "tolko_vladelcu": vid not in KRASNYE_ADMINAM}
+            if uid and uid not in udal:
+                g["ssylka"], g["ssylka_tekst"] = MK_USER.format(uid), "карточка в МойКлассе"
+            elif uid:
+                g["ssylka_tekst"] = "карточка удалена в МойКлассе"
+            gruppy[(vid, uid, naydeno) if uid else (vid, None, r["id"])] = g
+        nazv, podrobno = str(r["title"] or "").strip(), str(r["detail"] or "").strip()
+        if podrobno.startswith(nazv[:100]):          # сверка честности: название — обрезанный текст находки
+            nazv, podrobno = podrobno, ""
+        g["punkty"].append({"id": r["id"], "chto": nazv, "podrobno": podrobno})
+        g["podtverzhdeno"] = g["podtverzhdeno"] or r["status"] == "violation"
+        itog["vsego"] += 1
+        itog["po_vidam"][vid] = itog["po_vidam"].get(vid, 0) + 1
+    itog["gruppy"] = list(gruppy.values())
+    return itog
 
 
 # ── действия со страницы ──────────────────────────────────────────────────

@@ -189,12 +189,14 @@ def test_ssylki(c, m, baza):
     items = c.get("/api/search?q=Тестова", auth=ADMIN).json()["items"]
     proverka("поиск: клиент с телефоном → «Линия» с 10 цифрами",
              any(i["url"] == f"/liniya?phone={SEMYA[-10:]}" for i in items), [i["url"] for i in items])
+    # 13.11.2026, вечер 1: было …/client/<id>. Карточка МойКласса теперь по адресу /user/<id> —
+    # как на «Линии» (liniya.CRM_KARTOCHKA), пульте, «Без оплаты» и «Проверке МойКласса».
     items = c.get("/api/search?q=Безномерова", auth=ADMIN).json()["items"]
     proverka("поиск: клиент без телефона → карточка МойКласса",
-             [i["url"] for i in items] == ["https://app.moyklass.com/client/9901"], [i["url"] for i in items])
+             [i["url"] for i in items] == ["https://app.moyklass.com/user/9901"], [i["url"] for i in items])
     items = c.get("/api/search?q=Длинномерова", auth=ADMIN).json()["items"]
     proverka("поиск: номер из 12 цифр не обрезаем до чужого — карточка МойКласса",
-             [i["url"] for i in items] == ["https://app.moyklass.com/client/9902"], [i["url"] for i in items])
+             [i["url"] for i in items] == ["https://app.moyklass.com/user/9902"], [i["url"] for i in items])
     vse = json.dumps([c.get(f"/api/search?q={quote(q)}", auth=ADMIN).json() for q in ("Тестова", "999000", "ПШ")],
                      ensure_ascii=False)
     proverka("поиск не ведёт на /brief и /students", "/brief" not in vse and "/students" not in vse)
@@ -366,18 +368,23 @@ def test_menu(c, m):
     proverka(f"все {len(vse)} пунктов меню ведут на существующие страницы", not net, net)
     lishnie = [a for a in vse if a.split("?")[0] in set(m.UBRANO) | NE_V_MENU]
     proverka("в меню нет убранных, архивных и объединённых страниц", not lishnie, lishnie)
-    proverka("у админа 16 пунктов: Смена, Группы, Деньги, Справка",
-             [r for r, _ in nav.menu("admin")] == ["Смена", "Группы", "Деньги", "Справка"]
-             and len(_adresa(nav.menu("admin"))) == 16, [r for r, _ in nav.menu("admin")])
-    proverka("у владельца — те же и 11 своих последним разделом",
+    # 13.11.2026, Борис — меню, вечер 1 («М — по рекомендациям»): было 16 пунктов в четырёх
+    # разделах и 11 у владельца. Из меню админов ушли «Обзвон», «Шахматка», «Стоп-лист», пришла
+    # «Проверка МойКласса» (раздел «МойКласс», туда же переехала «Явка») — стало 14; у владельца
+    # ушли «Аномалии», «Журнал», «Откуда заявки», «Камеры», «Архив» — стало 6. Точный состав,
+    # замены и поиск проверяет раздел «Л».
+    proverka("у админа 14 пунктов: Смена, Группы, МойКласс, Деньги, Справка",
+             [r for r, _ in nav.menu("admin")] == ["Смена", "Группы", "МойКласс", "Деньги", "Справка"]
+             and len(_adresa(nav.menu("admin"))) == 14, [r for r, _ in nav.menu("admin")])
+    proverka("у владельца — те же и 6 своих последним разделом",
              nav.menu("owner")[:-1] == nav.menu("admin") and nav.menu("owner")[-1] == nav.OWNER
-             and len(nav.OWNER[1]) == 11)
+             and len(nav.OWNER[1]) == 6)
     proverka("педагогу по ключу меню не положено", nav.menu("pedagog") == [])
 
     print("Меню: админ")
     h = shapka(c, "/liniya", ADMIN)
     net = [a for a in _adresa(nav.ADMIN) if f'href="{a}"' not in h]
-    proverka("в шапке все 16 пунктов админов", not net, net)
+    proverka("в шапке все 14 пунктов админов", not net, net)      # 13.11.2026, вечер 1: было 16
     # 13.11.2026, шаг 2: ожидания поправлены под новую шапку — подсветка классом kn-tut,
     # «☰ Разделы» — четвёртая кнопка нижней панели (значок и подпись в отдельных span).
     proverka("подсвечена открытая страница", 'href="/liniya" class="kn-tut" aria-current="page"' in h)
@@ -398,7 +405,7 @@ def test_menu(c, m):
     print("Меню: владелец")
     h = shapka(c, "/liniya", VLADELEC)
     net = [a for a in _adresa(nav.menu("owner")) if f'href="{a}"' not in h]
-    proverka("в шапке все 16 пунктов админов и 11 своих", not net, net)
+    proverka("в шапке все 14 пунктов админов и 6 своих", not net, net)      # 13.11.2026, вечер 1: было 16 и 11
     proverka("раздел «Владельцу» — последним", h.rfind("Владельцу") > h.find('href="/base"') > 0)
     proverka("кнопка «Синхронизировать» есть", 'id="sync-btn"' in h)
     # 13.11.2026, шаг 2: ключ МойКласса переехал на саму /owner (раздел id='mk') — ссылка
@@ -434,8 +441,10 @@ def test_glavnaya(c, m):
     r = c.get("/", auth=ADMIN, follow_redirects=False)
     proverka("/ админ → 200, без перехода", (r.status_code, r.headers.get("location")) == (200, None),
              (r.status_code, r.headers.get("location")))
-    proverka("у админа все четыре раздела и кнопка пульта",
-             all(x in r.text for x in ("Смена", "Группы", "Деньги", "Справка", "Открыть пульт", "href=\"/pult\"")))
+    # 13.11.2026, вечер 1: разделов стало пять — добавился «МойКласс» с «Проверкой МойКласса»
+    proverka("у админа все пять разделов и кнопка пульта",
+             all(x in r.text for x in ("Смена", "Группы", "МойКласс", "Деньги", "Справка", "Открыть пульт",
+                                       "href=\"/pult\"", "href=\"/proverka-mk\"")))
     proverka("у админа нет раздела «Владельцу» и документов", "Владельцу" not in r.text and "Ваши документы" not in r.text)
     boris_docs.save("start", "Стартовая страница (стенд)", "<!doctype html><title>стенд</title>" + "<p>стенд</p>" * 5)
     boris_docs.save("stary-stend", "Старый документ (стенд)", "<!doctype html><title>стенд</title>" + "<p>стенд</p>" * 5)
@@ -508,10 +517,18 @@ def test_arhiv(c, m):
         proverka(f"пульт: ссылки {adres} нет", f"href='{adres}" not in h and f'href="{adres}' not in h)
     proverka("у админа раздела владельца нет",
              "Владельцу" not in blok and all(f"href='{a}'" not in h for a in ("/arhiv", "/owner", "/kontrol-oplat")))
-    proverka("строка «Ещё»: вернуть ушедших, карта, конструктор",
-             all(f"href='{a}'" in blok for a in ("/obzvon", "/karta", "/constructor")))
+    # 13.11.2026, Борис — меню, вечер 1: было «строка „Ещё“: вернуть ушедших, карта, конструктор».
+    # Строка «Ещё» с пульта снята («убираем сразу то, что без потерь»); вместо неё одна строка
+    # «Редко: Обзвон · Шахматка · Стоп-лист» — страницы, ушедшие из меню админов.
+    proverka("строки «Ещё» нет: вернуть ушедших, карта, конструктор с пульта сняты",
+             "Ещё:" not in blok and not any(f"href='{a}'" in blok for a in ("/obzvon", "/karta", "/constructor")))
+    proverka("строка «Редко»: Обзвон · Шахматка · Стоп-лист",
+             "<b>Редко:</b>" in blok and all(f"href='{a}'" in blok for a in ("/obzvon-dnya", "/grid", "/otkazy")))
     blok = c.get("/pult", auth=VLADELEC).text.split("id='razdely'", 1)[-1].split("</div>", 1)[0]
-    proverka("у владельца — и его раздел", "Владельцу" in blok and "href='/arhiv'" in blok and "href='/owner'" in blok)
+    # 13.11.2026, вечер 1: было «…и href='/arhiv'» — «Архив» ушёл из меню владельца на /owner
+    # («Редко нужное»); в его разделе на пульте остались «Настройки» и «Контроль оплат».
+    proverka("у владельца — и его раздел", "Владельцу" in blok and "href='/owner'" in blok
+             and "href='/kontrol-oplat'" in blok and "href='/arhiv'" not in blok)
 
 
 # --- В. Архив документов: признак в index.json, свёрнутый блок внизу списка ----------
@@ -729,7 +746,9 @@ def test_punkty_menu(c, m):
     print("Г1. Пункты владельца у админа")
     sh = shapka(c, "/liniya", ADMIN)
     pult = _razdely_pulta(c, ADMIN)
-    for imya, adres in nav.OWNER[1]:
+    # 13.11.2026, вечер 1: пять страниц владельца ушли из его меню (nav.REDKO_OWNER), но остались
+    # его страницами — проверяем их вместе с пунктами меню, доступы не менялись.
+    for imya, adres in list(nav.OWNER[1]) + list(nav.REDKO_OWNER):
         v_menu = f'href="{adres}"' in sh.split('id="nav-razdely"', 1)[-1] or f"href='{adres}'" in pult
         put = adres.split("?")[0]
         kod = c.get(adres, auth=ADMIN, follow_redirects=False).status_code
@@ -747,7 +766,10 @@ def test_punkty_menu(c, m):
                  put == "/pult" or put not in {a.split("?")[0] for a in _adresa(nav.ADMIN)})
     proverka("исключений ровно два, и оба — пункты владельца",
              set(VLADELCU_I_ADMINU) <= set(_adresa([nav.OWNER])) and len(VLADELCU_I_ADMINU) == 2)
-    proverka("уводим на пульт ровно четыре пункта владельца", VLADELCU_NA_PULT <= set(_adresa([nav.OWNER])))
+    # 13.11.2026, вечер 1: было «…<= пункты nav.OWNER»; три из четырёх (/journal, /istochniki, /audit)
+    # ушли из меню владельца в nav.REDKO_OWNER — правило увода на пульт для них прежнее.
+    proverka("уводим на пульт ровно четыре страницы владельца",
+             VLADELCU_NA_PULT <= set(_adresa([nav.OWNER])) | {a for _, a in nav.REDKO_OWNER} and len(VLADELCU_NA_PULT) == 4)
     for adres in sorted(VLADELCU_NA_PULT):
         r = c.get(adres, auth=ADMIN, follow_redirects=False)
         proverka(f"{adres}: у админа нет WWW-Authenticate (браузер не покажет окно пароля)",
@@ -853,14 +875,15 @@ def test_net_ssylok(c, m, tree):
         proverka(f"{rol}: в меню шапки — ни одной", not lishnie, sorted(lishnie))
         lishnie = ZAPRET & ssylki(c.get("/pult", auth=kto).text)
         proverka(f"{rol}: на пульте (весь HTML) — ни одной", not lishnie, sorted(lishnie))
-    for imya, adres in [p for _, punkty in nav.ADMIN for p in punkty]:
+    # 13.11.2026, вечер 1: и на страницах, ушедших из меню (nav.REDKO_ADMIN / REDKO_OWNER), — они живые
+    for imya, adres in [p for _, punkty in nav.ADMIN for p in punkty] + list(nav.REDKO_ADMIN):
         lishnie = ZAPRET & ssylki(c.get(adres, auth=ADMIN).text)
         proverka(f"admin: на странице «{imya}» {adres} — ни одной", not lishnie, sorted(lishnie))
     # у владельца: /settings — из плашки «укажите ключ МойКласса» (на стенде ключа нет) и со
     # страницы «Настройки»: только там ключ и меняется; /arhiv — сама страница архива
     # 13.11.2026, шаг 2: плашка теперь зовёт на /owner#mk, исключение осталось одно — сама
     # /owner: её форма ключа шлёт POST на /settings (адрес под защитой vhod.TOLKO_CHELOVEK)
-    for imya, adres in nav.OWNER[1]:
+    for imya, adres in list(nav.OWNER[1]) + list(nav.REDKO_OWNER):
         if adres == "/arhiv":
             continue
         mozhno = {"/settings"} if adres == "/owner" else set()
@@ -1027,7 +1050,7 @@ def test_popravki(c, m):
              "скоро переедет" in pa["vid"] and pa["kuda"] == [], pa)
     proverka("правило плашки: админу на страницу, которая ему открыта, — ссылка на пульт",
              pp["kuda"] == [("Пульт", "/pult")], pp)
-    for imya, adres in [x for _, punkty in m.nav.ADMIN for x in punkty]:
+    for imya, adres in [x for _, punkty in m.nav.ADMIN for x in punkty] + list(m.nav.REDKO_ADMIN):
         if adres in ("/pult",):
             continue
         r = c.get(adres, auth=ADMIN)
@@ -1976,6 +1999,7 @@ def main():
     test_pereezdy_pyati(c, m, baza)
     test_pravki_1311(c, m, tree, baza)
     test_posle_proverki(c, m, tree, baza)
+    test_vecher1(c, m, tree, baza)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     proverka("ни одной попытки выйти в сеть, кроме известных опросов Mango с пульта и «Ответов»",
              all(any(f.startswith(("mango.py", "zayavki.py")) for f in otkuda) for _, otkuda in lt.SET), lt.SET[:5])
@@ -2117,6 +2141,246 @@ def test_posle_proverki(c, m, tree, baza):
     t = c.get("/promo/grafik", auth=ADMIN).text
     proverka("/promo/grafik: логотип один (в общей шапке), ссылка «← Эффективность промоутеров» на месте",
              t.count("logo_color.png") == 0 and t.count("/static/logo.svg") == 1 and 'href="/promo"' in t, t.count("logo"))
+
+# --- Л. Меню вечера 1 (13.11.2026) ---------------------------------------------------------
+# Решение владельца 13.11.2026: «М, П, Т — по рекомендациям». Записано здесь отдельно от
+# кода, как и решение 12.11 (раздел «Г»): случайная правка nav.ADMIN / nav.OWNER ломает тест.
+# Из меню админов уходят «Обзвон», «Шахматка», «Стоп-лист» и строка «Ещё» на пульте; из меню
+# владельца — «Аномалии», «Журнал», «Откуда заявки», «Камеры», «Архив». Появляется раздел
+# «МойКласс»: «Проверка МойКласса» и «Явка» (переезжает из «Смены»). Все адреса открываются
+# как раньше; убранное не теряется — ссылки-заменители и поиск «Раздел» в шапке.
+
+MENU_ADMIN_V1 = [
+    ("Смена", [("Пульт", "/pult"), ("Ответы", "/waiting"), ("Линия", "/liniya")]),
+    ("Группы", [("Подбор группы", "/enrollment"), ("Места", "/mesta"), ("Бланки групп", "/blank-grupp")]),
+    ("МойКласс", [("Проверка МойКласса", "/proverka-mk"), ("Явка", "/yavka")]),
+    ("Деньги", [("Без оплаты", "/voronka"), ("Долги", "/dolgi")]),
+    ("Справка", [("Списки", "/admin/docs"), ("Описания занятий", "/courses"), ("Промоутеры", "/promo/grafik"),
+                 ("База знаний", "/base")]),
+]
+MENU_OWNER_V1 = [("Мои документы", "/boris/docs"), ("Мои дела", "/pult?who=Борис"), ("Контроль оплат", "/kontrol-oplat"),
+                 ("Сверка честности", "/sverka-chestnosti"), ("Итоги промоутеров", "/promo"), ("Настройки", "/owner")]
+UBRANO_ADMIN_V1 = {"/obzvon-dnya": "Обзвон", "/grid": "Шахматка", "/otkazy": "Стоп-лист"}
+UBRANO_OWNER_V1 = {"/audit": "Аномалии", "/journal": "Журнал", "/istochniki": "Откуда заявки",
+                   "/kamery/nastroyka": "Камеры", "/arhiv": "Архив"}
+ESHCHE_V1 = ("/obzvon", "/karta", "/constructor", "/base/gruppy_reshenia")      # строка «Ещё», снята с пульта
+
+
+def _poisk(c, q, kto) -> list:
+    return c.get("/api/search", params={"q": q}, auth=kto).json()["items"]
+
+
+def _razdely_poiska(c, q, kto) -> list:
+    return [(i["title"], i["url"]) for i in _poisk(c, q, kto) if i["type"] == "Раздел"]
+
+
+def test_vecher1(c, m, tree, baza):
+    from app import nav
+    print("Л1. Состав меню по ролям")
+    proverka("меню админа — ровно по решению: 14 пунктов, пять разделов", nav.menu("admin") == MENU_ADMIN_V1,
+             nav.menu("admin"))
+    proverka("раздел владельца — ровно по решению: 6 пунктов", nav.OWNER == ("Владельцу", MENU_OWNER_V1), nav.OWNER)
+    proverka("меню владельца — меню админа и его раздел последним", nav.menu("owner") == MENU_ADMIN_V1 + [nav.OWNER])
+    proverka("убранные из меню записаны отдельно (nav.REDKO_…) — ровно те восемь",
+             {a: i for i, a in nav.REDKO_ADMIN} == UBRANO_ADMIN_V1 and {a: i for i, a in nav.REDKO_OWNER} == UBRANO_OWNER_V1)
+    v_menu = set(_adresa(nav.menu("owner")))
+    proverka("ни одна убранная страница не осталась пунктом меню",
+             not v_menu & (set(UBRANO_ADMIN_V1) | set(UBRANO_OWNER_V1) | set(ESHCHE_V1)))
+    proverka("у каждого пункта меню есть описание для главной (nav.OPIS), у «Проверки МойКласса» тоже",
+             not [a for a in v_menu if not nav.OPIS.get(a)] and "МойКласс" in nav.OPIS["/proverka-mk"],
+             [a for a in v_menu if not nav.OPIS.get(a)])
+    for kto, rol, ubrano in ((ADMIN, "admin", UBRANO_ADMIN_V1), (VLADELEC, "owner", {**UBRANO_ADMIN_V1, **UBRANO_OWNER_V1})):
+        h = shapka(c, "/liniya", kto)
+        razdely = h.split('id="nav-razdely"', 1)[-1]          # шапка на компьютере и лист «☰ Разделы» — одна разметка
+        ostalis = [a for a in list(ubrano) + list(ESHCHE_V1) if f'href="{a}"' in razdely]
+        proverka(f"{rol}: в шапке и листе «☰ Разделы» убранных пунктов нет", not ostalis, ostalis)
+        mk = razdely.split(">МойКласс<", 1)[-1].split('class="kn-razdel', 1)[0] if ">МойКласс<" in razdely else ""
+        proverka(f"{rol}: раздел «МойКласс» — «Проверка МойКласса» и «Явка», больше ничего",
+                 re.findall(r'href="([^"]+)"', mk) == ["/proverka-mk", "/yavka"], re.findall(r'href="([^"]+)"', mk))
+        smena = razdely.split(">Смена<", 1)[-1].split('class="kn-razdel', 1)[0]
+        proverka(f"{rol}: «Явка» из «Смены» ушла", 'href="/yavka"' not in smena and 'href="/pult"' in smena)
+        panel = h.split('class="kn-panel"', 1)[-1]
+        proverka(f"{rol}: кнопки нижней панели ведут на пункты меню (или на главную), не на убранное",
+                 all(a == "/" or a in _adresa(nav.menu(rol)) for _, a, _ in nav.PANEL[rol])
+                 and not [a for a in ubrano if f'href="{a}"' in panel])
+        g = c.get("/", auth=kto).text.split('class="gl-grid"', 1)[-1].split("gl-docs", 1)[0]
+        proverka(f"{rol}: главная — раздел «МойКласс» с «Проверкой МойКласса» и её описанием, убранных нет",
+                 'href="/proverka-mk"' in g and nav.OPIS["/proverka-mk"] in g
+                 and not [a for a in list(ubrano) + list(ESHCHE_V1) if f'href="{a}"' in g],
+                 [a for a in list(ubrano) + list(ESHCHE_V1) if f'href="{a}"' in g])
+        blok = _razdely_pulta(c, kto)
+        proverka(f"{rol}: пульт, блок «Разделы» — строки «Ещё» нет, одна строка «Редко: Обзвон · Шахматка · Стоп-лист»",
+                 "Ещё:" not in blok and blok.count("<b>Редко:</b>") == 1
+                 and re.findall(r"href='([^']+)'", blok.split("<b>Редко:</b>", 1)[-1]) == list(UBRANO_ADMIN_V1)
+                 and not [a for a in ESHCHE_V1 if f"href='{a}'" in blok], blok[-400:])
+        proverka(f"{rol}: пульт, блок «Разделы» — есть «Проверка МойКласса», нет убранных пунктов владельца",
+                 "href='/proverka-mk'" in blok and not [a for a in UBRANO_OWNER_V1 if f"href='{a}'" in blok])
+
+    print("Л2. Убранные из меню страницы открываются по адресу, доступы прежние")
+    for adres, imya in UBRANO_ADMIN_V1.items():
+        for kto, rol in ((ADMIN, "admin"), (VLADELEC, "owner")):
+            kod = c.get(adres, auth=kto, follow_redirects=False).status_code
+            proverka(f"{rol}: «{imya}» {adres} → 200", kod == 200, kod)
+    for adres in ESHCHE_V1:
+        kod = c.get(adres, auth=ADMIN, follow_redirects=False).status_code
+        proverka(f"admin: {adres} (была в строке «Ещё») → 200", kod == 200, kod)
+    for adres, imya in UBRANO_OWNER_V1.items():
+        kod = c.get(adres, auth=VLADELEC, follow_redirects=False).status_code
+        proverka(f"owner: «{imya}» {adres} → 200", kod == 200, kod)
+        kuda = lokaciya(c, adres)
+        zhdem = (303, "/pult") if adres in VLADELCU_NA_PULT else (401, None)
+        proverka(f"admin: «{imya}» {adres} — как до вечера 1: {zhdem[0]}", kuda == zhdem, kuda)
+        proverka(f"{adres} без входа → 401", lokaciya(c, adres, kto=None)[0] == 401)
+    proverka("nav.TOLKO_VLADELCU: убранные страницы владельца по-прежнему «только владельцу»",
+             set(UBRANO_OWNER_V1) <= nav.TOLKO_VLADELCU and "/owner" in nav.TOLKO_VLADELCU
+             and not nav.TOLKO_VLADELCU & {"/promo", "/pult?who=Борис", "/pult"}, sorted(nav.TOLKO_VLADELCU))
+    bylo = nav.PEREEZD
+    nav.PEREEZD = [("/primer", "Пример", "Журнал", "/journal#schetchiki", "Что-то ещё не перенесено.")]
+    try:
+        pa, pv = nav.plashka("/primer", "admin"), nav.plashka("/primer", "owner")
+    finally:
+        nav.PEREEZD = bylo
+    proverka("плашка: админа не зовём на убранную из меню страницу владельца, даже если адрес с якорем",
+             pa["kuda"] == [] and pv["kuda"] == [("Журнал", "/journal#schetchiki")], (pa, pv))
+    for adres in list(UBRANO_ADMIN_V1) + list(ESHCHE_V1)[:3]:
+        proverka(f"{adres}: плашки «архивная» нет — страница не в архиве", nav.plashka(adres, "admin") is None)
+
+    print("Л3. Ссылки-заменители: убранное не потерялось")
+    h = c.get("/owner", auth=VLADELEC).text
+    blok = h.split("id='redko'", 1)[-1].split("</div>", 1)[0] if "id='redko'" in h else ""
+    net = [a for a in list(UBRANO_OWNER_V1) + list(UBRANO_ADMIN_V1) + list(ESHCHE_V1) if f"href='{a}'" not in blok]
+    proverka("/owner: блок «Редко нужное» — ссылки на пять страниц владельца, три админские и строку «Ещё»",
+             "Редко нужное" in blok and not net, net)
+    proverka("/owner: в блоке названия страниц владельца — Аномалии, Журнал, Откуда заявки, Камеры, Архив",
+             all(f">{i}</a>" in blok for i in UBRANO_OWNER_V1.values()))
+    proverka("/owner: вверху ссылка на блок", "href='#redko'" in h)
+    telo = c.get("/liniya", auth=ADMIN).text.split("<main", 1)[-1]
+    proverka("«Линия»: ссылка «Стоп-лист» в самой странице", 'href="/otkazy"' in telo and "Стоп-лист" in telo)
+    telo = c.get("/mesta", auth=ADMIN).text.split("<main", 1)[-1]
+    proverka("«Места»: ссылка «Шахматка» в самой странице", 'href="/grid"' in telo and "Шахматка" in telo)
+    o = m._otkrytiya(30)
+    uchteny = {x["path"] for x in o["stroki"]} | {x["adres"] for x in o["ne_otkryvali"]}
+    proverka("счётчик открытий (/journal) следит и за убранными из меню страницами",
+             set(UBRANO_ADMIN_V1) | set(UBRANO_OWNER_V1) <= uchteny, sorted((set(UBRANO_ADMIN_V1) | set(UBRANO_OWNER_V1)) - uchteny))
+
+    print("Л4. Поиск: результаты «Раздел» с учётом роли")
+    vladelca = {a for _, a in MENU_OWNER_V1} | set(UBRANO_OWNER_V1)
+    proverka("админ, «оплат» → «Без оплаты», «Долги»",
+             _razdely_poiska(c, "оплат", ADMIN) == [("Без оплаты", "/voronka"), ("Долги", "/dolgi")],
+             _razdely_poiska(c, "оплат", ADMIN))
+    proverka("владелец, «оплат» → ещё и «Контроль оплат»",
+             set(_razdely_poiska(c, "оплат", VLADELEC)) == {("Без оплаты", "/voronka"), ("Долги", "/dolgi"),
+                                                           ("Контроль оплат", "/kontrol-oplat")},
+             _razdely_poiska(c, "оплат", VLADELEC))
+    for q, zhdem in (("расписание", ("Шахматка", "/grid")), ("не звонить", ("Стоп-лист", "/otkazy")),
+                     ("обзвон", ("Обзвон", "/obzvon-dnya")), ("шахматка", ("Шахматка", "/grid")),
+                     ("стоп-лист", ("Стоп-лист", "/otkazy")), ("проверка", ("Проверка МойКласса", "/proverka-mk")),
+                     ("МойКласс", ("Проверка МойКласса", "/proverka-mk")), ("явка", ("Явка", "/yavka")),
+                     ("ушедших", ("Вернуть ушедших", "/obzvon")), ("конструктор", ("2–3 предмета в один вечер", "/constructor")),
+                     ("ЛИНИЯ", ("Линия", "/liniya")), ("бланки", ("Бланки групп", "/blank-grupp"))):
+        for kto, rol in ((ADMIN, "admin"), (VLADELEC, "owner")):
+            r = _razdely_poiska(c, q, kto)
+            proverka(f"{rol}, «{q}» → «{zhdem[0]}»", zhdem in r, r)
+    for q, zhdem in (("аномалии", ("Аномалии", "/audit")), ("журнал", ("Журнал", "/journal")),
+                     ("заявки", ("Откуда заявки", "/istochniki")), ("камеры", ("Камеры", "/kamery/nastroyka")),
+                     ("архив", ("Архив", "/arhiv")), ("настройки", ("Настройки", "/owner")),
+                     ("честность", ("Сверка честности", "/sverka-chestnosti")), ("документы", ("Мои документы", "/boris/docs"))):
+        r = _razdely_poiska(c, q, VLADELEC)
+        proverka(f"owner, «{q}» → «{zhdem[0]}»", zhdem in r, r)
+        r = _razdely_poiska(c, q, ADMIN)
+        proverka(f"admin, «{q}» → страницы владельца в поиске нет", not [x for x in r if x[1] in vladelca], r)
+    # все слова, по которым поиск вообще что-то знает: названия и синонимы всех страниц
+    slova = set()
+    for imya, adres in nav.stranicy_poiska("owner"):
+        slova |= set(nav._slova(imya))
+        for f in nav.SINONIMY.get(adres, []):
+            slova |= set(nav._slova(f)) | {f}
+    slova = sorted(w for w in slova if len(w) >= 2)
+    utechki, arhivnye, mertvye = [], [], []
+    for q in slova:
+        for kto, rol in ((ADMIN, "admin"), (VLADELEC, "owner")):
+            for i in _poisk(c, q, kto):
+                put = i["url"].split("?")[0]
+                if rol == "admin" and i["type"] == "Раздел" and i["url"] in vladelca:
+                    utechki.append((q, i["url"]))
+                if put in ARHIVNYE:
+                    arhivnye.append((rol, q, i["url"]))
+                if put in ("/brief", "/students") or put in m.UBRANO:
+                    mertvye.append((rol, q, i["url"]))
+    proverka(f"admin: ни по одному из {len(slova)} слов и синонимов поиск не даёт страницу владельца", not utechki, utechki[:5])
+    proverka("архивных страниц (nav.ARHIV) в поиске нет ни у кого", not arhivnye
+             and not ARHIVNYE & {a.split("?")[0] for rol in ("admin", "owner") for _, a in nav.stranicy_poiska(rol)}, arhivnye[:5])
+    proverka("поиск не ведёт на /brief, /students и убранные адреса", not mertvye, mertvye[:5])
+    for q, adres in (("ученики", "/students"), ("платежи", "/payments"), ("фото и видео", "/gruppy/media"),
+                     ("где теряем набор", "/nabor"), ("кому не звонили", "/nezvonili"), ("тексты набора", "/content"),
+                     ("чаты групп", "/chaty"), ("проверка перед рассылкой", "/prelaunch")):
+        r = _razdely_poiska(c, q, VLADELEC)
+        proverka(f"архивная «{q}» ({adres}) поиском не находится — даже владельцу",
+                 adres not in [a.split("?")[0] for _, a in r] and not [x for x in r if x[0].lower() == q], r)
+    for kto, rol in ((ADMIN, "admin"), (VLADELEC, "owner")):
+        ne200 = [(a, kod) for _, a in nav.stranicy_poiska(rol)
+                 for kod in [c.get(a, auth=kto, follow_redirects=False).status_code] if kod != 200]
+        proverka(f"{rol}: каждая страница, которую может выдать поиск, открывается этой роли (200)", not ne200, ne200)
+    proverka("педагогу поиск страниц не положен", nav.stranicy_poiska("pedagog") == [] and nav.nayti_razdely("пульт", "pedagog") == [])
+    items = _poisk(c, "Стоп", ADMIN)
+    proverka("клиент и раздел вместе: сначала клиент «Стопова», за ним раздел «Стоп-лист»",
+             [i["type"] for i in items] == ["Клиент", "Раздел"] and items[1]["url"] == "/otkazy", items)
+    items = _poisk(c, "Тестова", ADMIN)
+    proverka("фамилия — только клиенты, разделов нет; клиент с телефоном → «Линия»",
+             items and all(i["type"] == "Клиент" for i in items)
+             and any(i["url"] == f"/liniya?phone={SEMYA[-10:]}" for i in items), items)
+    proverka("телефон и короткий запрос — без разделов",
+             not _razdely_poiska(c, "9990001001", ADMIN) and not _razdely_poiska(c, "0001", ADMIN)
+             and _poisk(c, "п", ADMIN) == [])
+    proverka("две буквы ищут только в названиях («пр» не поднимает «Бланки групп» по синониму «пробные»)",
+             ("Бланки групп", "/blank-grupp") not in _razdely_poiska(c, "пр", ADMIN)
+             and ("Проверка МойКласса", "/proverka-mk") in _razdely_poiska(c, "пр", ADMIN), _razdely_poiska(c, "пр", ADMIN))
+    proverka("разделов в выдаче не больше четырёх", all(len(_razdely_poiska(c, q, VLADELEC)) <= 4 for q in ("пр", "по", "оплат", "звон")))
+    items = [i for i in _poisk(c, "Гр13", ADMIN) if i["type"] == "Группа"]
+    proverka("группа с «+» в названии: адрес закодирован и открывает «Подбор группы» с этим названием",
+             len(items) == 1 and "+" not in items[0]["url"].replace("%2B", "") and " " not in items[0]["url"]
+             and "Гр13" in c.get(items[0]["url"], auth=ADMIN).text, items)
+    js = open(os.path.join(tree, "app/static/nav.js"), encoding="utf-8").read()
+    css = open(os.path.join(tree, "app/static/nav.css"), encoding="utf-8").read()
+    proverka("nav.js: «Раздел» — своей меткой, карточка МойКласса — в новой вкладке; версия ?v= поднята до 3",
+             "kn-gs-razdel" in js and "kn-gs-razdel" in css and 'target="_blank" rel="noopener"' in js
+             and nav.VERSIYA == "3" and f"nav.js?v={nav.VERSIYA}" in c.get("/liniya", auth=ADMIN).text)
+    proverka("подсказка в поле поиска называет разделы", "Поиск: раздел, группа, ребёнок, телефон" in shapka(c, "/liniya", ADMIN))
+
+    print("Л5. «Аномалии» ушли из меню: красные находки — разделом 13 на «Проверке МойКласса», по роли")
+    # 13.11.2026, Борис (М3): красные находки ленты за 14 дней показываем на «Проверке МойКласса».
+    # Отчёты о самих админах (сверка честности, оплаты без подписи) с 12.11 только владельцу
+    # (раздел «Д2») — на общей странице админ их видеть не должен.
+    from app import audit
+    audit.add_flag("деньги", "neg-balance:9003:stend", audit.HIGH, "Долг клиента 25 000 ₽", "Пробная Алиса · баланс −25 000 ₽",
+                   user_id=9003)
+    audit.add_flag("честность", "chest:user_subscriptions:1:stend", audit.HIGH, "Тестова Ева: оплачено уменьшено 9450 → 8400",
+                   "Тестова Ева: оплачено уменьшено 9450 → 8400", user_id=9001)
+    proverka("жёлтая находка в ленту не пишется (настройка anomalii_ne_krasnye по умолчанию выключена)",
+             audit.add_flag("деньги", "test:mid:stend", audit.MID, "Долг клиента 4 000 ₽") is False
+             and "anomalii_ne_krasnye" in m.SETTABLE)
+
+    def r13(kto):
+        h = c.get("/proverka-mk", auth=kto).text
+        return h.split('id="r13"', 1)[-1].split("</section>", 1)[0] if 'id="r13"' in h else "", h
+    ra, ha = r13(ADMIN)
+    rv, hv = r13(VLADELEC)
+    proverka("админ: раздел 13 есть, в нём долг со ссылкой на карточку МойКласса",
+             "Долг клиента 25 000 ₽" in ra and 'href="https://app.moyklass.com/user/9003"' in ra and "только чтение" in ra, ra[:300])
+    proverka("админ: находки сверки честности на странице нет вовсе — ни в разделе, ни в сводке",
+             "оплачено уменьшено" not in ha and "честность" not in ra and 'href="/audit"' not in ha.split("<main", 1)[-1])
+    proverka("владелец: в разделе 13 и долг, и находка сверки честности, и ссылка на «Аномалии»",
+             "Долг клиента 25 000 ₽" in rv and "оплачено уменьшено" in rv and 'href="/audit"' in rv)
+    proverka("раздел только для чтения: ни кнопок, ни форм — у обеих ролей",
+             not any(x in ra + rv for x in ("<button", "onclick", "<form", "<input")))
+    da = c.get("/api/proverka-mk", auth=ADMIN).json()["krasnye"]
+    dv = c.get("/api/proverka-mk", auth=VLADELEC).json()["krasnye"]
+    proverka("API: админу — без сверки честности, владельцу — всё",
+             (da["vsego"], sorted(da["po_vidam"]), dv["vsego"], sorted(dv["po_vidam"])) == (1, ["деньги"], 2, ["деньги", "честность"]),
+             (da["po_vidam"], dv["po_vidam"]))
+    proverka("лента «Аномалии» админу по-прежнему закрыта (Д2), страница /audit владельцу открыта",
+             c.get("/api/audit", auth=ADMIN).status_code == 401 and lokaciya(c, "/audit") == (303, "/pult")
+             and c.get("/audit", auth=VLADELEC).status_code == 200)
 
 
 if __name__ == "__main__":

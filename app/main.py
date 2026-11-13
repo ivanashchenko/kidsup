@@ -854,8 +854,15 @@ def payments_page(request: Request, date_from: str = "", date_to: str = "",
 
 
 @app.get("/api/search", dependencies=AUTH)
-def api_search(q: str = ""):
-    """Глобальный поиск из шапки: группы 2026/27 и клиенты (имя/телефон)."""
+def api_search(request: Request, q: str = ""):
+    """Глобальный поиск из шапки: группы 2026/27, клиенты (имя/телефон) и разделы.
+
+    13.11.2026, вечер 1 (Борис: «М — по рекомендациям»): из меню ушли восемь пунктов и
+    строка «Ещё» — страницу без пункта меню находят словом. Результаты типа «Раздел» даёт
+    nav.nayti_razdely: пункты меню роли и убранные из меню, но живые страницы, по названию и
+    синонимам («оплат» → «Без оплаты», «Долги»). Админ страниц владельца не видит, архивных
+    нет ни у кого. Разделы стоят после групп и клиентов и в их лимит (9) не входят: набирая
+    фамилию, человек видит клиентов там же, где раньше."""
     q = " ".join(q.split())
     if len(q) < 2:
         return {"items": []}
@@ -876,9 +883,10 @@ def api_search(q: str = ""):
                 if ql in (r["name"] or "").lower() or ql in (r["course"] or "").lower()]
         for r in hits[:5]:
             free = max(0, (r["max_students"] or 0) - r["enrolled"])
+            # 13.11.2026: название группы в адресе кодируем — «+» и «&» в нём ломали параметр
             items.append({"type": "Группа", "title": r["name"],
                           "sub": f"{r['course'] or ''} · свободно {free}",
-                          "url": f"/enrollment?q={r['name']}"})
+                          "url": "/enrollment?q=" + quote(r["name"] or "", safe="")})
         if digits and len(digits) >= 4:
             urows = conn.execute(
                 "SELECT id, name, phone FROM users WHERE phone LIKE ? LIMIT 5",
@@ -893,13 +901,15 @@ def api_search(q: str = ""):
             # 12.11.2026: досье (/brief) слито с «Линией», список учеников ушёл в архив
             # владельца. В «Линию» ведём только с целым номером (10 цифр или 11 с 7/8):
             # обрезок длинного номера показал бы чужую семью. Остальных — в МойКласс.
+            # 13.11.2026: карточка МойКласса — по адресу /user/<id>, как на «Линии», пульте,
+            # «Без оплаты» и «Проверке МойКласса» (liniya.CRM_KARTOCHKA); был /client/<id>.
             d = "".join(ch for ch in (r["phone"] or "") if ch.isdigit())
             cel = len(d) == 10 or (len(d) == 11 and d[0] in "78")
             url = (f"/liniya?phone={d[-10:]}" if cel
-                   else f"https://app.moyklass.com/client/{r['id']}")
+                   else f"https://app.moyklass.com/user/{r['id']}")
             items.append({"type": "Клиент", "title": r["name"] or "Без имени",
                           "sub": r["phone"] or "", "url": url})
-    return {"items": items[:9]}
+    return {"items": items[:9] + nav.nayti_razdely(q, _rol(request))}
 
 
 DAY_ORDER = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
@@ -2060,6 +2070,19 @@ def _owner_ctx(request: Request = None, msg: str = "", vhody: dict | None = None
     форму; пришедшему через серое окно — ссылка «войти через форму». vhody — итог действия
     из блока (сообщение, отказ, ключ на один показ)."""
     blok = vhod.blok_vladelca_bezopasno(request, vhody) if request is not None else ""
+    # 13.11.2026, Борис — меню, вечер 1: из меню ушли пять страниц владельца, три страницы
+    # админов и строка «Ещё» на пульте. Сами страницы открываются как раньше; чтобы убранное
+    # не потерялось, ссылки на всё собраны здесь (списки — в app/nav.py).
+    def _ss(punkty):
+        return " · ".join(f"<a href='{html.escape(a)}'>{html.escape(i[:1].upper() + i[1:])}</a>" for i, a in punkty)
+    redko = (f"<div class='redko' id='redko'><h2>Редко нужное</h2>"
+             f"<p class='note'>Убрано из меню 13.11.2026 — открывается по ссылке, как раньше; любую из этих страниц "
+             f"находит и поиск в шапке.</p>"
+             f"<p><b>Ваши страницы:</b> {_ss(nav.REDKO_OWNER)}</p>"
+             f"<p><b>Из меню админов:</b> {_ss(nav.REDKO_ADMIN)}</p>"
+             f"<p><b>Из строки «Ещё» на пульте:</b> {_ss(nav.ESHCHE)}</p>"
+             f"<p class='note'>Через месяц смотрим счётчик открытий в «Журнале»: что открывали — вернём в меню, "
+             f"что нет — уберём совсем.</p></div>")
     rows = []
     for key, label, secret in OWNER_FIELDS:
         val = db.get_setting(key)
@@ -2072,10 +2095,13 @@ def _owner_ctx(request: Request = None, msg: str = "", vhody: dict | None = None
 .w{{max-width:720px;margin:0 auto}}h1{{color:#312783;font-size:24px}}label{{display:block;background:#fff;border:1px solid #e4e2f0;border-radius:12px;padding:12px 14px;margin:10px 0}}
 label span{{display:block;font-weight:600}}label small{{display:block;color:#6c6a86;margin:2px 0 6px}}input{{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #cfcde0;border-radius:8px;font-size:15px}}
 button{{background:#7DB928;color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:16px;font-weight:700;cursor:pointer}}.msg{{background:#eef8e6;border-left:4px solid #7DB928;padding:10px 12px;border-radius:8px;margin:12px 0}}
-p.note{{color:#6c6a86;font-size:14px}}p.nav{{font-size:14.5px;margin:-6px 0 10px}}p.nav a{{color:#312783}}</style></head><body><div class='w'>
+p.note{{color:#6c6a86;font-size:14px}}p.nav{{font-size:14.5px;margin:-6px 0 10px}}p.nav a{{color:#312783}}
+.redko{{background:#fff;border:1px solid #e4e2f0;border-left:4px solid #312783;border-radius:12px;padding:10px 14px;margin:14px 0}}
+.redko h2{{color:#312783;font-size:18px;margin:2px 0 4px}}.redko p{{margin:6px 0;line-height:1.7}}.redko a{{color:#312783;font-weight:600;white-space:nowrap}}</style></head><body><div class='w'>
 <h1>Настройки владельца</h1>
-<p class='nav'><a href='/boris/docs'>← Мои документы</a> · <a href='#mk'>Ключ МойКласса и выгрузка</a> · <a href='/kamery/nastroyka'>Камеры</a> · <a href='/arhiv'>Архив страниц</a></p>
+<p class='nav'><a href='/boris/docs'>← Мои документы</a> · <a href='#mk'>Ключ МойКласса и выгрузка</a> · <a href='/kamery/nastroyka'>Камеры</a> · <a href='/arhiv'>Архив страниц</a> · <a href='#redko'>Редко нужное</a></p>
 <p class='note'>Эта страница и всё, что на ней, закрыто отдельным паролем владельца — общий пароль admin сюда не подходит. Значения хранятся как секреты и в ответах сервера не показываются. Пустое поле — оставить как есть.</p>
+{redko}
 {blok}
 {_mk_razdel(mk)}
 <h2 style='color:#312783;font-size:20px'>Ключи банка, кассы и сервисов</h2>
@@ -2422,8 +2448,11 @@ def _otkrytiya(dney: int = 30) -> dict:
     stroki = sorted(({"path": p, "vsego": sum(r.values()), "admin": r.get("admin", 0),
                       "owner": r.get("owner", 0), "pedagog": r.get("pedagog", 0)} for p, r in svod.items()),
                     key=lambda x: (-x["vsego"], x["path"]))
+    # 13.11.2026, вечер 1: убранные из меню, но живые страницы (nav.REDKO_…) остаются в списке —
+    # по этому блоку через месяц решаем, что вернуть в меню, а что убрать совсем
     spisok = ([(imya, adres) for _, punkty in nav.ADMIN for imya, adres in punkty]
-              + list(nav.OWNER[1]) + [(nazv, adres) for adres, nazv, *_ in nav.ARHIV])
+              + list(nav.OWNER[1]) + list(nav.REDKO_ADMIN) + list(nav.REDKO_OWNER)
+              + [(nazv, adres) for adres, nazv, *_ in nav.ARHIV])
     ne, bylo = [], set()
     for imya, adres in spisok:
         put = adres.split("?")[0].rstrip("/") or "/"
@@ -4870,16 +4899,23 @@ def sverka_perehod():
 def proverka_mk_page(request: Request):
     from . import proverka_mk
     d = proverka_mk.dannye()
+    # 13.11.2026 (М3): раздел 13 — красные находки ленты «Аномалии» за 14 дней, только чтение.
+    # Собирается по роли: отчёты о самих админах (сверка честности, оплаты без подписи,
+    # возвраты) — только владельцу, как и сама лента (решение 12.11).
     return render(request, "proverka_mk.html", active="proverka-mk", d=d,
-                  stroka_borisa=proverka_mk.stroka_dlya_borisa())
+                  stroka_borisa=proverka_mk.stroka_dlya_borisa(),
+                  kr=proverka_mk.krasnye(vladelec=_rol(request) == "owner"))
 
 
 @app.get("/api/proverka-mk", dependencies=AUTH)
-def api_proverka_mk(kratko: int = 0):
+def api_proverka_mk(request: Request, kratko: int = 0):
     """Строки страницы по разделам, итог и сводка Бориса. kratko=1 — только «идёт ли
-    перепроверка» и время последней сборки (для кнопки)."""
+    перепроверка» и время последней сборки (для кнопки). 13.11.2026: ключ krasnye — раздел 13
+    (красные находки «Аномалий» за 14 дней), по роли, как на странице."""
     from . import proverka_mk
-    return proverka_mk.kratko() if kratko else proverka_mk.dannye()
+    if kratko:
+        return proverka_mk.kratko()
+    return {**proverka_mk.dannye(), "krasnye": proverka_mk.krasnye(vladelec=_rol(request) == "owner")}
 
 
 @app.post("/api/proverka-mk/perepoverit", dependencies=AUTH)
@@ -5315,6 +5351,9 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # страницу, «0» — пунктами в пульт, как раньше; и какие разделы страницы выключены
             # (номера через запятую, по умолчанию «5,11г»; «-» — показывать все)
             "proverka_mk_vmesto_punktov", "proverka_mk_vyklyucheny",
+            # 13.11.2026 (М3): лента «Аномалии» — «1» писать и жёлтые/серые находки ежедневных
+            # проверок, как до 13.11; «0» (по умолчанию) — только красные (app/audit.py, add_flag)
+            "anomalii_ne_krasnye",
             # пульт: хвосты прошлых дней — главный блок колонки на один день («Ира:2026-11-13»)
             "pult_hvost_glavnoe",
             "wazzup_dry_run", "digest_phone", "digest_off", "wa_watch_skip", "autopilot", "missed_reject_attempts", "wa_daily_cap", "wa_per_hour", "wa_senders", "wa_caps", "vk_lead_forms",

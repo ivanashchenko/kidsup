@@ -153,10 +153,15 @@
     var lupa = document.getElementById('kn-lupa');
     var t = null, sel = -1, items = [];
     function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML.replace(/"/g, '&quot;'); }
+    /* 13.11.2026, вечер 1: поиск отдаёт ещё и страницы (тип «Раздел») — у них своя метка;
+       карточка МойКласса (клиент без целого номера) открывается в новой вкладке, как на
+       остальных страницах, а не вместо рабочей. */
+    function vneshnyaya(u) { return /^https?:\/\//i.test(u || ''); }
     function narisovat() {
       if (!items.length) { drop.hidden = true; return; }
       drop.innerHTML = items.map(function (it, i) {
-        return '<a href="' + esc(it.url) + '" class="kn-gs-item' + (i === sel ? ' kn-vybran' : '') + '">' +
+        return '<a href="' + esc(it.url) + '"' + (vneshnyaya(it.url) ? ' target="_blank" rel="noopener"' : '') +
+          ' class="kn-gs-item' + (it.type === 'Раздел' ? ' kn-gs-razdel' : '') + (i === sel ? ' kn-vybran' : '') + '">' +
           '<span class="kn-gs-type">' + esc(it.type) + '</span>' +
           '<span class="kn-gs-title">' + esc(it.title) + '</span>' +
           '<span class="kn-gs-sub">' + esc(it.sub || '') + '</span></a>';
@@ -183,7 +188,9 @@
     inp.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, items.length - 1); narisovat(); e.preventDefault(); }
       else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); narisovat(); e.preventDefault(); }
-      else if (e.key === 'Enter' && sel >= 0 && items[sel]) { location.href = items[sel].url; }
+      else if (e.key === 'Enter' && sel >= 0 && items[sel]) {
+        if (vneshnyaya(items[sel].url)) window.open(items[sel].url, '_blank', 'noopener'); else location.href = items[sel].url;
+      }
       else if (e.key === 'Escape') { if (koren.classList.contains('kn-poisk-otkryt')) pole(false); else { drop.hidden = true; inp.blur(); } }
     });
     document.addEventListener('click', function (e) {

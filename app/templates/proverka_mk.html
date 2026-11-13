@@ -71,6 +71,12 @@
            border-radius:12px;padding:9px 12px;margin:0 0 14px}
   .pm .kak b{color:var(--ind)}
   .pm .foot{color:var(--muted);font-size:12px;margin:22px 0 6px}
+  /* 13.11.2026 (М3): раздел 13 — красные находки «Аномалий», только чтение */
+  .pm .st.kr13{border-left-color:var(--red)}
+  .pm .st.kr13 .chto{margin-top:4px}
+  .pm .st.kr13 .podr{font-size:13px;color:var(--text-2);margin:2px 0 0;overflow-wrap:anywhere}
+  .pm .metka.kr{background:#fde3e4;color:var(--red-t)}
+  .pm .r13-poyasn{font-size:13.5px;color:var(--text-2);margin:0 0 6px;max-width:76ch}
   @media (max-width:520px){
     .pm h1{font-size:21px}
     .pm .big{flex:1 1 100%}
@@ -96,6 +102,24 @@
     {% elif r.dogadka %}<button class="no" type="button" onclick="neOshibka(this)">не ошибка…</button>{% endif %}
   </div>
   {% if r.zametka %}<div class="zam">{{ r.zametka }}</div>{% endif %}
+</div>
+{%- endmacro %}
+{% macro krasnaya(g) -%}
+<div class="st kr13" data-vid="{{ g.vid }}">
+  <div class="kto">{{ g.rebenok or 'без карточки' }} <span class="gr">· {{ g.vid_tekst }}</span>
+    <span class="kogda"> · найдено {{ g.naydeno[8:10] }}.{{ g.naydeno[5:7] }}</span></div>
+  {% for x in g.punkty %}
+  <div class="chto">{{ x.chto }}</div>
+  {% if x.podrobno %}<div class="podr">{{ x.podrobno }}</div>{% endif %}
+  {% endfor %}
+  <div class="niz">
+    <span class="metka kr">{{ g.vid }}</span>
+    {% if g.podtverzhdeno %}<span class="metka sera">подтверждено владельцем</span>{% endif %}
+    {% if g.tolko_vladelcu %}<span class="metka">видит только владелец</span>{% endif %}
+    {% if g.ssylka %}<a href="{{ g.ssylka }}" target="_blank" rel="noopener">{{ g.ssylka_tekst }} ↗</a>
+    {% elif g.ssylka_tekst %}<span>{{ g.ssylka_tekst }}</span>{% endif %}
+    <span>запись на день проверки — сама не пропадает</span>
+  </div>
 </div>
 {%- endmacro %}
 {% set it = d.itog %}
@@ -134,8 +158,17 @@
       <tr class="{{ 'kr' if rz.krasnyi }}"><td>{{ rz.nomer }}. {{ rz.nazvanie }}</td><td class="n">{{ rz.vsego }}</td>
         <td class="n">{{ (rz.samoy_staroy ~ ' дн.') if rz.vsego else '—' }}</td></tr>
       {% endfor %}
+      {% if kr %}
+      <tr class="{{ 'kr' if kr.vsego }}"><td>13. Красные находки «Аномалий» за {{ kr.dney }} дней (в «осталось» не входят)</td>
+        <td class="n">{{ kr.vsego }}</td><td class="n">—</td></tr>
+      {% endif %}
     </table>
     <div class="stroka-b">Красным — раздел про деньги, где самой старой строке больше 7 дней.</div>
+    {% if kr and kr.vsego %}
+    <div class="stroka-b"><b>Красные находки «Аномалий»:</b>
+      {% for vid, n in kr.po_vidam|dictsort(by='value', reverse=true) %}{{ vid }} {{ n }}{{ ' · ' if not loop.last }}{% endfor %}.
+      {% if rol == 'owner' %}Снять находку («не нарушение») — на странице <a href="/audit">«Аномалии»</a>.{% endif %}</div>
+    {% endif %}
     {% if it.zhdut_resheniya %}
     <div class="stroka-b"><b>Ждёт решения Бориса:</b>
       {% for r in it.zhdut_resheniya %}<div>· {{ r.chto }}</div>{% endfor %}</div>
@@ -159,6 +192,28 @@
     {% endif %}
   </section>
   {% endfor %}
+
+  {#- 13.11.2026, Борис (М3): красные находки ленты «Аномалии» за 14 дней — отдельным разделом,
+      только чтение. В «осталось исправить» не входят: находка не пропадает сама. -#}
+  {% if kr %}
+  {% set pervye = kr.gruppy[:8] %}
+  {% set dalshe = kr.gruppy[8:] %}
+  <section class="razdel {{ 'pusto' if not kr.gruppy }}" id="r13">
+    <h2><span class="num">13</span> Красные находки «Аномалий» за {{ kr.dney }} дней
+      <span class="sch {{ 'r' if kr.vsego }}">{{ kr.vsego if kr.vsego else 'нет' }} · только чтение</span></h2>
+    <p class="r13-poyasn">Самое тяжёлое из ежедневных проверок денег, правил и состава групп{{ ', сверки честности и оплат' if rol == 'owner' }}:
+      крупный долг, неоплаченный абонемент, скидка от 30 % без объяснения{{ ', правка оплаченного' if rol == 'owner' }}.
+      Здесь только читать: галочек нет, в «осталось исправить» эти строки не входят. Проверь по карточке — возможно, уже исправлено.
+      {% if rol == 'owner' %}Снять находку — кнопкой «не нарушение» на странице <a href="/audit">«Аномалии»</a>.{% endif %}</p>
+    {% if kr.oshibka %}<div class="oshibka">Раздел сейчас не собрался: лента «Аномалии» не прочиталась. Клод видит это в журнале.</div>{% endif %}
+    {% for g in pervye %}{{ krasnaya(g) }}{% endfor %}
+    {% if dalshe %}
+    <details class="hvost"><summary>ещё {{ dalshe|length }} — показать все</summary>
+      {% for g in dalshe %}{{ krasnaya(g) }}{% endfor %}
+    </details>
+    {% endif %}
+  </section>
+  {% endif %}
 
   <p class="foot">Страница собирается из копии МойКласса на сервере и ничего в МойКласс не пишет.
     Последняя сверка с МойКлассом по занятиям и абонементам: {{ (d.sredniy_sync.konec or '—')[11:16] }}.</p>

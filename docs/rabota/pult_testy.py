@@ -754,12 +754,76 @@ def test_kolonka_borisa_1311():
             sys.modules["app.main"] = st[10]
 
 
+# ── М4 (13.11.2026): пункт о незакрытой явке идёт Лизе ───────────────────
+# Борис, 13.11: «М — по рекомендациям». Вопрос М4: «Кому идёт пункт о незакрытой явке?» —
+# «Лизе, явку ведёт она» (Лена просила 27.10, Ира 13.11: «Она с явками работает, не мы»).
+# Решение 08.10 «явка у Лены» отменено. Имена выдуманные.
+def test_yavka_lize_1311():
+    print("М4: пункт о незакрытой явке — Лизе (yavka.nightly), дежурной он не переносится")
+    import inspect
+    from app import config, hvost, pult, yavka, db
+    from app import autopilot as ap
+    from app.pult_proverka import liza_mozhno
+    from datetime import date as _date
+    proverka("yavka.nightly: по умолчанию who = «Лиза»", inspect.signature(yavka.nightly).parameters["who"].default, "Лиза")
+    proverka("подпись роли: явка — у Лизы, у Лены её нет", ("явка" in pult.ROLE["Лиза"], "явка" in pult.ROLE["Лена"]), (True, False))
+    staryj, st_today, st_duty = config.DB_PATH, pult.today, pult.duty
+    st_ap = (ap._today, ap._duty_name)
+    st_sverka = yavka.sverka
+    config.DB_PATH = os.path.join(tempfile.mkdtemp(), "t.db")
+    try:
+        db.init_db()
+        it = {"s_otchetom": 3, "ne_provedeno": 1, "otmetok_postavit": 2, "imen_bez_zapisi": 0, "spornyh": 0,
+              "konfliktov": 1, "bez_otcheta": 1}
+        yavka.sverka = lambda day, **k: {"itogo": dict(it), "bez_otcheta": [{"time": "16:00", "class": "ЛГ Тестовая"}]}
+        ap._today = lambda: _date(2026, 11, 12)                    # четверг, вечер: сверка за день
+        ap._duty_name = lambda: "Ира"                              # дежурная — не должна получить пункт
+        yavka.nightly("2026-11-12")
+        conn = sqlite3.connect(config.DB_PATH)
+        rows = conn.execute("SELECT who, source, text FROM plan_inbox").fetchall()
+        conn.close()
+        proverka("пункт один, адресат — Лиза, источник «явка 12.11»", [(r[0], r[1]) for r in rows], [("Лиза", "явка 12.11")])
+        tekst = rows[0][2] if rows else ""
+        proverka("настройка по умолчанию («1»): короткий пункт — без отчёта педагога, напомнить педагогам",
+                 ("без отчёта педагога 1 занятий" in tekst, "напомнить педагогам" in tekst, "раздел 3" in tekst,
+                  "не проведено" in tekst), (True, True, True, False))
+        proverka("сторож пульта: такой пункт Лизе можно", liza_mozhno(tekst), True)
+        # занятий без отчёта нет — при «1» пункта нет вовсе: расхождения Лиза видит на странице
+        it["bez_otcheta"] = 0
+        yavka.nightly("2026-11-11")
+        conn = sqlite3.connect(config.DB_PATH)
+        n = conn.execute("SELECT COUNT(*) FROM plan_inbox").fetchone()[0]
+        # старый пункт о явке у Лены (до решения 13.11) и её обычный пункт
+        conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) VALUES "
+                     "('2026-11-12', '2026-11-12T08:31+03:00', 'Лена', 'Явка 11.11: отчёты педагогов есть по 5 занятиям', '', 'явка 11.11')")
+        conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) VALUES "
+                     "('2026-11-12', '2026-11-12T10:00+03:00', 'Лена', 'Отправить Тестовым расписание', '', 'звонок 10:00')")
+        conn.commit()
+        conn.close()
+        proverka("все отчёты есть — второго пункта Лизе нет", n, 1)
+        # утро 13.11: в смене одна Ира, Лизы и Лены нет
+        pult.today = lambda: "2026-11-13"
+        pult.duty = lambda day: ["Ира"]
+        hvost.utro()
+        conn = sqlite3.connect(config.DB_PATH)
+        got = {r[0]: (r[1], r[2]) for r in conn.execute("SELECT source, who, day FROM plan_inbox WHERE done=0")}
+        conn.close()
+        proverka("утром пункт о явке остаётся у Лизы, дежурной Ире не уходит", got.get("явка 12.11"), ("Лиза", "2026-11-13"))
+        proverka("старый пункт о явке у Лены в её выходной дежурной тоже не переносится (правка 13.11, Ира)",
+                 got.get("явка 11.11"), ("Лена", "2026-11-13"))
+        proverka("…а обычный пункт Лены уходит дежурной, как раньше", got.get("звонок 10:00"), ("Ира", "2026-11-13"))
+    finally:
+        pult.today, pult.duty, config.DB_PATH = st_today, st_duty, staryj
+        ap._today, ap._duty_name = st_ap
+        yavka.sverka = st_sverka
+
+
 def main():
     for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_bloki, test_audit,
               test_data_gruppy, test_povtor,
               test_zayavki_odin_punkt, test_utro, test_boris_desyat,
               test_vozvrat_1211, test_utro_1211, test_naryad_1211, test_audit_1211, test_zayavki_blok_1211,
-              test_hvost_glavnoe, test_kolonka_borisa_1311):
+              test_hvost_glavnoe, test_kolonka_borisa_1311, test_yavka_lize_1311):
         t()
         print()
     if oshibok:
