@@ -1130,6 +1130,15 @@ def test_shapka_shag2(c, m, work):
     r = c.get(f"/base/{slug}", auth=ADMIN)
     proverka(f"/base/{slug} без Accept: text/html — тело методички без изменений",
              r.text == fajl and 'id="kidsup-doc-bar"' not in r.text)
+    kusok = next(s for _, punkty in m.DOC_GROUPS for s, _, _ in punkty if not s.startswith("plan_")
+                 and os.path.exists(os.path.join(ROOT, "docs", f"{s}.html"))
+                 and not open(os.path.join(ROOT, "docs", f"{s}.html"), encoding="utf-8").read().lstrip()[:9].lower().startswith("<!doctype"))
+    fajl = open(os.path.join(ROOT, "docs", f"{kusok}.html"), encoding="utf-8").read()
+    r = c.get(f"/base/{kusok}", auth=ADMIN, headers=BRAUZER)
+    proverka(f"/base/{kusok} (файл без <!doctype>) браузеру: ответ всё равно начинается с <!doctype, строка одна",
+             r.text[:15].lower() == "<!doctype html>" and r.text.count('id="kidsup-doc-bar"') == 1
+             and r.text.find("<!doctype") < r.text.find('id="kidsup-doc-bar"'), r.text[:80])
+    proverka(f"/base/{kusok} без Accept: text/html — файл как лежит", c.get(f"/base/{kusok}", auth=ADMIN).text == fajl)
     telo = "<!doctype html><html><head><meta charset=utf-8><title>стенд</title></head><body><h1>Список стенда</h1></body></html>"
     for put, api, nazad in (("/boris/docs", "/api/boris-docs", "Мои документы"), ("/admin/docs", "/api/admin-docs", "Списки")):
         rr = c.post(api, auth=VLADELEC, json={"slug": "shapka-stend", "title": "Стенд шапки", "html": telo})

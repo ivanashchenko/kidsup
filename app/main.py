@@ -436,6 +436,16 @@ def _doc_s_polosoy(request: Request, stranica: str, nazad: str, nazvanie: str, p
     return nav.vstavit(stranica, nav.doc_bar(nazad, nazvanie, podpis))
 
 
+def _s_doctype(stranica: str) -> str:
+    """Методичка для браузера всегда начинается с <!doctype html>. 13.11.2026: больше
+    половины файлов docs/*.html — куски без <!doctype> и <body> (сразу <title><style>…),
+    браузер открывал их в режиме совместимости. Сам файл не меняем: рутинам и скриптам
+    (без Accept: text/html) он уходит как лежит."""
+    if stranica.lstrip()[:9].lower() == "<!doctype":
+        return stranica
+    return "<!doctype html>\n" + stranica
+
+
 def render(request: Request, template: str, **ctx) -> HTMLResponse:
     from markupsafe import Markup
     counts = db.table_counts()
@@ -2101,11 +2111,13 @@ def base_doc(request: Request, slug: str):
                                + f'открыта в {(datetime.utcnow() + timedelta(hours=3)).strftime("%H:%M")}</span>'))
         if "text/html" in (request.headers.get("accept") or ""):
             # автообновление — тоже только браузеру и тоже не перед <!doctype>
-            page = nav.vstavit(page, '<meta http-equiv="refresh" content="300">')
+            page = nav.vstavit(_s_doctype(page), '<meta http-equiv="refresh" content="300">')
             return HTMLResponse(_doc_s_polosoy(
                 request, page, "/base", "База знаний",
                 "KidsUP · план дня · страница обновляется сама каждые 5 минут, "
                 f'открыта в {(datetime.utcnow() + timedelta(hours=3)).strftime("%H:%M")}'))
+    if "text/html" in (request.headers.get("accept") or ""):
+        page = _s_doctype(page)
     return HTMLResponse(_doc_s_polosoy(request, page, "/base", "База знаний", "KidsUP · база знаний"))
 
 

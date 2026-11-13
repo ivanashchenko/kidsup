@@ -9,6 +9,28 @@
   window.__knGotovo = true;
   var telefon = window.matchMedia ? window.matchMedia('(max-width: 919.98px)') : { matches: false };
 
+  /* --- шапка во всю ширину окна ---------------------------------------------
+     У части страниц со своим HTML у body поля или ограничена ширина (стоп-лист, контроль
+     оплат, сверка честности): шапка, вставленная в такой body, вышла бы узкой и со сдвигом.
+     Меряем и растягиваем до краёв окна; на страницах без полей ничего не меняется. */
+  (function () {
+    function rastyanut() {
+      koren.style.marginLeft = koren.style.marginRight = koren.style.marginTop = koren.style.width = '';
+      var r = koren.getBoundingClientRect();
+      var w = document.documentElement.clientWidth;
+      var sverhu = r.top + (window.pageYOffset || 0);
+      if (r.left > 0.5 || Math.abs(r.width - w) > 1) {
+        koren.style.marginLeft = (-r.left) + 'px';
+        koren.style.marginRight = (r.right - w) + 'px';
+        koren.style.width = w + 'px';
+      }
+      if (sverhu > 0.5 && sverhu < 80) koren.style.marginTop = (-sverhu) + 'px';
+    }
+    rastyanut();
+    window.addEventListener('resize', rastyanut);
+    window.addEventListener('load', rastyanut);
+  })();
+
   /* --- место под нижнюю панель ------------------------------------------- */
   (function () {
     var panel = koren.querySelector('.kn-panel');

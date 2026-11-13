@@ -74,15 +74,14 @@
 #kidsup-nav .kn-razdely { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; padding: 0 16px 8px; }
 #kidsup-nav .kn-list-verh, #kidsup-nav .kn-panel { display: none; }
 #kidsup-nav .kn-razdel { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; min-width: 0; }
-#kidsup-nav .kn-razdel:first-of-type, #kidsup-nav .kn-razdel.kn-vlad { flex: 1 1 100%; }
+#kidsup-nav .kn-razdel.kn-vlad { flex: 1 1 100%; }
 #kidsup-nav .kn-razdel-imya {
   pointer-events: none; cursor: default; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   color: var(--kn-tih); padding: 0 4px 0 0;
 }
 #kidsup-nav .kn-vlad .kn-razdel-imya { color: var(--kn-indigo); }
-#kidsup-nav .kn-punkty { display: flex; flex-wrap: wrap; gap: 2px; }
+#kidsup-nav .kn-punkty { display: contents; }   /* ссылки — прямо в строке раздела: длинный раздел переносится по пунктам */
 #kidsup-nav .kn-punkty a { display: inline-block; padding: 5px 9px; border-radius: 8px; font-weight: 600; font-size: 13.5px; white-space: nowrap; }
-#kidsup-nav .kn-razdel:first-of-type .kn-punkty a { font-size: 14.5px; padding: 6px 11px; }
 #kidsup-nav .kn-punkty a:hover { background: var(--kn-fon2); }
 #kidsup-nav .kn-punkty a.kn-tut { background: var(--kn-indigo); color: var(--kn-na-indigo); }
 
@@ -132,7 +131,7 @@
   #kidsup-nav .kn-list-kto { flex: 1 1 auto; min-width: 0; }
   #kidsup-nav .kn-list-kto .kto-polosa { padding: 0 !important; border: 0 !important; background: none !important; }
   #kidsup-nav .kn-zakryt { margin-left: auto; width: 48px; height: 48px; font-size: 30px; line-height: 1; color: var(--kn-tekst); flex: 0 0 auto; }
-  #kidsup-nav .kn-razdel, #kidsup-nav .kn-razdel:first-of-type, #kidsup-nav .kn-razdel.kn-vlad { display: block; border-bottom: 1px solid var(--kn-linia); }
+  #kidsup-nav .kn-razdel, #kidsup-nav .kn-razdel.kn-vlad { display: block; border-bottom: 1px solid var(--kn-linia); }
   #kidsup-nav .kn-razdel-imya {
     pointer-events: auto; cursor: pointer; display: flex; align-items: center; justify-content: space-between; width: 100%;
     min-height: 54px; padding: 0 16px; font-size: 17px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--kn-tekst); text-align: left;
@@ -145,7 +144,7 @@
   #kidsup-nav .kn-zdes .kn-razdel-imya::after { margin-left: auto; }
   #kidsup-nav .kn-punkty { display: none; padding: 0 8px 8px; }
   #kidsup-nav .kn-raskryt .kn-punkty { display: block; }
-  #kidsup-nav .kn-punkty a, #kidsup-nav .kn-razdel:first-of-type .kn-punkty a {
+  #kidsup-nav .kn-punkty a {
     display: flex; align-items: center; min-height: 50px; padding: 0 14px 0 20px; font-size: 17px; font-weight: 500; border-radius: 10px; white-space: normal;
   }
 
