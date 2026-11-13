@@ -991,10 +991,17 @@ def _novyj(age) -> dict:
 
 def _semya(conn, p: str, segodnya: date, age, child) -> dict:
     rows, vtoroj = _karty(conn, p)
+    # 13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1): «Стоп-лист» ушёл из меню,
+    # а семья, которая письменно просила ей не писать, должна быть видна там, где с ней
+    # говорят, — плашкой на «Линии»: причина (что написали) и дата. Только действующие
+    # записи: снятая кнопкой на /otkazy плашку не даёт. Номера может не быть в CRM — плашка
+    # всё равно нужна, поэтому она собирается до карточек.
+    from . import otkaz
     res = {"telefon": {"p10": p, "pokaz": pokaz(p), "tel": "7" + p},
            "kontakt": _kontakt(conn, p, [r["id"] for r in rows], segodnya),
            "obeshchaniya": _obeshchaniya(conn, p),
-           "zadachi": _zadachi(conn, p, segodnya.isoformat())}
+           "zadachi": _zadachi(conn, p, segodnya.isoformat()),
+           "stop_list": otkaz.v_stop_liste(p)}
     if not rows:
         res.update(_novyj(age))
         return res
