@@ -2068,6 +2068,7 @@ def main():
     test_vecher1(c, m, tree, baza)
     test_uborka_bezopasnost(c, m, tree, baza)
     test_ustarevshee(c, m, tree, baza)
+    test_posle_proverki_vechera1(c, m, tree, baza)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     proverka("ни одной попытки выйти в сеть, кроме известных опросов Mango с пульта и «Ответов»",
              all(any(f.startswith(("mango.py", "zayavki.py")) for f in otkuda) for _, otkuda in lt.SET), lt.SET[:5])
@@ -2262,8 +2263,9 @@ def test_vecher1(c, m, tree, baza):
         razdely = h.split('id="nav-razdely"', 1)[-1]          # шапка на компьютере и лист «☰ Разделы» — одна разметка
         ostalis = [a for a in list(ubrano) + list(ESHCHE_V1) if f'href="{a}"' in razdely]
         proverka(f"{rol}: в шапке и листе «☰ Разделы» убранных пунктов нет", not ostalis, ostalis)
-        mk = razdely.split(">МойКласс<", 1)[-1].split('class="kn-razdel', 1)[0] if ">МойКласс<" in razdely else ""
-        proverka(f"{rol}: раздел «МойКласс» — «Проверка МойКласса» и «Явка», больше ничего",
+        # 13.11.2026, вечер: раздел называется «МойКласс (Лиза)» — по утверждённому тексту «Вечера 1»
+        mk = razdely.split(">МойКласс (Лиза)<", 1)[-1].split('class="kn-razdel', 1)[0] if ">МойКласс (Лиза)<" in razdely else ""
+        proverka(f"{rol}: раздел «МойКласс (Лиза)» — «Проверка МойКласса» и «Явка», больше ничего",
                  re.findall(r'href="([^"]+)"', mk) == ["/proverka-mk", "/yavka"], re.findall(r'href="([^"]+)"', mk))
         smena = razdely.split(">Смена<", 1)[-1].split('class="kn-razdel', 1)[0]
         proverka(f"{rol}: «Явка» из «Смены» ушла", 'href="/yavka"' not in smena and 'href="/pult"' in smena)
@@ -3378,6 +3380,296 @@ def test_ustarevshee(c, m, tree, baza):
              _otkazy_staraya_tablica(m))
     proverka("is_refused и _tables — как были: новых колонок не читают и не создают",
              "snyal" not in inspect.getsource(otkaz.is_refused) and "ALTER" not in inspect.getsource(otkaz._tables))
+
+
+# --- П. После проверки «вечера 1» (13.11.2026, вечер) -------------------------------------
+# Замечания трёх проверяющих: стоп-лист (повторный отказ после снятия, «вернуть», подпись,
+# ключ записи), снятие чужих находок запросом, отметка ключа вебхука Wazzup, ключ Марквиза,
+# старые долги в разделе 13 «Проверки МойКласса».
+
+def test_posle_proverki_vechera1(c, m, tree, baza):
+    import datetime as dt
+    import logging
+    from app import audit, otkaz, proverka_mk, wazzup as wz
+
+    def zapis(chat):
+        with m.db.get_conn() as conn:
+            r = conn.execute("SELECT rowid AS id, * FROM otkazy WHERE chat=?", (chat,)).fetchone()
+            return dict(r) if r else None
+
+    def ujdet(nomer):
+        return c.get(f"/api/otkazy/check?phone={nomer}", auth=ADMIN).json()
+
+    print("П1. Стоп-лист: повторный письменный отказ после снятия возвращает запись в действие")
+    _otkazy_zaseyat(m)
+    semya = SEMYA[-10:]
+    NOVYY = "Пожалуйста, снимите бронь и больше не пишите нам"
+    r = c.post("/api/otkazy/snyat", json={"phone": SEMYA, "prichina": "мама написала, что передумали"},
+               auth=ADMIN, headers=SVOYA_STRANICA)
+    snyato = zapis(semya)
+    proverka("семью сняли кнопкой: запрета нет", r.status_code == 200 and snyato["released"] == 1 and otkaz.is_refused(SEMYA) is None)
+    proverka("то же старое сообщение (разбор входящих перечитывает месяц) снятую запись не возвращает",
+             otkaz.note(SEMYA, OTKAZ_TEKST, "2026-10-29T14:44:58+03:00") is False
+             and zapis(semya)["released"] == 1 and otkaz.is_refused(SEMYA) is None)
+    pozzhe = (dt.datetime.fromisoformat(snyato["snyal_kogda"]) + dt.timedelta(minutes=5)).isoformat(timespec="seconds")
+    vernulas = otkaz.note(SEMYA, NOVYY, pozzhe)
+    z = zapis(semya)
+    proverka("новый письменный отказ после снятия → запись снова действует (до правки note() отвечала False, и автоматика писала дальше)",
+             vernulas is True and z["released"] == 0 and z["ts"] == pozzhe and z["text"] == NOVYY, z)
+    proverka("…is_refused снова запрещает, предохранитель отправок письмо не пускает, плашка на «Линии» вернулась",
+             "больше не пишите" in (otkaz.is_refused(SEMYA) or "") and ujdet(SEMYA)["уйдёт"] is False
+             and "клиент отказался" in ujdet(SEMYA)["причина"]
+             and 'id="ln-stop-list"' in c.get(f"/liniya?phone={semya}", auth=ADMIN).text)
+    proverka("«кто, когда, почему снял» у вернувшейся записи целы; вторая запись семьи (чат мессенджера) осталась снятой",
+             z["snyal_kto"] == "админ" and z["snyal_kogda"] == snyato["snyal_kogda"]
+             and z["snyal_prichina"] == "мама написала, что передумали" and zapis("5139000001")["released"] == 1, z)
+    proverka("действующую запись повтор отказа не трогает — как и раньше",
+             otkaz.note(SEMYA, NOVYY + "!", pozzhe) is False and zapis(semya)["text"] == NOVYY)
+    proverka("запись, снятая до 13.11 (время снятия не писалось): то же старое сообщение её не возвращает, более позднее — возвращает",
+             otkaz.note("79990003001", "больше не пишите", "2026-08-24T17:00:40+03:00") is False
+             and zapis("9990003001")["released"] == 1
+             and otkaz.note("79990003001", "больше не пишите нам, пожалуйста", "2026-11-13T12:00:00+03:00") is True
+             and zapis("9990003001")["released"] == 0 and otkaz.is_refused("9990003001"))
+    t = c.get("/otkazy", auth=ADMIN).text
+    proverka("страница: у вернувшейся записи сказано, что семью снимали и она отказалась снова; правило названо в шапке",
+             "семья отказалась снова после снятия (снимал(а) админ" in t and "«мама написала, что передумали»" in t
+             and "снова письменно откажется, запись сама вернётся" in t)
+    proverka("is_refused и _tables по-прежнему не читают и не создают новых колонок (путь отправки не тронут); "
+             "note() таблицу не правит — колонку времени снятия только читает",
+             "snyal" not in inspect.getsource(otkaz.is_refused) and "ALTER" not in inspect.getsource(otkaz._tables)
+             and "ALTER" not in inspect.getsource(otkaz.note) and "_kolonki_snyatiya" not in inspect.getsource(otkaz.note)
+             and "ALTER" not in inspect.getsource(otkaz._posle_snyatiya))
+
+    print("П1 (продолжение). Разбор входящих: снятую запись старое сообщение не возвращает, новое — возвращает")
+    _otkazy_zaseyat(m)
+    nomer = "9990003002"
+    with m.db.get_conn() as conn:
+        m._wz_tables(conn)
+        conn.execute("DELETE FROM wazzup_inbox WHERE message_id LIKE 'stend-p1-%'")
+        conn.execute("INSERT INTO wazzup_inbox (ts, phone, chat_type, text, message_id) VALUES (?,?,?,?,?)",
+                     ("2026-09-05T10:00:00+03:00", "7" + nomer, "whatsapp", "Мы отказываемся, удалите наш номер", "stend-p1-1"))
+    try:
+        r = c.post("/api/otkazy/snyat", json={"phone": nomer, "prichina": "позвонили сами, просят писать"},
+                   auth=ADMIN, headers=SVOYA_STRANICA)
+        c.post("/api/otkazy/scan?hours=9000", auth=ADMIN, headers=SVOYA_STRANICA)
+        proverka("сняли → разбор входящих за год: старое сообщение запись не вернуло",
+                 r.status_code == 200 and zapis(nomer)["released"] == 1 and otkaz.is_refused(nomer) is None)
+        c.post("/api/otkazy/scan?hours=9000&rebuild=true", auth=ADMIN, headers=SVOYA_STRANICA)
+        proverka("…и пересборка стоп-листа (rebuild) тоже: решение человека не отменяется",
+                 zapis(nomer)["released"] == 1 and otkaz.is_refused(nomer) is None)
+        cherez_chas = (dt.datetime.fromisoformat(zapis(nomer)["snyal_kogda"]) + dt.timedelta(hours=1)).isoformat(timespec="seconds")
+        with m.db.get_conn() as conn:
+            conn.execute("INSERT INTO wazzup_inbox (ts, phone, chat_type, text, message_id) VALUES (?,?,?,?,?)",
+                         (cherez_chas, "7" + nomer, "whatsapp", "нам больше не пишите, ходить не будем, снимите бронь", "stend-p1-2"))
+        st = c.post("/api/otkazy/scan?hours=9000", auth=ADMIN, headers=SVOYA_STRANICA).json()
+        proverka("семья после снятия пишет «нам больше не пишите, ходить не будем, снимите бронь» → разбор находит новый отказ, запрет действует",
+                 st["новых отказов"] >= 1 and zapis(nomer)["released"] == 0 and zapis(nomer)["ts"] == cherez_chas
+                 and otkaz.is_refused(nomer) and ujdet("7" + nomer)["уйдёт"] is False, st)
+    finally:
+        with m.db.get_conn() as conn:
+            conn.execute("DELETE FROM wazzup_inbox WHERE message_id LIKE 'stend-p1-%'")
+
+    print("П1 (продолжение). «Вернуть в стоп-лист» и внесение руками не стирают сведения о снятии")
+    _otkazy_zaseyat(m)
+    c.post("/api/otkazy/snyat", json={"chat": "5139000002", "prichina": "сняли не ту строку"}, auth=ADMIN, headers=SVOYA_STRANICA)
+    do = zapis("5139000002")
+    proverka("без входа — 401, с чужого сайта — 403, без ключа записи и по несуществующему — 400; ничего не вернулось",
+             c.post("/api/otkazy/vernut", json={"chat": "5139000002"}).status_code == 401
+             and c.post("/api/otkazy/vernut", json={"chat": "5139000002"}, auth=ADMIN, headers=CHUZHOY_FON).status_code == 403
+             and c.post("/api/otkazy/vernut", json={}, auth=ADMIN, headers=SVOYA_STRANICA).status_code == 400
+             and c.post("/api/otkazy/vernut", json={"chat": "net-takogo"}, auth=ADMIN, headers=SVOYA_STRANICA).status_code == 400
+             and zapis("5139000002") == do and do["released"] == 1)
+    r = c.post("/api/otkazy/vernut", json={"chat": "5139000002"}, auth=ADMIN, headers=SVOYA_STRANICA)
+    posle = zapis("5139000002")
+    proverka("кнопка «вернуть»: запись снова действует; дата и цитата отказа прежние, «кто, когда, почему снял» остались",
+             r.status_code == 200 and r.json()["ok"] is True and posle["released"] == 0
+             and {k: posle[k] for k in posle if k != "released"} == {k: do[k] for k in do if k != "released"}, posle)
+    proverka("повторное «вернуть» действующей записи — 400",
+             c.post("/api/otkazy/vernut", json={"chat": "5139000002"}, auth=ADMIN, headers=SVOYA_STRANICA).status_code == 400)
+    t = c.get("/otkazy", auth=ADMIN).text
+    proverka("страница: у записи пометка «возвращена в стоп-лист после снятия»; в «Сняты» у каждой строки — «вернуть в стоп-лист»",
+             "возвращена в стоп-лист после снятия (снимал(а) админ" in t and "fetch('/api/otkazy/vernut'" in t
+             and t.count("вернуть в стоп-лист</button>") == t.count("<form class=vernut") == 1)
+    c.post("/api/otkazy/release?chat=79990002001", auth=VLADELEC, headers=SVOYA_STRANICA)
+    do = zapis("79990002001")
+    r = c.post("/api/otkazy/add?phone=79990002001&text=" + quote("снова попросила по телефону не писать"), auth=ADMIN, headers=SVOYA_STRANICA)
+    posle = zapis("79990002001")
+    proverka("POST /api/otkazy/add по семье, чья ручная запись снята: строка та же (раньше стиралась), снова действует, "
+             "текст новый, «кто и когда снял» целы, имя в записи не затёрто",
+             r.status_code == 200 and r.json()["ok"] is True and posle["id"] == do["id"] and posle["released"] == 0
+             and posle["text"] == "снова попросила по телефону не писать" and posle["snyal_kto"] == "Борис"
+             and posle["snyal_kogda"] == do["snyal_kogda"] and posle["name"] == "Пробная Алиса" and otkaz.is_refused("9990002001"), posle)
+    r = c.post("/api/otkazy/add?phone=79990009998&text=" + quote("по телефону: не пишите"), auth=ADMIN, headers=SVOYA_STRANICA)
+    proverka("…а новая семья вносится как раньше", r.status_code == 200 and zapis("79990009998")["released"] == 0
+             and zapis("79990009998")["source"] == "руками" and otkaz.is_refused("9990009998"))
+
+    print("П1 (продолжение). Пересборка списка сдвигает номера записей — старая вкладка чужую семью не снимет")
+    with m.db.get_conn() as conn:
+        conn.execute("DELETE FROM otkazy")
+        conn.execute("INSERT INTO otkazy (chat, phone, ts, text, source) VALUES ('5139000002', '', '2026-10-12T18:00:00+03:00', 'Отмените запись, пожалуйста', '')")
+        conn.execute("INSERT INTO otkazy (chat, phone, ts, text, source) VALUES ('9990003002', '9990003002', '2026-09-05T10:00:00+03:00', 'Мы отказываемся', 'телефон чата')")
+    nomer_chata = zapis("5139000002")["id"]
+    proverka("открытая вкладка: у чата без телефона в форме — ключ записи", 'data-chat="5139000002"' in c.get("/otkazy", auth=ADMIN).text)
+    with m.db.get_conn() as conn:                    # как после scan?rebuild=true: те же записи, вставлены заново в другом порядке
+        conn.execute("DELETE FROM otkazy")
+        conn.execute("INSERT INTO otkazy (chat, phone, ts, text, source) VALUES ('9990003002', '9990003002', '2026-09-05T10:00:00+03:00', 'Мы отказываемся', 'телефон чата')")
+        conn.execute("INSERT INTO otkazy (chat, phone, ts, text, source) VALUES ('5139000002', '', '2026-10-12T18:00:00+03:00', 'Отмените запись, пожалуйста', '')")
+    proverka("после пересборки под прежним номером записи — уже семья, а не чат", zapis("9990003002")["id"] == nomer_chata)
+    r = c.post("/api/otkazy/snyat", json={"chat": "5139000002", "id": nomer_chata, "prichina": "чат педагога, не клиента"},
+               auth=ADMIN, headers=SVOYA_STRANICA)
+    proverka("запрос с прежним номером и ключом чата — 400 «обновите страницу», никто не снят",
+             r.status_code == 400 and zapis("9990003002")["released"] == 0 and zapis("5139000002")["released"] == 0, r.text[:160])
+    r = c.post("/api/otkazy/snyat", json={"chat": "5139000002", "prichina": "чат педагога, не клиента"}, auth=ADMIN, headers=SVOYA_STRANICA)
+    proverka("кнопка со старой вкладки (ключ записи) снимает именно чат; семья под запретом, как была",
+             r.status_code == 200 and r.json()["snyato"] == 1 and zapis("5139000002")["released"] == 1
+             and zapis("9990003002")["released"] == 0 and otkaz.is_refused("9990003002"))
+    with m.db.get_conn() as conn:
+        conn.execute("DELETE FROM otkazy")
+
+    print("П2. /api/audit/resolve: не владелец снимает только находки вида «правила»")
+    nomera = {}
+    for vid in ("честность", "оплата без подписи", "деньги", "правила"):
+        audit.add_flag(vid, f"stend-p2:{vid}", audit.HIGH, f"Выдуманная находка «{vid}» (стенд)", "стенд", user_id=9001)
+    with m.db.get_conn() as conn:
+        for r in conn.execute("SELECT id, kind FROM audit_flags WHERE key LIKE 'stend-p2:%'"):
+            nomera[r["kind"]] = r["id"]
+
+    def status(vid):
+        with m.db.get_conn() as conn:
+            return conn.execute("SELECT status FROM audit_flags WHERE id=?", (nomera[vid],)).fetchone()[0]
+    try:
+        u_vladelca = proverka_mk.krasnye(vladelec=True)["vsego"]
+        kody = {vid: c.post(f"/api/audit/resolve?flag_id={nomera[vid]}&status=ok", auth=ADMIN, headers=SVOYA_STRANICA).status_code
+                for vid in ("честность", "оплата без подписи", "деньги")}
+        proverka("админ по номеру находки «честность», «оплата без подписи», «деньги» — 403, находка не снята",
+                 set(kody.values()) == {403} and all(status(v) == "new" for v in kody), kody)
+        proverka("…и число красных находок в разделе 13 у владельца не изменилось (до правки запросом админа их становилось меньше)",
+                 proverka_mk.krasnye(vladelec=True)["vsego"] == u_vladelca)
+        r = c.post(f"/api/audit/resolve?flag_id={nomera['правила']}&status=ok", auth=ADMIN, headers=SVOYA_STRANICA)
+        proverka("находку вида «правила» админ снимает, как раньше (кнопки /pravila-kontrol)",
+                 r.status_code == 200 and r.json() == {"ok": True} and status("правила") == "ok")
+        r = c.post("/api/audit/resolve?flag_id=0&status=ok", auth=ADMIN, headers=SVOYA_STRANICA)
+        proverka("номера нет в ленте — как было: не отказ, {\"ok\": false}", r.status_code == 200 and r.json() == {"ok": False}, r.text[:80])
+        r = c.post(f"/api/audit/resolve?flag_id={nomera['честность']}&status=ok", auth=VLADELEC, headers=SVOYA_STRANICA)
+        proverka("владелец снимает любую находку", r.status_code == 200 and r.json() == {"ok": True} and status("честность") == "ok")
+        proverka("кнопки «не нарушение» на /audit (владелец) и «принято» на /pravila-kontrol зовут тот же адрес",
+                 "/api/audit/resolve?flag_id=" in inspect.getsource(m.audit_page) and "_rol(request) != \"owner\"" in inspect.getsource(m.api_audit_resolve))
+    finally:
+        with m.db.get_conn() as conn:
+            conn.execute("DELETE FROM audit_flags WHERE key LIKE 'stend-p2:%'")
+
+    print("П3. Вебхук Wazzup: после отката и повторного ввода того же ключа сообщения не теряются")
+    def wh(klyuch=None):
+        return c.post("/wazzup/webhook", params={} if klyuch is None else {"k": klyuch}, json={}).status_code
+
+    def nastroyka(znachenie):
+        return c.post("/api/settings", json={"key": "wazzup_hook_key", "value": znachenie}, auth=VLADELEC).status_code
+    K, K2 = "stend-wazzup-klyuch-povtor", "stend-wazzup-klyuch-vtoroj"
+    try:
+        proverka("ключ вписан, пришло событие с ключом — ключ требуется: без ключа 403",
+                 nastroyka(K) == 200 and wh(K) == 200 and wz.hook_strogo() and wh() == 403)
+        proverka("откат: настройку очистили — принимается всё, отметка «ключ требуется» стёрта",
+                 nastroyka("") == 200 and wh() == 200 and not m.db.get_setting(wz._HOOK_OK))
+        r = c.post("/owner", data={"wazzup_hook_key": K}, auth=VLADELEC)
+        proverka("тот же ключ вписали снова (Wazzup ещё шлёт по адресу без ключа): запрос без ключа принимается — "
+                 "состояние «ждём первое событие», а не «ключ требуется»",
+                 r.status_code == 200 and not wz.hook_strogo() and wh() == 200 and "ждём первое событие" in wz.hook_sostoyanie()
+                 and "ждём первое событие" in r.text and "ключ требуется" not in r.text, wz.hook_sostoyanie())
+        proverka("…и снова требуется только после первого события с ключом", wh(K) == 200 and wz.hook_strogo() and wh() == 403)
+        c.post("/owner", data={"wazzup_hook_key": K}, auth=VLADELEC)
+        proverka("тот же ключ, сохранённый повторно, проверку не выключает", wz.hook_strogo() and wh() == 403)
+        proverka("K → K2 (события с K2 ещё не было) → снова K: проверка сама не включается, без ключа принимаем",
+                 nastroyka(K2) == 200 and not wz.hook_strogo() and nastroyka(K) == 200 and not wz.hook_strogo() and wh() == 200)
+        proverka("оба места, где настройку сохраняет человек, идут через одну функцию со сбросом отметки",
+                 "_nastroyku_zapisat(" in inspect.getsource(m.owner_save) and "_nastroyku_zapisat(" in inspect.getsource(m.api_set_setting)
+                 and "hook_klyuch_zapisat" in inspect.getsource(m._nastroyku_zapisat))
+    finally:
+        m.db.set_setting("wazzup_hook_key", "")
+        m.db.set_setting(wz._HOOK_OK, "")
+
+    print("П4. Вебхук Марквиза: ключ, ломающий адрес, не сохраняется; отказ по ключу оставляет след")
+    def mq(klyuch=None):
+        return c.post("/marquiz/webhook", params={} if klyuch is None else {"key": klyuch}, json={})
+    plohie = ("Kl+yuch&2026#x%41-dlinnyy", "korotkiy-1", "ключ-русскими-буквами-12345", "s probelom vnutri 1234567")
+    otvety = [(c.post("/owner", data={"marquiz_key": k}, auth=VLADELEC), c.post("/api/settings", json={"key": "marquiz_key", "value": k}, auth=VLADELEC))
+              for k in plohie]
+    proverka("ключ с «+», «&», «#», «%», пробелом, русскими буквами или короче 16 знаков не сохраняется: страница объясняет, запрос — 400",
+             all(a.status_code == 200 and "ключ не сохранён" in a.text and b.status_code == 400 for a, b in otvety)
+             and not m.db.get_setting("marquiz_key"), [(a.status_code, b.status_code) for a, b in otvety])
+    proverka("…значение отвергнутого ключа на страницу не попадает, прежний ключ продолжает работать",
+             all(k not in a.text for (a, _), k in zip(otvety, plohie)) and mq(m.MARQUIZ_KEY).status_code == 200)
+    HOROSHIJ = "Stend_marquiz-klyuch-2026"
+    zapisi_zhurnala = []
+
+    class _Lovec(logging.Handler):
+        def emit(self, record):
+            zapisi_zhurnala.append(record.getMessage())
+    lovec = _Lovec()
+    logging.getLogger("kidsup.marquiz").addHandler(lovec)
+    try:
+        r = c.post("/owner", data={"marquiz_key": HOROSHIJ}, auth=VLADELEC)
+        do = dict(m._MARQUIZ_SLED)
+        kody = [mq("chuzhoy-klyuch-s-oshibkoj").status_code, mq(HOROSHIJ).status_code]
+        stranica = c.get("/owner", auth=VLADELEC).text
+        proverka("ключ из латиницы, цифр, «-» и «_» сохраняется; с ним заявка принимается, с чужим — 403",
+                 r.status_code == 200 and "Сохранено: Марквиз" in r.text and m.db.get_setting("marquiz_key") == HOROSHIJ and kody == [403, 200], kody)
+        proverka("отказ по ключу оставляет след: строка в журнале сервера без значения ключа и счёт на странице «Настройки»",
+                 len(zapisi_zhurnala) == 1 and "ключ не подошёл" in zapisi_zhurnala[0] and "chuzhoy" not in zapisi_zhurnala[0]
+                 and HOROSHIJ not in zapisi_zhurnala[0]
+                 and m._MARQUIZ_SLED["otkloneno"] == do["otkloneno"] + 1 and m._MARQUIZ_SLED["prinyato"] == do["prinyato"] + 1
+                 and f"отклонено по ключу {m._MARQUIZ_SLED['otkloneno']}" in stranica and "действует ключ из настройки" in stranica, zapisi_zhurnala)
+        proverka("на странице — готовый адрес для кабинета Марквиза без значения ключа и порядок шагов",
+                 "https://app.kidsup.ru/marquiz/webhook?key=&lt;ключ&gt;" in stranica and HOROSHIJ not in stranica
+                 and "Сначала сохранить здесь, сразу после — вписать адрес в Марквизе" in stranica)
+        src = inspect.getsource(m)
+        proverka("порядок шагов в коде — тот же, что на странице: сначала настройка, потом адрес в кабинете",
+                 "1) /owner → «Марквиз — ключ вебхука» → «Сохранить»" in src and "2) сразу после — адрес" in src)
+    finally:
+        logging.getLogger("kidsup.marquiz").removeHandler(lovec)
+        m.db.set_setting("marquiz_key", "")
+
+    print("П5. Раздел 13 «Проверки МойКласса»: «долг клиента» по старым счетам админам красным не показывается")
+    # суммы и названия — приметные: в ленте стенда уже есть свои «Долг клиента …» от прежних проверок
+    audit.add_flag("деньги", "neg-balance:9005:stend-p5", audit.HIGH, "Долг клиента 25 777 ₽", "стенд: весь долг — счёт 2024 года", user_id=9005)
+    audit.add_flag("деньги", "neg-balance:9001:stend-p5", audit.HIGH, "Долг клиента 22 777 ₽", "стенд: счёт этого месяца", user_id=9001)
+    audit.add_flag("деньги", "sub-unpaid:9005:stend-p5", audit.HIGH, "Абонемент не оплачен (стенд П5)", "стенд: другая находка той же семьи", user_id=9005)
+
+    def nashi(vladelec):
+        kr = proverka_mk.krasnye(vladelec=vladelec)
+        return kr, {x["chto"]: g for g in kr["gruppy"] for x in g["punkty"]}
+    bylo_snimok = m.db.get_state(m.DOLGI_KLYUCH)
+    try:
+        m.db.set_state(m.DOLGI_KLYUCH, "")
+        kr, stroki = nashi(False)
+        proverka("снимка «Долгов» нет — админ видит обе находки «Долг клиента», как раньше",
+                 "Долг клиента 25 777 ₽" in stroki and "Долг клиента 22 777 ₽" in stroki and kr["starye_scheta"] == 0)
+        m.db.set_state(m.DOLGI_KLYUCH, json.dumps({"ts": dt.datetime.now().isoformat(), "d": _dolgi_otchet()}, ensure_ascii=False))
+        kr, stroki = nashi(False)
+        proverka("свежий снимок: весь долг семьи — в корзине «списать» (старые счета) → находка админу не показана и посчитана отдельно",
+                 "Долг клиента 25 777 ₽" not in stroki and kr["starye_scheta"] == 1,
+                 (sorted(stroki), sorted(proverka_mk._dolzhniki_po_starym_schetam())))
+        proverka("…долг по счёту этого месяца и другая находка той же семьи — на месте",
+                 "Долг клиента 22 777 ₽" in stroki and "Абонемент не оплачен (стенд П5)" in stroki)
+        kr_v, stroki_v = nashi(True)
+        proverka("владелец видит всё; у старого долга пометка «старый счёт», у остальных её нет",
+                 stroki_v["Долг клиента 25 777 ₽"]["staryj_schet"] is True and not stroki_v["Долг клиента 22 777 ₽"]["staryj_schet"]
+                 and kr_v["starye_scheta"] == 0 and kr_v["vsego"] >= kr["vsego"] + 1)
+        ha, hv = c.get("/proverka-mk", auth=ADMIN).text, c.get("/proverka-mk", auth=VLADELEC).text
+        proverka("страница админа: «Не показано: 1 «долг клиента» по старым счетам … делать с ними ничего не нужно»; владельца — пометка у строки",
+                 "Не показано: 1 «долг клиента» по старым счетам" in ha and "делать с ними ничего не нужно" in ha
+                 and "Долг клиента 25 777 ₽" not in ha and "Долг клиента 25 777 ₽" in hv
+                 and "старый счёт — ждёт вашего решения" in hv and "Не показано:" not in hv)
+        proverka("то же число красных «денег» — на «Долгах» (строка про раздел 13)",
+                 m._dolgi_krasnyh() == kr["po_vidam"].get("деньги", 0))
+        m.db.set_state(m.DOLGI_KLYUCH, json.dumps({"ts": (dt.datetime.now() - dt.timedelta(days=3)).isoformat(), "d": _dolgi_otchet()},
+                                                  ensure_ascii=False))
+        proverka("снимок старше полутора суток — не доверяем: находка снова показана",
+                 "Долг клиента 25 777 ₽" in nashi(False)[1] and proverka_mk.DOLGI_SNIMOK_CHASOV == 36)
+        proverka("ключ снимка — один на «Долги» и на раздел 13", proverka_mk.DOLGI_SNIMOK == m.DOLGI_KLYUCH)
+    finally:
+        m.db.set_state(m.DOLGI_KLYUCH, bylo_snimok or "")
+        with m.db.get_conn() as conn:
+            conn.execute("DELETE FROM audit_flags WHERE key LIKE '%stend-p5'")
 
 
 if __name__ == "__main__":

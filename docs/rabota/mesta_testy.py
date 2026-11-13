@@ -475,6 +475,149 @@ def test_voronka(c, m):
              "оплачено до 18.11" in h and "закончился 31.10" in h)
 
 
+# --- Е. После проверки «вечера 1» (13.11.2026, вечер) ------------------------------
+
+def test_posle_proverki(c, m):
+    """Замечания проверяющих «вечера 1» по числам: заголовок блока пульта, сводка «Подбора
+    группы», «Линия» и предложения возврата по единому правилу, разница «Мест» и «Без оплаты»."""
+    from app import db, liniya, mesta, mesta_pravilo, vozvrat
+    it = c.get("/api/mesta/tablica").json()["итого"]
+
+    print("Е1. Блок мест на пульте: «занято» и «оплатили» — по одним и тем же группам")
+    b = mesta.block()
+    zag = re.sub(r"<[^>]+>", "", b.split("<summary", 1)[1].split("</summary>", 1)[0])
+    proverka("заголовок: «занято 15, из них оплатили ноябрь 8» — оба числа по открытым группам, как на «Местах»",
+             f"занято {it['занято']}, из них оплатили ноябрь {it['оплатили']}" in zag and (it["занято"], it["оплатили"]) == (15, 8), zag)
+    proverka("оплатившие сада, нулевого и закрытых групп (3) в заголовок не входят — названы отдельной строкой",
+             "оплатили ноябрь 11" not in zag and "Ещё 3 оплативших — в строках мини-сада, нулевого класса и закрытых групп" in b)
+    proverka("в заголовке нет числа «оплатили», которое больше «занято» по другой базе групп",
+             int(re.search(r"оплатили ноябрь (\d+)", zag).group(1)) <= it["занято"])
+
+    print("Е2. Блок мест: у группы с пометкой видно и число мест, заголовок считает все пометки")
+    bylo = dict(mesta.WAITLIST), dict(mesta.HOLD)
+    mesta.WAITLIST["ПШ_вт-пт_17:00"] = "стендовая пометка «полная»"          # группа 201: по счёту 3 места
+    mesta.HOLD["РР.Музыка и речь_Группа 4"] = "стендовая пометка «пауза»"       # группа 209: по счёту 5 мест
+    try:
+        b2 = mesta.block()
+    finally:
+        mesta.WAITLIST.clear(); mesta.WAITLIST.update(bylo[0])
+        mesta.HOLD.clear(); mesta.HOLD.update(bylo[1])
+    stroka201 = re.sub(r"<[^>]+>", "", next(x for x in b2.split("<tr>") if "ПШ_вт-пт_17:00" in x))
+    stroka209 = re.sub(r"<[^>]+>", "", next(x for x in b2.split("<tr>") if "Музыка и речь_Группа 4" in x))
+    proverka("«полная»: перед пометкой — «3 места по счёту» (раньше стояла одна пометка)",
+             "3 места по счёту · полная стендовая пометка" in stroka201, stroka201)
+    proverka("«пауза»: перед пометкой — «5 мест по счёту»", "5 мест по счёту · ⛔ пауза стендовая пометка" in stroka209, stroka209)
+    proverka("заголовок: «из них 8 в группах с пометкой «не записывать», «полная» или «пауза»» — сумма по всем пометкам",
+             "свободно 8 в 3 группах · из них 8 в группах с пометкой «не записывать», «полная» или «пауза»" in re.sub(r"<[^>]+>", "", b2), b2[:300])
+    proverka("без пометок приписки «из них …» нет", "из них 8 в группах" not in b and "по счёту" not in b.split("<table>", 1)[-1])
+
+    print("Е3. «Подбор группы», сводка по предметам: сад и нулевой — «по дням», а не «0 мест / 0 свободно / 0 %»")
+    h = c.get("/enrollment").text
+    svodka = h.split("<h2>Сводка по предметам</h2>", 1)[1].split("</div>", 1)[0]
+    yacheyki = [re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", x)).strip()
+                for x in re.findall(r"<td[^>]*>(.*?)</td>", svodka.split("</tr>", 2)[1], re.S)]
+    # На стенде все группы — одного курса, поэтому в строке вместе: три открытые группы (23 места,
+    # записано 17), логопед (1 место, 1), архивная группа и праздник (8 и 30 мест по прежнему счёту,
+    # записан 1) — всего 62 места и 19 записанных; сад и нулевой — «по дням»; закрытые и «Заявки» — мимо.
+    proverka("строка курса: «всего мест» — «62 + по дням», «свободно» — «45 + до 11 в день» (а не 0 и 0 у сада)",
+             yacheyki[3] == "62 + по дням" and yacheyki[4] == "45 + до 11 в день", yacheyki[:6])
+    proverka("заполненность — по тем же группам, что места: 19 из 62 = 31 % (прежняя формула делила всех 29 записанных "
+             "курса, с садом, закрытыми и «Заявками», на те же 62 места — 47 %)",
+             yacheyki[2] == "29" and yacheyki[5] == "31%", yacheyki[:6])
+    proverka("под таблицей сказано, что считается по дням и что в места не входит",
+             "«до N в день» — мест в самый свободный день" in svodka and "без закрытых для записи групп и буферов «Заявки»" in svodka)
+    eg = {g["id"]: g for g in m._enrollment_groups()}
+    proverka("у сада и нулевого в строке группы свободно 8 и 11 в день — сводка с ними больше не спорит",
+             (eg[205]["free"], eg[206]["free"]) == (8, 11), (eg[205]["free"], eg[206]["free"]))
+
+    print("Е4. «Линия»: закрытые для записи группы не предлагаются, места — по правилу, сад и нулевой — по дням")
+    vse = {g["id"]: g for g in liniya.vse_gruppy()}
+    proverka("закрытая решением владельца группа (ПШ Гр5) помечена и в предложения не попадает",
+             "Гр5" in vse[202]["zakryta"] and not [g for sp in liniya.podobrat(6, list(vse.values())) for g in sp if g["id"] == 202],
+             vse[202]["zakryta"])
+    proverka("группа без занятий на две недели вперёд — тоже закрыта (такая одна — это не сбой расписания)",
+             vse[204]["zakryta"] == mesta_pravilo.NET_ZANYATIY
+             and not [g for sp in liniya.podobrat(4, list(vse.values())) for g in sp if g["id"] == 204], vse[204]["zakryta"])
+    proverka("свободные места — как на «Местах»: в Гр9 3 (прежний счёт давал 2: «Подтвердил заявку» держал место), в МиР 5 (было 2)",
+             (vse[201]["free"], vse[201]["free_text"], vse[209]["free"]) == (3, "3 места", 5)
+             and not vse[201]["zakryta"], (vse[201]["free"], vse[209]["free"]))
+    proverka("мини-сад и нулевой класс — «по дням» с раскладкой, как на «Местах» (нулевой раньше был «N мест» при норме 10)",
+             vse[205]["mesto"] == "po_dnyam" and vse[205]["free_text"] == "по дням: пн 5 · вт 7 · ср 5 · чт 8 · пт 7"
+             and vse[206]["mesto"] == "po_dnyam" and vse[206]["free_text"].startswith("по дням: ") and vse[206]["free"] == 11,
+             (vse[205]["free_text"], vse[206]["free_text"], vse[206]["free"]))
+    top, eshche = liniya.podobrat(6, list(vse.values()))
+    proverka("для шести лет открытая Гр9 предлагается, закрытая Гр5 — нет",
+             any(g["id"] == 201 for g in top + eshche) and all(g["id"] != 202 for g in top + eshche), [g["id"] for g in top + eshche])
+    nast = mesta.svod
+    zakr = [{"cid": 900 + i, "why": mesta_pravilo.NET_ZANYATIY, "cap": 8, "busy": 0, "prob": 0} for i in range(3)]
+    mesta.svod = lambda today=None, conn=None: {"groups": [], "closed": zakr + [{"cid": 950, "why": "ПШ Гр5 — не набираем", "cap": 8, "busy": 1, "prob": 0}]}
+    try:
+        dl = mesta.dlya_linii()
+    finally:
+        mesta.svod = nast
+    proverka("без занятий сразу три группы и больше (каникулы, сбой расписания) — «Линия» их не прячет; закрытые решением — прячет",
+             sorted(dl) == [950] and dl[950]["zakryta"] == "ПШ Гр5 — не набираем" and mesta.BEZ_ZANYATIY_SBOJ == 3, sorted(dl))
+    mesta.svod = lambda today=None, conn=None: (_ for _ in ()).throw(RuntimeError("стенд: правило не посчиталось"))
+    try:
+        zapas = {g["id"]: g for g in liniya.vse_gruppy()}
+    finally:
+        mesta.svod = nast
+    proverka("правило не посчиталось — «Линия» работает на прежнем счёте, а не падает",
+             zapas[201]["free"] == 2 and zapas[202]["zakryta"] == "", (zapas[201]["free"], zapas[202]["zakryta"]))
+
+    print("Е5. Предложения возврата (vozvrat.gruppy): закрытые решением владельца группы не предлагаются")
+    with db.get_conn() as conn:
+        conn.executemany("INSERT INTO classes (id, name, course_id, status, max_students, raw) VALUES (?,?,1,'opened',8,'{}')",
+                         [(290, "2627_ПШ_ср-пт_19:00_5-7 лет_ПШ1 нечитающие (Гр15)"),      # в списке закрытых
+                          (291, "2627_ПШ_ср-пт_18:00_5-7 лет_ПШ1 нечитающие (Гр16)")])     # обычная, для сравнения
+    try:
+        imena = [g["name"] for g in vozvrat.gruppy()]
+    finally:
+        with db.get_conn() as conn:
+            conn.execute("DELETE FROM classes WHERE id IN (290, 291)")
+    proverka("ПШ Гр15 («не набираем») в списке «куда звать» нет, такая же открытая Гр16 — есть; остальное — как было",
+             not any("(Гр15)" in n for n in imena) and any("(Гр16)" in n for n in imena) and any("(Гр9)" in n for n in imena), imena)
+    proverka("список только сужается: правило применяется по списку решений владельца, без «нет занятий»",
+             "mesta_pravilo.zakryta(" in __import__("inspect").getsource(vozvrat.gruppy)
+             and "NET_ZANYATIY" not in __import__("inspect").getsource(vozvrat.gruppy))
+
+    print("Е6. «Без оплаты»: разница с «Местами» названа — оплачен тот же предмет в другой группе")
+    with db.get_conn() as conn:
+        conn.execute("INSERT INTO users (id, name, phone, client_state_id, raw) VALUES (1090, 'Примеров Ребёнок 1090', '79990001001', 125955, '{}')")
+        conn.execute("INSERT INTO joins (id, user_id, class_id, status_id, raw) VALUES (990, 1090, 201, 2, '{}')")
+        conn.execute("INSERT INTO user_subscriptions (id, user_id, begin_date, end_date, visits_total, visits_used, raw) "
+                     "VALUES (7990, 1090, '2026-11-01', '2026-11-30', 8, 1, ?)",
+                     (json.dumps(_raw_abonement((7990, 1090, [202], 202, "2026-11-01", "2026-11-30", 8400, 8400, 8, 1, "2026-11-01"))),))
+    try:
+        v = c.get("/api/mesta/voronka").json()
+        t2 = c.get("/api/mesta/tablica").json()
+        hv = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", c.get("/voronka").text.split("<main", 1)[-1]))
+    finally:
+        with db.get_conn() as conn:
+            conn.execute("DELETE FROM user_subscriptions WHERE id=7990")
+            conn.execute("DELETE FROM joins WHERE id=990")
+            conn.execute("DELETE FROM users WHERE id=1090")
+    v_spiskah = {r["uid"] for sp in v["списки"].values() for r in sp}
+    proverka("ребёнок ходит в Гр9, ноябрь оплачен абонементом Гр5 того же предмета: на «Местах» он в «не оплатили», в списках «Без оплаты» его нет",
+             t2["итого"]["детей_без_оплаты"] == it["детей_без_оплаты"] + 1 and 1090 not in v_spiskah
+             and [r["uid"] for r in v["оплачен_в_другой_группе"]] == [1090], v["оплачен_в_другой_группе"])
+    proverka("страница называет разницу: «входят ещё 1 ребёнок … абонемент привязан к другой группе», с именем и группой",
+             "входят ещё 1 ребёнок" in hv and "которых в списках ниже нет" in hv
+             and "абонемент привязан к другой группе" in hv and "Примеров Ребёнок 1090" in hv
+             and "ПШ_вт-пт_17:00" in hv.split("абонемент привязан к другой группе", 1)[-1][:400], hv[:200])
+    proverka("подпись карточки больше не обещает «как на „Местах“» — сказано, что число с «Мест» и что оно значит",
+             "не оплачен — как на «Местах»" not in hv and "число с «Мест»: нет оплаченного абонемента на свою группу" in hv)
+    proverka("без таких детей строки на странице нет",
+             "абонемент привязан к другой группе" not in re.sub(r"<[^>]+>", " ", c.get("/voronka").text.split("<main", 1)[-1])
+             and c.get("/api/mesta/voronka").json()["оплачен_в_другой_группе"] == [])
+
+    print("Е7. «Места»: правило оплаты не выдаётся за правило «Бланков групп»")
+    hm = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", c.get("/mesta").text.split("<main", 1)[-1]))
+    proverka("слов «правило то же» нет; отличия от бланков названы: абонемент без даты конца, второй неоплаченный, смена месяца с 25-го",
+             "правило то же" not in hm and "Чем отличается от бланков" in hm and "без даты окончания" in hm
+             and "с 25-го числа бланки показывают оплату следующего месяца" in hm)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tree", default=ROOT)
@@ -497,6 +640,7 @@ def main():
     t = test_stranicy(c, m, dok)
     test_oplatili(c, m, t)
     test_voronka(c, m)
+    test_posle_proverki(c, m)
     proverka("в сеть не ходили", not lt.SET, lt.SET[:3])
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     print(f"\nИтого: {proshlo} OK, {oshibok} ошибок · стенд {work}")
