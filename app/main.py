@@ -7538,13 +7538,41 @@ def api_otkazy_add(phone: str, text: str, name: str = ""):
 
 
 @app.post("/api/otkazy/release", dependencies=AUTH)
-def api_otkazy_release(chat: str):
+def api_otkazy_release(request: Request, chat: str):
     """Снять стоп-лист — когда клиент сам написал, что передумал.
 
-    Только руками: автоматика не должна решать, что отказ «устарел»."""
+    Только руками: автоматика не должна решать, что отказ «устарел».
+
+    13.11.2026: адрес оставлен для рутин — работает как работал, причину не спрашивает;
+    теперь записывает, кто и когда снял (имя — с сервера). Людям — кнопка «снять» на
+    странице, POST /api/otkazy/snyat, там причина обязательна."""
     from . import otkaz
-    otkaz.release(chat)
+    kto = vhod.podpis(request, "") or ("Борис" if _rol(request) == "owner" else "админ")
+    otkaz.release(chat, kto=kto)
+    request.state.chto = "стоп-лист: снята запись (старый адрес, без причины)"
     return {"ok": True, "чат": chat, "статус": "снят со стоп-листа"}
+
+
+@app.post("/api/otkazy/snyat", dependencies=AUTH)
+def api_otkazy_snyat(request: Request, payload: dict = Body(...)):
+    """{"phone": "79990001001", "prichina": "…"} или {"id": 12, "prichina": "…"} — снять семью
+    со стоп-листа. Запись не удаляется: помечается снятой (кто, когда, причина) и перестаёт
+    действовать — письма этой семье снова проходят предохранитель. По телефону снимаются все
+    действующие записи семьи; id — одна запись (для чатов без телефона). Причина обязательна.
+
+    13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1): на странице «Стоп-лист» не было
+    ни одной кнопки. Кто снял — решает сервер (vhod.podpis), как у галочек пульта: вошедшему
+    через форму — его имя, что бы ни стояло в запросе; под общим входом — «админ» или «Борис»."""
+    from . import otkaz
+    kto = (vhod.podpis(request, str(payload.get("kto") or ""))
+           or ("Борис" if _rol(request) == "owner" else "админ"))
+    try:
+        r = otkaz.snyat(phone=str(payload.get("phone") or ""), id=payload.get("id") or 0,
+                        prichina=str(payload.get("prichina") or ""), kto=kto)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    request.state.chto = f"стоп-лист: снято записей {r['snyato']} — {r['prichina'][:80]}"
+    return r
 
 
 @app.get("/otkazy", response_class=HTMLResponse, dependencies=AUTH)
@@ -7553,19 +7581,51 @@ def otkazy_page(request: Request):
     from . import otkaz
     import html as _h
     rows = otkaz.feed()
-    body = []
-    for r in rows:
-        cls = "off" if r["снят"] else "on"
+
+    def kto_i_nomer(r):
         who = r["кто"] or "—"
         ph = ("+7" + r["телефон"]) if r["телефон"] else \
              f"<span class=warn>чат без телефона ({_h.escape(str(r['чат']))})</span>"
+        return f"{_h.escape(who)}<br>{ph}"
+
+    def den(ts):
+        ts = str(ts or "")
+        return f"{ts[8:10]}.{ts[5:7]}.{ts[:4]} {ts[11:16]}".strip() if len(ts) >= 10 else "—"
+
+    # 13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1): у действующей записи — кнопка
+    # «снять» с обязательной причиной; снятые ушли в свёрнутый список «Сняты» внизу — с тем,
+    # кто снял, когда и почему. Раньше снятые стояли в общей таблице бледными строками, а снять
+    # можно было только запросом POST /api/otkazy/release?chat=… (он остался для рутин).
+    body, snyatye = [], []
+    for r in rows:
+        if r["снят"]:
+            snyatye.append(
+                f"<tr><td>{_h.escape(str(r['когда'])[:16])}</td>"
+                f"<td>{kto_i_nomer(r)}</td>"
+                f"<td class=q>«{_h.escape(str(r['цитата'])[:220])}»</td>"
+                f"<td>{_h.escape(r['снял'] or '—')}<br>{den(r['снят когда']) if r['снят когда'] else 'дата не записана'}</td>"
+                f"<td>{_h.escape(r['причина снятия']) if r['причина снятия'] else '<span class=mut>причина не записана</span>'}</td></tr>")
+            continue
+        # по телефону снимаются все действующие записи семьи; у чата без телефона — одна, по номеру записи
+        komu = (f'data-phone="{_h.escape(r["телефон"])}"' if r["телефон"] else f'data-id="{int(r["id"])}"')
         body.append(
-            f"<tr class={cls}><td>{_h.escape(str(r['когда'])[:16])}</td>"
-            f"<td>{_h.escape(who)}<br>{ph}</td>"
+            f"<tr><td>{_h.escape(str(r['когда'])[:16])}</td>"
+            f"<td>{kto_i_nomer(r)}</td>"
             f"<td class=q>«{_h.escape(str(r['цитата'])[:220])}»</td>"
             f"<td>{_h.escape(r['как связали'] or '—')}</td>"
-            f"<td>{'снят' if r['снят'] else 'не пишем'}</td></tr>")
-    n_live = sum(1 for r in rows if not r["снят"])
+            f"<td class=dej>не пишем"
+            f"<details class=snyat><summary>снять</summary>"
+            f"<form {komu} onsubmit=\"return snyat(this)\">"
+            f"<input name=prichina required minlength=3 maxlength=300 autocomplete=off "
+            f"placeholder=\"причина: почему снова можно писать\">"
+            f"<button type=submit>снять со стоп-листа</button><div class=osh></div></form></details></td></tr>")
+    n_live = len(body)
+    blok_snyatye = (
+        f"<details id=snyatye><summary>Сняты — {len(snyatye)}</summary>"
+        f"<p class=sub>Этим семьям автоматика снова пишет. Запись остаётся здесь: кто снял, когда и почему.</p>"
+        f"<div class=tabl><table><tr><th>Когда отказ</th><th>Кто</th><th>Что написали</th>"
+        f"<th>Кто и когда снял</th><th>Причина снятия</th></tr>{''.join(snyatye)}</table></div></details>"
+    ) if snyatye else ""
     # 13.11.2026: общая шапка вместо временной строки «← Пульт · Разделы» шага 1; заодно у
     # страницы появились <meta viewport> и <body> — без них на телефоне она была мелкой.
     return _s_shapkoy(request, f"""<!doctype html><html lang="ru"><head><meta charset=utf-8>
@@ -7579,19 +7639,49 @@ table{{border-collapse:collapse;width:100%}}
 td,th{{border-bottom:1px solid #e6e6ef;padding:8px 10px;vertical-align:top;text-align:left}}
 th{{background:#f6f6fb;font-size:13px;color:#555}}
 tr.off{{opacity:.45}} .q{{color:#444;font-style:italic}}
-.warn{{color:#E30613}}
+.warn{{color:#E30613}} .mut{{color:#888}}
 .nazad a{{color:#1DA7E0;text-decoration:none}}
 .tabl{{overflow-x:auto}}
+td.dej{{min-width:150px}}
+details.snyat{{margin-top:6px}}
+details.snyat > summary{{cursor:pointer;color:#1DA7E0;text-decoration:underline;display:inline-block;padding:6px 0;min-height:32px}}
+details.snyat form{{display:flex;flex-direction:column;gap:6px;margin-top:4px;min-width:220px}}
+details.snyat input{{font:inherit;padding:8px 10px;border:1px solid #c9c9dd;border-radius:8px;min-height:40px;width:100%;box-sizing:border-box}}
+details.snyat button{{font:inherit;padding:8px 12px;min-height:40px;border:0;border-radius:8px;background:#312783;color:#fff;cursor:pointer}}
+details.snyat button:disabled{{opacity:.5}}
+details.snyat .osh{{color:#E30613;font-size:13px}}
+details#snyatye{{margin-top:28px;border-top:1px solid #e6e6ef;padding-top:14px}}
+details#snyatye > summary{{cursor:pointer;font-size:17px;font-weight:700;padding:6px 0}}
+details#snyatye .sub{{margin:6px 0 10px}}
 @media (max-width:700px){{body{{margin:14px}}}}
 </style></head><body>
 <h1>Стоп-лист: {n_live} семей, которым автоматика не пишет</h1>
 <div class=sub>Сюда попадает всё, где клиент письменно просил снять бронь.
 Пока строка активна, ни одна рассылка этому телефону не уходит — только
 живые ответы администратора. Снять стоп-лист может только человек:
-<code>POST /api/otkazy/release?chat=…</code></div>
+кнопка «снять» в строке, причина обязательна. Снимаются все записи этой семьи;
+снятая запись не удаляется — остаётся в списке «Сняты» внизу.</div>
 <div class=tabl><table><tr><th>Когда</th><th>Кто</th><th>Что написали</th>
 <th>Как связали с семьёй</th><th>Статус</th></tr>
-{''.join(body) or '<tr><td colspan=5>Пока пусто</td></tr>'}</table></div></body></html>""")
+{''.join(body) or '<tr><td colspan=5>Пока пусто</td></tr>'}</table></div>
+{blok_snyatye}
+<script>
+function snyat(f) {{
+  var p = f.prichina.value.trim(), osh = f.querySelector('.osh'), b = f.querySelector('button');
+  if (p.length < 3) {{ osh.textContent = 'Напишите причину: почему семье снова можно писать.'; return false; }}
+  var telo = {{prichina: p}};
+  if (f.dataset.phone) telo.phone = f.dataset.phone; else telo.id = parseInt(f.dataset.id, 10);
+  b.disabled = true; osh.textContent = '';
+  fetch('/api/otkazy/snyat', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, body: JSON.stringify(telo)}})
+    .then(function (r) {{ return r.json().then(function (j) {{ return [r.ok, j]; }}); }})
+    .then(function (x) {{
+      if (x[0] && x[1].ok) {{ location.reload(); return; }}
+      osh.textContent = x[1].detail || 'Не получилось снять.'; b.disabled = false;
+    }})
+    .catch(function () {{ osh.textContent = 'Нет связи с сервером — запись не снята.'; b.disabled = false; }});
+  return false;
+}}
+</script></body></html>""")
 
 
 @app.get("/api/dostavka/phone", dependencies=AUTH)
@@ -11674,24 +11764,123 @@ async def api_money_run():
     return {k: len(v) for k, v in _rules.money_check().items()}
 
 
+# --- «Долги»: снимок из МойКласса на 15 минут ----------------------------------------
+# 13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1, устаревшее на страницах меню).
+# Было: обработчик async сам ходил в МойКласс при каждом открытии — все счета, потом по два
+# запроса на каждого должника. На сервере это 43 секунды, и всё это время сервер не отвечал
+# никому: обработчик async, запросы в нём синхронные — стоял весь цикл событий (пульт, «Линия»,
+# вебхуки Mango и Wazzup). Стало: расчёт идёт в отдельном потоке и хранится снимком
+# DOLGI_SNIMOK_MIN минут; страница и /api/dolgi отдают снимок, кнопка «обновить сейчас» —
+# POST /api/dolgi/obnovit. Автопилот снимок не трогает: первый, кто открыл страницу после
+# 15 минут, ждёт пересчёт (сервер при этом отвечает остальным), следующие получают готовое.
+DOLGI_SNIMOK_MIN = 15
+DOLGI_KLYUCH = "dolgi_snimok"      # sync_state: {"ts": когда снят, "d": отчёт crmcheck.debts_report()}
+_dolgi_zamok = threading.Lock()
+
+
+def _dolgi_iz_snimka():
+    """(отчёт, когда снят) из сохранённого снимка или (None, None)."""
+    try:
+        c = json.loads(db.get_state(DOLGI_KLYUCH) or "{}")
+        return c["d"], datetime.fromisoformat(c["ts"])
+    except Exception:  # noqa: BLE001 — снимка нет или он битый: считаем заново
+        return None, None
+
+
+def _dolgi_snimok(obnovit: bool = False) -> dict:
+    """Отчёт «Долгов»: снимок не старше DOLGI_SNIMOK_MIN минут, иначе (или obnovit=True) —
+    пересчёт из МойКласса. Зовётся только из потока (run_in_threadpool): пересчёт долгий.
+    Возвращает {"d": отчёт | None, "ts": datetime | None, "oshibka": str, "pereschitan": bool}.
+    МойКласс не ответил — отдаём прежний снимок с пометкой: страница не падает."""
+    from . import crmcheck
+    nachalo = datetime.now()
+    svezh = timedelta(minutes=DOLGI_SNIMOK_MIN)
+    d, ts = _dolgi_iz_snimka()
+    if d and not obnovit and nachalo - ts < svezh:
+        return {"d": d, "ts": ts, "oshibka": "", "pereschitan": False}
+    with _dolgi_zamok:
+        # пока ждали замок, снимок мог пересчитать сосед (двое открыли страницу разом или
+        # двое нажали «обновить») — второй раз МойКласс не дёргаем
+        d, ts = _dolgi_iz_snimka()
+        if d and (ts >= nachalo if obnovit else datetime.now() - ts < svezh):
+            return {"d": d, "ts": ts, "oshibka": "", "pereschitan": False}
+        try:
+            novyj = crmcheck.debts_report()
+        except Exception as e:  # noqa: BLE001
+            logging.getLogger("kidsup.dolgi").warning("долги: МойКласс не ответил: %s", str(e)[:200])
+            return {"d": d, "ts": ts, "pereschitan": False,
+                    "oshibka": f"МойКласс не ответил ({type(e).__name__})"}
+        if not novyj.get("ready"):                     # ключа МойКласса нет — хранить нечего
+            return {"d": novyj, "ts": None, "oshibka": "", "pereschitan": False}
+        ts = datetime.now()
+        try:
+            db.set_state(DOLGI_KLYUCH, json.dumps({"ts": ts.isoformat(), "d": novyj}, ensure_ascii=False))
+        except Exception:  # noqa: BLE001
+            logging.getLogger("kidsup.dolgi").exception("долги: снимок не сохранился")
+        return {"d": novyj, "ts": ts, "oshibka": "", "pereschitan": True}
+
+
+def _dolgi_krasnyh() -> int | None:
+    """Сколько красных находок утренней проверки денег за 14 дней (раздел 13 «Проверки
+    МойКласса») — для строки на «Долгах». Лента не читается — None, строка без числа."""
+    try:
+        from . import proverka_mk
+        return int(proverka_mk.krasnye(vladelec=False).get("po_vidam", {}).get("деньги", 0))
+    except Exception:  # noqa: BLE001
+        return None
+
+
 @app.get("/api/dolgi", dependencies=AUTH)
 async def api_dolgi():
-    from . import crmcheck
-    return crmcheck.debts_report()
+    """Отчёт «Долгов» машинным форматом — из того же снимка, что и страница (не старше
+    15 минут). Ключи прежние; добавлены «snimok» (когда снят) и «snimok_oshibka»."""
+    from starlette.concurrency import run_in_threadpool
+    sn = await run_in_threadpool(_dolgi_snimok)
+    if sn["d"] is None:
+        raise HTTPException(502, sn["oshibka"] or "МойКласс не ответил, снимка ещё нет")
+    if not sn["d"].get("ready"):
+        return sn["d"]
+    return {**sn["d"], "snimok": sn["ts"].isoformat(timespec="seconds"), "snimok_oshibka": sn["oshibka"]}
+
+
+@app.post("/api/dolgi/obnovit", dependencies=AUTH)
+async def api_dolgi_obnovit():
+    """Кнопка «обновить сейчас» на «Долгах»: пересчитать снимок из МойКласса, не дожидаясь
+    15 минут. Только читает МойКласс; ничего не отмечает и никому не пишет."""
+    from starlette.concurrency import run_in_threadpool
+    sn = await run_in_threadpool(_dolgi_snimok, True)
+    d = sn["d"] or {}
+    return {"ok": bool(d.get("ready")) and not sn["oshibka"], "oshibka": sn["oshibka"],
+            "pereschitan": sn["pereschitan"],
+            "snimok": sn["ts"].isoformat(timespec="seconds") if sn["ts"] else None,
+            "vsego": (d.get("totals") or {}).get("всего")}
 
 
 @app.get("/dolgi", response_class=HTMLResponse, dependencies=AUTH)
 async def money_page(request: Request):
     """Долги: по абонементам и по занятиям, разложенные по тому, что с ними
-    реально можно сделать. Данные тянутся из МойКласс при каждом открытии."""
-    from . import crmcheck
-    d = crmcheck.debts_report()
-    if not d.get("ready"):
+    реально можно сделать. Данные тянутся из МойКласс при каждом открытии.
+
+    13.11.2026: уже не при каждом — снимком на 15 минут и в отдельном потоке (см.
+    _dolgi_snimok выше); «обновить сейчас» — кнопкой."""
+    from starlette.concurrency import run_in_threadpool
+    sn = await run_in_threadpool(_dolgi_snimok)
+    krasnyh = await run_in_threadpool(_dolgi_krasnyh)
+    return HTMLResponse(_s_shapkoy(request, _dolgi_stranica(sn, krasnyh)))
+
+
+def _dolgi_stranica(sn: dict, krasnyh: int | None = None) -> str:
+    """HTML «Долгов» по снимку sn (см. _dolgi_snimok)."""
+    d = sn["d"]
+    if d is None or not d.get("ready"):
         # 13.11.2026: общая шапка вместо временной строки «← Пульт · Разделы» шага 1
-        return HTMLResponse(_s_shapkoy(request, '<!doctype html><html lang="ru"><head><meta charset="utf-8">'
-                                       '<meta name="viewport" content="width=device-width,initial-scale=1">'
-                                       '<title>Долги — KidsUP</title><script src="/static/vhod.js"></script></head>'
-                                       '<body><p style="margin:24px;font:16px/1.5 system-ui,sans-serif">Нет ключа МойКласс</p></body></html>'))
+        chto = ("Нет ключа МойКласс" if d is not None else
+                html.escape(sn["oshibka"] or "МойКласс не ответил") + " — снимка долгов ещё нет. "
+                "Откройте страницу ещё раз через минуту.")
+        return ('<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+                '<meta name="viewport" content="width=device-width,initial-scale=1">'
+                '<title>Долги — KidsUP</title><script src="/static/vhod.js"></script></head>'
+                f'<body><p style="margin:24px;font:16px/1.5 system-ui,sans-serif">{chto}</p></body></html>')
     t = d["totals"]
     rows, nobill = d["rows"], d["nobill"]
     BUCKET = {
@@ -11705,11 +11894,8 @@ async def money_page(request: Request):
     }
     def money(v):
         return f"{v:,.0f}".replace(",", " ") + " ₽"
-    blocks = []
-    for b, (title, color, why) in BUCKET.items():
-        sel = [r for r in rows if r["bucket"] == b]
-        if not sel:
-            continue
+
+    def tablica(sel):
         trs = "".join(
             f'<tr><td><b>{html.escape(str(r["name"]))}</b>'
             f'<div class="m">{html.escape(r["kind"])} · счёт от {r["date"]}'
@@ -11720,13 +11906,33 @@ async def money_page(request: Request):
             f'<td class="num">{r["overdue"]} дн.</td>'
             f'<td class="w"><a href="tel:+7{r["phone"]}">+7{r["phone"]}</a></td></tr>'
             for r in sel)
+        return (f'<div class="tbl"><table>'
+                f'<tr><th>кто и за что</th><th class="num">долг</th>'
+                f'<th class="num">просрочка</th><th>телефон</th></tr>{trs}</table></div>')
+    blocks = []
+    starye = ""
+    for b, (title, color, why) in BUCKET.items():
+        sel = [r for r in rows if r["bucket"] == b]
+        if not sel:
+            continue
+        if b == "списать":
+            # 13.11.2026, Борис (вечер 1): счета прошлых лет (12 счетов 2023–2025 годов на
+            # 293 175 ₽ на 12.11) висели общим списком «Списать» — как дело админов, хотя
+            # списывать или взыскивать решает владелец. Теперь это отдельный свёрнутый блок
+            # внизу страницы; в «Собрать» и «Разобрать» эти счета не входят, как и раньше.
+            starye = (
+                f'<section><details id="starye-scheta"><summary><span class="chip" style="background:{color}"></span>'
+                f'Старые счета — ждут решения владельца — {len(sel)} на {money(sum(r["debt"] for r in sel))}</summary>'
+                f'<p class="sub">Абонементы, проданные до 1 сентября 2025 года, у семей, которые сейчас '
+                f'не в работе. {why} Списывать или взыскивать — решает владелец; до его решения '
+                f'админам с этими счетами ничего делать не нужно.</p>'
+                f'{tablica(sel)}</details></section>')
+            continue
         blocks.append(
             f'<section><h2><span class="chip" style="background:{color}"></span>'
             f'{title} — {len(sel)} на {money(sum(r["debt"] for r in sel))}</h2>'
             f'<p class="sub">{why}</p>'
-            f'<div class="tbl"><table>'
-            f'<tr><th>кто и за что</th><th class="num">долг</th>'
-            f'<th class="num">просрочка</th><th>телефон</th></tr>{trs}</table></div></section>')
+            f'{tablica(sel)}</section>')
     nb = ""
     if nobill:
         nb = ('<section><h2>Занятия без счёта — ' + str(len(nobill)) + '</h2>'
@@ -11738,7 +11944,24 @@ async def money_page(request: Request):
                         f'<td class="w">{x["date"]}</td>'
                         f'<td>{html.escape(str(x["class"] or ""))}</td></tr>'
                         for x in nobill) + '</table></div></section>')
-    return HTMLResponse(_s_shapkoy(request, f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
+    snyat = sn["ts"].strftime("%d.%m %H:%M") if sn.get("ts") else str(d.get("as_of") or "")
+    oshibka = (f'<p class="oshibka" id="snimok-oshibka">{html.escape(sn["oshibka"])} — показан прежний снимок, '
+               f'на {snyat}.</p>') if sn.get("oshibka") else ""
+    kart_starye = (f'<div class="n"><b>{money(t["списать"]["sum"])}</b><span>старые счета — {t["списать"]["n"]}, '
+                   f'ждут решения владельца</span></div>') if t.get("списать", {}).get("n") else ""
+    # 13.11.2026: утренняя проверка денег (автопилот, 09:40) должна была ставить админам пункт,
+    # а владельцу — сообщение со ссылкой на эту страницу, но не поставила ни разу: она берёт
+    # находки через rules.open_flags(), а та отдаёт только вид «правила». Клиентам проверка не
+    # пишет. Автопилот здесь не меняем; на странице — куда смотреть: её находки разбираются на
+    # «Проверке МойКласса» (разделы 4 и 7; красные за 14 дней — раздел 13).
+    proverka_deneg = (
+        '<p class="sub" id="proverka-deneg"><b>Утренняя проверка денег</b> пунктов и сообщений со ссылкой на эту '
+        'страницу не ставит. Её находки — на <a href="/proverka-mk">Проверке МойКласса</a>: '
+        '<a href="/proverka-mk#r4">раздел 4</a> «Был на занятии — ничего не списано», '
+        '<a href="/proverka-mk#r7">раздел 7</a> «Ложный долг», красные за 14 дней — '
+        '<a href="/proverka-mk#r13">раздел 13</a>'
+        + (f' (сейчас {krasnyh})' if krasnyh is not None else '') + '.</p>')
+    return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Долги — KidsUP</title><script src="/static/vhod.js"></script><style>
 :root{{--paper:#FCFBF7;--ink:#1B1D2B;--muted:#5F6478;--line:#E7E4DA;--card:#fff;--fill:#F3F1E9}}
@@ -11770,15 +11993,28 @@ td.w{{white-space:nowrap}}
   border-radius:0 10px 10px 0;padding:.9rem 1.1rem;margin:1.2rem 0;max-width:46rem;font-size:.93rem}}
 .how ol{{margin:.5rem 0;padding-left:1.2rem}} .how li{{margin:.3rem 0}}
 a{{color:inherit}}
+#obn{{font:inherit;font-size:.86rem;padding:.4rem .8rem;min-height:2.4rem;border-radius:8px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);cursor:pointer;margin:.3rem .4rem .3rem 0}}
+#obn:disabled{{opacity:.55;cursor:default}}
+.oshibka{{color:#A3282B;font-size:.92rem;margin:0 0 .9rem;max-width:46rem}}
+details#starye-scheta > summary{{cursor:pointer;font-size:1.12rem;font-weight:700;display:flex;align-items:center;
+  gap:.5rem;flex-wrap:wrap;margin:0 0 .3rem}}
+details#starye-scheta > summary::after{{content:"показать";font-size:.8rem;font-weight:400;color:var(--muted);
+  text-decoration:underline}}
+details#starye-scheta[open] > summary::after{{content:"свернуть"}}
+details#starye-scheta .sub{{margin-top:.5rem}}
 </style></head><body><div class="wrap">
 <h1>Долги по абонементам и занятиям</h1>
-<p class="sub">Данные тянутся из МойКласс при каждом открытии страницы —
-на {d["as_of"]}. Источник: счета с датой оплаты, поэтому просрочка считается точно.</p>
+<p class="sub">Снимок из МойКласса на <b id="snimok-ot">{snyat}</b> — пересчитывается не чаще раза в
+{DOLGI_SNIMOK_MIN} минут. Источник: счета с датой оплаты, поэтому просрочка считается точно.<br>
+<button type="button" id="obn">обновить сейчас</button><span id="obn-st"></span></p>
+{oshibka}
 <div class="nums">
   <div class="n"><b>{money(t["всего"]["sum"])}</b><span>всего, {t["всего"]["n"]} счетов</span></div>
   <div class="n"><b>{money(t["абонементы"]["sum"])}</b><span>по абонементам — {t["абонементы"]["n"]}</span></div>
   <div class="n"><b>{money(t["занятия"]["sum"])}</b><span>по занятиям — {t["занятия"]["n"]}</span></div>
   <div class="n"><b>{money(t["собрать"]["sum"])}</b><span>можно собрать</span></div>
+  {kart_starye}
 </div>
 <div class="how"><b>Откуда берётся долг.</b>
 <ol>
@@ -11788,9 +12024,23 @@ a{{color:inherit}}
 <li>Если абонемент не оплачен, каждое занятие уводит баланс в минус.
 Ошибки на экране не появляется — долг растёт молча.</li>
 </ol></div>
+{proverka_deneg}
 {"".join(blocks)}
 {nb}
-</div></body></html>"""))
+{starye}
+</div><script>
+document.getElementById('obn').onclick = async function () {{
+  var b = this, st = document.getElementById('obn-st');
+  b.disabled = true; st.textContent = 'пересчитываю из МойКласса — до минуты…';
+  try {{
+    var r = await fetch('/api/dolgi/obnovit', {{method: 'POST'}});
+    var j = await r.json();
+    if (r.ok && j.ok) {{ location.reload(); return; }}
+    st.textContent = (j.oshibka || j.detail || ('ошибка ' + r.status)) + ' — показан прежний снимок';
+  }} catch (e) {{ st.textContent = 'не получилось обновить: ' + e; }}
+  b.disabled = false;
+}};
+</script></body></html>"""
 
 
 @app.get("/api/duty", dependencies=AUTH)
