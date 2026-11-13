@@ -123,7 +123,7 @@ def test_proverka_pulta():
              P.liza_mozhno("в холле 29.10 — до или после занятия, иначе звонком"), False)
     proverka("«сами позвонят» — не звонок Лизы",
              P.liza_mozhno("Почему: «сами позвонят» (15–21.09)"), True)
-    proverka("телефон из любого написания", P._p10("+7 (916) 187-97-63"), "9161879763")
+    proverka("телефон из любого написания", P._p10("+7 (999) 000-10-01"), "9990001001")
     proverka("короткий номер не телефон", P._p10("123"), "")
 
 
@@ -131,7 +131,7 @@ def test_proverka_pulta():
 def test_ves():
     print("Порядок дел по цене ошибки (pult._ves)")
     from app import pult
-    def ves(text, tag="обещание", phone="9161879763"):
+    def ves(text, tag="обещание", phone="9990001001"):
         return pult._ves({"text": text, "tag": tag, "phone": phone})
     proverka("жалоба — первой", ves("!! Жалоба: семья ждёт ответа сутки"), 0)
     proverka("готов оплатить — первой", ves("Семья готова оплатить сегодня"), 0)

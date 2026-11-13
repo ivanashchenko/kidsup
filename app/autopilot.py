@@ -1273,9 +1273,9 @@ def inbox_add(text: str, phone: str = "", who: str = "", source: str = "авто
             if занят:
                 return False
         # Номер храним с кодом страны. 22.09.2026, аудит: наряд клал десять
-        # цифр, и кнопка «позвонить» на пульте собиралась как tel:+9032952727 —
-        # телефон админа набирал Турцию, для 8123315033 Японию, для
-        # 4956460344 Германию. На живой странице таких ссылок было 36.
+        # цифр, и кнопка «позвонить» на пульте собиралась как tel:+903xxxxxxx —
+        # телефон админа набирал Турцию, для 812xxxxxxx Японию, для
+        # 495xxxxxxx Германию. На живой странице таких ссылок было 36.
         cifry = "".join(c for c in str(phone or "") if c.isdigit())[-11:]
         if len(cifry) == 10:
             cifry = "7" + cifry
@@ -3398,7 +3398,7 @@ def missed_calls(days: list[str] | None = None) -> None:
             phone = m["phone"]
             if len(phone) == 11 and phone[0] == "8":
                 phone = "7" + phone[1:]
-            # 01.09 в отчёте Манго попался 10-значный «8906002687» — обрубок
+            # 01.09 в отчёте Манго попался 10-значный «8906xxxxxx» — обрубок
             # номера; писать по нему некуда, а 10 знаков через проверку проходили
             if len(phone) != 11 or not _mark("missed_wa", f"{today}:{phone}"):
                 continue
@@ -4550,30 +4550,19 @@ def _migrations() -> None:
                 WHERE campaign = 'no1_digest' AND status IN ('cancelled', 'pending')""",
                 (NO1_TEXT_V2,))
             log.info("миграция no1_text_v2: обновлено %d сообщений", cur.rowcount)
-    if _mark("migration", "replied_requeue_v1"):
-        # 12.08: ответившие/лайкнувшие в MAX и WhatsApp (по чатам) — фиксируем
-        # как получивших; затем возвращаем в очередь тех, кому не дошло
-        # (мнимые отправки в Telegram/MAX). Порядок важен: сначала отметка
-        # ответивших, потом requeue — иначе им уйдёт дубль.
-        replied_phones = [
-            "79258918322", "79266774045", "79036649004", "79106356942",
-            "79032567843", "79060688848", "79055389799", "79858190030",
-            "79153901997", "79269930533", "79267369118", "79060341004",
-            "79169570156", "79096901009", "79264749585", "79636553779",
-            "79190146711", "79629319883", "79151003905", "79151019030",
-        ]
-        ts = _now().isoformat(timespec="seconds")
-        with db.get_conn() as conn:
-            conn.execute("""CREATE TABLE IF NOT EXISTS wazzup_inbox (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, phone TEXT,
-                chat_type TEXT, text TEXT, message_id TEXT UNIQUE)""")
-            for p in replied_phones:
-                conn.execute(
-                    "INSERT OR IGNORE INTO wazzup_inbox (ts, phone, chat_type, text, message_id) "
-                    "VALUES (?, ?, 'manual', 'ответы 12.08', ?)", (ts, p, f"manual-{p}"))
-        db.set_setting("broadcast_transports", "whatsapp")
-        res = broadcast_requeue_undelivered("2026-08-12")
-        log.info("миграция replied_requeue_v1: 20 ответивших отмечено, requeue: %s", res)
+    # 12.08: ответившие/лайкнувшие в MAX и WhatsApp (по чатам) — фиксируем
+    # как получивших; затем возвращаем в очередь тех, кому не дошло
+    # (мнимые отправки в Telegram/MAX). Порядок важен: сначала отметка
+    # ответивших, потом requeue — иначе им уйдёт дубль.
+    # 13.11.2026, Борис: тело этой миграции убрано. В нём был зашит список из
+    # 20 телефонов клиентов, а репозиторий публичный. На сервере миграция
+    # выполнена 13.08 (метка стоит в autopilot_state), повторно она не
+    # запускается, поэтому на сервере не меняется ничего. Метку по-прежнему
+    # ставим — пустая и безвредная: ничего не отправляет и не пишет, кроме самой
+    # себя. Отличие только на новой пустой базе: ручные отметки «ответы 12.08»
+    # не появятся, августовская очередь не пересобирается, настройку
+    # broadcast_transports миграция больше не трогает.
+    _mark("migration", "replied_requeue_v1")
     if _mark("migration", "anna_away_v1"):
         # Анна отсутствует 13–15.08 — утренние порции только Дарье
         try:
