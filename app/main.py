@@ -3383,7 +3383,10 @@ def api_karta_send(payload: dict = Body(...)):
 
 @app.get("/spiski", dependencies=AUTH)
 def spiski_page(request: Request, day: str = "", subject: str = "", print: int = 0):
-    """13.11.2026, шаг 2: «Списки по группам» переехали на «Бланки групп» — вид «Все группы
+    """Списки по группам для стойки (просьба Иры 05.09): кто записан, оплатил, на пробном.
+    Сам обновляется каждые 5 минут вслед за лёгким синком.
+
+    13.11.2026, шаг 2: «Списки по группам» переехали на «Бланки групп» — вид «Все группы
     дня» (/blank-grupp?vid=den). День и предмет из старого адреса переносим; без дня там
     открывается сегодняшний, а старое «вся неделя» — это day=vse (нужно, когда в адресе
     был только предмет)."""
@@ -3394,13 +3397,6 @@ def spiski_page(request: Request, day: str = "", subject: str = "", print: int =
     if subject:
         q["subject"] = subject
     return RedirectResponse("/blank-grupp?" + urlencode(q), status_code=303)
-
-
-def _spiski_staraya(request: Request, day: str = "", subject: str = "", print: int = 0):
-    """Списки по группам для стойки (просьба Иры 05.09): кто записан, оплатил, на пробном.
-    Сам обновляется каждые 5 минут вслед за лёгким синком."""
-    from . import spiski
-    return HTMLResponse(_s_shapkoy(request, spiski.page(day or None, subject or None, bool(print))))
 
 
 @app.get("/api/spiski", dependencies=AUTH)
@@ -3463,7 +3459,8 @@ def leads_page(request: Request):
     """13.11.2026, шаг 2: «Лиды» переехали на «Откуда заявки», раздел «Заявки Марквиза, не
     дошедшие до CRM» (id="leads"). «Откуда заявки» — страница владельца, админа с неё уводят
     на пульт (_vladelcu), поэтому админа ведём на пульт сразу, одним переходом, как у
-    /metrics. Кнопка отправки /leads/push/{id} и выгрузка /export/leads.csv не менялись."""
+    /metrics. Отправка в CRM (POST /leads/push/{id}) и выгрузка /export/leads.csv не менялись;
+    кнопки отправки на старой странице не было — на новой её тоже нет."""
     return _vladelcu(request) or RedirectResponse("/istochniki#leads", status_code=303)
 
 
@@ -6808,16 +6805,8 @@ def zayavki_page(request: Request, fresh: int = 0):
     return RedirectResponse("/blank-grupp#budushchie", status_code=303)
 
 
-def _zayavki_staraya(request: Request, fresh: int = 0):
-    # 13.11.2026: прежний обработчик /zayavki, маршрута у него больше нет. Оставлен вместе с
-    # _zayavki_build до решения владельца — убрать код совсем или вернуть живой сбор из МойКласса.
-    def _build():
-        r = _zayavki_build()
-        return r.body.decode() if hasattr(r, "body") else str(r)
-    # 13.11.2026: шапка ставится поверх кэша — в кэше страница без шапки, шапка зависит от вошедшего
-    return HTMLResponse(_s_shapkoy(request, _page_cache("zayavki", 15, _build, fresh=bool(fresh))))
-
-
+# 13.11.2026: у _zayavki_build маршрута больше нет (страница /zayavki — переход на бланки).
+# Код оставлен до решения владельца: это единственный живой сбор листов заявок из МойКласса.
 def _zayavki_build():
     """Листы заявок сезона 2026/27 поимённо: кому звонить и что говорить.
 

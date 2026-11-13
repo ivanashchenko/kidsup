@@ -40,5 +40,85 @@
 Поэтому прямо сказать «ВКонтакте дал столько-то, а Директ столько-то» по этой таблице нельзя:
 у большинства карточек канала просто не записано. Это не свойство отчёта, а дыра в учёте.</div>
 
-<style>table td{padding:.35rem .5rem}</style>
+{# 13.11.2026, шаг 2 меню: сюда переехали страницы /leads и /clicks (старые адреса ведут на
+   якоря #leads и #clicks). Таблица «QR-ссылки для каналов» не перенесена: адреса /q/<канал>
+   в приложении нет, ссылки были битые. Клики — только владельцу (/clicks был под его входом). #}
+<p class="ist-yakorya">На этой странице: <a href="#leads">заявки, не дошедшие до CRM</a>{% if kliki is not none %}
+ · <a href="#clicks">клики по ссылкам</a>{% endif %}</p>
+
+<section id="leads" class="ist-razdel">
+<h2>Заявки Марквиза, не дошедшие до CRM</h2>
+{% set ne_v_crm = leads_rows|rejectattr("pushed_to_crm")|list %}
+<p class="muted">Заявки с форм и квизов, которые сервер принял сам. «✓» — карточка в МойКлассе заведена,
+«—» — заявка осталась только здесь, по ней надо позвонить и завести карточку руками.
+Из последних {{ leads_rows|length }} не дошли до CRM: <b{% if ne_v_crm %} style="color:#E30613"{% endif %}>{{ ne_v_crm|length }}</b>.
+<a href="/export/leads.csv">Выгрузить все заявки (CSV)</a></p>
+{% if leads_stats %}
+<div class="scroll"><table>
+  <tr><th>Источник</th><th>Промокод</th><th class="num">заявок</th><th class="num">в CRM</th><th>Первая</th><th>Последняя</th></tr>
+  {% for s in leads_stats %}
+  <tr><td>{{ s.source_label }}</td><td class="muted">{{ s.promo or "—" }}</td>
+      <td class="num"><b>{{ s.c }}</b></td><td class="num">{{ s.pushed or 0 }}</td>
+      <td class="muted small">{{ (s.first_at or "")[:16].replace("T", " ") }}</td>
+      <td class="muted small">{{ (s.last_at or "")[:16].replace("T", " ") }}</td></tr>
+  {% endfor %}
+</table></div>
+{% endif %}
+{% if leads_rows %}
+<details class="ist-spisok"{% if ne_v_crm %} open{% endif %}><summary>Последние заявки поимённо — {{ leads_rows|length }}</summary>
+<div class="scroll"><table>
+  <tr><th>Дата</th><th>Источник</th><th>Родитель</th><th>Телефон</th><th>Ребёнок</th><th>Интересы</th><th>CRM</th></tr>
+  {% for r in leads_rows %}
+  <tr><td class="muted small">{{ (r.created_at or "")[:16].replace("T", " ") }}</td>
+      <td>{{ leads_sources.get(r.source, r.source) }}{% if r.promo %} <span class="muted small">/ {{ r.promo }}</span>{% endif %}</td>
+      <td>{{ r.parent_name }}</td><td style="white-space:nowrap">{{ r.phone }}</td>
+      <td>{{ r.child_name }}{% if r.child_age %} <span class="muted small">({{ r.child_age }})</span>{% endif %}</td>
+      <td class="muted small">{{ r.interests }}</td>
+      <td>{% if r.pushed_to_crm %}<span class="badge income">✓</span>{% else %}<span class="badge refund">—</span>{% endif %}</td></tr>
+  {% endfor %}
+</table></div></details>
+{% else %}
+<p class="muted">Заявок пока нет.</p>
+{% endif %}
+</section>
+
+{% if kliki is not none %}
+<section id="clicks" class="ist-razdel">
+<h2>Клики по ссылкам</h2>
+<p class="muted">Кнопки «Написать» на kidsup.ru ведут не напрямую в мессенджер, а через
+<code>app.kidsup.ru/go/…</code> — здесь запоминается номер визита Roistat. WhatsApp получает номер
+прямо в тексте первого сообщения. У Telegram и MAX такого параметра нет, поэтому первое входящее
+сообщение склеивается с последним кликом по времени (окно 20 минут) — колонка «Обращение».</p>
+{% if kliki %}
+<details class="ist-spisok"><summary>Последние клики построчно — {{ kliki|length }},
+ из них дошли до переписки: {{ kliki|selectattr("matched_phone")|list|length }}</summary>
+<div class="scroll"><table>
+  <tr><th>Время клика</th><th>Мессенджер</th><th>Номер визита Roistat</th><th>UTM</th><th>Обращение</th></tr>
+  {% for r in kliki %}
+  <tr><td class="small" style="white-space:nowrap">{{ (r.ts or "")|replace('T', ' ') }}</td>
+      <td>{{ r.channel }}</td>
+      <td class="small">{{ r.roistat_visit or '—' }}</td>
+      <td class="small muted" style="overflow-wrap:anywhere">{{ r.utm if r.utm and r.utm != '{}' else '' }}</td>
+      <td class="small">{% if r.matched_phone %}{{ r.matched_phone }}<br>
+          <span class="muted">{{ (r.matched_ts or "")|replace('T', ' ') }}</span>
+        {% else %}<span class="muted">не написал</span>{% endif %}</td></tr>
+  {% endfor %}
+</table></div></details>
+{% else %}
+<p class="muted">Кликов пока нет.</p>
+{% endif %}
+</section>
+{% endif %}
+
+<style>table td{padding:.35rem .5rem}
+.ist-yakorya{margin:1.4rem 0 0;font-size:.92rem}
+.ist-razdel{margin-top:1.6rem;scroll-margin-top:70px}
+.ist-spisok{margin-top:.8rem}.ist-spisok>summary{cursor:pointer;color:#312783;font-weight:600;padding:.3rem 0}
+</style>
+<script>
+// 13.11.2026: старые адреса /leads и /clicks ведут на якорь — список в разделе раскрываем сразу
+(function(){function o(){var h=(location.hash||'').slice(1);if(h!=='leads'&&h!=='clicks')return;
+ var s=document.getElementById(h);if(!s)return;var d=s.querySelector('details');if(d)d.open=true;s.scrollIntoView();}
+ o();window.addEventListener('hashchange',o);})();
+</script>
 {% endblock %}

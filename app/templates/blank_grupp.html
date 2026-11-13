@@ -70,9 +70,16 @@ main{padding:12px}
 /* 13.11.2026: на телефоне внизу панель общей шапки — подсказку поднимаем над ней */
 @media (max-width:919.98px){.toast{bottom:calc(64px + env(safe-area-inset-bottom))}}
 @media (max-width:900px){.grid{grid-template-columns:1fr;grid-auto-flow:row;grid-template-rows:none}}
+.bud{margin:0 12px 24px;background:#fff;border:1px solid var(--line);border-radius:6px;padding:8px 12px;scroll-margin-top:120px}
+.bud>summary{cursor:pointer;font-weight:700}
+.bud-p{color:var(--mut);font-size:13px;margin:6px 0}
+.bud h3{font-size:14px;margin:12px 0 4px}
+.bud table{border-collapse:collapse;font-size:13px}
+.bud td{padding:3px 12px 3px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.bud td.tl{white-space:nowrap}
 @media print{
  @page{size:A4 landscape;margin:7mm}
- header,.lgd,.toast,.sum{display:none}
+ header,.lgd,.toast,.sum,.bud{display:none}
  body{background:#fff;font-size:11px}
  main{padding:0}
  .blk{border:0;padding:0}
@@ -89,11 +96,20 @@ main{padding:12px}
   <button id="refresh" title="Пересчитать проверки по свежим данным МойКласса. Бланк не меняется.">Обновить проверки из МойКласса</button>
   <a class="btn" href="/api/blank-grupp/xlsx">Скачать Excel</a>
   <button onclick="window.print()">Печать</button>
+  <!-- 13.11.2026, шаг 2 меню: сюда переехали «Списки по группам» (/spiski) — вид «Все группы дня» -->
+  <a class="btn" href="/blank-grupp?vid=den" title="Все группы выбранного дня по времени, с телефонами — список для стойки и печати">Все группы дня →</a>
   <span class="st" id="st"></span>
  </div>
  <div class="tabs" id="tabs"></div>
 </header>
 <main id="main"><p>Загружаю… (первый раз до 2 минут)</p></main>
+<!-- 13.11.2026, шаг 2 меню: сюда переехал поимённый лист ожидания направлений, которых ещё нет
+     в расписании (раньше — страница /zayavki). Данные — /api/blank-grupp/budushchie, локальная база. -->
+<details id="budushchie" class="bud">
+ <summary>Будущие направления — лист ожидания: <span id="bud-n">…</span></summary>
+ <p class="bud-p">Семьи, оставившие заявку на направление, которого пока нет в расписании. Дату старта не обещаем: говорим, что позовём первыми, когда наберётся группа. Позвонили — поставьте итог в МойКлассе, после смены статуса строка отсюда уйдёт.</p>
+ <div id="bud-telo"></div>
+</details>
 <div class="toast" id="toast"></div>
 <datalist id="dd"></datalist>
 <script>
@@ -356,6 +372,26 @@ function bindEdits(el){
 $('#refresh').onclick=()=>load(true);
 load(false);
 setInterval(()=>{if(!document.querySelector(':focus'))load(false)},10*60*1000);
+// 13.11.2026: «Будущие направления» — лист ожидания направлений, которых ещё нет (переезд /zayavki)
+(async function(){
+  const box=document.getElementById('budushchie');
+  function poYakoryu(){if(location.hash==='#budushchie'){box.open=true;box.scrollIntoView()}}
+  poYakoryu();window.addEventListener('hashchange',poYakoryu);
+  try{
+    const r=await fetch('/api/blank-grupp/budushchie');if(!r.ok)throw 0;const d=await r.json();
+    document.getElementById('bud-n').textContent=d.vsego?d.vsego+' чел.':'пусто';
+    const ddmm=x=>x&&x.length>=10?x.slice(8,10)+'.'+x.slice(5,7)+'.'+x.slice(0,4):'';
+    document.getElementById('bud-telo').innerHTML=d.napravleniya.length?d.napravleniya.map(n=>
+      `<h3>${esc(n.kurs)} — ${n.deti.length}</h3><table>`+n.deti.map(k=>
+        `<tr><td>${esc(k.imya)}</td><td class="tl">${k.tel?`<a href="tel:+${esc(k.tel)}">+${esc(k.tel)}</a>`:'телефона нет'}</td>`+
+        `<td>${k.kogda?'заявка от '+ddmm(k.kogda):''}</td>`+
+        `<td><a target="_blank" rel="noopener" href="https://app.moyklass.com/user/${encodeURIComponent(k.uid)}/info">МойКласс</a></td></tr>`).join('')+'</table>').join('')
+      +`<p class="bud-p">Собрано в ${esc(d.sobrano)} по данным МойКласса на сервере (обновляются раз в 5 минут).</p>`
+      :'<p class="bud-p">Заявок на будущие направления сейчас нет.</p>';
+    poYakoryu();
+  }catch(e){document.getElementById('bud-n').textContent='не загрузилось';
+    document.getElementById('bud-telo').innerHTML='<p class="bud-p">Список не загрузился — обновите страницу.</p>'}
+})();
 </script>
 </body>
 </html>

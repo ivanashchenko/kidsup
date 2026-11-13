@@ -128,18 +128,24 @@ def test_perehody(c, m):
     proverka("POST /api/boris/status: админ → 401",
              c.post("/api/boris/status", auth=ADMIN, json={"id": 1, "status": "done"}).status_code == 401)
 
-    print("Остаются по адресу (перенос содержимого — шаг 2)")
-    # на этих страницах есть то, чего нет на целевой: переход ставить рано
-    # 13.11.2026, шаг 2: /settings и /metrics переехали (раздел «Ж») — из списка убраны
+    print("Переехали на шаге 2 (содержимое перенесено — адрес остался переходом)")
+    # 13.11.2026, шаг 2: /settings и /metrics переехали (раздел «Ж»), остальные пять — раздел «З».
+    # Было: «маршрут на месте и не переход» — на страницах оставалось то, чего не было на целевой.
+    # Теперь содержимое перенесено; адрес живёт своим обработчиком (не в таблице UBRANO), он ведёт
+    # на якорь нового места — сами переходы и перенесённые блоки проверяет раздел «З».
     for adres in ("/segodnya", "/spiski", "/zayavki", "/leads", "/clicks"):
-        proverka(f"{adres} — маршрут на месте и не переход", f"GET {adres}" in est and adres not in m.UBRANO)
+        proverka(f"{adres} — маршрут на месте (свой обработчик-переход, не в UBRANO)",
+                 f"GET {adres}" in est and adres not in m.UBRANO)
     proverka("POST /settings и /settings/test — форма ключа МойКласса не осталась без адреса",
              {"POST /settings", "POST /settings/test"} <= est)
     proverka("/spiski — один обработчик (мёртвый второй удалён)",
              sum(1 for r in m.app.routes if getattr(r, "path", "") == "/spiski") == 1)
+    # 13.11.2026, шаг 2: было «/spiski открывается (200): списки по группам». Страница переехала на
+    # «Бланки групп» (вид «Все группы дня»), сам адрес — переход; списки открываются на новом месте.
     r = c.get("/spiski", auth=ADMIN)
-    proverka("/spiski открывается: списки по группам", r.status_code == 200 and "Списки по группам" in r.text,
-             r.status_code)
+    proverka("/spiski ведёт на «Все группы дня» на бланках: списки по группам открываются там",
+             r.status_code == 200 and str(r.url).endswith("/blank-grupp?vid=den") and "Все группы дня" in r.text,
+             (r.status_code, str(r.url)))
 
 
 # --- А. Безопасность: открытие ссылки ничего не отправляет ---------------------
@@ -239,6 +245,8 @@ NOVYE_PROVERKA_MK = {"GET /proverka-mk", "GET /api/proverka-mk", "POST /api/prov
 # 13.11.2026, шаг 2 (общая шапка): лёгкий счётчик для бейджа «ждут ответа» — шапка на каждой
 # странице опрашивает его, а не тяжёлый /api/waiting.
 NOVYE_SHAPKA = {"GET /api/waiting/schet"}
+# 13.11.2026, шаг 2: лист ожидания будущих направлений переехал с /zayavki на бланки — чтение.
+NOVYE_PEREEZDY = {"GET /api/blank-grupp/budushchie"}
 # Не из шага 1: разовый просмотр «старых звонков» (решение Бориса 12.11), только чтение.
 NOVYE_ZVONKI_1211 = {"GET /api/hvost/staroe"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
@@ -270,9 +278,10 @@ def test_marshruty(m, fajl_do):
     proverka("пропали ровно пять — те, что звала только убранная страница (и перечень адресов: "
              "/openapi.json, /docs, /redoc)", do - posle == PROPALI | UBRANY_VHOD,
              sorted((do - posle) ^ (PROPALI | UBRANY_VHOD)))
-    vse_novye = NOVYE | NOVYE_ZVONKI_1211 | NOVYE_PROVERKA_MK | NOVYE_VHOD | NOVYE_SHAPKA
+    vse_novye = NOVYE | NOVYE_ZVONKI_1211 | NOVYE_PROVERKA_MK | NOVYE_VHOD | NOVYE_SHAPKA | NOVYE_PEREEZDY
     proverka("появились ровно три: «Архив» и признак «архив» у документов (и просмотр старых звонков 12.11, "
-             "пять адресов страницы «Проверка МойКласса», адреса личных входов и счётчик бейджа шапки 13.11)",
+             "пять адресов страницы «Проверка МойКласса», адреса личных входов, счётчик бейджа шапки и лист "
+             "«Будущие направления» для бланков 13.11)",
              posle - do == vse_novye, sorted((posle - do) ^ vse_novye))
     nuzhny = [x.strip() for x in NUZHNY.replace("\n", " · ").split(" · ") if x.strip()]
     net = [x for x in nuzhny if x not in posle]
@@ -463,14 +472,15 @@ def test_arhiv(c, m):
     proverka("на каждую — ссылка", not net, net)
     proverka("у каждой — «что это» и «почему в архиве»",
              all(chto and pochemu for _, _, chto, pochemu in nav.ARHIV) and r.text.count("Почему в архиве:") == 9)
-    net = [a for a, *_ in nav.PEREEZD if f'href="{a}"' not in r.text]
-    # 13.11.2026, шаг 2: было семь; /settings и /metrics переехали — они в блоке «Уже переехали»
-    proverka("блок «Переезжают»: пять страниц, которые ещё открываются по адресу",
-             "Переезжают" in r.text and len(nav.PEREEZD) == 5 and not net, net)
+    # 13.11.2026, шаг 2: было семь «переезжают»; утром переехали /settings и /metrics, днём —
+    # остальные пять. Список пуст, и блок «Переезжают» не рисуется: «пока открываются по адресу»
+    # было бы неправдой. Все семь — в блоке «Уже переехали».
+    proverka("блок «Переезжают» пуст и не показан: по адресу не открывается ни одна из семи",
+             nav.PEREEZD == [] and "Переезжают на другие страницы" not in r.text, nav.PEREEZD)
     net = [a for a, _, _, kuda, *_ in nav.PEREEHALI if a not in r.text or f'href="{kuda}"' not in r.text]
-    proverka("блок «Уже переехали»: /settings и /metrics — с датой и ссылкой на новое место, без ссылки на старый адрес",
-             "Уже переехали" in r.text and {a for a, *_ in nav.PEREEHALI} == set(OBEDINENY_PEREEHALI) and not net
-             and 'href="/settings"' not in r.text and 'href="/metrics"' not in r.text and "13.11.2026" in r.text, net)
+    proverka("блок «Уже переехали»: все семь — с датой и ссылкой на новое место, без ссылки на старый адрес",
+             "Уже переехали" in r.text and {a: k for a, _, _, k, *_ in nav.PEREEHALI} == OBEDINENY_PEREEHALI and not net
+             and not [a for a in OBEDINENY_PEREEHALI if f'href="{a}"' in r.text] and "13.11.2026" in r.text, net)
     proverka("внизу — ссылки на свёрнутый архив документов",
              'href="/boris/docs#arhiv"' in r.text and 'href="/admin/docs#arhiv"' in r.text)
 
@@ -629,9 +639,12 @@ UBRANY_17 = {
 # открываются по адресу до шага 2 (nav.PEREEZD).
 OBEDINENY_PEREHOD = ("/brief", "/boris", "/obeshchaniya")
 # 13.11.2026, шаг 2: /settings и /metrics переехали — отдельным словарём (раздел «Ж»).
-OBEDINENY_SHAG2 = {"/segodnya": "/pult", "/spiski": "/blank-grupp",
-                   "/zayavki": "/blank-grupp", "/leads": "/istochniki", "/clicks": "/istochniki"}
-OBEDINENY_PEREEHALI = {"/settings": "/owner#mk", "/metrics": "/journal#schetchiki"}
+# 13.11.2026, шаг 2 (днём): переехали и остальные пять — «ещё открываются по адресу» больше нет.
+OBEDINENY_SHAG2: dict = {}
+OBEDINENY_PEREEHALI = {"/settings": "/owner#mk", "/metrics": "/journal#schetchiki",
+                       "/segodnya": "/pult#pervye", "/spiski": "/blank-grupp?vid=den",
+                       "/zayavki": "/blank-grupp#budushchie", "/leads": "/istochniki#leads",
+                       "/clicks": "/istochniki#clicks"}
 # Чего не должно быть ни в меню, ни на пульте, ни на рабочих страницах.
 ZAPRET = (set(UBRANY_17) | {"/sverka"} | ARHIVNYE | set(OBEDINENY_PEREHOD) | set(OBEDINENY_SHAG2)
           | set(OBEDINENY_PEREEHALI))
@@ -766,18 +779,12 @@ def test_perehody_bez_cepochek(c, m):
 
     print("Г2. Объединённые без перехода (перенос содержимого — шаг 2)")
     from app import nav
+    # 13.11.2026, шаг 2: было «пять записаны в блок „Переезжают“ и открываются по адресу (200)».
+    # Содержимое перенесено, все пять стали переходами — их проверяет раздел «З»; здесь остаётся
+    # сверка: в списке «переезжают» нет никого, чего нет в решении.
     pereezd = {a: kuda for a, _, _, kuda, _ in nav.PEREEZD}
-    proverka("все пять записаны на страницу «Архив» в блок «Переезжают» с той же целью", pereezd == OBEDINENY_SHAG2,
+    proverka("«Переезжают» совпадает с решением: на 13.11 — пусто, все семь переехали", pereezd == OBEDINENY_SHAG2,
              pereezd)
-    for adres in OBEDINENY_SHAG2:
-        if adres == "/zayavki":
-            # без ключа МойКласса на стенде страница падает — так было и до правок; смотрим маршрут
-            r = [x for x in m.app.routes if getattr(x, "path", "") == adres]
-            proverka(f"{adres}: маршрут — сама страница, не переход",
-                     len(r) == 1 and r[0].endpoint.__name__ == "zayavki_page", [x.endpoint.__name__ for x in r])
-            continue
-        kod = c.get(adres, auth=ADMIN, follow_redirects=False).status_code
-        proverka(f"{adres} открывается по адресу (200), не переход", kod == 200, kod)
 
 
 def test_arhivnye(c, m):
@@ -995,14 +1002,27 @@ def test_popravki(c, m):
     # страницу владельца и «скоро переедет» без ссылки проверяем на тех, что ещё не переехали.
     proverka("/metrics и /settings: плашки нет — страницы переехали",
              m.nav.plashka("/metrics", "owner") is None and m.nav.plashka("/settings", "owner") is None)
-    p = _plashka(c.get("/leads", auth=VLADELEC).text)
-    proverka("/leads у владельца: «переезжает», ссылка на «Откуда заявки»",
-             "переезжает" in p and 'href="/istochniki"' in p, p[:200])
-    p = _plashka(c.get("/leads", auth=ADMIN).text)
-    proverka("/leads у админа: «скоро переедет», без ссылки на закрытую ему страницу владельца",
-             "скоро переедет" in p and "/istochniki" not in p, p[:200])
-    p = _plashka(c.get("/segodnya", auth=ADMIN).text)
-    proverka("/segodnya у админа: ссылка на пульт", 'href="/pult"' in p, p[:200])
+    # 13.11.2026, шаг 2 (днём): /leads и /segodnya тоже переехали. Было: у владельца на /leads плашка
+    # «переезжает» со ссылкой на «Откуда заявки», у админа — «скоро переедет» без ссылки, на /segodnya —
+    # ссылка на пульт. Страниц с плашкой «переезжает» не осталось; само правило (админу не показывать
+    # ссылку на страницу владельца) проверяем на функции с подставной записью.
+    proverka("переехавшие /leads, /clicks, /segodnya, /spiski, /zayavki: плашки нет",
+             not any(m.nav.plashka(a, r) for a in ("/leads", "/clicks", "/segodnya", "/spiski", "/zayavki")
+                     for r in ("owner", "admin")))
+    bylo = m.nav.PEREEZD
+    m.nav.PEREEZD = [("/primer", "Пример", "Откуда заявки", "/istochniki", "Что-то ещё не перенесено."),
+                     ("/primer2", "Пример 2", "Пульт", "/pult", "Что-то ещё не перенесено.")]
+    try:
+        pv, pa = m.nav.plashka("/primer", "owner"), m.nav.plashka("/primer", "admin")
+        pp = m.nav.plashka("/primer2", "admin")
+    finally:
+        m.nav.PEREEZD = bylo
+    proverka("правило плашки: владельцу — «переезжает» со ссылкой на «Откуда заявки»",
+             "переезжает" in pv["vid"] and pv["kuda"] == [("Откуда заявки", "/istochniki")], pv)
+    proverka("правило плашки: админу — «скоро переедет», без ссылки на закрытую ему страницу владельца",
+             "скоро переедет" in pa["vid"] and pa["kuda"] == [], pa)
+    proverka("правило плашки: админу на страницу, которая ему открыта, — ссылка на пульт",
+             pp["kuda"] == [("Пульт", "/pult")], pp)
     for imya, adres in [x for _, punkty in m.nav.ADMIN for x in punkty]:
         if adres in ("/pult",):
             continue
@@ -1057,7 +1077,7 @@ def _koren(html: str) -> str:
 
 # Страницы со своим HTML и несколько страниц base.html: на каждой шапка ровно одна.
 S_SHAPKOJ_ADMIN = ["/pult", "/blank-grupp", "/promo/grafik", "/admin/docs", "/dolgi", "/otkazy", "/karta",
-                   "/pravila-kontrol", "/proverka-mk", "/spiski", "/mesta", "/waiting", "/liniya"]
+                   "/pravila-kontrol", "/proverka-mk", "/blank-grupp?vid=den", "/mesta", "/waiting", "/liniya"]
 S_SHAPKOJ_VLADELEC = ["/boris/docs", "/owner", "/kontrol-oplat", "/sverka-chestnosti", "/audit",
                       "/kamery/nastroyka", "/arhiv"]
 ADRESA_VLADELCA = ("/owner", "/arhiv", "/kontrol-oplat", "/boris/docs", "/sverka-chestnosti", "/audit")
@@ -1455,6 +1475,209 @@ def test_schetchik_i_pereezdy(c, m, baza):
                  "Какие страницы открывают" not in c.get(adres, auth=ADMIN).text)
 
 
+# --- З. Шаг 2: переезды /segodnya, /spiski, /zayavki, /leads, /clicks (13.11.2026) -------
+
+def _vhod_marshruta(m, metod: str, put: str) -> set:
+    for r in m.app.routes:
+        if getattr(r, "path", "") == put and metod in getattr(r, "methods", ()):
+            return {getattr(d.call, "__name__", "") for d in getattr(getattr(r, "dependant", None), "dependencies", [])}
+    return {"нет маршрута"}
+
+
+def test_pereezdy_pyati(c, m, baza):
+    import datetime as dt
+    from app import pult, nav
+    den = dt.date.today()
+    print("З1. Старые адреса: 303 сразу на страницу, которая сама отвечает 200")
+    zhdem = {  # адрес: (владельцу, админу)
+        "/segodnya": ("/pult#pervye", "/pult#pervye"),
+        "/spiski": ("/blank-grupp?vid=den", "/blank-grupp?vid=den"),
+        "/zayavki": ("/blank-grupp#budushchie", "/blank-grupp#budushchie"),
+        # «Откуда заявки» — страница владельца: админа с /leads ведём на пульт сразу, без цепочки
+        "/leads": ("/istochniki#leads", "/pult"),
+    }
+    for adres, (vl, ad) in zhdem.items():
+        for kto, rol, kuda in ((VLADELEC, "владелец", vl), (ADMIN, "админ", ad)):
+            kod, loc, cel = perehod_i_cel(c, adres, kto)
+            proverka(f"{rol}: {adres} → 303 {kuda} → 200, без цепочки", (kod, loc, cel) == (303, kuda, 200), (kod, loc, cel))
+        proverka(f"{adres} без входа → 401", lokaciya(c, adres, kto=None) == (401, None))
+    kod, loc, cel = perehod_i_cel(c, "/clicks", VLADELEC)
+    proverka("владелец: /clicks → 303 /istochniki#clicks → 200, без цепочки",
+             (kod, loc, cel) == (303, "/istochniki#clicks", 200), (kod, loc, cel))
+    proverka("админ: /clicks → 401, как и было (страница под входом владельца)", lokaciya(c, "/clicks")[0] == 401)
+    proverka("/clicks без входа → 401", lokaciya(c, "/clicks", kto=None) == (401, None))
+    proverka("вход у старых адресов прежний: /clicks — владельца, остальные четыре — общий",
+             _vhod_marshruta(m, "GET", "/clicks") == {"check_owner"}
+             and all(_vhod_marshruta(m, "GET", a) == {"check_auth"} for a in zhdem))
+    kod, loc = lokaciya(c, "/spiski?day=" + quote("ср"))
+    proverka("/spiski?day=ср → день переносится", (kod, loc) == (303, "/blank-grupp?vid=den&day=" + quote("ср")), (kod, loc))
+    kod, loc = lokaciya(c, "/spiski?subject=" + quote("Шахматы"))
+    proverka("/spiski?subject=… (без дня — была вся неделя) → day=vse и предмет",
+             (kod, loc) == (303, "/blank-grupp?vid=den&day=vse&subject=" + quote("Шахматы")), (kod, loc))
+    proverka("/arhiv и плашка честные: «переезжают» пуст, все пять — в «уже переехали»",
+             nav.PEREEZD == [] and {"/segodnya", "/spiski", "/zayavki", "/leads", "/clicks"}
+             <= {a for a, *_ in nav.PEREEHALI})
+    for imya in ("segodnya.html", "leads.html", "clicks.html"):
+        proverka(f"шаблон {imya} удалён", not os.path.exists(os.path.join(ROOT, "app/templates", imya)))
+
+    print("З2. /pult: «Первые занятия» и «Занятия без отметок явки»")
+    con = sqlite3.connect(baza)
+    zavtra, vchera = (den + dt.timedelta(days=1)).isoformat(), (den - dt.timedelta(days=1)).isoformat()
+    con.executemany("INSERT OR REPLACE INTO lessons (id, date, begin_time, class_id) VALUES (?,?,?,?)",
+                    [(5901, zavtra, "17:00", 105), (5902, vchera, "17:00", 101)])
+    # 9001 (Тестова Ева, 79990001001) идёт завтра в первый раз; 9003 был вчера — отметки явки нет
+    con.executemany("INSERT OR REPLACE INTO lesson_records (id, lesson_id, user_id, visit, raw) VALUES (?,?,?,?,?)",
+                    [(59011, 5901, 9001, 0, '{"test": true}'), (59021, 5902, 9003, 0, "{}")])
+    con.commit()
+    con.close()
+    pult._SEGODNYA_KESH.clear()
+    r = c.get("/pult", auth=ADMIN)
+    h = r.text
+    proverka("оба блока есть: id=\"pervye\" и id=\"bez-yavki\"", "id='pervye'" in h and "id='bez-yavki'" in h)
+    proverka("оба — свёрнутые <details>, стоят над блоком «Разделы»",
+             "<details class='card small' id='pervye'>" in h and "<details class='card small' id='bez-yavki'>" in h
+             and 0 < h.find("id='pervye'") < h.find("id='bez-yavki'") < h.find("id='razdely'"))
+    pv = h.split("id='pervye'", 1)[-1].split("</details>")[0]
+    proverka("«Первые занятия»: число в заголовке, ребёнок, телефон с +7, отметка касания",
+             "Первые занятия: сегодня и два дня вперёд — 1 ребёнок" in pv and "Тестова Ева" in pv
+             and "tel:+" + SEMYA in pv and "не касались" in pv and "не прозвонено: 1" in pv, pv[:400])
+    by = h.split("id='bez-yavki'", 1)[-1].split("</details>")[0]
+    proverka("«Без явки»: число в заголовке, занятие вчера, ссылка на отметку явки",
+             "Занятия без отметок явки за 6 дней — 1 занятие, 1 ребёнок" in by and vchera[8:] + "." + vchera[5:7] in by
+             and "href='/yavka'" in by, by[:400])
+    api = c.get("/api/segodnya", auth=ADMIN).json()
+    proverka("числа те же, что отдаёт /api/segodnya (считают одни функции)",
+             api["итоги"]["первые_занятия"] == 1 and api["итоги"]["занятий_без_явки"] == 1, api["итоги"])
+    con = sqlite3.connect(baza)
+    con.execute("DELETE FROM lesson_records WHERE id IN (59011, 59021)")
+    con.execute("DELETE FROM lessons WHERE id IN (5901, 5902)")
+    con.commit()
+    con.close()
+    proverka("расчёт минуту держится в памяти: второй показ пульта базу не читает",
+             "Тестова Ева" in c.get("/pult", auth=ADMIN).text.split("id='pervye'", 1)[-1].split("</details>")[0])
+    pult._SEGODNYA_KESH.clear()
+    h = c.get("/pult", auth=ADMIN).text
+    proverka("пусто — блоки на месте, в заголовке ноль",
+             "вперёд — 0 детей" in h and "за 6 дней — 0 — явка проставлена везде" in h)
+    proverka("блок раскрывается по якорю (#pervye) — скрипт на странице", "ids=['pervye','bez-yavki']" in h)
+
+    print("З3. /blank-grupp: «Все группы дня» и «Будущие направления»")
+    h = c.get("/blank-grupp", auth=ADMIN).text
+    proverka("на бланках — переключатель «Все группы дня» и свёрнутый блок id=\"budushchie\"",
+             'href="/blank-grupp?vid=den"' in h and '<details id="budushchie"' in h and "Будущие направления" in h)
+    proverka("бланки остались бланками: вкладки, Excel, печать",
+             'id="tabs"' in h and "/api/blank-grupp/xlsx" in h and "window.print()" in h)
+    r = c.get("/blank-grupp?vid=den&day=" + quote("пн"), auth=ADMIN)
+    h = r.text
+    proverka("?vid=den&day=пн: группы понедельника по времени, с телефонами, шапка одна",
+             r.status_code == 200 and "Все группы дня" in h and "ПШ2 читающие (Гр7)" in h and "ПШ1 нечитающие (Гр9)" not in h
+             and "class='ph'" in h and h.count('id="kidsup-nav"') == 1, r.status_code)
+    proverka("печать как у /spiski: кнопка «Печать» и правила печати на странице",
+             "javascript:print()" in h and "@media print" in h)
+    proverka("ссылки дней ведут на новое место, обратно — на бланки; /spiski в ссылках нет",
+             "href='/blank-grupp?vid=den&day=" + quote("вт") + "'" in h and "href='/blank-grupp'" in h
+             and "/spiski" not in h)
+    segodnya = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"][m.autopilot._today().weekday()]
+    h = c.get("/blank-grupp?vid=den", auth=ADMIN).text
+    proverka("без дня — сегодняшний день недели", f"class='on' href='/blank-grupp?vid=den&day={quote(segodnya)}'" in h)
+    h = c.get("/blank-grupp?vid=den&day=vse", auth=ADMIN).text
+    proverka("day=vse — вся неделя по дням (как раньше /spiski без параметров)", "Понедельник" in h and "Пятница" in h)
+    proverka("?vid=den без входа → 401", lokaciya(c, "/blank-grupp?vid=den", kto=None)[0] == 401)
+    con = sqlite3.connect(baza)
+    con.executemany("INSERT OR REPLACE INTO classes (id, name, course_id, status, max_students, raw) VALUES (?,?,?,'opened',0,'{}')",
+                    [(191, "2627_ПШ_Заявки", 1), (192, "2627_Заявки_Скорочтение", 9)])
+    con.executemany("INSERT OR REPLACE INTO joins (id, user_id, class_id, status_id, created_at, raw) VALUES (?,?,?,?,?,'{}')",
+                    [(88001, 9001, 192, 50509, "2026-11-01T10:00:00"), (88002, 9003, 192, 4, "2026-11-02T10:00:00"),
+                     (88003, 9003, 191, 50509, "2026-11-03T10:00:00"), (88004, 9001, 192, 50509, "2026-11-04T10:00:00")])
+    con.commit()
+    con.close()
+    r = c.get("/api/blank-grupp/budushchie", auth=ADMIN)
+    d = r.json() if r.status_code == 200 else {}
+    kursy = {n["kurs"]: n["deti"] for n in d.get("napravleniya", [])}
+    proverka("лист будущих направлений: скорочтение есть, ПШ (действующий курс) — нет",
+             "Скорочтение" in kursy and not any("ПШ" in k for k in kursy), list(kursy))
+    sk = kursy.get("Скорочтение", [])
+    proverka("поимённо, с телефоном и датой заявки; отказавшийся не показан, двойная заявка — одной строкой",
+             [x["imya"] for x in sk] == ["Тестова Ева"] and sk[0]["tel"] == SEMYA and sk[0]["kogda"] == "2026-11-01", sk)
+    proverka("число в заголовке блока — из тех же данных", d.get("vsego") == sum(len(v) for v in kursy.values()), d.get("vsego"))
+    proverka("/api/blank-grupp/budushchie без входа → 401",
+             c.get("/api/blank-grupp/budushchie").status_code == 401)
+    con = sqlite3.connect(baza)
+    con.execute("DELETE FROM joins WHERE id BETWEEN 88001 AND 88004")
+    con.execute("DELETE FROM classes WHERE id IN (191, 192)")
+    con.commit()
+    con.close()
+    proverka("устаревшие скрипты разговоров на бланки не перенесены",
+             "цены прошлого года" not in c.get("/blank-grupp", auth=ADMIN).text)
+
+    print("З4. /istochniki: «Заявки Марквиза» и «Клики по ссылкам»")
+    lid = m.leads.save_lead({"source": "marquiz", "parent_name": "Тестова Ольга", "phone": "79990001077",
+                             "comment": "Марквиз «стенд»", "consent_pd": "on"})
+    con = sqlite3.connect(baza)
+    m._clicks_init(con)
+    con.execute("INSERT INTO messenger_clicks (ts, channel, roistat_visit, utm, matched_phone, matched_ts) "
+                "VALUES (?,?,?,?,?,?)", (den.isoformat() + "T10:00:00", "stend-kanal", "990077", "{}", "79990001078",
+                                         den.isoformat() + "T10:05:00"))
+    con.commit()
+    con.close()
+    r = c.get("/istochniki", auth=VLADELEC)
+    h = r.text
+    proverka("владелец: разделы id=\"leads\" и id=\"clicks\" на месте, отчёт по источникам — тоже",
+             r.status_code == 200 and '<section id="leads"' in h and '<section id="clicks"' in h
+             and "Откуда заявки и что из них вышло" in h)
+    ld = h.split('<section id="leads"', 1)[-1].split("</section>")[0]
+    proverka("заявки: заголовок, заявка поимённо, «не дошли до CRM», ссылка на выгрузку CSV",
+             "Заявки Марквиза, не дошедшие до CRM" in ld and "Тестова Ольга" in ld and "79990001077" in ld
+             and 'href="/export/leads.csv"' in ld and "не дошли до CRM" in ld, ld[:300])
+    proverka("кнопки отправки в CRM на странице нет — как не было и на /leads (открытие и клик ничего не шлют)",
+             "/leads/push" not in h and "<form" not in ld)
+    kl = h.split('<section id="clicks"', 1)[-1].split("</section>")[0]
+    proverka("клики: построчно, со склейкой с обращением",
+             "Клики по ссылкам" in kl and "stend-kanal" in kl and "990077" in kl and "79990001078" in kl, kl[:300])
+    proverka("битые QR-ссылки /q/… не перенесены", "/q/" not in h)
+    kod, loc = lokaciya(c, "/istochniki")
+    proverka("админ: /istochniki → 303 /pult — раздела кликов (и всей страницы владельца) у админа нет",
+             (kod, loc) == (303, "/pult") and "stend-kanal" not in c.get("/istochniki", auth=ADMIN).text, (kod, loc))
+    shab = open(os.path.join(ROOT, "app/templates/istochniki.html"), encoding="utf-8").read()
+    proverka("раздел кликов закрыт ролью дважды: данные считаются только владельцу, шаблон без них раздел не рисует",
+             'kliki = _kliki_stroki() if _rol(request) == "owner" else None' in inspect.getsource(m.istochniki_page)
+             and "{% if kliki is not none %}\n<section id=\"clicks\"" in shab)
+    # если страницу когда-нибудь откроют админам: снимаем увод на пульт и смотрим, что админ увидит
+    bylo = m._vladelcu
+    m._vladelcu = lambda request: None
+    try:
+        ha = c.get("/istochniki", auth=ADMIN).text
+    finally:
+        m._vladelcu = bylo
+    proverka("если страницу открыть админу: заявки есть, раздела id=\"clicks\", ссылки на него и самих кликов нет",
+             '<section id="leads"' in ha and 'id="clicks"' not in ha and 'href="#clicks"' not in ha
+             and "stend-kanal" not in ha and "Тестова Ольга" in ha)
+    con = sqlite3.connect(baza)
+    con.execute("DELETE FROM leads WHERE id=?", (lid,))
+    con.execute("DELETE FROM messenger_clicks WHERE channel='stend-kanal'")
+    con.commit()
+    con.close()
+
+    print("З5. API старых страниц — на месте и под прежним входом")
+    for metod, put, vhod in (("GET", "/api/segodnya", "check_auth"), ("GET", "/api/spiski", "check_auth"),
+                             ("GET", "/api/zayavki", "check_auth"), ("GET", "/export/leads.csv", "check_owner"),
+                             ("POST", "/leads/push/{lead_id}", "check_auth"),
+                             ("GET", "/api/clicks/summary", "check_owner"), ("GET", "/go/{channel}", "")):
+        proverka(f"{metod} {put} — вход «{vhod or 'без входа'}»",
+                 _vhod_marshruta(m, metod, put) == ({vhod} if vhod else set()), _vhod_marshruta(m, metod, put))
+    proverka("/api/segodnya отдаёт все разделы, как раньше",
+             {"первые", "дела", "без_галочки", "ждут", "чаты", "новые_лиды", "явка", "итоги"}
+             <= set(c.get("/api/segodnya", auth=ADMIN).json()))
+    proverka("/api/spiski отвечает списком групп", "groups" in c.get("/api/spiski", auth=ADMIN).json())
+    proverka("/api/zayavki отвечает (вечерний контроль 21:00)", c.get("/api/zayavki", auth=ADMIN).status_code == 200)
+    proverka("/export/leads.csv: владельцу — 200, админу — 401",
+             c.get("/export/leads.csv", auth=VLADELEC).status_code == 200
+             and c.get("/export/leads.csv", auth=ADMIN).status_code == 401)
+    proverka("/api/clicks/summary: владельцу — 200, админу — 401",
+             c.get("/api/clicks/summary", auth=VLADELEC).status_code == 200
+             and c.get("/api/clicks/summary", auth=ADMIN).status_code == 401)
+
+
 def _lovushki_na_vse():
     """Страницы меню подгружают модули при первом открытии — ловушки отправки ставим и на них,
     до первого запроса: сеть на стенде закрыта, но и попытки отправить быть не должно."""
@@ -1511,6 +1734,7 @@ def main():
     test_marshruty_zhestkie(m, a.do)
     test_shapka_shag2(c, m, work)
     test_schetchik_i_pereezdy(c, m, baza)
+    test_pereezdy_pyati(c, m, baza)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     proverka("ни одной попытки выйти в сеть, кроме известных опросов Mango с пульта и «Ответов»",
              all(any(f.startswith(("mango.py", "zayavki.py")) for f in otkuda) for _, otkuda in lt.SET), lt.SET[:5])
