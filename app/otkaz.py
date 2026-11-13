@@ -385,16 +385,22 @@ def snyat(phone: str = "", id=0, prichina: str = "", kto: str = "") -> dict:
             "eshche_dejstvuet": is_refused(p) if p else None}
 
 
-def v_stop_liste(phone: str) -> dict | None:
-    """Действующая запись стоп-листа по телефону семьи — для плашки на «Линии»; снятые не в счёт."""
+def v_stop_liste(phone: str, conn=None) -> dict | None:
+    """Действующая запись стоп-листа по телефону семьи — для плашки на «Линии»; снятые не в
+    счёт (условие то же, что у is_refused). conn — уже открытое соединение страницы: тогда
+    только читаем, таблицу не создаём и не правим (её нет — значит, и записи нет)."""
     p = _digits(phone)[-10:]
     if len(p) != 10:
         return None
+    zapros = ("SELECT ts, text, source FROM otkazy WHERE phone=? AND released=0 "
+              "ORDER BY ts DESC LIMIT 1")
     try:
-        with db.get_conn() as conn:
-            _tables(conn)
-            r = conn.execute("SELECT ts, text, source FROM otkazy WHERE phone=? AND released=0 "
-                             "ORDER BY ts DESC LIMIT 1", (p,)).fetchone()
+        if conn is not None:
+            r = conn.execute(zapros, (p,)).fetchone()
+        else:
+            with db.get_conn() as c:
+                _tables(c)
+                r = c.execute(zapros, (p,)).fetchone()
     except Exception:
         return None
     if not r:

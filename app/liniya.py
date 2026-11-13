@@ -1001,7 +1001,7 @@ def _semya(conn, p: str, segodnya: date, age, child) -> dict:
            "kontakt": _kontakt(conn, p, [r["id"] for r in rows], segodnya),
            "obeshchaniya": _obeshchaniya(conn, p),
            "zadachi": _zadachi(conn, p, segodnya.isoformat()),
-           "stop_list": otkaz.v_stop_liste(p)}
+           "stop_list": otkaz.v_stop_liste(p, conn)}
     if not rows:
         res.update(_novyj(age))
         return res
