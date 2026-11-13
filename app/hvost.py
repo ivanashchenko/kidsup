@@ -607,7 +607,13 @@ def utro(dry: bool = False) -> dict:
                 continue
             novyj = kto
             den_novyj = segodnya
-            if kto in set(pult.SHORT.values()) and smena and kto not in smena:
+            # 13.11.2026, Ира: «это не моя зона ответственности… Она с явками работает,
+            # не мы». Пункт о явке (yavka.nightly, source «явка ДД.ММ») — не дело
+            # дежурной: в выходной хозяйки он остаётся в её колонке до её смены.
+            # Чья явка — Лены (решение 08.10) или Лизы — вопрос Борису.
+            if str(r["source"] or "").startswith("явка"):
+                pass
+            elif kto in set(pult.SHORT.values()) and smena and kto not in smena:
                 novyj = min(smena, key=lambda w: nagruzka.get(w, 0))
                 if delit and ((r["prio"] or 0) >= 400 or nagruzka.get(novyj, 0) >= 20):
                     den_novyj = zavtra
