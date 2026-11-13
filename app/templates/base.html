@@ -5,18 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}KidsUP{% endblock %}</title>
 <meta name="theme-color" content="#1DA7E0">
-<style>/* critical: если style.css не загрузился, шапка остаётся читаемой.
-Сетка та же, что в основном файле, — иначе при медленной загрузке видно,
-как блоки прыгают по местам. */
-.topbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;
-grid-template-areas:"brand search badge sync" "nav nav nav nav";
-align-items:center;gap:.5rem 1.1rem;padding:.6rem 1rem}
-.brand{grid-area:brand}.nav-toggle{display:none}.gsearch{grid-area:search;min-width:0}
-.wait-badge{grid-area:badge}.sync-block{grid-area:sync;white-space:nowrap}
-.nav-razdely{grid-area:nav}
-.nav-main,.nav-sub{display:flex;flex-wrap:wrap;gap:.35rem;font-size:14px;align-items:center}
-.nav-main a,.nav-sub a{text-decoration:none;color:#312783}
-.gsearch input{width:100%}</style>
 <link rel="stylesheet" href="/static/style.css?v=16">
 <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 {#- 12.11.2026: вход истёк посреди работы — уводит на форму входа и обратно (app/vhod.py) -#}
@@ -29,54 +17,23 @@ align-items:center;gap:.5rem 1.1rem;padding:.6rem 1rem}
     Подсветка — по адресу страницы, а не по параметру active. -#}
 {% set here = request.url.path %}
 {#- 12.11.2026, личные входы: «Вы: Лена · Выйти / сменить» или жёлтая полоса общего входа (vhod.shapka) -#}
-{{ kto_shapka if kto_shapka is defined else '' }}
-<header class="topbar">
-{% if menu %}
-  <a class="brand" href="/" title="На свою главную"><img src="/static/logo.svg" alt=""> KidsUP</a>
-  <button id="nav-toggle" class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-razdely">☰ Разделы</button>
-  <div class="gsearch">
-    <input type="search" id="gs-input" placeholder="Поиск: группа, ребёнок, телефон…  ( / )"
-           autocomplete="off" spellcheck="false">
-    <div id="gs-drop" class="gs-drop" hidden></div>
-  </div>
-  <a id="wait-badge" href="/waiting" class="wait-badge" hidden></a>
-  <div class="sync-block">
-    {% if last_sync %}<span class="muted small">Синхр.: {{ last_sync }}</span>{% endif %}
-    {#- полная выгрузка МойКласса тяжёлая — кнопка только у владельца -#}
-    {% if rol == 'owner' %}
-    <button id="sync-btn" class="btn btn-primary" {% if not has_api_key %}disabled title="Укажите API-ключ в настройках"{% endif %}>
-      Синхронизировать
-    </button>
-    {% endif %}
-  </div>
-  <div id="nav-razdely" class="nav-razdely">
-    <nav class="nav-main" aria-label="{{ menu[0][0] }}">
-      <span class="nav-label">{{ menu[0][0] }}</span>
-      {% for name, href in menu[0][1] %}<a href="{{ href }}"{% if href == here %} class="active" aria-current="page"{% endif %}>{{ name }}</a>
-      {% endfor %}
-    </nav>
-    <nav class="nav-sub" aria-label="Разделы">
-      {% for title, items in (menu[1:-1] if rol == 'owner' else menu[1:]) %}
-      <div class="nav-group">
-        <span class="nav-label">{{ title }}</span>
-        {% for name, href in items %}<a href="{{ href }}"{% if href == here %} class="active" aria-current="page"{% endif %}>{{ name }}</a>
-        {% endfor %}
-      </div>
-      {% endfor %}
-    </nav>
-    {% if rol == 'owner' %}
-    <nav class="nav-sub nav-vlad" aria-label="{{ menu[-1][0] }}">
-      <span class="nav-label">{{ menu[-1][0] }}</span>
-      {% for name, href in menu[-1][1] %}<a href="{{ href }}"{% if href == here %} class="active" aria-current="page"{% endif %}>{{ name }}</a>
-      {% endfor %}
-    </nav>
-    {% endif %}
-  </div>
-{% else %}
-  {#- педагог открыл страницу по ключу из ссылки: меню, поиска и служебных кнопок ему не показываем -#}
-  <div class="brand"><img src="/static/logo.svg" alt=""> KidsUP</div>
+{#- 13.11.2026, шаг 2: шапка одна на всех страницах — её собирает app/nav.py, shapka()
+    (логотип, поиск, бейдж «ждут ответа», полоска «кто вошёл», разделы, на телефоне —
+    нижняя панель и лист «☰ Разделы»). Прежний блок header.topbar и скрипты меню, бейджа
+    и поиска переехали в nav.py и /static/nav.js: те же шапка и скрипты стоят на страницах
+    со своим HTML (пульт, бланки групп, долги…). Педагогу по ключу — строка «KidsUP · педагогам». -#}
+{{ shapka|safe if shapka is defined else '' }}
+{#- подпись «Синхр.: …» — всем, кроме педагога; полная выгрузка МойКласса тяжёлая — кнопка только у владельца -#}
+{% if rol != 'pedagog' and (last_sync or rol == 'owner') %}
+<div class="kn-sync">
+  {% if last_sync %}<span class="muted small">Синхр.: {{ last_sync }}</span>{% endif %}
+  {% if rol == 'owner' %}
+  <button id="sync-btn" class="btn btn-primary" {% if not has_api_key %}disabled title="Укажите API-ключ в настройках"{% endif %}>
+    Синхронизировать
+  </button>
+  {% endif %}
+</div>
 {% endif %}
-</header>
 
 <div id="sync-status" class="sync-status" hidden></div>
 
@@ -162,88 +119,8 @@ window.KIDSUP_PED = {{ 'true' if rol == 'pedagog' else 'false' }};
   });
 })();
 
-/* --- мобильное меню: «☰ Разделы» раскрывает и сворачивает разделы ------- */
-(function () {
-  const t = document.getElementById('nav-toggle');
-  if (!t) return;
-  function otkryt(da) {
-    document.body.classList.toggle('nav-open', da);
-    t.setAttribute('aria-expanded', da ? 'true' : 'false');
-    t.textContent = da ? '✕ Свернуть' : '☰ Разделы';
-  }
-  t.addEventListener('click', () => otkryt(!document.body.classList.contains('nav-open')));
-  document.querySelectorAll('.nav-razdely a').forEach(a =>
-    a.addEventListener('click', () => otkryt(false)));
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') otkryt(false); });
-})();
-
-/* --- бейдж «кто ждёт ответа» -------------------------------------------- */
-(function () {
-  const b = document.getElementById('wait-badge');
-  if (!b || window.KIDSUP_PED) return;
-  async function tick() {
-    try {
-      const w = await (await fetch('/api/waiting')).json();
-      const calls = w.calls_count || 0;
-      // 14.10: чаты Telegram/MAX без номера — своей цифрой, отвечать в Wazzup
-      const np = w.nophone || [];
-      const npHot = np.some(x => x.money);
-      if (!w.count && !calls && !np.length) { b.hidden = true; return; }
-      b.hidden = false;
-      const parts = [];
-      if (w.count) parts.push('💬 ' + w.count);
-      if (np.length) parts.push('📨 ' + np.length);
-      if (calls) parts.push('☎ ' + calls);
-      b.textContent = (w.money || npHot ? '🔥 ' : '') + parts.join(' · ') + ' ждут';
-      b.classList.toggle('hot', w.money > 0 || w.max_wait > 30 || calls > 0 ||
-                         npHot || np.some(x => x.wait_min > 30));
-    } catch (e) {}
-  }
-  tick(); setInterval(tick, 180000);
-})();
-
-/* --- глобальный поиск в шапке ------------------------------------------- */
-(function () {
-  const inp = document.getElementById('gs-input'), drop = document.getElementById('gs-drop');
-  if (!inp) return;
-  let t = null, sel = -1, items = [];
-  function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-  function renderList() {
-    if (!items.length) { drop.hidden = true; return; }
-    drop.innerHTML = items.map((it, i) =>
-      `<a href="${it.url}" class="gs-item ${i===sel?'sel':''}">
-         <span class="gs-type">${it.type}</span>
-         <span class="gs-title">${esc(it.title)}</span>
-         <span class="gs-sub">${esc(it.sub || '')}</span></a>`).join('');
-    drop.hidden = false;
-  }
-  async function search(q) {
-    try {
-      const r = await fetch('/api/search?q=' + encodeURIComponent(q));
-      items = (await r.json()).items || []; sel = -1; renderList();
-    } catch (e) {}
-  }
-  inp.addEventListener('input', () => {
-    clearTimeout(t);
-    const q = inp.value.trim();
-    if (q.length < 2) { drop.hidden = true; items = []; return; }
-    t = setTimeout(() => search(q), 220);
-  });
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'ArrowDown') { sel = Math.min(sel + 1, items.length - 1); renderList(); e.preventDefault(); }
-    else if (e.key === 'ArrowUp') { sel = Math.max(sel - 1, 0); renderList(); e.preventDefault(); }
-    else if (e.key === 'Enter' && sel >= 0 && items[sel]) { location.href = items[sel].url; }
-    else if (e.key === 'Escape') { drop.hidden = true; inp.blur(); }
-  });
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.gsearch')) drop.hidden = true;
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === '/' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
-      e.preventDefault(); inp.focus();
-    }
-  });
-})();
+/* 13.11.2026: скрипты меню, бейджа «ждут ответа» и поиска переехали в /static/nav.js —
+   его подключает сама шапка (app/nav.py), он же работает на страницах со своим HTML. */
 </script>
 {% block scripts %}{% endblock %}
 </body>

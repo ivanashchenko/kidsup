@@ -398,7 +398,46 @@ def _kto_shapka(request: Request):
         return Markup("")
 
 
+def _shapka(request: Request, kto: bool = True) -> str:
+    """Общая шапка страницы под вошедшего (app/nav.py, shapka). 13.11.2026, шаг 2: одна
+    шапка и на страницах base.html, и на страницах со своим HTML.
+
+    Педагогу (роль "pedagog", пришёл по ключу из ссылки) — строка «KidsUP · педагогам» с
+    одним пунктом. Ключ попадает в ссылки шапки, только если совпал с настройкой
+    pedagog_key: чужую строку из адреса в страницу не переносим.
+    kto=False — без полоски «Вы: Лена · Выйти / сменить»: пульт рисует её сам."""
+    try:
+        rol = _rol(request)
+        if rol == "pedagog":
+            k = request.query_params.get("k") or ""
+            want = db.get_setting("pedagog_key", "")
+            return nav.shapka("pedagog", request.url.path, k=k if (want and k and vhod._ravny(k, want)) else "")
+        return nav.shapka(rol, request.url.path, kto_html=str(_kto_shapka(request)) if kto else "")
+    except Exception:  # noqa: BLE001 — шапка страницу не ломает
+        logging.getLogger("kidsup.nav").exception("общая шапка")
+        return ""
+
+
+def _s_shapkoy(request: Request, stranica: str, kto: bool = True) -> str:
+    """Страница со своим HTML → она же с общей шапкой (nav.wrap). Зовётся явно в каждом
+    маршруте, а не прослойкой на все ответы: документам, JSON, выгрузкам и публичным
+    страницам kidsup.ru шапка не нужна."""
+    return nav.wrap(stranica, _shapka(request, kto))
+
+
+def _doc_s_polosoy(request: Request, stranica: str, nazad: str, nazvanie: str, podpis: str = "") -> str:
+    """Документ (/boris/docs/…, /admin/docs/…, /base/…) с тонкой строкой «← Списки · 🖨 Печать».
+    Только браузеру (в Accept есть text/html): рутины забирают документы GET-запросом и
+    могут сравнивать тело с выложенным — им тело без изменений (PLAN.md, риск 6)."""
+    if "text/html" not in (request.headers.get("accept") or ""):
+        return stranica
+    if 'id="kidsup-doc-bar"' in stranica or nav.KOREN in stranica:
+        return stranica
+    return nav.vstavit(stranica, nav.doc_bar(nazad, nazvanie, podpis))
+
+
 def render(request: Request, template: str, **ctx) -> HTMLResponse:
+    from markupsafe import Markup
     counts = db.table_counts()
     rol = _rol(request)
     ctx.update({
@@ -413,7 +452,9 @@ def render(request: Request, template: str, **ctx) -> HTMLResponse:
         # 12.11.2026, личные входы: кто вошёл — для имени в шапке
         "kto": vhod.iz(request),
         # полоска «Вы: Лена · Выйти / сменить» или жёлтая «Вы под общим входом» (vhod.shapka)
-        "kto_shapka": _kto_shapka(request),
+        # 13.11.2026: полоска теперь внутри общей шапки (_shapka → nav.shapka), отдельно
+        # в шаблон не передаётся.
+        "shapka": Markup(_shapka(request)),
         # архивная или переезжающая страница — плашка «это не рабочая страница, иди туда»
         "plashka": nav.plashka(request.url.path, rol),
     })
@@ -1890,7 +1931,7 @@ p.note{{color:#6c6a86;font-size:14px}}p.nav{{font-size:14.5px;margin:-6px 0 10px
 @app.get("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
 def owner_page(request: Request):
     """Форма владельца для ключей банка, кассы и МойКласса (09.09.2026)."""
-    return HTMLResponse(_owner_ctx(request))
+    return HTMLResponse(_s_shapkoy(request, _owner_ctx(request)))
 
 
 @app.post("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -2012,7 +2053,7 @@ def perepiska_report(day: str | None = None):
 
 
 @app.get("/base/{slug}", response_class=HTMLResponse, dependencies=AUTH)
-def base_doc(slug: str):
+def base_doc(request: Request, slug: str):
     """Отдаёт методичку. Имя файла проверяем по белому списку."""
     known = {s for _, items in DOC_GROUPS for s, _, _ in items}
     if slug not in known:
@@ -2020,6 +2061,10 @@ def base_doc(slug: str):
     f = Path(__file__).resolve().parent.parent / "docs" / f"{slug}.html"
     if not f.exists():
         raise HTTPException(404)
+    # 13.11.2026: полоса «← Все методички» приклеивалась ПЕРЕД <!doctype> (HTMLResponse(back + page))
+    # — браузер уходил в режим совместимости (quirks). Теперь вместо неё общая тонкая строка
+    # nav.doc_bar «← База знаний · 🖨 Печать», вставленная после <body>, и только браузеру
+    # (_doc_s_polosoy). Старая разметка оставлена ниже для истории, в ответ не идёт.
     back = (
         '<div style="position:sticky;top:0;z-index:99;display:flex;gap:14px;'
         'align-items:center;flex-wrap:wrap;padding:9px 18px;'
@@ -2054,7 +2099,14 @@ def base_doc(slug: str):
                 + back.replace('<span style="color:#6B7A91;font-weight:500">KidsUP · база знаний</span>',
                                '<span style="color:#6B7A91;font-weight:500">KidsUP · план дня · страница обновляется сама каждые 5 минут, '
                                + f'открыта в {(datetime.utcnow() + timedelta(hours=3)).strftime("%H:%M")}</span>'))
-    return HTMLResponse(back + page)
+        if "text/html" in (request.headers.get("accept") or ""):
+            # автообновление — тоже только браузеру и тоже не перед <!doctype>
+            page = nav.vstavit(page, '<meta http-equiv="refresh" content="300">')
+            return HTMLResponse(_doc_s_polosoy(
+                request, page, "/base", "База знаний",
+                "KidsUP · план дня · страница обновляется сама каждые 5 минут, "
+                f'открыта в {(datetime.utcnow() + timedelta(hours=3)).strftime("%H:%M")}'))
+    return HTMLResponse(_doc_s_polosoy(request, page, "/base", "База знаний", "KidsUP · база знаний"))
 
 
 # 12.11.2026, Борис: «пункты владельца админу не показываются вовсе». Страница из раздела
@@ -2712,10 +2764,15 @@ def _suggest_by_age(age: float | None) -> str:
 
 
 @app.get("/pedagog", response_class=HTMLResponse)
-def pedagog_page(k: str = ""):
+def pedagog_page(request: Request, k: str = ""):
     """Страница педагога без админского пароля: вход по ключу из ссылки (pedagog_key)."""
     from . import pedagog
-    return HTMLResponse(pedagog.page(k))
+    stranica = pedagog.page(k)
+    # 13.11.2026: шапка педагога («KidsUP · педагогам», один пункт) — только при верном ключе.
+    # Маршрут без входа, поэтому шапка всегда педагогическая: меню админов сюда не попадает.
+    if pedagog.key_ok(k):
+        stranica = nav.wrap(stranica, nav.shapka("pedagog", request.url.path, k=k))
+    return HTMLResponse(stranica)
 
 
 @app.post("/api/pedagog/save")
@@ -2738,19 +2795,20 @@ _DOC_HEADERS = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"
 
 
 @app.get("/boris/docs", response_class=HTMLResponse, dependencies=OWNER_AUTH)
-def boris_docs_page():
+def boris_docs_page(request: Request):
     """Документы владельца — только под логином boris (15.10.2026, app/boris_docs.py)."""
     from . import boris_docs
-    return HTMLResponse(boris_docs.page(), headers=_DOC_HEADERS)
+    return HTMLResponse(_s_shapkoy(request, boris_docs.page()), headers=_DOC_HEADERS)
 
 
 @app.get("/boris/docs/{slug}", response_class=HTMLResponse, dependencies=OWNER_AUTH)
-def boris_doc(slug: str):
+def boris_doc(request: Request, slug: str):
     from . import boris_docs
     html = boris_docs.get(slug)
     if html is None:
         raise HTTPException(404, "нет такого документа")
-    return HTMLResponse(html, headers=_DOC_HEADERS)
+    # 13.11.2026: браузеру — тонкая строка «← Мои документы · 🖨 Печать»; рутинам тело как есть
+    return HTMLResponse(_doc_s_polosoy(request, html, "/boris/docs", "Мои документы"), headers=_DOC_HEADERS)
 
 
 @app.get("/api/boris-docs", dependencies=OWNER_AUTH)
@@ -2848,18 +2906,19 @@ def api_doc_state_put(doc: str, payload: dict = Body(...)):
 # Списки для администраторов (16.10.2026): та же папка на сервере, что у документов
 # владельца, но читают под логином admin, а выкладывает только владелец.
 @app.get("/admin/docs", response_class=HTMLResponse, dependencies=AUTH)
-def admin_docs_page():
+def admin_docs_page(request: Request):
     from . import boris_docs
-    return HTMLResponse(boris_docs.ADMIN.page(), headers=_DOC_HEADERS)
+    return HTMLResponse(_s_shapkoy(request, boris_docs.ADMIN.page()), headers=_DOC_HEADERS)
 
 
 @app.get("/admin/docs/{slug}", response_class=HTMLResponse, dependencies=AUTH)
-def admin_doc(slug: str):
+def admin_doc(request: Request, slug: str):
     from . import boris_docs
     html = boris_docs.ADMIN.get(slug)
     if html is None:
         raise HTTPException(404, "нет такого списка")
-    return HTMLResponse(html, headers=_DOC_HEADERS)
+    # 13.11.2026: браузеру — тонкая строка «← Списки · 🖨 Печать»; рутинам тело как есть
+    return HTMLResponse(_doc_s_polosoy(request, html, "/admin/docs", "Списки"), headers=_DOC_HEADERS)
 
 
 @app.get("/api/admin-docs", dependencies=OWNER_AUTH)
@@ -2922,7 +2981,8 @@ def api_boris_status(payload: dict = Body(...)):
 def pult_page(request: Request, day: str = "", who: str = ""):
     """Пульт смены: задачи по тем, кто сегодня работает, + Лиза и Борис, живые блоки (06.09)."""
     from . import pult
-    return HTMLResponse(pult.page(day, who, rol=_rol(request), kto=vhod.iz(request)))
+    # 13.11.2026: общая шапка. Полоску «Вы: …» пульт рисует сам (с «ваша колонка») — в шапке её нет.
+    return HTMLResponse(_s_shapkoy(request, pult.page(day, who, rol=_rol(request), kto=vhod.iz(request)), kto=False))
 
 
 @app.get("/obeshchaniya", dependencies=AUTH)
@@ -3153,10 +3213,10 @@ def api_pult_nedozvon(request: Request, payload: dict = Body(...)):
 
 
 @app.get("/karta", response_class=HTMLResponse, dependencies=AUTH)
-def karta_page():
+def karta_page(request: Request):
     """«Карта развития» после первого занятия: три строки педагога → PNG маме в WhatsApp (06.09)."""
     from . import karta_razvitiya as karta
-    return HTMLResponse(karta.page(PRICES))
+    return HTMLResponse(_s_shapkoy(request, karta.page(PRICES)))
 
 
 @app.post("/api/karta/send", dependencies=AUTH)
@@ -3166,11 +3226,11 @@ def api_karta_send(payload: dict = Body(...)):
 
 
 @app.get("/spiski", response_class=HTMLResponse, dependencies=AUTH)
-def spiski_page(day: str = "", subject: str = "", print: int = 0):
+def spiski_page(request: Request, day: str = "", subject: str = "", print: int = 0):
     """Списки по группам для стойки (просьба Иры 05.09): кто записан, оплатил, на пробном.
     Сам обновляется каждые 5 минут вслед за лёгким синком."""
     from . import spiski
-    return HTMLResponse(spiski.page(day or None, subject or None, bool(print)))
+    return HTMLResponse(_s_shapkoy(request, spiski.page(day or None, subject or None, bool(print))))
 
 
 @app.get("/api/spiski", dependencies=AUTH)
@@ -3196,10 +3256,10 @@ def promo_page(request: Request):
 
 
 @app.get("/promo/grafik", response_class=HTMLResponse, dependencies=AUTH)
-def promo_grafik_page():
+def promo_grafik_page(request: Request):
     """График выходов промоутеров: кто и когда готов (Борис 26.10.2026, app/promo_grafik.py)."""
     from . import promo_grafik
-    return HTMLResponse(promo_grafik.page())
+    return HTMLResponse(_s_shapkoy(request, promo_grafik.page()))
 
 
 @app.get("/api/promo/grafik", dependencies=AUTH)
@@ -4488,9 +4548,9 @@ def api_kontrol_oplat_run(day: str = "", dry: int = 1):
 
 
 @app.get("/kontrol-oplat", response_class=HTMLResponse, dependencies=OWNER_AUTH)
-def kontrol_oplat_page(day: str = ""):
+def kontrol_oplat_page(request: Request, day: str = ""):
     from . import kontrol_oplat
-    return HTMLResponse(kontrol_oplat.html(day or None))
+    return HTMLResponse(_s_shapkoy(request, kontrol_oplat.html(day or None)))
 
 
 # 14.10.2026, Борис: ежедневная сверка честности — правки, удаления и проводки
@@ -4542,7 +4602,7 @@ def sverka_chestnosti_page(request: Request, day: str = ""):
     if r:
         return r
     from . import sverka_chestnosti
-    return HTMLResponse(sverka_chestnosti.html(_sverka_den(day, 404)))
+    return HTMLResponse(_s_shapkoy(request, sverka_chestnosti.html(_sverka_den(day, 404))))
 
 
 @app.get("/sverka", dependencies=OWNER_AUTH)
@@ -6135,7 +6195,7 @@ def api_prelaunch():
 
 
 @app.get("/prelaunch", response_class=HTMLResponse, dependencies=AUTH)
-def prelaunch_page():
+def prelaunch_page(request: Request):
     """Предполётный чек глазами человека: светофор вместо JSON.
 
     /api/prelaunch отдаёт машинный ответ с русскими ключами в юникоде —
@@ -6152,7 +6212,7 @@ def prelaunch_page():
         f"<td>{c['всего']}</td><td>{c['дошло']}</td>"
         f"<td class={'ok' if c['доля'] >= 80 else 'warn'}>{c['доля']}%</td></tr>"
         for c in d["каналы за 4ч"])
-    return f"""<!doctype html><meta charset=utf-8>
+    return _s_shapkoy(request, f"""<!doctype html><meta charset=utf-8>
 <meta name=viewport content="width=device-width, initial-scale=1">
 <title>Предполётный чек — KidsUP</title>
 <style>
@@ -6177,7 +6237,7 @@ td.ok{{color:#1b7a1b;font-weight:600}} td.warn{{color:#b07500;font-weight:600}}
 Очередь рассылки: <b>{d["очередь nabormail"]}</b> ·
 Отказов в стоп-листе: <b>{d["отказов в стоп-листе"]}</b> ·
 СМС: <b>{'включены' if d["sms_on"] else 'выключены'}</b><br>
-Отправители WhatsApp: <b>{html.escape(d["отправители"])}</b></div>"""
+Отправители WhatsApp: <b>{html.escape(d["отправители"])}</b></div>""")
 
 
 @app.post("/api/broadcast/cancel-campaign", dependencies=AUTH)
@@ -6555,11 +6615,12 @@ def autopilot_digest_now():
 
 
 @app.get("/zayavki", response_class=HTMLResponse, dependencies=AUTH)
-def zayavki_page(fresh: int = 0):
+def zayavki_page(request: Request, fresh: int = 0):
     def _build():
         r = _zayavki_build()
         return r.body.decode() if hasattr(r, "body") else str(r)
-    return HTMLResponse(_page_cache("zayavki", 15, _build, fresh=bool(fresh)))
+    # 13.11.2026: шапка ставится поверх кэша — в кэше страница без шапки, шапка зависит от вошедшего
+    return HTMLResponse(_s_shapkoy(request, _page_cache("zayavki", 15, _build, fresh=bool(fresh))))
 
 
 def _zayavki_build():
@@ -6888,7 +6949,7 @@ def api_otkazy_release(chat: str):
 
 
 @app.get("/otkazy", response_class=HTMLResponse, dependencies=AUTH)
-def otkazy_page():
+def otkazy_page(request: Request):
     """Отказы глазами администратора: кто, когда, дословно и на чём связали."""
     from . import otkaz
     import html as _h
@@ -6906,7 +6967,10 @@ def otkazy_page():
             f"<td>{_h.escape(r['как связали'] or '—')}</td>"
             f"<td>{'снят' if r['снят'] else 'не пишем'}</td></tr>")
     n_live = sum(1 for r in rows if not r["снят"])
-    return f"""<!doctype html><meta charset=utf-8>
+    # 13.11.2026: общая шапка вместо временной строки «← Пульт · Разделы» шага 1; заодно у
+    # страницы появились <meta viewport> и <body> — без них на телефоне она была мелкой.
+    return _s_shapkoy(request, f"""<!doctype html><html lang="ru"><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width, initial-scale=1">
 <script src="/static/vhod.js"></script>
 <title>Стоп-лист — KidsUP</title>
 <style>
@@ -6918,16 +6982,17 @@ th{{background:#f6f6fb;font-size:13px;color:#555}}
 tr.off{{opacity:.45}} .q{{color:#444;font-style:italic}}
 .warn{{color:#E30613}}
 .nazad a{{color:#1DA7E0;text-decoration:none}}
-</style>
-<p class=nazad><a href="/pult">← Пульт</a> · <a href="/pult#razdely">Разделы</a></p>
+.tabl{{overflow-x:auto}}
+@media (max-width:700px){{body{{margin:14px}}}}
+</style></head><body>
 <h1>Стоп-лист: {n_live} семей, которым автоматика не пишет</h1>
 <div class=sub>Сюда попадает всё, где клиент письменно просил снять бронь.
 Пока строка активна, ни одна рассылка этому телефону не уходит — только
 живые ответы администратора. Снять стоп-лист может только человек:
 <code>POST /api/otkazy/release?chat=…</code></div>
-<table><tr><th>Когда</th><th>Кто</th><th>Что написали</th>
+<div class=tabl><table><tr><th>Когда</th><th>Кто</th><th>Что написали</th>
 <th>Как связали с семьёй</th><th>Статус</th></tr>
-{''.join(body) or '<tr><td colspan=5>Пока пусто</td></tr>'}</table>"""
+{''.join(body) or '<tr><td colspan=5>Пока пусто</td></tr>'}</table></div></body></html>""")
 
 
 @app.get("/api/dostavka/phone", dependencies=AUTH)
@@ -8881,7 +8946,7 @@ def kamery_page(request: Request):
 def kamery_nastroyka(request: Request):
     """Форма владельца: вставить ссылки на трансляции камер."""
     from . import kamery
-    return HTMLResponse(kamery.nastroyka())
+    return HTMLResponse(_s_shapkoy(request, kamery.nastroyka()))
 
 
 @app.post("/kamery/nastroyka", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -9911,10 +9976,10 @@ def api_mesta_razrez():
 
 
 @app.get("/blank-grupp", response_class=HTMLResponse, dependencies=AUTH)
-def blank_grupp_page():
+def blank_grupp_page(request: Request):
     """Бланки групп «как на бумаге» (просьба Иры 31.10). С 02.11 бланк ведут админы,
     МойКласс — только в проверках вверху (замечания Иры 02.11)."""
-    return HTMLResponse((BASE / "templates" / "blank_grupp.html").read_text(encoding="utf-8"))
+    return HTMLResponse(_s_shapkoy(request, (BASE / "templates" / "blank_grupp.html").read_text(encoding="utf-8")))
 
 
 @app.get("/api/blank-grupp", dependencies=AUTH)
@@ -10706,7 +10771,7 @@ async def audit_page(request: Request):
             f'</div>')
     body = "".join(rows) or '<p class="empty">Лента пуста — за вчера расхождений нет.</p>'
     kinds = " · ".join(f"{k}: {v}" for k, v in (s.get("by_kind") or {}).items()) or "—"
-    return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
+    return HTMLResponse(_s_shapkoy(request, f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Лента аномалий — KidsUP</title><script src="/static/vhod.js"></script>
 <style>
 :root{{--paper:#FAF9F5;--ink:#22271F;--muted:#6E7264;--line:#E3E1D6;--card:#fff}}
@@ -10749,7 +10814,7 @@ async function mark(id, st) {{
   const el = document.querySelector('.f[data-id="' + id + '"]');
   if (el) el.classList.add('done');
 }}
-</script></body></html>""")
+</script></body></html>"""))
 
 
 @app.get("/api/rules", dependencies=AUTH)
@@ -10774,7 +10839,7 @@ async def api_rules_baseline(since: str = "2025-09-01"):
 
 
 @app.get("/pravila-kontrol", response_class=HTMLResponse, dependencies=AUTH)
-async def rules_page():
+async def rules_page(request: Request):
     """Кто как соблюдает правила посещения. Не рейтинг стыда, а список
     того, что надо поправить в карточках — с именем и абонементом."""
     from . import rules as _rules
@@ -10808,7 +10873,7 @@ async def rules_page():
         for m in s.get("managers", [])) or '<tr><td colspan="4">пока пусто</td></tr>'
     mute = " · ".join(f"{html.escape(k)} {v}" for k, v in
                       (base.get("discount_mute_by_manager") or {}).items()) or "—"
-    return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
+    return HTMLResponse(_s_shapkoy(request, f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Соблюдение правил — KidsUP</title>
 <style>
@@ -10878,7 +10943,7 @@ async function mark(id, st) {{
   const el = document.querySelector('.f[data-id="' + id + '"]');
   if (el) el.classList.add('done');
 }}
-</script></body></html>""")
+</script></body></html>"""))
 
 
 @app.post("/api/fit/run", dependencies=AUTH)
@@ -10910,15 +10975,17 @@ async def api_dolgi():
 
 
 @app.get("/dolgi", response_class=HTMLResponse, dependencies=AUTH)
-async def money_page():
+async def money_page(request: Request):
     """Долги: по абонементам и по занятиям, разложенные по тому, что с ними
     реально можно сделать. Данные тянутся из МойКласс при каждом открытии."""
     from . import crmcheck
     d = crmcheck.debts_report()
     if not d.get("ready"):
-        return HTMLResponse('<script src="/static/vhod.js"></script>'
-                            '<p><a href="/pult">← Пульт</a> · <a href="/pult#razdely">Разделы</a></p>'
-                            "<p>Нет ключа МойКласс</p>")
+        # 13.11.2026: общая шапка вместо временной строки «← Пульт · Разделы» шага 1
+        return HTMLResponse(_s_shapkoy(request, '<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+                                       '<meta name="viewport" content="width=device-width,initial-scale=1">'
+                                       '<title>Долги — KidsUP</title><script src="/static/vhod.js"></script></head>'
+                                       '<body><p style="margin:24px;font:16px/1.5 system-ui,sans-serif">Нет ключа МойКласс</p></body></html>'))
     t = d["totals"]
     rows, nobill = d["rows"], d["nobill"]
     BUCKET = {
@@ -10965,7 +11032,7 @@ async def money_page():
                         f'<td class="w">{x["date"]}</td>'
                         f'<td>{html.escape(str(x["class"] or ""))}</td></tr>'
                         for x in nobill) + '</table></div></section>')
-    return HTMLResponse(f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
+    return HTMLResponse(_s_shapkoy(request, f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Долги — KidsUP</title><script src="/static/vhod.js"></script><style>
 :root{{--paper:#FCFBF7;--ink:#1B1D2B;--muted:#5F6478;--line:#E7E4DA;--card:#fff;--fill:#F3F1E9}}
@@ -10998,7 +11065,6 @@ td.w{{white-space:nowrap}}
 .how ol{{margin:.5rem 0;padding-left:1.2rem}} .how li{{margin:.3rem 0}}
 a{{color:inherit}}
 </style></head><body><div class="wrap">
-<p class="m"><a href="/pult">← Пульт</a> · <a href="/pult#razdely">Разделы</a></p>
 <h1>Долги по абонементам и занятиям</h1>
 <p class="sub">Данные тянутся из МойКласс при каждом открытии страницы —
 на {d["as_of"]}. Источник: счета с датой оплаты, поэтому просрочка считается точно.</p>
@@ -11018,7 +11084,7 @@ a{{color:inherit}}
 </ol></div>
 {"".join(blocks)}
 {nb}
-</div></body></html>""")
+</div></body></html>"""))
 
 
 @app.get("/api/duty", dependencies=AUTH)
@@ -11325,14 +11391,79 @@ async def api_waiting(min_minutes: int = 15):
     except Exception as exc:
         logging.getLogger(__name__).warning("nophone: %s", exc)
         nophone = []
-    return {"count": len(waiting),
-            "money": sum(1 for w in waiting if w["money"]),
-            "max_wait": max((w["wait_min"] for w in waiting), default=0),
-            "items": waiting,
-            "calls_count": len(calls_waiting),
-            "calls": calls_waiting,
-            "nophone_count": len(nophone),
-            "nophone": nophone}
+    otvet = {"count": len(waiting),
+             "money": sum(1 for w in waiting if w["money"]),
+             "max_wait": max((w["wait_min"] for w in waiting), default=0),
+             "items": waiting,
+             "calls_count": len(calls_waiting),
+             "calls": calls_waiting,
+             "nophone_count": len(nophone),
+             "nophone": nophone}
+    if min_minutes == 15:
+        # 13.11.2026: каждый обычный расчёт (страница «Ответы», рутины) освежает счётчик бейджа
+        _schet_zapomnit(otvet)
+    return otvet
+
+
+# 13.11.2026, шаг 2: бейдж «ждут ответа» в общей шапке. Раньше каждая вкладка раз в три
+# минуты звала /api/waiting — а он идёт в Mango до минуты и считается заново. С шапкой на
+# пульте, бланках и долгах таких вкладок стало кратно больше (PLAN.md, риск 7). Теперь
+# шапка берёт только числа из кэша последнего расчёта.
+SCHET_TTL = 100          # секунд: свежее — отдаём как есть
+_SCHET: dict = {"ts": 0.0, "dannye": None, "zadacha": None}
+
+
+def _schet_zapomnit(w: dict) -> dict:
+    """Числа бейджа из ответа /api/waiting — тот же смысл, что считал скрипт в base.html:
+    переписка, чаты без номера, пропущенные звонки; «деньги» — огонёк, «горячо» — красный."""
+    np = w.get("nophone") or []
+    np_dengi = any(x.get("money") for x in np)
+    zvonki = int(w.get("calls_count") or 0)
+    d = {"perepiska": int(w.get("count") or 0), "bez_nomera": len(np), "zvonki": zvonki,
+         "dengi": bool(w.get("money") or np_dengi),
+         "goryacho": bool((w.get("money") or 0) > 0 or (w.get("max_wait") or 0) > 30 or zvonki > 0
+                          or np_dengi or any((x.get("wait_min") or 0) > 30 for x in np)),
+         "max_wait": int(w.get("max_wait") or 0)}
+    _SCHET["dannye"], _SCHET["ts"] = d, time.time()
+    return d
+
+
+async def _schet_obnovit() -> None:
+    """Один расчёт /api/waiting для счётчика — в отдельном потоке: внутри синхронные
+    запросы (Mango до минуты), в общем цикле они держали бы весь сервер."""
+    import asyncio
+    try:
+        await asyncio.to_thread(lambda: asyncio.run(api_waiting()))
+    except Exception:  # noqa: BLE001 — бейдж не должен ронять страницу
+        logging.getLogger("kidsup.nav").exception("счётчик «ждут ответа»")
+        if _SCHET["dannye"] is None:
+            _SCHET["dannye"] = {"perepiska": 0, "bez_nomera": 0, "zvonki": 0, "dengi": False,
+                                "goryacho": False, "max_wait": 0, "oshibka": True}
+        _SCHET["ts"] = time.time()   # не повторять упавший расчёт на каждый опрос
+
+
+@app.get("/api/waiting/schet", dependencies=AUTH)
+async def api_waiting_schet():
+    """Числа для бейджа шапки: {"perepiska", "bez_nomera", "zvonki", "dengi", "goryacho",
+    "max_wait", "vozrast"} из кэша последнего расчёта /api/waiting.
+
+    Кэш свежий (до SCHET_TTL секунд) — отдаём сразу. Устарел — отдаём прежние числа и
+    запускаем один пересчёт в фоне. Кэша нет вовсе (сервер только поднялся) — считаем один
+    раз; пришедшие в это время ждут тот же расчёт, второй параллельно не запускается."""
+    import asyncio
+    c = _SCHET
+
+    def zapustit():
+        if c["zadacha"] is None or c["zadacha"].done():
+            c["zadacha"] = asyncio.create_task(_schet_obnovit())
+        return c["zadacha"]
+
+    if c["dannye"] is None:
+        await asyncio.shield(zapustit())
+    elif time.time() - c["ts"] >= SCHET_TTL:
+        zapustit()
+    return JSONResponse({**(c["dannye"] or {}), "vozrast": int(time.time() - c["ts"])},
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/waiting", response_class=HTMLResponse, dependencies=AUTH)
