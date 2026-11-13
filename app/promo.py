@@ -143,7 +143,14 @@ def _funnel(users, paid_ids):
     return f
 
 
-def stats():
+def stats(raschety: bool = True):
+    """Цифры для /promo. raschety=False — без денег: ни ставок, ни начислений, ни авансов.
+
+    13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1): блок «Расчёты с промоутерами»
+    считает по правилам 17.08 — они сейчас не действуют, новое правило оплаты промоутеров ещё
+    не принято, а таблица авансов (август) была видна админам. Страница зовёт stats(raschety=
+    False) для всех, кроме владельца: в ответе тогда нет ключей pay_groups, total_fee и rates,
+    то есть суммы не могут попасть в HTML и по ошибке шаблона."""
     users, old_clients = _promo_users()
     ids = [u["id"] for u in users]
     paid_ids = set()
@@ -226,10 +233,10 @@ def stats():
                      "total": sum(per_day.get(d, {}).values())})
 
     bad_source = sum(1 for u in users if u.get("advSourceId") != ADV_PROMO)
+    dengi = {"total_fee": total_fee, "pay_groups": pay_groups,
+             "rates": {"new": RATE_NEW, "old": RATE_OLD, "hour": RATE_HOUR}} if raschety else {}
     return {
-        "total_fee": total_fee,
-        "pay_groups": pay_groups,
-        "rates": {"new": RATE_NEW, "old": RATE_OLD, "hour": RATE_HOUR},
+        **dengi,
         "promoters": promoters,
         "untagged": _funnel(untagged, paid_ids),
         "untagged_list": [{"id": u["id"], "name": u.get("name") or "",

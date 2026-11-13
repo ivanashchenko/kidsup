@@ -1137,6 +1137,29 @@ def _time_slot(times: list[str]) -> str:
 SLOT_LABEL = {"morning": "утро (до 13:00)", "day": "день (13–17)", "evening": "вечер (17:00+)"}
 
 
+# 13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1, устаревшее на страницах меню):
+# сезонные строки «Подбора группы» писались в августе и остались на экране после своих дат —
+# в ноябре страница звала на праздник 29.08 и на Неделю открытых уроков 31.08–06.09, учила
+# говорить «стартуем 31 августа», сравнивала цену с прошлым учебным годом и держала прайс
+# летнего лагеря «до 28.08». У каждой такой строки теперь срок — последний день, когда она ещё
+# верна: сегодня позже срока — строка не рисуется. Тексты прежние, новых не добавлено.
+# «Первое занятие условно-бесплатное» срока не имеет и остаётся всегда.
+SEZON_SROKI = {
+    "letnij_klub": date(2026, 8, 28),     # прайс «Английский летний клуб — Лагерь до 28.08» (и его строка в калькуляторе)
+    "prazdnik": date(2026, 8, 29),        # «29.08 (сб) — праздник открытия сезона»
+    "starye_ceny": date(2026, 8, 30),     # «Было (25/26)», «Разница», «(было …)»: прошлогодняя цена действовала до 30.08
+    "s_0109": date(2026, 8, 31),          # пометка «с 01.09» у цены и «стартуем 31 августа»: до 01.09 это было будущее
+    "otkrytye_uroki": date(2026, 9, 6),   # «31.08–06.09 — Неделя открытых уроков», «первый день — 31.08 … 1–6 сентября»
+    "uchebnyj_god": date(2027, 5, 31),    # «Учебный год: 31 августа 2026 — 31 мая 2027», «последние занятия 25–31 мая»
+}
+LETNIJ_KLUB = "Английский летний клуб"
+
+
+def _sezon(segodnya: date) -> dict:
+    """Какие сезонные строки «Подбора группы» ещё рисовать: срок не прошёл — True."""
+    return {k: segodnya <= srok for k, srok in SEZON_SROKI.items()}
+
+
 @app.get("/enrollment", response_class=HTMLResponse, dependencies=AUTH)
 def enrollment_page(request: Request, course: str = "", day: str = "", free: int = 0,
                     age: str = "", slot: str = "", feature: str = "", q: str = "",
@@ -1254,9 +1277,14 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
         s["fill_pct"] = round(s["enrolled"] * 100 / s["capacity"]) if s["capacity"] else 0
         s["price"] = PRICES.get(s["course"])
     # цены: показываем блок целиком либо только по выбранному направлению
-    price_blocks = [{"course": c, **PRICES[c]} for c in PRICES
+    # 13.11.2026: прайс летнего лагеря «до 28.08» после срока не показываем (SEZON_SROKI) —
+    # с ним уходит и его строка в калькуляторе для родителя. Сам PRICES не трогаем: по нему
+    # считают автопилот, «Линия» и бланки.
+    sezon = _sezon(autopilot._today())
+    ceny = [c for c in PRICES if sezon["letnij_klub"] or c != LETNIJ_KLUB]
+    price_blocks = [{"course": c, **PRICES[c]} for c in ceny
                     if not course or c == course] or \
-                   [{"course": c, **PRICES[c]} for c in PRICES]
+                   [{"course": c, **PRICES[c]} for c in ceny]
     # ссылка «Записать» — шаблон настраивается: у МойКласса адрес группы
     # может отличаться от аккаунта к аккаунту (настройка moyklass_group_url)
     tpl = db.get_setting("moyklass_group_url",
@@ -1326,6 +1354,7 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
                   age=age, slots=slots_list, slot=slot,
                   features=features_list, feature=feature, q=q,
                   prices=price_blocks, pitches=pitches, waitlist=_waitlist_rows(),
+                  sezon=sezon,
                   summary=sorted(summary.values(), key=lambda x: -x["free"]))
 
 
@@ -3623,7 +3652,12 @@ def grid_page(request: Request, course: int = 0, all: int = 0):
 @app.get("/promo", response_class=HTMLResponse, dependencies=AUTH)
 def promo_page(request: Request):
     from . import promo
-    return render(request, "promo.html", active="promo", s=promo.stats())
+    # 13.11.2026, Борис (вечер 1): «Расчёты с промоутерами» (ставки, начислено, авансы, итог) —
+    # только владельцу и с пометкой, что правила 17.08 не действуют. Админам деньги не считаем
+    # и в шаблон не передаём вовсе; воронка, сбор по дням и неразмеченные карточки — как были.
+    vladelec = _rol(request) == "owner"
+    return render(request, "promo.html", active="promo", s=promo.stats(raschety=vladelec),
+                  vladelec=vladelec)
 
 
 @app.get("/promo/grafik", response_class=HTMLResponse, dependencies=AUTH)

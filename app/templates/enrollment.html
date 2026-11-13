@@ -39,12 +39,16 @@
                 background:linear-gradient(90deg,var(--brand-green),var(--brand-blue))"></div>
   </div>
 </div>
-<div class="notice"><b>Учебный год: 31 августа 2026 — 31 мая 2027.</b>
-Первый день — понедельник 31.08, в этот день стартует 21 группа; остальные —
-на своём первом дне недели, 1–6 сентября. Последние занятия 25–31 мая.
-29.08 (сб) — праздник открытия сезона · 31.08–06.09 — Неделя открытых уроков.
-Так и говорим родителю: «стартуем 31 августа».<br>
-<b>Первое занятие условно-бесплатное:</b> не понравилось — клиент не платит; понравилось —
+{#- 13.11.2026, Борис (вечер 1, устаревшее на страницах меню): сезонные строки рисуются, пока не
+    прошёл их срок (main.SEZON_SROKI): праздник 29.08, «стартуем 31 августа», Неделя открытых уроков
+    31.08–06.09, первый день групп 1–6 сентября — в ноябре их на экране нет. Тексты прежние.
+    «Первое занятие условно-бесплатное» — без срока, остаётся всегда. -#}
+<div class="notice">{% if sezon.uchebnyj_god %}<b>Учебный год: 31 августа 2026 — 31 мая 2027.</b>
+{% if sezon.otkrytye_uroki %}Первый день — понедельник 31.08, в этот день стартует 21 группа; остальные —
+на своём первом дне недели, 1–6 сентября. {% endif %}Последние занятия 25–31 мая.
+{% if sezon.prazdnik %}29.08 (сб) — праздник открытия сезона · {% endif %}{% if sezon.otkrytye_uroki %}31.08–06.09 — Неделя открытых уроков.
+{% endif %}{% if sezon.s_0109 %}Так и говорим родителю: «стартуем 31 августа».{% endif %}<br>
+{% endif %}<b>Первое занятие условно-бесплатное:</b> не понравилось — клиент не платит; понравилось —
 занятие входит в первый абонемент (абонемент оформляем датой начала = день пробного).
 Слов «бесплатное пробное» не используем.</div>
 <p class="muted">Все группы нового учебного года (префикс «2627_» в МойКласс), обновление каждые 5 минут.
@@ -125,7 +129,7 @@
     <tr>
       <th>Группа</th><th>Предмет</th><th>Возраст</th><th>Особенности</th><th>День</th><th>Время</th>
       <th class="num">Записано</th><th class="num">Мест</th><th class="num">Свободно</th>
-      <th>Заполненность</th><th class="num">Цена с 01.09</th><th class="num">Пробные</th><th class="num">+ за 7 дней</th><th>Действия</th>
+      <th>Заполненность</th><th class="num">Цена{% if sezon.s_0109 %} с 01.09{% endif %}</th><th class="num">Пробные</th><th class="num">+ за 7 дней</th><th>Действия</th>
     </tr>
     {% for g in groups %}
     <tr>
@@ -167,7 +171,7 @@
         </details>
         {% endif %}
         <button type="button" class="copy" style="margin-left:6px"
-                data-text="Записываю [ребёнка] в группу «{{ g.course }}», {{ g.day }} в {{ g.time }}{% if g.age != '—' %}, возраст {{ g.age }}{% endif %}. Адрес: б-р Маршала Рокоссовского, 6 к1В (напротив ТЦ «Янтарь»). Абонемент 8 занятий — {{ g.price_new or '—' }} ₽ с 01.09. Первое занятие условно-бесплатное: не понравится — платить не нужно, понравится — оно входит в этот абонемент. Приходите, посмотрите педагога 💛">текст клиенту</button>
+                data-text="Записываю [ребёнка] в группу «{{ g.course }}», {{ g.day }} в {{ g.time }}{% if g.age != '—' %}, возраст {{ g.age }}{% endif %}. Адрес: б-р Маршала Рокоссовского, 6 к1В (напротив ТЦ «Янтарь»). Абонемент 8 занятий — {{ g.price_new or '—' }} ₽{% if sezon.s_0109 %} с 01.09{% endif %}. Первое занятие условно-бесплатное: не понравится — платить не нужно, понравится — оно входит в этот абонемент. Приходите, посмотрите педагога 💛">текст клиенту</button>
       </td>
     </tr>
     {% endfor %}
@@ -177,19 +181,21 @@
 
 <div class="card" style="overflow-x:auto">
   <h2>Цены</h2>
-  <p class="muted" style="margin-top:0">Слева — цена прошлого учебного года со страницы kidsup.ru/price, справа — с 01.09.2026.
-  Сверено 14.08.2026.</p>
+  {#- 13.11.2026: сравнение с прошлым учебным годом («Было (25/26)», «Разница») — только пока
+      прошлогодняя цена действовала (до 30.08, main.SEZON_SROKI); после — одна колонка с ценой. -#}
+  <p class="muted" style="margin-top:0">{% if sezon.starye_ceny %}Слева — цена прошлого учебного года со страницы kidsup.ru/price, справа — с 01.09.2026.
+  {% endif %}Сверено 14.08.2026.</p>
   {% for p in prices %}
   <details {% if course %}open{% endif %} style="margin-bottom:8px">
     <summary><b>{{ p.course }}</b> <span class="muted">— {{ p.title }}</span></summary>
     <table style="margin-top:6px">
-      <tr><th>Позиция</th><th class="num">Было (25/26)</th><th class="num">Стало (с 01.09)</th><th class="num">Разница</th></tr>
+      <tr><th>Позиция</th>{% if sezon.starye_ceny %}<th class="num">Было (25/26)</th><th class="num">Стало (с 01.09)</th><th class="num">Разница</th>{% else %}<th class="num">Цена{% if sezon.s_0109 %} с 01.09{% endif %}</th>{% endif %}</tr>
       {% for line in p.lines %}
       <tr>
         <td>{{ line[0] }}</td>
-        <td class="num muted">{{ "{:,}".format(line[1]).replace(",", " ") }} ₽</td>
+        {% if sezon.starye_ceny %}<td class="num muted">{{ "{:,}".format(line[1]).replace(",", " ") }} ₽</td>{% endif %}
         <td class="num"><b>{{ "{:,}".format(line[2]).replace(",", " ") }} ₽</b></td>
-        <td class="num">{% if line[2] > line[1] %}+{{ "{:,}".format(line[2] - line[1]).replace(",", " ") }} ₽{% elif line[2] < line[1] %}−{{ "{:,}".format(line[1] - line[2]).replace(",", " ") }} ₽{% else %}—{% endif %}</td>
+        {% if sezon.starye_ceny %}<td class="num">{% if line[2] > line[1] %}+{{ "{:,}".format(line[2] - line[1]).replace(",", " ") }} ₽{% elif line[2] < line[1] %}−{{ "{:,}".format(line[1] - line[2]).replace(",", " ") }} ₽{% else %}—{% endif %}</td>{% endif %}
       </tr>
       {% endfor %}
     </table>
@@ -262,13 +268,13 @@ document.addEventListener('change', function (e) {
 <div class="card" style="overflow-x:auto">
   <h2>Сводка по предметам</h2>
   <table>
-    <tr><th>Предмет</th><th class="num">Групп</th><th class="num">Записано</th><th class="num">Всего мест</th><th class="num">Свободно</th><th class="num">Заполненность</th><th>Абонемент с 01.09</th></tr>
+    <tr><th>Предмет</th><th class="num">Групп</th><th class="num">Записано</th><th class="num">Всего мест</th><th class="num">Свободно</th><th class="num">Заполненность</th><th>Абонемент{% if sezon.s_0109 %} с 01.09{% endif %}</th></tr>
     {% for s in summary %}
     <tr>
       <td>{{ s.course }}</td><td class="num">{{ s.groups }}</td><td class="num">{{ s.enrolled }}</td>
       <td class="num">{{ s.capacity }}</td><td class="num"><b>{{ s.free }}</b></td><td class="num">{{ s.fill_pct }}%</td>
       <td>{% if s.price %}{{ "{:,}".format(s.price.lines[0][2]).replace(",", " ") }} ₽
-          <span class="muted small">(было {{ "{:,}".format(s.price.lines[0][1]).replace(",", " ") }})</span>{% else %}—{% endif %}</td>
+          {% if sezon.starye_ceny %}<span class="muted small">(было {{ "{:,}".format(s.price.lines[0][1]).replace(",", " ") }})</span>{% endif %}{% else %}—{% endif %}</td>
     </tr>
     {% endfor %}
   </table>

@@ -107,6 +107,12 @@ def _tables(conn) -> None:
         released INTEGER DEFAULT 0 -- 1 = снят человеком, можно писать снова
     )""")
     conn.execute("CREATE INDEX IF NOT EXISTS otkaz_phone ON otkazy (phone)")
+    # 13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1): у снятой записи видно, кто её
+    # снял, когда и почему. Сама запись не удаляется — released=1, как и раньше.
+    est = {r[1] for r in conn.execute("PRAGMA table_info(otkazy)")}
+    for kol in ("snyal_kto", "snyal_kogda", "snyal_prichina"):
+        if kol not in est:
+            conn.execute(f"ALTER TABLE otkazy ADD COLUMN {kol} TEXT DEFAULT ''")
 
 
 def _digits(x) -> str:
@@ -315,13 +321,87 @@ def mark_moved(phone: str, quote: str = "") -> int:
     return n
 
 
-def release(chat: str) -> bool:
-    """Снять стоп-лист — только по решению человека."""
+def release(chat: str, kto: str = "") -> bool:
+    """Снять стоп-лист — только по решению человека.
+
+    13.11.2026: старый адрес POST /api/otkazy/release?chat=… работает как работал (причину
+    не спрашивает), но теперь тоже записывает, кто и когда снял. Уже снятую запись не трогаем —
+    иначе повторный вызов затёр бы автора и причину первого снятия."""
     with db.get_conn() as conn:
         _tables(conn)
-        conn.execute("UPDATE otkazy SET released=1 WHERE chat=?",
-                     (str(chat),))
+        conn.execute("UPDATE otkazy SET released=1, snyal_kto=?, snyal_kogda=? "
+                     "WHERE chat=? AND released=0",
+                     ((kto or "").strip()[:60], datetime.now(MSK).isoformat(timespec="seconds"),
+                      str(chat)))
     return True
+
+
+PRICHINA_MIN = 3        # «ок», «.» — не причина
+
+
+def snyat(phone: str = "", id=0, prichina: str = "", kto: str = "") -> dict:
+    """Снять семью со стоп-листа кнопкой на /otkazy: причина обязательна, автор — с сервера.
+
+    13.11.2026, Борис («М, П, Т — по рекомендациям»; вечер 1). На странице не было ни одной
+    кнопки: 07.11 Лиза заметила, что семье не уходят сообщения, и решалось это не через
+    страницу. Запись не удаляется, а помечается снятой (released=1 + кто, когда, причина) и
+    перестаёт действовать там же, где действовала: is_refused() (его спрашивает предохранитель
+    wazzup.guard перед каждой отправкой — автопилот, рассылки, напоминания), проверка перед
+    рассылкой /api/prelaunch и плашка на «Линии» смотрят только неснятые записи.
+
+    phone — телефон семьи: снимаются ВСЕ её действующие записи (у семьи их бывает две: отказ с
+    телефона и отказ из чата мессенджера, связанный по имени ребёнка, — пока жива хоть одна,
+    письма не уходят). id — номер одной записи (rowid): для чатов без телефона.
+    ValueError — если причины нет или снимать нечего."""
+    prichina = " ".join(str(prichina or "").split())[:300]
+    if len(prichina) < PRICHINA_MIN:
+        raise ValueError("нужна причина: почему семье снова можно писать")
+    p = _digits(phone)[-10:] if phone else ""
+    try:
+        rid = int(id or 0)
+    except (TypeError, ValueError):
+        rid = 0
+    if phone and len(p) != 10:
+        raise ValueError("нужен телефон из 10–11 цифр")
+    if not p and not rid:
+        raise ValueError("нужен phone или id записи")
+    kogda = datetime.now(MSK).isoformat(timespec="seconds")
+    with db.get_conn() as conn:
+        _tables(conn)
+        if p:
+            gde, arg = "(phone=? OR chat=?) AND released=0", (p, p)
+        else:
+            gde, arg = "rowid=? AND released=0", (rid,)
+        n = conn.execute(f"UPDATE otkazy SET released=1, snyal_kto=?, snyal_kogda=?, snyal_prichina=? "
+                         f"WHERE {gde}", ((kto or "").strip()[:60], kogda, prichina) + arg).rowcount
+        if not n:
+            raise ValueError("действующей записи стоп-листа с таким телефоном или номером нет")
+        if not p:
+            r = conn.execute("SELECT phone FROM otkazy WHERE rowid=?", (rid,)).fetchone()
+            p = (r[0] if r else "") or ""
+    log.info("стоп-лист: снято записей %d (%s), кто: %s", n, p or f"запись {rid}", kto or "—")
+    # если у семьи осталась другая действующая запись (сняли по номеру одну из двух) — говорим прямо
+    return {"ok": True, "snyato": n, "phone": p, "kto": kto, "kogda": kogda, "prichina": prichina,
+            "eshche_dejstvuet": is_refused(p) if p else None}
+
+
+def v_stop_liste(phone: str) -> dict | None:
+    """Действующая запись стоп-листа по телефону семьи — для плашки на «Линии»; снятые не в счёт."""
+    p = _digits(phone)[-10:]
+    if len(p) != 10:
+        return None
+    try:
+        with db.get_conn() as conn:
+            _tables(conn)
+            r = conn.execute("SELECT ts, text, source FROM otkazy WHERE phone=? AND released=0 "
+                             "ORDER BY ts DESC LIMIT 1", (p,)).fetchone()
+    except Exception:
+        return None
+    if not r:
+        return None
+    ts = str(r[0] or "")
+    return {"kogda": f"{ts[8:10]}.{ts[5:7]}.{ts[:4]}" if len(ts) >= 10 else ts,
+            "prichina": str(r[1] or "")[:220], "kak": str(r[2] or "")}
 
 
 def scan(hours: int = 720, rebuild: bool = False) -> dict:
@@ -358,10 +438,13 @@ def feed() -> list[dict]:
     with db.get_conn() as conn:
         _tables(conn)
         rows = conn.execute(
-            "SELECT chat, phone, name, ts, text, source, released "
+            "SELECT chat, phone, name, ts, text, source, released, "
+            "rowid, snyal_kto, snyal_kogda, snyal_prichina "
             "FROM otkazy ORDER BY ts DESC").fetchall()
+    # 13.11.2026: к прежним ключам добавлены id записи и «кто, когда, почему снял»
     return [{"чат": r[0], "телефон": r[1], "кто": r[2], "когда": r[3],
-             "цитата": r[4], "как связали": r[5], "снят": bool(r[6])}
+             "цитата": r[4], "как связали": r[5], "снят": bool(r[6]),
+             "id": r[7], "снял": r[8] or "", "снят когда": r[9] or "", "причина снятия": r[10] or ""}
             for r in rows]
 
 
