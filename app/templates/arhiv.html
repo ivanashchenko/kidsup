@@ -43,6 +43,22 @@
 {% endfor %}
 </ul>
 
+{#- 13.11.2026, шаг 2: что уже перенесено — чтобы было видно, что ничего не пропало -#}
+{% if pereehali %}
+<h2>Уже переехали</h2>
+<p class="muted">Содержимое перенесено, старый адрес сам ведёт на новое место.</p>
+
+<ul class="arh-list">
+{% for adres, nazvanie, kuda, kuda_adres, chto, kogda in pereehali %}
+  <li>
+    <span class="t" style="font-weight:700;font-size:16px">{{ nazvanie }}</span><span class="adr">{{ adres }} · {{ kogda }}</span>
+    <p>Теперь на странице <a href="{{ kuda_adres }}">«{{ kuda }}»</a>.</p>
+    <p class="pochemu"><b>Что перенесено:</b> {{ chto }}</p>
+  </li>
+{% endfor %}
+</ul>
+{% endif %}
+
 <p class="arh-niz">Старые документы лежат не здесь, а свёрнутым блоком «Архив» внизу своих
 списков: <a href="/boris/docs#arhiv">архив документов владельца</a> ·
 <a href="/admin/docs#arhiv">архив списков администраторов</a>.</p>

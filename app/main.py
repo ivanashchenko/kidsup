@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import secrets
+import sqlite3
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -164,6 +165,65 @@ def _bez_hvosta_ssylki(path: str, query: str = "") -> str:
         p = _srezat(path)
         return (p or "/") if p != path else ""
     return ""
+
+
+# --- счётчик открытий страниц (13.11.2026) -------------------------------------------
+# Решение владельца 12.11: архивные страницы удалить совсем через 30 дней, если заходов
+# нет, — а журнала запросов у сервера нет. Считаем сами: таблица page_hits (app/db.py).
+# Почему @app.middleware, а не чистый ASGI: слой не трогает тело ответа (только код и
+# заголовки запроса), поэтому со сжатием не спорит — GZip зарегистрирован ниже и стоит
+# снаружи; а request.state у такого слоя общий с обработчиком (на этом уже держится
+# _vhod_sloy выше: роль и «кто вошёл» читаются после call_next). Зарегистрирован после
+# _public_hosts и _vhod_sloy, то есть снаружи них: видит и ответы, которые они вернули сами.
+# Что считаем: GET на служебном хосте, который открыл человек в браузере (Accept: text/html
+# и, если браузер его шлёт, Sec-Fetch-Dest: document) — фоновые запросы страниц к самим себе
+# (автообновление) и рутины по curl открытием не считаются, иначе «страницу открывают»
+# значило бы «её дёргает скрипт». Коды: 2xx и 303 (переход со старого адреса — тоже
+# открытие, это и есть основание адрес удалять); 301/307 (хвост пунктуации из чата), 401,
+# 403, 404 — нет.
+_SCHET_MIMO = ("/api", "/static", "/export", "/go", "/wazzup", "/hook", "/mango", "/events",
+               "/marquiz", "/lk", "/v", "/kadry/file")   # /lk и /v — личные ссылки семей: в адресе ключ
+_SCHET_ROLI = ("owner", "admin", "pedagog")
+_schet_log_ts = 0.0
+
+
+def _schet_chto_pisat(request, kod: int):
+    """(день, адрес, роль) для счётчика или None — если этот запрос не считаем."""
+    if request.method != "GET" or not (200 <= kod < 300 or kod == 303):
+        return None
+    if vhod.publichnyy(request):
+        return None
+    if "text/html" not in (request.headers.get("accept") or ""):
+        return None
+    if (request.headers.get("sec-fetch-dest") or "document").lower() != "document":
+        return None
+    path = request.url.path
+    if path.startswith("/favicon") or any(path == p or path.startswith(p + "/") for p in _SCHET_MIMO):
+        return None
+    # без параметров и хвостового «/»; /boris/docs/<slug> остаётся со slug. 120 знаков —
+    # чтобы длинный мусорный адрес не раздувал таблицу (404 сюда и так не доходит)
+    path = (path.rstrip("/") or "/")[:120]
+    rol = getattr(request.state, "rol", "") or "?"
+    return autopilot._today().isoformat(), path, rol if rol in _SCHET_ROLI else "?"
+
+
+@app.middleware("http")
+async def _schetchik_otkrytiy(request, call_next):
+    """13.11.2026: +1 в page_hits после ответа. Любой сбой счётчика глотается и пишется в
+    лог (не чаще раза в минуту) — страница из-за него упасть не должна. Занятая база —
+    запись пропускается без ожидания (db.page_hit, timeout=0)."""
+    resp = await call_next(request)
+    try:
+        zapis = _schet_chto_pisat(request, resp.status_code)
+        if zapis:
+            from starlette.concurrency import run_in_threadpool
+            await run_in_threadpool(db.page_hit, *zapis)
+    except Exception:  # noqa: BLE001
+        global _schet_log_ts
+        if time.time() - _schet_log_ts > 60:
+            _schet_log_ts = time.time()
+            logging.getLogger("kidsup.schetchik").exception("счётчик открытий: запись не удалась")
+    return resp
 
 
 # 17.09: сайт отдаётся uvicorn напрямую, без сжатия на прокси — главная уходила в телефон
@@ -1839,25 +1899,70 @@ DOC_GROUPS = [
 
 
 
-def _settings_ctx(request: Request, msg: str = "", ok: bool = True) -> HTMLResponse:
-    """Страница настроек: ключ МойКласс, глубина выгрузки, сырые выгрузки."""
+# 13.11.2026, шаг 2: страница /settings переехала на /owner, раздел «МойКласс» (id="mk").
+# Сохранение и проверка остались по старым адресам POST /settings и /settings/test: они
+# стоят в vhod.TOLKO_CHELOVEK (ключ выкладки их не откроет), и новый адрес эту защиту
+# потерял бы. После действия — 303 на /owner?mk=1#mk; итог лежит в sync_state (mk_itog)
+# и показывается две минуты: текст из адреса на страницу не попадает.
+MK_NAZAD = "/owner?mk=1#mk"
+
+
+def _mk_itog(msg: str, ok: bool) -> RedirectResponse:
+    db.set_state("mk_itog", json.dumps({"ts": autopilot._now().isoformat(timespec="seconds"),
+                                        "msg": msg[:300], "ok": bool(ok)}, ensure_ascii=False))
+    return RedirectResponse(MK_NAZAD, status_code=303)
+
+
+def _mk_itog_svezhiy() -> dict | None:
+    try:
+        it = json.loads(db.get_state("mk_itog") or "{}")
+        vozrast = (autopilot._now().replace(tzinfo=None)
+                   - datetime.fromisoformat(it["ts"]).replace(tzinfo=None)).total_seconds()
+        return it if -5 <= vozrast <= 120 else None
+    except Exception:  # noqa: BLE001 — нет итога или он битый: просто не показываем
+        return None
+
+
+def _mk_razdel(itog: dict | None = None) -> str:
+    """Раздел «МойКласс» на /owner: ключ (только хвост), глубина выгрузки, проверка связи,
+    счётчики локальной базы и сырые выгрузки — всё, что было на /settings."""
     key = sync.get_api_key()
-    return render(
-        request, "settings.html", active="settings",
-        counts=db.table_counts(),
-        key_from_env=bool(config.ENV_API_KEY),
-        masked_key=(key[:4] + "…" + key[-4:]) if len(key) > 10 else ("задан" if key else ""),
-        history_months=db.get_setting("history_months", str(config.DEFAULT_HISTORY_MONTHS)),
-        msg=msg, ok=ok,
-    )
+    maska = (f"задан, …{key[-4:]} ({len(key)} симв.)" if len(key) > 10 else ("задан" if key else "— не задан —"))
+    counts = db.table_counts()
+    stroki = "".join(f"<tr><td>{html.escape(t)}</td><td style='text-align:right'>{n}</td></tr>"
+                     for t, n in counts.items())
+    vygruzki = " · ".join(f"<a href='/export/raw/{html.escape(t)}.json'>{html.escape(t)}.json</a>"
+                          for t, n in counts.items() if n) or "появятся после первой синхронизации"
+    env = ("<p class='note'>Ключ задан переменной окружения <code>MOYKLASS_API_KEY</code> — она главнее "
+           "того, что сохранено здесь.</p>") if config.ENV_API_KEY else ""
+    soob = ""
+    if itog:
+        cvet = "" if itog.get("ok") else " style='background:#fdecea;border-left-color:#c0392b'"
+        soob = f"<div class='msg' id='mk-itog'{cvet}>{html.escape(itog.get('msg') or '')}</div>"
+    mes = html.escape(db.get_setting("history_months", str(config.DEFAULT_HISTORY_MONTHS)))
+    return f"""<h2 id='mk' style='color:#312783;font-size:20px;scroll-margin-top:70px'>МойКласс: ключ и выгрузка</h2>
+{soob}{env}
+<form method='post' action='/settings'>
+<label><span>API-ключ МойКласса</span><small>сейчас: {html.escape(maska)} · создаётся в CRM: Настройки → API
+(<a href='https://app.moyklass.com/settings/settings/api' target='_blank' rel='noopener'>открыть</a>)</small>
+<input type='password' name='api_key' placeholder='вставьте новый ключ, чтобы заменить' autocomplete='new-password'></label>
+<label><span>Глубина выгрузки истории, месяцев</span>
+<input type='number' name='history_months' value='{mes}' min='1' max='120' inputmode='numeric'></label>
+<button type='submit'>Сохранить ключ и глубину</button></form>
+<form method='post' action='/settings/test' style='margin:10px 0'>
+<button type='submit' style='background:#fff;color:#312783;border:1px solid #312783'>Проверить подключение</button></form>
+<details style='margin:10px 0 22px'><summary style='cursor:pointer;color:#312783'>Данные в локальной базе и сырые выгрузки</summary>
+<table style='border-collapse:collapse;margin:8px 0;font-size:14.5px'><tr><th style='text-align:left'>Таблица</th><th>Записей</th></tr>{stroki}</table>
+<p class='note' style='overflow-wrap:anywhere'>Сырые данные (JSON): {vygruzki}</p></details>"""
 
 
-@app.get("/settings", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+@app.get("/settings", dependencies=OWNER_AUTH)
 def settings_page(request: Request):
-    return _settings_ctx(request)
+    """13.11.2026: страница переехала — /owner, раздел «МойКласс»."""
+    return RedirectResponse("/owner#mk", status_code=303)
 
 
-@app.post("/settings", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+@app.post("/settings", dependencies=OWNER_AUTH)
 def settings_save(request: Request, api_key: str = Form(""),
                   history_months: str = Form("")):
     saved = []
@@ -1868,21 +1973,21 @@ def settings_save(request: Request, api_key: str = Form(""),
         db.set_setting("history_months", history_months.strip())
         saved.append("глубина выгрузки")
     msg = ("Сохранено: " + ", ".join(saved)) if saved else "Нечего сохранять."
-    return _settings_ctx(request, msg, bool(saved))
+    return _mk_itog(msg, bool(saved))
 
 
-@app.post("/settings/test", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+@app.post("/settings/test", dependencies=OWNER_AUTH)
 def settings_test(request: Request):
     """Пробный запрос к МойКласс — сразу видно, живой ключ или нет."""
     if not sync.get_api_key():
-        return _settings_ctx(request, "API-ключ не задан.", False)
+        return _mk_itog("API-ключ не задан.", False)
     try:
         mk = autopilot._client()
         data = mk.get("/v1/company/managers")
         n = len(data.get("managers") if isinstance(data, dict) else data or [])
-        return _settings_ctx(request, f"Связь есть: МойКласс отдал {n} сотрудников.", True)
+        return _mk_itog(f"Связь есть: МойКласс отдал {n} сотрудников.", True)
     except Exception as e:                                    # noqa: BLE001
-        return _settings_ctx(request, f"Не получилось: {e}", False)
+        return _mk_itog(f"Не получилось: {e}", False)
 
 
 OWNER_FIELDS = [
@@ -1909,7 +2014,8 @@ OWNER_FIELDS = [
 ]
 
 
-def _owner_ctx(request: Request = None, msg: str = "", vhody: dict | None = None) -> str:
+def _owner_ctx(request: Request = None, msg: str = "", vhody: dict | None = None,
+               mk: dict | None = None) -> str:
     """Страница владельца. 12.11.2026: вверху блок «Входы» (vhod.blok_vladelca) — пароли
     админов, ключи Клода, отключение старых входов. Виден только владельцу, вошедшему через
     форму; пришедшему через серое окно — ссылка «войти через форму». vhody — итог действия
@@ -1929,9 +2035,10 @@ label span{{display:block;font-weight:600}}label small{{display:block;color:#6c6
 button{{background:#7DB928;color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:16px;font-weight:700;cursor:pointer}}.msg{{background:#eef8e6;border-left:4px solid #7DB928;padding:10px 12px;border-radius:8px;margin:12px 0}}
 p.note{{color:#6c6a86;font-size:14px}}p.nav{{font-size:14.5px;margin:-6px 0 10px}}p.nav a{{color:#312783}}</style></head><body><div class='w'>
 <h1>Настройки владельца</h1>
-<p class='nav'><a href='/boris/docs'>← Мои документы</a> · <a href='/settings'>Ключ МойКласса и выгрузка</a> · <a href='/kamery/nastroyka'>Камеры</a> · <a href='/arhiv'>Архив страниц</a></p>
+<p class='nav'><a href='/boris/docs'>← Мои документы</a> · <a href='#mk'>Ключ МойКласса и выгрузка</a> · <a href='/kamery/nastroyka'>Камеры</a> · <a href='/arhiv'>Архив страниц</a></p>
 <p class='note'>Эта страница и всё, что на ней, закрыто отдельным паролем владельца — общий пароль admin сюда не подходит. Значения хранятся как секреты и в ответах сервера не показываются. Пустое поле — оставить как есть.</p>
 {blok}
+{_mk_razdel(mk)}
 <h2 style='color:#312783;font-size:20px'>Ключи банка, кассы и сервисов</h2>
 {('<div class="msg">' + html.escape(msg) + '</div>') if msg else ''}
 <form method='post'>{''.join(rows)}<button type='submit'>Сохранить</button></form>
@@ -1939,9 +2046,10 @@ p.note{{color:#6c6a86;font-size:14px}}p.nav{{font-size:14.5px;margin:-6px 0 10px
 
 
 @app.get("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
-def owner_page(request: Request):
-    """Форма владельца для ключей банка, кассы и МойКласса (09.09.2026)."""
-    return HTMLResponse(_s_shapkoy(request, _owner_ctx(request)))
+def owner_page(request: Request, mk: str = ""):
+    """Форма владельца для ключей банка, кассы и МойКласса (09.09.2026).
+    13.11.2026: ?mk=1 — после сохранения ключа МойКласса или проверки связи: показать итог."""
+    return HTMLResponse(_s_shapkoy(request, _owner_ctx(request, mk=_mk_itog_svezhiy() if mk else None)))
 
 
 @app.post("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -1996,7 +2104,8 @@ def arhiv_page(request: Request):
     разовых кампаний из меню и с рабочих страниц убраны, но не удалены: здесь на каждую
     есть ссылка и строка, что это и почему в архиве. Ниже — страницы, которые переезжают
     на другие и пока открываются по адресу. Списки — в app/nav.py."""
-    return render(request, "arhiv.html", active="arhiv", arhiv=nav.ARHIV, pereezd=nav.PEREEZD)
+    return render(request, "arhiv.html", active="arhiv", arhiv=nav.ARHIV, pereezd=nav.PEREEZD,
+                  pereehali=nav.PEREEHALI)
 
 
 @app.get("/base", response_class=HTMLResponse, dependencies=AUTH)
@@ -2189,59 +2298,64 @@ def journal_page(request: Request, day: str = ""):
     for r in rows:
         p = per.setdefault(r["who"], {"запись в группу": 0, "оплата": 0, "комментарий": 0})
         p[r["kind"]] = p.get(r["kind"], 0) + 1
-    return render(request, "journal.html", active="journal", rows=rows, per=per, day=d)
+    # 13.11.2026: счётчики со страницы /metrics и «какие страницы открывают». Сбой любого
+    # из блоков журнал не роняет — блок просто не рисуется.
+    try:
+        schet = _schetchiki(d)
+    except Exception:  # noqa: BLE001
+        logging.getLogger("kidsup.journal").exception("счётчики дня")
+        schet = None
+    try:
+        otkr = _otkrytiya() if _rol(request) == "owner" else None
+    except Exception:  # noqa: BLE001
+        logging.getLogger("kidsup.journal").exception("счётчик открытий: показ")
+        otkr = None
+    return render(request, "journal.html", active="journal", rows=rows, per=per, day=d,
+                  schet=schet, otkr=otkr, segodnya=autopilot._today().isoformat())
 
 
-@app.get("/metrics", response_class=HTMLResponse, dependencies=AUTH)
-def metrics_page(request: Request):
-    """Не «сколько задач», а что они дают: скорость первого касания,
-    доля закрытых в тот же день, конверсия задачи в запись."""
-    from . import sla
-    try:
-        load = sla.load_caps()
-    except Exception as e:
-        load = {"error": f"{type(e).__name__}: {e}", "load": {}, "over": {}}
-    # «нагрузка смены» — только про админов; задачи Бориса/Маши (владелец,
-    # маркетинг) — не смена, потолки к ним не относятся
-    ADMINS_ONLY = {202856: "Лена", 232805: "Аня", 232763: "Ира", 154181: "Лиза"}
-    load["load"] = {m: (load.get("load") or {}).get(m, {"calls": 0, "chats": 0, "other": 0})
-                    for m in ADMINS_ONLY}
-    names = {a["managerId"]: a["name"] for a in autopilot._admins()}
-    for mid, nm in ADMINS_ONLY.items():
-        names.setdefault(mid, nm)
-    try:
-        alert = json.loads(db.get_setting("sla_last_alert") or "{}")
-    except ValueError:
-        alert = {}
-    # реальные звонки за день — напрямую из Mango (чужой центр уже отфильтрован)
-    try:
-        from . import mango
-        _now = autopilot._now()
-        mrows = mango.calls(_now.replace(hour=0, minute=0, second=0, microsecond=0), _now)
-        calls = {"in": len({r["from_num"][-10:] for r in mrows if not r["from_ext"]}),
-                 "out": len({r["to_num"][-10:] for r in mrows if r["from_ext"]}),
-                 "talked": len({(r["to_num"] if r["from_ext"] else r["from_num"])[-10:]
-                                for r in mrows if r["answer"]})}
-    except Exception:
-        calls = {}
+def _schetchiki(d: str) -> dict:
+    """Счётчики, переехавшие со страницы /metrics (13.11.2026): звонки и сообщения за день d,
+    записи в группы по админам за 7 дней. Звонки — из локальной таблицы mango_calls (её
+    пишет вебхук АТС и ночная догрузка), а не запросом в Mango, как было на /metrics:
+    журнал открывается без похода в сеть. Сроки (SLA) и «нагрузка» не перенесены.
+    Нет таблицы (пустая база) — нули, журнал из-за счётчиков не падает."""
+    calls = {"in": 0, "out": 0, "talked": 0}
+    msgs = 0
+    rec: dict[int, dict] = {}
+    # в зачёте только тройка набора: Лена, Аня, Ира. Лиза — операционка,
+    # её записи (лагерь, переоформления) в соревнование не входят
+    MGR_NAMES = {202856: "Лена", 232805: "Аня", 232763: "Ира"}
+    IRA_SINCE = "2026-08-18"  # аккаунт Ирины Головиной передан новой Ире 18.08
+    today = autopilot._today().isoformat()
+    yest = (autopilot._today() - timedelta(days=1)).isoformat()
+    week_ago = (autopilot._today() - timedelta(days=6)).isoformat()
     with db.get_conn() as conn:
-        today = autopilot._today().isoformat()
-        msgs = conn.execute(
-            "SELECT COUNT(*) FROM wazzup_outbox WHERE ts >= ?", (today,)).fetchone()[0]
+        try:
+            vh, ish, razg = set(), set(), set()
+            for phone, napr, state in conn.execute(
+                    "SELECT phone, direction, state FROM mango_calls WHERE substr(ts,1,10)=?", (d,)):
+                p = (phone or "")[-10:]
+                if not p:
+                    continue
+                (ish if napr == "out" else vh).add(p)
+                if state in ("talked", "connected"):
+                    razg.add(p)
+            calls = {"in": len(vh), "out": len(ish), "talked": len(razg)}
+        except sqlite3.OperationalError:
+            pass
+        try:
+            msgs = conn.execute(
+                "SELECT COUNT(*) FROM wazzup_outbox WHERE substr(ts,1,10)=?", (d,)).fetchone()[0]
+        except sqlite3.OperationalError:
+            pass
         # главный счёт недели: записи в группы по админам (создатель заявки).
         # joins обновляются лёгким синком каждые 5 минут
-        yest = (autopilot._today() - timedelta(days=1)).isoformat()
-        week_ago = (autopilot._today() - timedelta(days=6)).isoformat()
-        # в зачёте только тройка набора: Лена, Аня, Ира. Лиза — операционка,
-        # её записи (лагерь, переоформления) в соревнование не входят
-        MGR_NAMES = {202856: "Лена", 232805: "Аня", 232763: "Ира"}
-        rec: dict[int, dict] = {}
-        IRA_SINCE = "2026-08-18"  # аккаунт Ирины Головиной передан новой Ире 18.08
         for (raw,) in conn.execute(
                 "SELECT raw FROM joins WHERE created_at >= ?", (week_ago,)):
             try:
                 j = json.loads(raw)
-            except ValueError:
+            except (ValueError, TypeError):
                 continue
             mid = j.get("managerId")
             if mid not in MGR_NAMES or j.get("autoJoin"):
@@ -2255,14 +2369,40 @@ def metrics_page(request: Request):
                 r["today"] += 1
             elif day == yest:
                 r["yest"] += 1
-    records = sorted(
-        ({"name": MGR_NAMES[m], **v}
-         for m, v in rec.items()),
-        key=lambda x: (-x["today"], -x["week"]))
-    return render(request, "metrics.html", active="metrics", load=load,
-                  names=names, alert=alert, calls=calls, msgs=msgs, records=records,
-                  sla=[(sla.CAT_NAME[k], v) for k, v in sla.SLA_MINUTES.items()],
-                  caps={"calls": sla.CAP_CALLS, "chats": sla.CAP_CHATS})
+    records = sorted(({"name": MGR_NAMES[m], **v} for m, v in rec.items()),
+                     key=lambda x: (-x["today"], -x["week"]))
+    return {"calls": calls, "msgs": msgs, "records": records}
+
+
+def _otkrytiya(dney: int = 30) -> dict:
+    """Блок «Какие страницы открывают» для /journal (только владельцу): строки по убыванию
+    и адреса меню и архива, которые за срок не открыли ни разу. Адрес с параметром
+    («Мои дела» — /pult?who=Борис) сверяется по пути: счётчик параметры не хранит."""
+    s_dnya = (autopilot._today() - timedelta(days=dney - 1)).isoformat()
+    svod, pervyy = db.page_hits_svod(s_dnya)
+    stroki = sorted(({"path": p, "vsego": sum(r.values()), "admin": r.get("admin", 0),
+                      "owner": r.get("owner", 0), "pedagog": r.get("pedagog", 0)} for p, r in svod.items()),
+                    key=lambda x: (-x["vsego"], x["path"]))
+    spisok = ([(imya, adres) for _, punkty in nav.ADMIN for imya, adres in punkty]
+              + list(nav.OWNER[1]) + [(nazv, adres) for adres, nazv, *_ in nav.ARHIV])
+    ne, bylo = [], set()
+    for imya, adres in spisok:
+        put = adres.split("?")[0].rstrip("/") or "/"
+        if put in svod or put in bylo:
+            continue
+        bylo.add(put)
+        ne.append({"imya": imya, "adres": put})
+    return {"stroki": stroki, "ne_otkryvali": ne, "dney": dney,
+            "pervyy": pervyy, "nepolnyy": bool(pervyy) and pervyy > s_dnya or not pervyy}
+
+
+@app.get("/metrics", dependencies=AUTH)
+def metrics_page(request: Request):
+    """13.11.2026, шаг 2: страница «Дисциплина» переехала в «Журнал» (раздел «Счётчики»);
+    сроки (SLA) и «нагрузка» выброшены — ими не пользовались. «Журнал» — страница
+    владельца, админа с него уводят на пульт (_vladelcu), поэтому админа ведём на пульт
+    сразу, одним переходом, а не цепочкой /metrics → /journal → /pult."""
+    return _vladelcu(request) or RedirectResponse("/journal#schetchiki", status_code=303)
 
 
 @app.post("/waitlist/add", dependencies=AUTH)

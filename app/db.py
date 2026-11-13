@@ -169,6 +169,12 @@ CREATE INDEX IF NOT EXISTS idx_lessons_date ON lessons(date);
 CREATE INDEX IF NOT EXISTS idx_lesson_records_lesson ON lesson_records(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_lesson_records_user ON lesson_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user ON user_subscriptions(user_id);
+
+-- 13.11.2026: счётчик открытий страниц (см. page_hit ниже). Одна строка на день, адрес и роль.
+CREATE TABLE IF NOT EXISTS page_hits (
+    day TEXT, path TEXT, rol TEXT, n INTEGER,
+    PRIMARY KEY (day, path, rol)
+);
 """
 
 
@@ -555,3 +561,51 @@ def table_counts() -> dict:
         for t in tables:
             out[t] = conn.execute(f"SELECT COUNT(*) c FROM {t}").fetchone()["c"]
     return out
+
+
+# --- счётчик открытий страниц ----------------------------------------------
+# 13.11.2026, решение владельца от 12.11: «архивные страницы удалить совсем через 30 дней,
+# если заходов нет» — для этого нужно знать, какие страницы открывают. Сервер не ведёт
+# журнала запросов, поэтому считаем сами: одна строка на (день, адрес, роль).
+
+_PAGE_HITS_SQL = ("CREATE TABLE IF NOT EXISTS page_hits (day TEXT, path TEXT, rol TEXT, n INTEGER, "
+                  "PRIMARY KEY (day, path, rol))")
+_page_hits_est = False
+
+
+def page_hit(day: str, path: str, rol: str) -> bool:
+    """+1 к счётчику открытий. Одна короткая транзакция. timeout=0: если база занята
+    (синхронизация пишет большую пачку) — запись пропускаем и возвращаем False, а не держим
+    страницу: счётчик — справка, а не учёт. Прочие ошибки уходят наверх, их глотает
+    вызывающий (main._schetchik_otkrytiy)."""
+    global _page_hits_est
+    conn = sqlite3.connect(config.DB_PATH, timeout=0)
+    try:
+        if not _page_hits_est:
+            conn.execute(_PAGE_HITS_SQL)
+        conn.execute(
+            "INSERT INTO page_hits (day, path, rol, n) VALUES (?,?,?,1) "
+            "ON CONFLICT(day, path, rol) DO UPDATE SET n = n + 1", (day, path, rol))
+        conn.commit()
+        _page_hits_est = True
+        return True
+    except sqlite3.OperationalError as e:
+        if "locked" in str(e) or "busy" in str(e):
+            return False
+        _page_hits_est = False      # таблицу могли удалить или испортить — в следующий раз создадим
+        raise
+    finally:
+        conn.close()
+
+
+def page_hits_svod(s_dnya: str) -> tuple[dict, str]:
+    """Открытия с дня s_dnya: ({адрес: {роль: сколько}}, первый день, за который есть записи
+    вообще — чтобы «ни разу за 30 дней» не читали как правду на второй день работы счётчика)."""
+    svod: dict = {}
+    with get_conn() as conn:
+        conn.execute(_PAGE_HITS_SQL)
+        for path, rol, n in conn.execute(
+                "SELECT path, rol, SUM(n) FROM page_hits WHERE day >= ? GROUP BY path, rol", (s_dnya,)):
+            svod.setdefault(path, {})[rol] = int(n or 0)
+        pervyy = conn.execute("SELECT MIN(day) FROM page_hits").fetchone()[0] or ""
+    return svod, pervyy

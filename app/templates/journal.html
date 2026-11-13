@@ -26,6 +26,63 @@ API нет, но у записи, платежа и комментария ав�
   </tbody>
 </table>
 
+{#- 13.11.2026, шаг 2: счётчики со страницы /metrics («Дисциплина»). Сроки (SLA) и «нагрузка»
+    не перенесены. Таблицы в обёртке с прокруткой — на телефоне страница вбок не едет. -#}
+{% if schet %}
+<h2 id="schetchiki" style="scroll-margin-top:70px">Счётчики</h2>
+<h3>Звонки и сообщения за {{ day }}</h3>
+<div style="overflow-x:auto"><table class="data">
+  <tbody>
+    <tr><td>Входящих звонков (уникальных номеров)</td><td><b>{{ schet.calls['in'] }}</b></td></tr>
+    <tr><td>Исходящих звонков (уникальных номеров)</td><td><b>{{ schet.calls['out'] }}</b></td></tr>
+    <tr><td>Состоялось разговоров (уникальных номеров)</td><td><b>{{ schet.calls['talked'] }}</b></td></tr>
+    <tr><td>Отправлено сообщений</td><td><b>{{ schet.msgs }}</b></td></tr>
+  </tbody>
+</table></div>
+<p class="muted small">Звонки — из журнала АТС на сервере (его пишет Mango при каждом звонке),
+сообщения — отправленные через Wazzup.</p>
+
+<h3>Записи в группы по админам — 7 дней до {{ segodnya }}</h3>
+{% if schet.records %}
+<div style="overflow-x:auto"><table class="data">
+  <thead><tr><th>Админ</th><th>Сегодня</th><th>Вчера</th><th>За 7 дней</th></tr></thead>
+  <tbody>
+  {% for r in schet.records %}
+    <tr><td>{{ r.name }}</td><td>{{ r.today }}</td><td>{{ r.yest }}</td><td>{{ r.week }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}
+<div class="notice">Записей за неделю пока нет.</div>
+{% endif %}
+<p class="muted small">Считаются записи, созданные админом в МойКлассе (автозаписи — нет).
+Ире — с 18.08, дня передачи ей аккаунта.</p>
+{% endif %}
+
+{#- 13.11.2026: счётчик открытий страниц (таблица page_hits) — только владельцу. По нему
+    решаем, какие архивные страницы удалить совсем. -#}
+{% if rol == 'owner' and otkr %}
+<h2 id="otkrytiya" style="scroll-margin-top:70px">Какие страницы открывают — {{ otkr.dney }} дней</h2>
+<p class="muted small">Считается открытие страницы человеком в браузере (переход со старого адреса — тоже).
+Запросы рутин и фоновые обновления не считаются.
+{% if otkr.pervyy %}Счётчик работает с {{ otkr.pervyy }}{% if otkr.nepolnyy %} — это меньше {{ otkr.dney }} дней,
+«не открывали» пока значит «не открывали с этого дня»{% endif %}.{% else %}Записей пока нет: счётчик только включён.{% endif %}</p>
+{% if otkr.stroki %}
+<div style="overflow-x:auto"><table class="data">
+  <thead><tr><th>Адрес</th><th>Всего</th><th>Админы</th><th>Владелец</th><th>Педагоги</th></tr></thead>
+  <tbody>
+  {% for r in otkr.stroki %}
+    <tr><td style="overflow-wrap:anywhere">{{ r.path }}</td><td><b>{{ r.vsego }}</b></td>
+        <td>{{ r.admin }}</td><td>{{ r.owner }}</td><td>{{ r.pedagog }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+<p class="muted small">«Всего» может быть больше суммы по ролям: туда входят открытия без входа (страница входа).</p>
+{% endif %}
+<p id="ne-otkryvali"><b>Не открывали ни разу</b> (из меню и архива):
+{% for x in otkr.ne_otkryvali %}{{ x.imya }} <span class="muted small">{{ x.adres }}</span>{% if not loop.last %} · {% endif %}{% else %}таких нет{% endfor %}.</p>
+{% endif %}
+
 <h2>Подробно</h2>
 <table class="data">
   <thead><tr><th>Время</th><th>Кто</th><th>Что</th><th>Клиент</th><th>Детали</th></tr></thead>
