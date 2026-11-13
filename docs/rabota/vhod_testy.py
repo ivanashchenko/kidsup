@@ -2087,7 +2087,8 @@ def test_prava_v_den_vykladki():
              "kto-polosa" not in t and "Вы под общим входом" not in t and "ваша колонка" not in t
              and "сейчас в системе" not in t)
     t = c.get("/leads", auth=OBSHCHIY, headers=STR).text
-    proverka("страница с общей шапкой под общим admin: полосы нет", "kto-polosa" not in t and "<header" in t)
+    # 13.11.2026, шаг 2: шапка теперь <div id="kidsup-nav"> из app/nav.py (не <header>) — ожидание поправлено
+    proverka("страница с общей шапкой под общим admin: полосы нет", "kto-polosa" not in t and 'id="kidsup-nav"' in t)
     proverka("/obeshchaniya под общим входом ведёт в колонку Лизы, как раньше; who из адреса остаётся",
              unquote(c.get("/obeshchaniya", auth=OBSHCHIY).headers["location"]) == "/pult?who=Лиза"
              and unquote(c.get("/obeshchaniya?who=Ира&day=2026-11-10", auth=OBSHCHIY).headers["location"])
@@ -2289,7 +2290,7 @@ def test_kto_voshel():
              and "href='/vhod?next=/pult'" in t and "ваша колонка" not in t, t[t.find("kto-polosa"):][:200] if "kto-polosa" in t else "нет")
     t = lena.get("/leads", headers=STR).text
     proverka("общая шапка (base.html): «Вы: Лена», кнопка выхода — над меню",
-             "Вы: <b style='color:#7DB928'>Лена</b>" in t and "action='/vyhod'" in t and t.index("kto-polosa") < t.index("<header"))
+             "Вы: <b style='color:#7DB928'>Лена</b>" in t and "action='/vyhod'" in t and t.index('id="kidsup-nav"') < t.index("kto-polosa") < t.index('id="nav-razdely"'))   # 13.11: полоска — внутри новой шапки, над меню
     t = kl().get("/leads", auth=OBSHCHIY, headers=STR).text
     proverka("…под общим входом — жёлтая полоса", "Вы под общим входом" in t and "kto-polosa obshchiy" in t)
     r = vyyti_s_next(lena, "/pult")
