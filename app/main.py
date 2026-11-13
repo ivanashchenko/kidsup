@@ -204,7 +204,11 @@ def _schet_chto_pisat(request, kod: int):
     # чтобы длинный мусорный адрес не раздувал таблицу (404 сюда и так не доходит)
     path = (path.rstrip("/") or "/")[:120]
     rol = getattr(request.state, "rol", "") or "?"
-    return autopilot._today().isoformat(), path, rol if rol in _SCHET_ROLI else "?"
+    if rol not in _SCHET_ROLI:
+        if kod == 303:
+            return None      # переход без входа (на страницу входа) — не открытие
+        rol = "?"
+    return autopilot._today().isoformat(), path, rol
 
 
 @app.middleware("http")
