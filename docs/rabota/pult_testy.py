@@ -679,12 +679,87 @@ def test_hvost_glavnoe():
         db.set_setting("pult_hvost_glavnoe", "")
 
 
+def test_kolonka_borisa_1311():
+    # 13.11.2026, сверка безопасности: колонку «Борис» (решения владельца, контроль админов)
+    # видел любой админ. Теперь её рисует только rol == "owner".
+    print("Колонка «Борис» — только владельцу (rol == 'owner')")
+    import types
+    from app import pult, zayavki, mesta
+    TAJNA = "Контроль: Лена не перезвонила Стендовым"
+    st = (pult.duty, pult.kpi, pult.tasks, pult._col, pult._shapka_vhoda, pult._pervye_blok,
+          pult._bez_yavki_blok, pult._nikogda_ne_zvonili, zayavki.block, mesta.block,
+          sys.modules.get("app.main"))
+    bez_spisok = []
+    try:
+        _baza_1211().close()
+        from app import db
+        with db.get_conn() as conn:
+            pult._init(conn)
+            conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source, done) "
+                         "VALUES ('2026-11-13', '2026-11-13 10:00:00', 'Борис', ?, '', 'контроль', 0)", (TAJNA,))
+        pult.duty = lambda day: ["Лена", "Ира"]
+        pult.kpi = lambda day: {k: 0 for k in ("pays", "pays_sum", "joins_new", "firsts", "kids", "lessons",
+                                               "inbox_done", "tasks_done", "inbox", "tasks", "y_kids",
+                                               "y_visits", "visits")}
+        pult.tasks = lambda day: {"Борис": [{"id": 1, "t": "", "text": TAJNA, "done": 0}],
+                                  "Лена": [{"id": 2, "t": "", "text": "Дело Лены", "done": 0}]}
+        pult._col = lambda who, items, onduty, day="", now_hm="", svoya=False: (
+            f"<div class='wcard'>КОЛОНКА[{who}]" + "".join(i["text"] for i in items)
+            + (TAJNA if who == "Борис" else "") + "</div>")
+        pult._shapka_vhoda = lambda kto, day, who, on: ("", "", (kto or {}).get("imya", ""))
+        pult._pervye_blok = pult._bez_yavki_blok = lambda: ""
+        pult._nikogda_ne_zvonili = lambda day: ""
+        zayavki.block = mesta.block = lambda: ""
+        zaglushka = types.ModuleType("app.main")
+        zaglushka.APP_VERSION = "стенд"
+
+        def _inbox_block(day, bez=()):
+            bez_spisok.append(tuple(bez))
+            return "" if "Борис" in bez else f"<li>{TAJNA}</li>"
+        zaglushka._inbox_block = _inbox_block
+        sys.modules["app.main"] = zaglushka
+
+        def kolonki(h):
+            import re
+            return re.findall(r"КОЛОНКА\[(.*?)\]", h)
+
+        vl = pult.page("2026-11-13", "", rol="owner")
+        proverka("владелец: колонка «Борис» есть, пункты видны",
+                 ("Борис" in kolonki(vl), TAJNA in vl, "who=Борис" in vl), (True, True, True))
+        proverka("владелец: ?who=Борис — одна его колонка",
+                 kolonki(pult.page("2026-11-13", "Борис", rol="owner")), ["Борис"])
+        ad = pult.page("2026-11-13", "", rol="admin")
+        proverka("админ: колонки «Борис» нет, остальные на месте", kolonki(ad), ["Лена", "Ира", "Лиза"])
+        proverka("админ: текста пунктов Бориса в HTML нет", TAJNA in ad, False)
+        proverka("админ: ссылки «Борис» в шапке нет, «Лиза» есть", ("who=Борис" in ad, "who=Лиза" in ad), (False, True))
+        proverka("админ: «плюс Лиза и Борис» не написано", "плюс Лиза и Борис" in ad, False)
+        proverka("админ: общий список обещаний зовётся без пунктов Бориса", bez_spisok[-1], ("Борис",))
+        lena = {"imya": "Лена", "sposob": "forma"}
+        h = pult.page("2026-11-13", "Борис", rol="admin", kto=lena)
+        proverka("админ Лена, ?who=Борис — её собственная колонка, без Бориса", (kolonki(h), TAJNA in h), (["Лена"], False))
+        h = pult.page("2026-11-13", "Борис", rol="admin", kto={})
+        proverka("общий вход, ?who=Борис — обычный пульт без Бориса", (kolonki(h), TAJNA in h), (["Лена", "Ира", "Лиза"], False))
+        h = pult.page("2026-11-13", "Лиза", rol="admin", kto=lena)
+        proverka("админ: ?who=Лиза работает как раньше", kolonki(h), ["Лиза"])
+        h = pult.page("2026-11-13", "", rol="admin", kto={"imya": "Борис", "sposob": "forma"})
+        proverka("имя «Борис» без роли владельца колонку не открывает", ("Борис" in kolonki(h), TAJNA in h), (False, False))
+        h = pult.page("2026-11-13", "", rol="pedagog")
+        proverka("любая роль, кроме владельца, — без колонки", ("Борис" in kolonki(h), TAJNA in h), (False, False))
+    finally:
+        (pult.duty, pult.kpi, pult.tasks, pult._col, pult._shapka_vhoda, pult._pervye_blok,
+         pult._bez_yavki_blok, pult._nikogda_ne_zvonili, zayavki.block, mesta.block) = st[:10]
+        if st[10] is None:
+            sys.modules.pop("app.main", None)
+        else:
+            sys.modules["app.main"] = st[10]
+
+
 def main():
     for t in (test_dedup, test_polite, test_proverka_pulta, test_ves, test_bloki, test_audit,
               test_data_gruppy, test_povtor,
               test_zayavki_odin_punkt, test_utro, test_boris_desyat,
               test_vozvrat_1211, test_utro_1211, test_naryad_1211, test_audit_1211, test_zayavki_blok_1211,
-              test_hvost_glavnoe):
+              test_hvost_glavnoe, test_kolonka_borisa_1311):
         t()
         print()
     if oshibok:

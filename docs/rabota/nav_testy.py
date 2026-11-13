@@ -1697,6 +1697,226 @@ def _lovushki_na_vse():
     lt._postavit_lovushki()
 
 
+# --- И. 13.11.2026: четыре правки безопасности и надёжности (сверка 13.11) -----------------
+
+class _BezPerezapuska:
+    """Выкладка на стенде: служба не перезапускается, а попытки считаются."""
+
+    def __enter__(self):
+        import subprocess
+        import threading
+        self.bylo = (threading.Timer, subprocess.Popen)
+        self.zvali = []
+
+        class _Timer:
+            def __init__(s_, *a, **k):
+                pass
+
+            def start(s_):
+                self.zvali.append("timer")
+        threading.Timer = _Timer
+        nastoyashchij = subprocess.Popen
+
+        def _popen(args, *a, **k):
+            # проверка импорта идёт настоящим отдельным процессом (subprocess.run внутри зовёт
+            # Popen) — её пропускаем; systemctl на стенде не запускаем никогда
+            if "systemctl" in str(args):
+                self.zvali.append("systemctl")
+                raise RuntimeError("стенд: systemctl не запускаем")
+            return nastoyashchij(args, *a, **k)
+        subprocess.Popen = _popen
+        return self
+
+    def __exit__(self, *a):
+        import subprocess
+        import threading
+        threading.Timer, subprocess.Popen = self.bylo
+
+
+def _arhiv_koda(fajly: dict) -> bytes:
+    """tar.gz для /api/deploy: {путь: содержимое}; добивка случайным файлом до 1000+ байт."""
+    import io
+    import secrets
+    import tarfile
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as t:
+        for imya, data in {**fajly, "docs/_stend_dobivka.bin": secrets.token_bytes(1500)}.items():
+            data = data.encode("utf-8") if isinstance(data, str) else data
+            ti = tarfile.TarInfo(imya)
+            ti.size = len(data)
+            t.addfile(ti, io.BytesIO(data))
+    return buf.getvalue()
+
+
+def test_pravki_1311(c, m, tree, baza):
+    import datetime as dt
+    import shutil
+    from pathlib import Path
+
+    print("И1. /api/net (правила файрвола, домены Caddy) — только владельцу")
+    proverka("/api/net без входа → 401", c.get("/api/net").status_code == 401)
+    proverka("/api/net: админ → 401/403", c.get("/api/net", auth=ADMIN).status_code in (401, 403))
+    r = c.get("/api/net", auth=VLADELEC)
+    proverka("/api/net: владелец → 200, ответ прежний", r.status_code == 200 and r.json().get("ok") is True
+             and "firewall" in r.json(), r.status_code)
+    proverka("/api/health без входа по-прежнему 200 (проверка «сервер жив» не закрыта)",
+             c.get("/api/health").status_code == 200)
+
+    print("И2. Неопределённые имена и суточный кэш контактов Wazzup")
+    imena = [f"{r_.path}:{r_.endpoint.__name__}" for r_ in m.app.routes
+             if getattr(r_, "path", "").startswith("/api/broadcast/requeue")]
+    proverka("два адреса requeue — два разных имени функций, адреса прежние",
+             sorted(imena) == ["/api/broadcast/requeue-undelivered:api_broadcast_requeue_undelivered",
+                               "/api/broadcast/requeue:api_broadcast_requeue"], imena)
+    try:
+        from pyflakes import api as _pf, reporter as _rep
+        import io
+        vyvod = io.StringIO()
+        for f in ("app/main.py", "app/wazzup.py"):
+            _pf.checkPath(os.path.join(tree, f), _rep.Reporter(vyvod, vyvod))
+        plohie = [x for x in vyvod.getvalue().splitlines() if "undefined name" in x]
+        proverka("pyflakes: в app/main.py и app/wazzup.py нет «undefined name»", not plohie, plohie[:5])
+    except ImportError:
+        print("  --   pyflakes не установлен — проверка имён пропущена")
+    from app import wazzup
+    st = (wazzup._CONTACTS_CACHE, wazzup.httpx.get, wazzup._headers)
+    hodili = []
+
+    class _Otvet:
+        status_code = 200
+
+        def __init__(self, data):
+            self._d = data
+
+        def json(self):
+            return {"data": self._d}
+
+    def _get(url, **k):                      # подмена сети: стенд наружу не ходит
+        hodili.append((k.get("params") or {}).get("offset"))
+        if hodili[-1] == 0 and not pusto[0]:
+            return _Otvet([{"id": 501, "name": "Стендова Мама",
+                            "contactData": [{"chatId": "5113895858", "chatType": "telegram"}]}])
+        return _Otvet([])
+    pusto = [False]
+    try:
+        wazzup._CONTACTS_CACHE = os.path.join(os.path.dirname(baza), "kesh_wz", "wz_contacts.json")
+        wazzup.httpx.get, wazzup._headers = _get, (lambda: {})
+        pervyj = wazzup.contacts()
+        n1 = len(hodili)
+        vtoroj = wazzup.contacts()
+        proverka("первый вызов ходит в Wazzup и отдаёт карту chatId → имя",
+                 n1 == 2 and pervyj.get("5113895858", {}).get("name") == "Стендова Мама", (n1, pervyj))
+        proverka("второй вызов в тот же день в сеть не ходит и отдаёт то же", len(hodili) == n1 and vtoroj == pervyj,
+                 (len(hodili), vtoroj))
+        proverka("кэш лежит файлом (папка создана сама)", os.path.isfile(wazzup._CONTACTS_CACHE))
+        wazzup.contacts(refresh=True)
+        proverka("refresh=True ходит в сеть заново", len(hodili) == n1 + 2, len(hodili))
+        d = json.load(open(wazzup._CONTACTS_CACHE, encoding="utf-8"))
+        d["день"] = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+        json.dump(d, open(wazzup._CONTACTS_CACHE, "w", encoding="utf-8"), ensure_ascii=False)
+        wazzup.contacts()
+        proverka("вчерашний кэш не годится — идём в сеть", len(hodili) == n1 + 4, len(hodili))
+        pusto[0] = True
+        os.remove(wazzup._CONTACTS_CACHE)
+        proverka("пустой ответ (сбой, отказ ключу) в кэш не кладётся",
+                 wazzup.contacts() == {} and not os.path.exists(wazzup._CONTACTS_CACHE))
+
+        def _padaet(url, **k):
+            raise OSError("сети нет")
+        wazzup.httpx.get = _padaet
+        proverka("сбой сети — пустая карта без падения (раньше NameError: log)", wazzup.contacts() == {})
+    finally:
+        wazzup._CONTACTS_CACHE, wazzup.httpx.get, wazzup._headers = st
+
+    print("И3. Пульт: колонка «Борис» и его пункты — только владельцу")
+    TAJNA = "Контроль стенда: админ не перезвонила Стендовым"
+    den = m.pult.today() if hasattr(m, "pult") else __import__("app.pult", fromlist=["x"]).today()
+    con = sqlite3.connect(baza)
+    con.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source, done) VALUES (?,?,?,?,?,?,0)",
+                (den, den + " 10:00:00", "Борис", TAJNA, "", "контроль"))
+    con.commit()
+    nomer = con.execute("SELECT id FROM plan_inbox WHERE text=?", (TAJNA,)).fetchone()[0]
+    con.close()
+    try:
+        vl = c.get("/pult", auth=VLADELEC).text
+        proverka("владелец: колонка «Борис» и пункт контроля на пульте есть",
+                 TAJNA in vl and "who=Борис" in vl and ">Борис" in vl)
+        proverka("владелец: /pult?who=Борис — его колонка", TAJNA in c.get("/pult?who=Борис", auth=VLADELEC).text)
+        for adres in ("/pult", "/pult?who=Борис", "/pult?who=%D0%91%D0%BE%D1%80%D0%B8%D1%81&day=" + den):
+            r = c.get(adres, auth=ADMIN)
+            proverka(f"админ {adres}: 200, пункта Бориса в HTML нет, ссылки на его колонку нет",
+                     r.status_code == 200 and TAJNA not in r.text and "who=Борис" not in r.text
+                     and "class='nm'>Борис" not in r.text, r.status_code)
+        r = c.get("/pult?who=Борис", auth=ADMIN)
+        proverka("админ ?who=Борис: обычный пульт с колонками смены (Лиза на месте)", "class='nm'>Лиза" in r.text)
+    finally:
+        con = sqlite3.connect(baza)
+        con.execute("DELETE FROM plan_inbox WHERE id=?", (nomer,))
+        con.commit()
+        con.close()
+
+    print("И4. /api/deploy: код с ошибкой не выкладывается, прежние файлы возвращаются")
+    koren = Path(tempfile.mkdtemp(prefix="nav_vykladka_"))
+    shutil.copytree(os.path.join(tree, "app"), koren / "app", ignore=shutil.ignore_patterns("__pycache__"))
+    glavnyj = koren / "app" / "main.py"
+    bylo = glavnyj.read_bytes()
+    bylo_nav = (koren / "app" / "nav.py").read_bytes()
+    st_koren = m._koren_proekta
+    m._koren_proekta = lambda: koren
+    try:
+        proverka("проверка импорта не стартует потоки и стоит под KIDSUP_PROVERKA_IMPORTA",
+                 "threading.Thread.start = lambda self: None" in m._PROVERKA_IMPORTA_KOD
+                 and 'environ.get("KIDSUP_PROVERKA_IMPORTA") != "1"' in bylo.decode("utf-8"))
+        with _BezPerezapuska() as bp:
+            r = c.post("/api/deploy", auth=VLADELEC, content=_arhiv_koda({
+                "app/main.py": "def slomano(:\n    pass\n", "app/nav.py": bylo_nav + b"\n# stend\n",
+                "app/_stend_novyj.py": "X = 1\n"}))
+        proverka("архив с синтаксической ошибкой в app/main.py → 500", r.status_code == 500, r.status_code)
+        otvet = r.json() if r.status_code == 500 else {}
+        proverka("…в ответе хвост ошибки (SyntaxError), не длиннее 2000 знаков",
+                 "SyntaxError" in otvet.get("stderr", "") and len(otvet.get("stderr", "")) <= 2000
+                 and otvet.get("restarting") is False, str(otvet)[:300])
+        proverka("…файлы прежние: main.py и nav.py как были, нового файла нет",
+                 glavnyj.read_bytes() == bylo and (koren / "app" / "nav.py").read_bytes() == bylo_nav
+                 and not (koren / "app" / "_stend_novyj.py").exists())
+        proverka("…перезапуск не вызван", bp.zvali == [], bp.zvali)
+        proverka("…без входа и под админом выкладка закрыта, как раньше",
+                 (c.post("/api/deploy", content=b"x" * 2000).status_code,
+                  c.post("/api/deploy", content=b"x" * 2000, auth=ADMIN).status_code) == (401, 401))
+
+        # нормальный архив: тот же main.py + строка, которая записывает число потоков проверочного процесса
+        metka = (b"\nimport threading as _t, pathlib as _p\n"
+                 b"_p.Path(__file__).with_name('_stend_potoki.txt').write_text(str(_t.active_count()))\n")
+        with _BezPerezapuska() as bp:
+            r = c.post("/api/deploy", auth=VLADELEC, content=_arhiv_koda({
+                "app/main.py": bylo + metka, "app/_stend_novyj.py": "X = 1\n"}))
+        proverka("нормальный архив → 200, ответ как раньше (ok, files, restarting)",
+                 r.status_code == 200 and r.json().get("ok") is True and r.json().get("restarting") is True
+                 and r.json().get("files") == 3, (r.status_code, r.text[:300]))
+        proverka("…файлы новые, перезапуск назначен один раз",
+                 glavnyj.read_bytes() == bylo + metka and (koren / "app" / "_stend_novyj.py").exists()
+                 and bp.zvali == ["timer"], bp.zvali)
+        potoki = koren / "app" / "_stend_potoki.txt"
+        proverka("…проверочный процесс импортировал новый код и не запустил ни одного потока (автопилот не стартовал)",
+                 potoki.exists() and potoki.read_text() == "1", potoki.read_text() if potoki.exists() else "нет файла")
+
+        with _BezPerezapuska() as bp:
+            r = c.post("/api/deploy", auth=VLADELEC, content=_arhiv_koda({"requirements.txt": "fastapi>=0.110\n"}))
+        proverka("архив без app/ — как раньше: 200 и перезапуск, проверка импорта не нужна",
+                 r.status_code == 200 and bp.zvali == ["timer"], (r.status_code, bp.zvali))
+        with _BezPerezapuska() as bp:
+            r = c.post("/api/deploy?bez_proverki=1", auth=VLADELEC,
+                       content=_arhiv_koda({"app/_stend_bitoe.py": "def slomano(:\n"}))
+        proverka("?bez_proverki=1 — запасной выход: выкладка без проверки, как раньше",
+                 r.status_code == 200 and bp.zvali == ["timer"], (r.status_code, bp.zvali))
+        proverka("сам репозиторий выкладками стенда не тронут",
+                 not os.path.exists(os.path.join(tree, "app", "_stend_novyj.py"))
+                 and not os.path.exists(os.path.join(tree, "docs", "_stend_dobivka.bin")))
+    finally:
+        m._koren_proekta = st_koren
+        shutil.rmtree(koren, ignore_errors=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tree", default=ROOT)
@@ -1743,6 +1963,7 @@ def main():
     test_shapka_shag2(c, m, work)
     test_schetchik_i_pereezdy(c, m, baza)
     test_pereezdy_pyati(c, m, baza)
+    test_pravki_1311(c, m, tree, baza)
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     proverka("ни одной попытки выйти в сеть, кроме известных опросов Mango с пульта и «Ответов»",
              all(any(f.startswith(("mango.py", "zayavki.py")) for f in otkuda) for _, otkuda in lt.SET), lt.SET[:5])

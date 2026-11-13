@@ -187,7 +187,7 @@ EXPIRED = (
 )
 
 
-def _msk() -> "datetime.datetime":
+def _msk():   # -> datetime.datetime (13.11.2026: подпись ссылалась на неимпортированное имя)
     import datetime as _dt
     return _dt.datetime.utcnow() + _dt.timedelta(hours=3)
 
@@ -713,12 +713,20 @@ def contacts(refresh: bool = False) -> dict:
     МойКласс. Значит по id чата восстанавливается и имя, и карточка.
 
     Кэш на сутки: список меняется медленно, а тянуть 5800 контактов
-    на каждую задачу незачем."""
+    на каждую задачу незачем.
+
+    13.11.2026, сверка: имена date и log в модуле не были импортированы — чтение кэша
+    каждый раз падало NameError (и молча глоталось), запись тоже, а при сбое сети
+    падал уже сам разбор ошибки. То есть кэша не было вовсе: 5800 контактов тянулись
+    на каждую задачу. Теперь день берётся из datetime, папка кэша создаётся, пустой
+    ответ (сбой, отказ ключу) в кэш не кладётся — иначе имена пропали бы на сутки."""
+    from datetime import date
     if not refresh:
         try:
-            d = json.load(open(_CONTACTS_CACHE))
-            if d.get("день") == date.today().isoformat():
-                return d.get("map") or {}
+            with open(_CONTACTS_CACHE, encoding="utf-8") as f:
+                d = json.load(f)
+            if d.get("день") == date.today().isoformat() and d.get("map"):
+                return d["map"]
         except Exception:
             pass
     out, off = {}, 0
@@ -739,13 +747,19 @@ def contacts(refresh: bool = False) -> dict:
                                     "type": cd.get("chatType") or ""}
             off += 100
     except Exception as e:  # noqa: BLE001
-        log.warning("wazzup.contacts: %s", type(e).__name__)
+        logging.getLogger("kidsup.wazzup").warning("wazzup.contacts: %s", type(e).__name__)
+        return out
+    if not out:
         return out
     try:
-        json.dump({"день": date.today().isoformat(), "map": out},
-                  open(_CONTACTS_CACHE, "w"), ensure_ascii=False)
+        os.makedirs(os.path.dirname(_CONTACTS_CACHE), exist_ok=True)
+        # сначала во временный файл: оборванная запись не должна испортить кэш
+        vrem = f"{_CONTACTS_CACHE}.{os.getpid()}.tmp"
+        with open(vrem, "w", encoding="utf-8") as f:
+            json.dump({"день": date.today().isoformat(), "map": out}, f, ensure_ascii=False)
+        os.replace(vrem, _CONTACTS_CACHE)
     except Exception:
-        pass
+        logging.getLogger("kidsup.wazzup").warning("wazzup.contacts: кэш не записался", exc_info=True)
     return out
 
 

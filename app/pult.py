@@ -12,6 +12,8 @@
     админ ставит галочку (POST /api/pult/done), галочка видна всем;
   • живые блоки: «Появилось за день», «Заявки с 10.08 без обработки»,
     «Свободные места сейчас»;
+  • 13.11.2026: над «Разделами» — два свёрнутых блока со старой страницы /segodnya:
+    «Первые занятия: сегодня и два дня вперёд» и «Занятия без отметок явки за 6 дней»;
   • блок «Разделы» внизу — то же меню, что в общей шапке (app/nav.py): у пульта
     свой HTML, общей шапки на нём нет, а это стартовая страница админов.
 
@@ -1246,7 +1248,13 @@ def page(day: str = "", who: str = "", rol: str = "admin", kto: dict | None = No
     раздел владельца админу не рисуется.
     kto — кто вошёл (vhod.iz(request), 12.11.2026): колонка вошедшего через форму стоит первой
     и развёрнута, даже если он сегодня не в смене; сверху — «Вы: Лена · Выйти / сменить», под
-    общим входом (когда личные входы уже заведены) — жёлтая полоса. ?who= работает как раньше."""
+    общим входом (когда личные входы уже заведены) — жёлтая полоса. ?who= работает как раньше.
+
+    13.11.2026, сверка безопасности: колонку «Борис» (решения владельца и пункты контроля
+    админов) видел любой админ. Теперь она рисуется только при rol == "owner": у админа нет
+    ни колонки, ни текста её пунктов (в том числе в общем списке «Обещания клиентам за
+    день»), ни ссылки «Борис» в шапке. ?who=Борис у админа — его собственная колонка
+    (вошёл лично) или обычный пульт (общий вход), без пунктов Бориса."""
     from . import zayavki, mesta, nav
     from .main import _inbox_block
     day = day or today()
@@ -1255,7 +1263,14 @@ def page(day: str = "", who: str = "", rol: str = "admin", kto: dict | None = No
     tk = tasks(day)
     d = datetime.fromisoformat(day)
     wd = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"][d.weekday()]
-    order = on + [w for w in ("Лиза", "Борис") if w not in on]
+    vladelec = (rol == "owner")
+    # 13.11.2026: чужим колонку владельца не рисуем (см. описание функции)
+    skryt = () if vladelec else ("Борис",)
+    kto_prosil_borisa = who in skryt
+    if kto_prosil_borisa:
+        who = ""
+    on_vid = [w for w in on if w not in skryt]
+    order = on_vid + [w for w in ("Лиза", "Борис") if w not in on and w not in skryt]
     # 22.09.2026, аудит. Колонка рисовалась только тем, у кого есть ЗАДАЧИ
     # смены. Ира не в смене и задач нет — колонки нет, и пункты инбокса,
     # адресованные лично ей, не видел никто, включая её саму (так пролежал
@@ -1270,8 +1285,10 @@ def page(day: str = "", who: str = "", rol: str = "admin", kto: dict | None = No
                 "AND COALESCE(who,'') != ''", (day,)).fetchall()}
     except Exception:
         pass
-    extra = [w for w in sorted(komu) if w not in order]  # не в смене — показываем свёрнуто внизу
+    extra = [w for w in sorted(komu) if w not in order and w not in skryt]  # не в смене — показываем свёрнуто внизу
     polosa, v_sisteme, ya = _shapka_vhoda(kto, day, who, on)
+    if ya in skryt:   # личный вход с именем владельца, но без его роли — колонку не открываем
+        ya = ""
     if ya and not who and ya in COLOR and ya not in UVOLENY:
         # своя колонка — первой, даже если человек не в смене и дел у него нет
         order = [ya] + [w for w in order if w != ya]
@@ -1279,6 +1296,9 @@ def page(day: str = "", who: str = "", rol: str = "admin", kto: dict | None = No
     if who:
         order = [w for w in order + extra if w == who] or [who]
         extra = []
+    elif kto_prosil_borisa and ya and ya in order:
+        # 13.11.2026: админ открыл ?who=Борис — показываем его собственную колонку
+        order, extra = [ya], []
     from . import autopilot
     now_msk = autopilot._now()
     now_hm = now_msk.strftime("%H:%M") if day == today() else ""
@@ -1314,7 +1334,8 @@ def page(day: str = "", who: str = "", rol: str = "admin", kto: dict | None = No
     kpi_html = "".join(f"<div class='k'><b>{a}</b><span>{b}</span></div>" for a, b in kpis)
     kpi_html += f"<div class='k' style='border-color:{vis_col}'><b style='color:{vis_col}'>{k['y_visits']} из {k['y_kids']}</b><span style='color:{vis_col};font-weight:700'>явка за вчера в CRM · {today_txt}</span></div>"
     hero_who = " + ".join(on) if on else "смена не задана"
-    filt = "".join(f"<a href='/pult?who={html.escape(w)}' style='margin-right:8px'>{html.escape(w)}</a>" for w in on + ["Лиза", "Борис"])
+    filt = "".join(f"<a href='/pult?who={html.escape(w)}' style='margin-right:8px'>{html.escape(w)}</a>" for w in on_vid + [w for w in ("Лиза", "Борис") if w not in skryt])
+    plus_kto = "плюс Лиза и Борис" if vladelec else "плюс Лиза"
     return f"""<!doctype html><html lang='ru'><head><meta charset='utf-8'><script src='/static/vhod.js'></script><title>Пульт KidsUP · {day}</title>
 <meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='300'>
 <style>
@@ -1336,7 +1357,7 @@ td{{padding:6px;border-bottom:1px solid var(--line);vertical-align:top}}.num{{te
 h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 </style></head><body>{polosa}<div class='wrap'>
 <div class='hero'><h1>Пульт · {wd}, {d.day:02d}.{d.month:02d} · в смене: {html.escape(hero_who)} · <span id='clock'>{now_msk.strftime('%H:%M')}</span> МСК</h1>
-<p>Одна ссылка для всех: задачи по колонкам — только тем, кто сегодня работает, плюс Лиза и Борис. Галочка видна всем. Обновляется сама каждые 5 минут. Своя колонка: {filt}
+<p>Одна ссылка для всех: задачи по колонкам — только тем, кто сегодня работает, {plus_kto}. Галочка видна всем. Обновляется сама каждые 5 минут. Своя колонка: {filt}
 {"<a href='/pult'>все</a>" if who else ""} · <a href='#razdely'>☰ Разделы</a></p>{v_sisteme}</div>
 <div class='kpis'>{kpi_html}</div>
 {HOWTO}
@@ -1348,7 +1369,7 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 <h2 style='margin-top:26px'>Справочные списки — для Бориса и на потом</h2>
 <p style='margin:-4px 0 10px;color:#6c6a86;font-size:13.5px'>Админам сюда ходить не нужно: всё, что нужно сделать сегодня, уже стоит в колонке выше.</p>
 {_safe(_nikogda_ne_zvonili, day, imya='кому не звонили')}
-<div id='inbox'></div>{_safe(_inbox_block, day, imya='обещания за день')}
+<div id='inbox'></div>{_safe(_inbox_block, day, bez=skryt, imya='обещания за день')}
 {_safe(zayavki.block, imya='заявки сезона')}
 {_safe(mesta.block, imya='свободные места')}
 <p style='color:#6c6a86;font-size:12px'>Пульт собран сервером {now_msk.strftime('%H:%M')} МСК · версия {ver}</p><script>

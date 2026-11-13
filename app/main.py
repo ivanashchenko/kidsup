@@ -46,7 +46,11 @@ async def _zhizn(_app):
 app = FastAPI(title="KidsUP", docs_url=None, redoc_url=None, openapi_url=None, lifespan=_zhizn)
 
 from . import autopilot  # noqa: E402  (нужен db.init_db выше)
-autopilot.start()
+# 13.11.2026: /api/deploy перед перезапуском проверяет новый код отдельным процессом
+# («import app.main», см. _proverit_import). Тот процесс — не сервер: второй автопилот
+# рядом с боевым слал бы клиентам дубли, поэтому под проверкой он не запускается.
+if __import__("os").environ.get("KIDSUP_PROVERKA_IMPORTA") != "1":
+    autopilot.start()
 
 BASE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
@@ -3938,14 +3942,14 @@ def _inbox_store(payload: dict) -> None:
         try:
             _msg_to_crm(phone, chat_type)
         except Exception as e:  # noqa: BLE001
-            log.info("автокарточка по %s не создана: %s", (phone or "")[-4:], e)
+            logging.getLogger("kidsup.wazzup").info("автокарточка по %s не создана: %s", (phone or "")[-4:], e)
     # Отказ ловим в момент получения, а не при следующем разборе: между
     # просьбой снять бронь и очередной рассылкой бывает меньше часа.
     for ts, phone, chat_type, text, mid in rows:
         try:
             from . import otkaz
             if otkaz.note(phone, text, ts):
-                log.warning("отказ от %s — автосообщения остановлены", phone)
+                logging.getLogger("kidsup.wazzup").warning("отказ от %s — автосообщения остановлены", phone)
         except Exception:
             pass
 
@@ -3984,7 +3988,7 @@ def _catch_visit(conn, phone: str, text: str) -> None:
         conn.execute("INSERT OR REPLACE INTO roistat_visits (phone10, visit, source, ts) "
                      "VALUES (?, ?, 'wa_hello', datetime('now'))", (ph10, m.group(1)))
     except Exception as e:  # noqa: BLE001
-        log.info("визит из сообщения не записан: %s", e)
+        logging.getLogger("kidsup.wazzup").info("визит из сообщения не записан: %s", e)
 
 
 def _visit_for(phone: str) -> str:
@@ -4045,7 +4049,7 @@ def _msg_to_crm(phone: str, chat_type: str) -> None:
                 mk.post("/v1/company/joins", {"userId": uid, "classId": AUTO_LEAD_CLASS,
                                               "statusId": 50509, "createSourceId": 2})
             except Exception as e:  # noqa: BLE001
-                log.info("запись в «Заявки через Roistat» не создана: %s", e)
+                logging.getLogger("kidsup.wazzup").info("запись в «Заявки через Roistat» не создана: %s", e)
         with db.get_conn() as conn:
             _inbox_init(conn)
             now = autopilot._now()
@@ -5202,10 +5206,13 @@ def _wazzup_process(payload: dict) -> None:
 APP_VERSION = "2026-11-13.1"   # .1 — хвосты главным блоком (Ира), контроль оплат без «МК»-семей
 
 
-@app.get("/api/net")
+@app.get("/api/net", dependencies=OWNER_AUTH)
 async def api_net(request: Request):
     """Диагностика доступа: видно, дошёл ли запрос до приложения и с какого IP.
-    Без авторизации — чтобы можно было проверить доступность из-под VPN."""
+    Без авторизации — чтобы можно было проверить доступность из-под VPN.
+    13.11.2026, сверка безопасности: адрес отдавал правила файрвола и домены Caddy
+    любому прохожему — теперь только владельцу (рутины им не пользуются). Дошёл ли
+    запрос до приложения, без входа видно по /api/health."""
     import subprocess
     def sh(cmd: list[str]) -> str:
         try:
@@ -5433,18 +5440,105 @@ def _vazhnoe_servera(request: Request, chto: str, soobshchit: bool = True) -> No
         logging.getLogger("kidsup.vhod").exception("строка «Важное» не записана")
 
 
+def _koren_proekta() -> Path:
+    """Корень проекта — куда /api/deploy распаковывает архив (отдельной функцией: тест
+    выкладки подставляет временную папку)."""
+    return Path(__file__).resolve().parent.parent
+
+
+# Проверка нового кода перед перезапуском. Потоки в проверочном процессе не стартуют
+# вовсе (Thread.start заглушён до импорта) и стоит KIDSUP_PROVERKA_IMPORTA=1: импорт
+# app.main запускает автопилот, а второй автопилот рядом с боевым недопустим.
+_PROVERKA_IMPORTA_KOD = ("import threading; threading.Thread.start = lambda self: None; "
+                         "import app.main")
+_PROVERKA_IMPORTA_SEK = 60
+
+
+def _proverit_import(root: Path) -> str:
+    """Импортируется ли код в root: отдельный процесс тем же интерпретатором, из корня
+    проекта, с окружением службы. Пустая строка — да; иначе хвост ошибки (2000 знаков)."""
+    import os
+    import subprocess
+    import sys
+    env = dict(os.environ)
+    env["KIDSUP_PROVERKA_IMPORTA"] = "1"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"   # проверка не оставляет .pyc от кода, который может быть откачен
+    try:
+        r = subprocess.run([sys.executable, "-c", _PROVERKA_IMPORTA_KOD], cwd=str(root), env=env,
+                           capture_output=True, text=True, errors="replace",
+                           timeout=_PROVERKA_IMPORTA_SEK)
+    except subprocess.TimeoutExpired as e:
+        hvost = e.stderr or ""
+        if isinstance(hvost, bytes):
+            hvost = hvost.decode("utf-8", "replace")
+        return (f"импорт app.main не закончился за {_PROVERKA_IMPORTA_SEK} с\n" + hvost)[-2000:]
+    except Exception as e:  # noqa: BLE001
+        return f"проверку импорта не удалось запустить: {type(e).__name__}: {e}"[-2000:]
+    if r.returncode == 0:
+        return ""
+    return ((r.stderr or "") or (r.stdout or "") or f"код выхода {r.returncode}")[-2000:]
+
+
+def _vykladka_kopiya(tar, root: Path) -> tuple[Path, list]:
+    """Копия файлов, которые архив заменит, — до распаковки (архив ложится прямо поверх
+    рабочего каталога). Возвращает (папка копии, [(путь в проекте, был ли файл)])."""
+    import shutil
+    import tempfile
+    kopiya = Path(tempfile.mkdtemp(prefix="kidsup_vykladka_"))
+    spisok = []
+    for chl in tar.getmembers():
+        if chl.isdir():
+            continue
+        gde = root / chl.name
+        byl = gde.is_file() or gde.is_symlink()
+        if byl:
+            kuda = kopiya / chl.name
+            kuda.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(gde, kuda, follow_symlinks=False)
+        spisok.append((chl.name, byl))
+    return kopiya, spisok
+
+
+def _vykladka_vernut(kopiya: Path, spisok: list, root: Path) -> list:
+    """Вернуть прежние файлы: заменённые — из копии, новые — убрать. Список того, что
+    вернуть не удалось (пустой — всё как было)."""
+    import shutil
+    ne_vyshlo = []
+    for imya, byl in spisok:
+        gde = root / imya
+        try:
+            if gde.is_file() or gde.is_symlink():
+                gde.unlink()
+            if byl:
+                shutil.copy2(kopiya / imya, gde, follow_symlinks=False)
+        except Exception as e:  # noqa: BLE001
+            ne_vyshlo.append(f"{imya}: {type(e).__name__}")
+    return ne_vyshlo
+
+
 @app.post("/api/deploy", dependencies=OWNER_AUTH)
-async def api_deploy(request: Request):
+async def api_deploy(request: Request, bez_proverki: int = 0):
     """Самообновление: тело запроса — tar.gz с app/ и requirements.txt.
     Распаковывает в корень проекта и перезапускает службу через 2 секунды.
-    Допустимы только относительные пути внутри app/ и requirements.txt."""
+    Допустимы только относительные пути внутри app/ и requirements.txt.
+
+    13.11.2026, сверка надёжности: архив с ошибкой в коде распаковывался, служба
+    перезапускалась и уже не поднималась — а выкладка идёт через неё же, починить было
+    нечем. Теперь, если в архиве есть app/: до распаковки — копия заменяемых файлов,
+    после — «import app.main» отдельным процессом (_proverit_import). Импорт упал —
+    прежние файлы возвращаются, перезапуска нет, ответ 500 с хвостом ошибки. Архив без
+    app/ (docs/, requirements.txt) идёт как раньше. ?bez_proverki=1 — выложить без
+    проверки: запасной выход, если проверка ошибается сама (например, новая библиотека
+    из requirements.txt ещё не установлена, а ставится она при перезапуске)."""
+    import shutil
     import tarfile
     import threading
     import subprocess
+    from starlette.concurrency import run_in_threadpool
     data = await request.body()
     if len(data) < 1000 or len(data) > 50_000_000:
         raise HTTPException(400, "подозрительный размер архива")
-    root = Path(__file__).resolve().parent.parent
+    root = _koren_proekta()
     try:
         tar = tarfile.open(fileobj=io.BytesIO(data), mode="r:gz")
     except tarfile.TarError as e:
@@ -5456,7 +5550,38 @@ async def api_deploy(request: Request):
                 not (n == "requirements.txt" or n in ("app", "docs")
                      or n.startswith("app/") or n.startswith("docs/")):
             raise HTTPException(400, f"недопустимый путь в архиве: {n}")
-    tar.extractall(root)  # noqa: S202 — пути проверены выше
+    proveryat = (not bez_proverki) and any(n == "app" or n.startswith("app/") for n in names)
+    kopiya, spisok = (None, [])
+    if proveryat:
+        try:
+            kopiya, spisok = _vykladka_kopiya(tar, root)
+        except Exception as e:  # noqa: BLE001 — без копии не распаковываем: откатить будет нечем
+            raise HTTPException(500, f"выкладка не начата: копия прежних файлов не снялась "
+                                     f"({type(e).__name__}: {e}); файлы не тронуты")
+    try:
+        tar.extractall(root)  # noqa: S202 — пути проверены выше
+        oshibka = (await run_in_threadpool(_proverit_import, root)) if proveryat else ""
+    except Exception as e:  # noqa: BLE001 — распаковка оборвалась на середине
+        if not proveryat:
+            raise
+        oshibka = f"распаковка архива не удалась: {type(e).__name__}: {e}"
+    if oshibka:
+        ne_vyshlo = _vykladka_vernut(kopiya, spisok, root)
+        if not ne_vyshlo:
+            shutil.rmtree(kopiya, ignore_errors=True)
+        logging.getLogger("kidsup.deploy").error(
+            "deploy: новый код не импортируется — файлы возвращены, перезапуска нет: %s", oshibka[-500:])
+        request.state.chto = "выкладка отклонена: код не импортируется"
+        _vazhnoe_servera(request, "выкладка кода отклонена: новый код не импортируется, "
+                                  "прежние файлы возвращены, перезапуска не было", soobshchit=False)
+        return JSONResponse(status_code=500, content={
+            "ok": False, "restarting": False,
+            "error": "новый код не импортируется — служба НЕ перезапущена, прежние файлы возвращены"
+                     + (f" (кроме: {', '.join(ne_vyshlo)[:500]}; копия осталась в {kopiya})" if ne_vyshlo else ""),
+            "stderr": oshibka[-2000:],
+            "hint": "исправьте ошибку и выложите снова; если ошибается сама проверка — ?bez_proverki=1"})
+    if kopiya:
+        shutil.rmtree(kopiya, ignore_errors=True)
     _POSL_VYKLADKA[0] = time.time()
     request.state.chto = f"выкладка: {len(names)} файлов"
     _vazhnoe_servera(request, f"выкладка кода: {len(names)} файлов, перезапуск")
@@ -7710,12 +7835,16 @@ def _pult_tel(phone) -> str:
     return _tel(phone)
 
 
-def _inbox_block(day: str) -> str:
-    """HTML-блок «Появилось за день» для страниц плана. Галочка — fetch на /done."""
+def _inbox_block(day: str, bez: tuple = ()) -> str:
+    """HTML-блок «Появилось за день» для страниц плана. Галочка — fetch на /done.
+    13.11.2026: bez — чьи пункты не показывать (пульт у админа: пункты Бориса — решения
+    владельца и контроль админов — видит только владелец)."""
     with db.get_conn() as conn:
         _inbox_init(conn)
         rows = conn.execute("SELECT id, ts, who, text, phone, done FROM plan_inbox "
                             "WHERE day=? ORDER BY done, id", (day,)).fetchall()
+    if bez:
+        rows = [r for r in rows if r["who"] not in bez]
     col = {"Лена": "#7DB928", "Аня": "#F59C00", "Ира": "#F59C00", "Лиза": "#1DA7E0", "Борис": "#312783"}
     items = []
     for r in rows:
@@ -10149,6 +10278,7 @@ def api_mesta_voronka_refresh(bg: int = 1):
     if bg:
         voronka.refresh_comments_bg()
         return {"ok": True, "started": True}
+    from .moyklass_client import MoyklassClient  # 13.11.2026: имя не было импортировано — bg=0 падал NameError
     mk = MoyklassClient(sync.get_api_key())
     try:
         return voronka.refresh_comments(mk)
@@ -10648,8 +10778,10 @@ async def api_broadcast_cancel(payload: dict = None):
     return {"cancelled": autopilot.broadcast_cancel((payload or {}).get("campaign"))}
 
 
+# 13.11.2026: функция звалась так же, как обработчик /api/broadcast/requeue выше (дубль
+# имени) — переименована, адрес прежний.
 @app.post("/api/broadcast/requeue-undelivered", dependencies=AUTH)
-async def api_broadcast_requeue(payload: dict = None):
+async def api_broadcast_requeue_undelivered(payload: dict = None):
     """Вернуть в очередь недоставленное в Telegram/MAX (доставка упала после
     ответа API). Опционально {"day": "2026-08-12"} — по умолчанию сегодня.
     Ответившие (wazzup_inbox) не дублируются."""
