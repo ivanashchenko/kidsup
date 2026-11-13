@@ -1113,6 +1113,106 @@ def _safe(fn, *a, imya: str = "", **kw) -> str:
                 f"Остальной пульт работает. Клод увидит это в логе и починит.</div>")
 
 
+# --- 13.11.2026, шаг 2 меню: два блока со страницы /segodnya («Горит сегодня») --------
+# Владелец 12.11 одобрил переезд /segodnya на пульт. Остальные её разделы на пульте уже
+# есть (галочки пробного, ждут ответа, новые лиды — в колонках и справочных списках),
+# не было двух: «кто идёт на первое занятие» и «занятия без отметок явки». Пульт ждёт
+# переделки, поэтому блоки самодостаточные: свёрнутые <details> над «Разделами», считают
+# их те же функции, что и /api/segodnya (segodnya._pervye, segodnya._yavka) — только
+# чтение локальной базы. Пульт перезагружается раз в 5 минут у каждого админа, поэтому
+# расчёт держим минуту в памяти: открытия подряд базу второй раз не читают.
+_SEGODNYA_KESH: dict = {}
+_SEGODNYA_KESH_SEK = 60
+
+
+def _iz_segodnya(imya: str) -> list:
+    """Список segodnya._pervye() или segodnya._yavka() с минутным кэшем."""
+    import time
+    from . import segodnya
+    den = today()
+    k = _SEGODNYA_KESH.get(imya)
+    if k and k[0] == den and time.monotonic() - k[1] < _SEGODNYA_KESH_SEK:
+        return k[2]
+    dannye = {"pervye": segodnya._pervye, "yavka": segodnya._yavka}[imya]()
+    _SEGODNYA_KESH[imya] = (den, time.monotonic(), dannye)
+    return dannye
+
+
+def _ddmm(iso: str) -> str:
+    return f"{iso[8:10]}.{iso[5:7]}" if len(iso or "") >= 10 else (iso or "")
+
+
+def _pervye_blok() -> str:
+    """«Первые занятия: сегодня и два дня вперёд» — с отметкой «звонили / писали»."""
+    gruppy = _iz_segodnya("pervye")
+    detey = sum(g["детей"] for g in gruppy)
+    bez = sum(g["без_касания"] for g in gruppy)
+    hvost = (f" · <span style='color:#E30613'>не прозвонено: {bez}</span>" if bez
+             else (" · все прозвонены ✓" if detey else ""))
+    telo = ""
+    for g in gruppy:
+        stroki = ""
+        for r in g["дети"]:
+            t = _tel(r["телефон"])
+            nomer = (f"<a href='tel:+{t}'>+{t}</a>{_liniya(t)}" if t else html.escape(str(r["телефон"] or "—")))
+            if r["звонили"]:
+                kasanie = "✅ звонили"
+            elif r["писали"]:
+                kasanie = "💬 писали"
+            else:
+                kasanie = "<b style='color:#E30613'>не касались</b>"
+            if not r["галочка"]:
+                kasanie += " · <span style='color:#a35f00'>нет галочки «Пробное»</span>"
+            stroki += (f"<tr><td>{html.escape(r['имя'] or '')}</td><td style='white-space:nowrap'>{nomer}</td>"
+                       f"<td>{kasanie}</td><td><a href='https://app.moyklass.com/user/{int(r['uid'])}' "
+                       f"target='_blank' rel='noopener'>CRM</a></td></tr>")
+        ne = (f" — <span style='color:#E30613'>не прозвонено: {g['без_касания']}</span>" if g["без_касания"] else "")
+        telo += (f"<p style='margin:12px 0 2px'><b>{_ddmm(g['дата'])} {html.escape(g['время'])}</b> · "
+                 f"{html.escape(g['группа'])} · {_sklon(g['детей'], 'ребёнок', 'ребёнка', 'детей')}{ne}</p>"
+                 f"<div class='scroll'><table>{stroki}</table></div>")
+    if not gruppy:
+        telo = "<p style='color:#6c6a86'>На ближайшие три дня первых занятий нет.</p>"
+    return (f"<details class='card small' id='pervye'><summary style='cursor:pointer;font-weight:700;color:#312783'>"
+            f"Первые занятия: сегодня и два дня вперёд — {_sklon(detey, 'ребёнок', 'ребёнка', 'детей')}{hvost}</summary>"
+            f"<p style='color:#6c6a86;font-size:13.5px;margin:8px 0 0'>Пробное, которое не подтвердили голосом, срывается "
+            f"чаще остального. «Звонили» и «писали» считаются за последние сутки.</p>{telo}</details>")
+
+
+def _bez_yavki_blok() -> str:
+    """«Занятия без отметок явки за 6 дней»: записанные дети есть, не отмечен ни один."""
+    zan = _iz_segodnya("yavka")
+    detey = sum(r["детей"] for r in zan)
+    stroki = "".join(
+        f"<tr><td style='white-space:nowrap'>{_ddmm(r['дата'])}</td><td>{html.escape(r['время'])}</td>"
+        f"<td>{html.escape(r['группа'])}</td><td class='num'>{r['детей']}</td></tr>" for r in zan)
+    if zan:
+        telo = (f"<div class='scroll'><table><tr><th>Дата</th><th>Время</th><th>Группа</th>"
+                f"<th class='num'>детей</th></tr>{stroki}</table></div>"
+                f"<p style='margin:8px 0 0'><a href='/yavka'>Отметить явку →</a></p>")
+        chislo = f"{_sklon(len(zan), 'занятие', 'занятия', 'занятий')}, {_sklon(detey, 'ребёнок', 'ребёнка', 'детей')}"
+    else:
+        telo = "<p style='color:#6c6a86'>Явка проставлена везде.</p>"
+        chislo = "0 — явка проставлена везде ✓"
+    return (f"<details class='card small' id='bez-yavki'><summary style='cursor:pointer;font-weight:700;color:#312783'>"
+            f"Занятия без отметок явки за 6 дней — {chislo}</summary>"
+            f"<p style='color:#6c6a86;font-size:13.5px;margin:8px 0 0'>На этих занятиях есть записанные дети, но не "
+            f"отмечен ни один. Пока явки нет, не видно, кто дошёл до пробного.</p>{telo}</details>")
+
+
+# Свёрнутый блок раскрывается по якорю (/pult#pervye — сюда ведёт старый адрес /segodnya) и
+# остаётся раскрытым после автообновления страницы: раскрыли — якорь встаёт в адрес.
+_SEGODNYA_JS = """<script>(function(){
+var ids=['pervye','bez-yavki'];
+function otkryt(){var h=(location.hash||'').slice(1);if(ids.indexOf(h)<0)return;
+ var d=document.getElementById(h);if(d){d.open=true;d.scrollIntoView();}}
+ids.forEach(function(i){var d=document.getElementById(i);if(!d)return;
+ d.addEventListener('toggle',function(){
+  if(d.open){history.replaceState(null,'','#'+i);}
+  else if(location.hash==='#'+i){history.replaceState(null,'',location.pathname+location.search);}});});
+otkryt();window.addEventListener('hashchange',otkryt);
+})();</script>"""
+
+
 def _shapka_vhoda(kto: dict | None, day: str, who: str, on: list) -> tuple[str, str, str]:
     """Личные входы → (полоска «кто вошёл» над пультом, строка «сейчас в системе», имя вошедшего).
     Имя — только у человека, вошедшего через форму; под общим входом, ключом и без входа — пусто."""
@@ -1189,6 +1289,8 @@ def page(day: str = "", who: str = "", rol: str = "admin", kto: dict | None = No
     # плана дня — за 06.09, с тех пор ссылка каждый день вела на 404. Сам блок теперь —
     # меню из app/nav.py: пульт стал стартовой страницей админов, а общей шапки на нём
     # нет. /segodnya из блока ушла (переезжает на пульт, открывается по адресу).
+    # 13.11.2026: /segodnya переехала — два её блока стоят над «Разделами» (_pervye_blok,
+    # _bez_yavki_blok), старый адрес ведёт на /pult#pervye.
     ver = ""
     try:
         from .main import APP_VERSION
@@ -1237,6 +1339,8 @@ h2{{font-size:18px;margin:22px 0 8px;color:var(--indigo)}}
 <div class='kpis'>{kpi_html}</div>
 {HOWTO}
 <div class='who'>{cols}</div>
+{_safe(_pervye_blok, imya='первые занятия')}
+{_safe(_bez_yavki_blok, imya='занятия без явки')}
 <div class='links card' id='razdely'>{nav.stroka(rol)}<br>
 <span class='razdel'><b>Ещё:</b> {nav.eshche()}</span></div>
 <h2 style='margin-top:26px'>Справочные списки — для Бориса и на потом</h2>
@@ -1278,5 +1382,5 @@ function pultMiss(kind, id){{
    .then(function(r){{ return r.json(); }})
    .then(function(res){{ if (res && res.совет) {{ alert(res.совет); }} location.reload(); }});
 }}
-</script><script>(function(){{var off={int(now_msk.utcoffset().total_seconds())}*1000;function t(){{var d=new Date(Date.now()+off);document.getElementById('clock').textContent=('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)}};t();setInterval(t,15000)}})();</script>
+</script>{_SEGODNYA_JS}<script>(function(){{var off={int(now_msk.utcoffset().total_seconds())}*1000;function t(){{var d=new Date(Date.now()+off);document.getElementById('clock').textContent=('0'+d.getUTCHours()).slice(-2)+':'+('0'+d.getUTCMinutes()).slice(-2)}};t();setInterval(t,15000)}})();</script>
 </div></body></html>"""

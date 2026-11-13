@@ -372,3 +372,57 @@ def block() -> str:
     parts.append(f"<div style='font-size:12px;color:#6c6a86;margin-top:8px'>Всего «новых заявок» в CRM: {d['season_total'] + d['old_total']}, "
                  f"из них {d['old_total']} — хвосты до 10.08.2026 (прошлые сезоны), закрываются массово по решению Бориса.</div></div>")
     return "".join(parts)
+
+
+# --- 13.11.2026, шаг 2 меню: «Будущие направления» для «Бланков групп» ----------------
+# Страница /zayavki («Листы заявок — кому звонить») переехала на /blank-grupp. Из неё
+# переносится одно: поимённый лист ожидания направлений, которых ещё нет в расписании
+# (танцы, скорочтение и др.). Заявки на действующие курсы уже стоят в листах ожидания
+# самих бланков, а скрипты разговоров на старой странице были августовские («цены
+# прошлого года до 31 августа») — их не переносим.
+# Старая страница ходила в МойКласс при каждом открытии (30–60 секунд). Здесь — локальные
+# таблицы joins/classes/users, которые лёгкий синк обновляет раз в 5 минут: бланки не ждут.
+BUD_DEAD = (1, 4)                  # как на старой странице: отказавшиеся и завершившие
+_BUD_NE_NAPRAVLENIE = re.compile(r"roistat|лагер|летн|праздник|тест", re.I)
+
+
+def budushchie() -> dict:
+    """Лист ожидания направлений, которых пока нет: {"napravleniya": [{"kurs", "deti": [...]}],
+    "vsego": N, "sobrano": "ЧЧ:ММ"}. «Нет в расписании» — у буферной группы «…Заявки…»
+    сезона 2627 нет ни одной открытой обычной группы того же курса. Только чтение."""
+    with db.get_conn() as conn:
+        classes = conn.execute(
+            "SELECT cl.id, cl.name, cl.course_id, co.name FROM classes cl "
+            "LEFT JOIN courses co ON co.id = cl.course_id "
+            "WHERE cl.name LIKE '2627%' AND COALESCE(cl.status,'opened') = 'opened'").fetchall()
+        zhivye_kursy = {r[2] for r in classes if r[2] and "аявк" not in (r[1] or "")}
+        bufery = {}
+        for cid, name, course_id, course in classes:
+            name = name or ""
+            if "аявк" not in name or (course_id and course_id in zhivye_kursy):
+                continue
+            if _BUD_NE_NAPRAVLENIE.search(name) or _BUD_NE_NAPRAVLENIE.search(course or ""):
+                continue
+            kurs = (name.replace("2627_", "").replace("_Заявки", "").replace("Заявки_", "")
+                    .replace("Заявки", "").strip(" _")) or (course or "?")
+            bufery[cid] = kurs
+        po_kursu: dict[str, dict] = {}
+        if bufery:
+            q = ",".join("?" * len(bufery))
+            rows = conn.execute(
+                f"SELECT j.class_id, j.user_id, j.status_id, j.created_at, u.name, u.phone "
+                f"FROM joins j LEFT JOIN users u ON u.id = j.user_id "
+                f"WHERE j.class_id IN ({q}) ORDER BY j.created_at", list(bufery)).fetchall()
+            for class_id, uid, status_id, created, uname, phone in rows:
+                if status_id in BUD_DEAD:
+                    continue
+                d = "".join(ch for ch in (phone or "") if ch.isdigit())
+                deti = po_kursu.setdefault(bufery[class_id], {})
+                if uid in deti:          # две заявки одного ребёнка на одно направление — одна строка
+                    continue
+                deti[uid] = {"uid": uid, "imya": uname or f"id {uid}",
+                             "tel": ("7" + d[-10:]) if len(d) >= 10 else "",
+                             "kogda": str(created or "")[:10]}
+    napr = [{"kurs": k, "deti": list(v.values())} for k, v in sorted(po_kursu.items())]
+    return {"napravleniya": napr, "vsego": sum(len(n["deti"]) for n in napr),
+            "sobrano": datetime.now().strftime("%H:%M")}

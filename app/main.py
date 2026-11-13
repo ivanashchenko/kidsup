@@ -3381,8 +3381,22 @@ def api_karta_send(payload: dict = Body(...)):
     return karta.send(payload or {})
 
 
-@app.get("/spiski", response_class=HTMLResponse, dependencies=AUTH)
+@app.get("/spiski", dependencies=AUTH)
 def spiski_page(request: Request, day: str = "", subject: str = "", print: int = 0):
+    """13.11.2026, шаг 2: «Списки по группам» переехали на «Бланки групп» — вид «Все группы
+    дня» (/blank-grupp?vid=den). День и предмет из старого адреса переносим; без дня там
+    открывается сегодняшний, а старое «вся неделя» — это day=vse (нужно, когда в адресе
+    был только предмет)."""
+    from urllib.parse import urlencode
+    q = {"vid": "den"}
+    if day or subject:
+        q["day"] = day or "vse"
+    if subject:
+        q["subject"] = subject
+    return RedirectResponse("/blank-grupp?" + urlencode(q), status_code=303)
+
+
+def _spiski_staraya(request: Request, day: str = "", subject: str = "", print: int = 0):
     """Списки по группам для стойки (просьба Иры 05.09): кто записан, оплатил, на пробном.
     Сам обновляется каждые 5 минут вслед за лёгким синком."""
     from . import spiski
@@ -3444,11 +3458,13 @@ def api_promo_grafik_den(payload: dict = Body(...)):
         raise HTTPException(400, str(e))
 
 
-@app.get("/leads", response_class=HTMLResponse, dependencies=AUTH)
+@app.get("/leads", dependencies=AUTH)
 def leads_page(request: Request):
-    return render(request, "leads.html", active="leads",
-                  stats=leads.stats_by_source(), rows=leads.recent(),
-                  sources=leads.SOURCES)
+    """13.11.2026, шаг 2: «Лиды» переехали на «Откуда заявки», раздел «Заявки Марквиза, не
+    дошедшие до CRM» (id="leads"). «Откуда заявки» — страница владельца, админа с неё уводят
+    на пульт (_vladelcu), поэтому админа ведём на пульт сразу, одним переходом, как у
+    /metrics. Кнопка отправки /leads/push/{id} и выгрузка /export/leads.csv не менялись."""
+    return _vladelcu(request) or RedirectResponse("/istochniki#leads", status_code=303)
 
 
 @app.post("/leads/push/{lead_id}", dependencies=AUTH)
@@ -4146,11 +4162,12 @@ def api_chaty_plan():
     return chaty.plan()
 
 
-@app.get("/segodnya", response_class=HTMLResponse, dependencies=AUTH)
+@app.get("/segodnya", dependencies=AUTH)
 def segodnya_page(request: Request):
-    """Одна страница на день: что горит, с именами и телефонами."""
-    from . import segodnya
-    return render(request, "segodnya.html", active="segodnya", d=segodnya.dela())
+    """13.11.2026, шаг 2: «Горит сегодня» переехала на пульт. Двух её блоков там не было —
+    «первые занятия на три дня» и «занятия без явки»: теперь они стоят внизу пульта
+    (pult._pervye_blok, pult._bez_yavki_blok). /api/segodnya отдаёт всё, как раньше."""
+    return RedirectResponse("/pult#pervye", status_code=303)
 
 
 @app.get("/api/segodnya", dependencies=AUTH)
@@ -4179,8 +4196,15 @@ def istochniki_page(request: Request, since: str = "", until: str = ""):
     if r:
         return r
     from . import istochniki
+    # 13.11.2026, шаг 2: сюда переехали /leads и /clicks. Заявки Марквиза — раздел id="leads"
+    # (как было на /leads). Клики — id="clicks", только владельцу: /clicks был под OWNER_AUTH.
+    # Сейчас страницу и так видит один владелец (_vladelcu выше), проверка роли стоит второй
+    # раз нарочно: если страницу когда-нибудь откроют админам, клики вместе с ней не откроются.
+    kliki = _kliki_stroki() if _rol(request) == "owner" else None
     return render(request, "istochniki.html", active="istochniki",
-                  d=istochniki.otchet(since, until))
+                  d=istochniki.otchet(since, until),
+                  leads_stats=leads.stats_by_source(), leads_rows=leads.recent(),
+                  leads_sources=leads.SOURCES, kliki=kliki)
 
 
 @app.get("/api/tvoyklass/plan", dependencies=AUTH)
@@ -5076,15 +5100,20 @@ async def go_messenger(channel: str, request: Request):
     return RedirectResponse(target, status_code=302)
 
 
-@app.get("/clicks", response_class=HTMLResponse, dependencies=OWNER_AUTH)
-def clicks_page(request: Request):
-    """Клики по кнопкам мессенджеров и то, с каким обращением они склеились."""
+def _kliki_stroki() -> list:
+    """Клики по кнопкам мессенджеров и то, с каким обращением они склеились — последние 300."""
     with db.get_conn() as conn:
         _clicks_init(conn)
-        rows = [dict(r) for r in conn.execute(
+        return [dict(r) for r in conn.execute(
             "SELECT ts, channel, roistat_visit, utm, matched_phone, matched_ts "
             "FROM messenger_clicks ORDER BY id DESC LIMIT 300")]
-    return render(request, "clicks.html", active="clicks", rows=rows)
+
+
+@app.get("/clicks", dependencies=OWNER_AUTH)
+def clicks_page(request: Request):
+    """13.11.2026, шаг 2: «Клики по мессенджерам» переехали на «Откуда заявки», раздел
+    «Клики по ссылкам» (id="clicks"). Вход — как был, владельца."""
+    return RedirectResponse("/istochniki#clicks", status_code=303)
 
 
 
@@ -6770,8 +6799,18 @@ def autopilot_digest_now():
         mk.close()
 
 
-@app.get("/zayavki", response_class=HTMLResponse, dependencies=AUTH)
+@app.get("/zayavki", dependencies=AUTH)
 def zayavki_page(request: Request, fresh: int = 0):
+    """13.11.2026, шаг 2: «Листы заявок» переехали на «Бланки групп». Заявки на действующие
+    курсы стоят там в листах ожидания групп, а поимённый лист направлений, которых ещё нет, —
+    в блоке «Будущие направления» (zayavki.budushchie). Августовские скрипты разговоров не
+    переносились. /api/zayavki (вечерний контроль 21:00) не менялся."""
+    return RedirectResponse("/blank-grupp#budushchie", status_code=303)
+
+
+def _zayavki_staraya(request: Request, fresh: int = 0):
+    # 13.11.2026: прежний обработчик /zayavki, маршрута у него больше нет. Оставлен вместе с
+    # _zayavki_build до решения владельца — убрать код совсем или вернуть живой сбор из МойКласса.
     def _build():
         r = _zayavki_build()
         return r.body.decode() if hasattr(r, "body") else str(r)
@@ -10132,9 +10171,18 @@ def api_mesta_razrez():
 
 
 @app.get("/blank-grupp", response_class=HTMLResponse, dependencies=AUTH)
-def blank_grupp_page(request: Request):
+def blank_grupp_page(request: Request, vid: str = "", day: str = "", subject: str = ""):
     """Бланки групп «как на бумаге» (просьба Иры 31.10). С 02.11 бланк ведут админы,
-    МойКласс — только в проверках вверху (замечания Иры 02.11)."""
+    МойКласс — только в проверках вверху (замечания Иры 02.11).
+
+    13.11.2026, шаг 2: ?vid=den — «Все группы дня» по времени, с телефонами (просьба
+    админа 05.09, раньше страница /spiski). День — ?day=пн…вс, без него сегодняшний;
+    day=vse — вся неделя по дням. Печать — как была у /spiski (кнопка «Печать»)."""
+    if vid == "den":
+        from . import spiski
+        if day not in spiski.DAY_ORDER and day != "vse":
+            day = spiski.DAY_ORDER[autopilot._today().weekday()]
+        return HTMLResponse(_s_shapkoy(request, spiski.page(None if day == "vse" else day, subject or None, False)))
     return HTMLResponse(_s_shapkoy(request, (BASE / "templates" / "blank_grupp.html").read_text(encoding="utf-8")))
 
 
@@ -10165,6 +10213,14 @@ def api_blank_grupp_row(payload: dict = Body(...)):
         return {"ok": True, "rows": blank_grupp.row_op(payload)}
     except (ValueError, KeyError):
         raise HTTPException(400, "bad request")
+
+
+@app.get("/api/blank-grupp/budushchie", dependencies=AUTH)
+def api_blank_grupp_budushchie():
+    """13.11.2026: лист ожидания направлений, которых ещё нет в расписании, — блок
+    «Будущие направления» на бланках (переехал со страницы /zayavki). Локальная база, чтение."""
+    from . import zayavki
+    return zayavki.budushchie()
 
 
 @app.get("/api/blank-grupp/xlsx", dependencies=AUTH)

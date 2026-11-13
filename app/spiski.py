@@ -179,10 +179,16 @@ def page(day: str | None, subject: str | None, print_mode: bool) -> str:
     @media print{.top,.sum{display:none}body{background:#fff}.wrap{display:block;padding:0}.g{box-shadow:none;border:1px solid #bbb;margin:0 0 10px;border-radius:6px}}
     </style>"""
     from urllib.parse import quote
-    nav = "".join(f"<a class='{'on' if day == k else ''}' href='/spiski?day={quote(k)}{'&subject=' + quote(subject) if subject else ''}'>{DAY_LABEL[k]}</a>" for k in DAY_ORDER)
-    subj = "".join(f"<a class='{'on' if subject == c else ''}' href='/spiski?subject={quote(c)}{'&day=' + quote(day) if day else ''}'>{esc(c)}</a>" for c in courses)
-    h = [f"<!doctype html><html lang='ru'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='300'><title>Списки по группам — KidsUP</title>{css}</head><body>",
-         f"<div class='top'><b>Списки по группам</b><a class='{'on' if not day and not subject else ''}' href='/spiski'>Все</a>{nav}<span style='opacity:.5'>|</span>{subj}<a href='javascript:print()'>🖨 Печать</a>"
+    # 13.11.2026, шаг 2 меню: страница переехала с /spiski на «Бланки групп» — вид
+    # «Все группы дня» (/blank-grupp?vid=den). Ссылки дней и предметов ведут туда же;
+    # day=vse — вся неделя по дням (то, что раньше показывал /spiski без параметров).
+    def _adres(d_, s_):
+        return "/blank-grupp?vid=den&day=" + quote(d_ or "vse") + ("&subject=" + quote(s_) if s_ else "")
+    nav = "".join(f"<a class='{'on' if day == k else ''}' href='{_adres(k, subject)}'>{DAY_LABEL[k]}</a>" for k in DAY_ORDER)
+    subj = "".join(f"<a class='{'on' if subject == c else ''}' href='{_adres(day, c)}'>{esc(c)}</a>" for c in courses)
+    vse_predmety = f"<a href='{_adres(day, '')}'>Все предметы</a>" if subject else ""
+    h = [f"<!doctype html><html lang='ru'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='300'><title>Все группы дня — KidsUP</title>{css}</head><body>",
+         f"<div class='top'><a href='/blank-grupp'>← Бланки групп</a><b>Все группы дня</b><a class='{'on' if not day else ''}' href='{_adres('', subject)}'>Вся неделя</a>{nav}{vse_predmety}<span style='opacity:.5'>|</span>{subj}<a href='javascript:print()'>🖨 Печать</a>"
          f"<span class='st'>данные CRM на {esc(d['synced'])} · страница обновляется сама каждые 5 минут · собрано {d['built']}</span></div>",
          f"<div class='sum'>Групп {len(G)} · мест {tot_cap} · живых записей <b>{tot_live}</b> · оплачено <b style='color:#3d6e0e'>{tot_paid}</b> · не оплатили <b style='color:#a30d15'>{tot_debt}</b> · "
          f"<span class='pill ok'>оплачено</span> <span class='pill trial'>записан на пробное</span> <span class='pill debt'>был / учится без оплаты — дожать</span></div>",
@@ -197,6 +203,9 @@ def page(day: str | None, subject: str | None, print_mode: bool) -> str:
     if day:
         for g in G:
             h.append(card(g, day))
+        if not G:
+            h.append(f"<p style='margin:6px 2px;color:#666'>В этот день ({DAY_LABEL.get(day, esc(day))}) групп"
+                     f"{' по предмету «' + esc(subject) + '»' if subject else ''} нет.</p>")
     else:
         h.pop()   # вместо одной сетки — секция на каждый день недели, группы по времени
         for dsel in DAY_ORDER:
