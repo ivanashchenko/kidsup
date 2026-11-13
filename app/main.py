@@ -1161,8 +1161,9 @@ def enrollment_page(request: Request, course: str = "", day: str = "", free: int
     # правилу (app/mesta_pravilo.py), тому же, что на «Местах» и в документе владельца.
     # Прежде занятым местом считалась любая запись, кроме «Отказался» и «Завершил» —
     # отработки, новые и старые заявки, «не пришёл на пробное», — и страница писала
-    # «мест нет» там, где места есть (на копии базы 12.11: 102 свободных вместо 93 и
-    # «мест нет» в 63 группах и слотах). Буферы «Заявки» считаются по-старому.
+    # «мест нет» там, где места есть (на копии базы 12.11 табло показывало 72 свободных,
+    # сумма по строкам — 102, а «Места» в тот же день — 146; по правилу — 93).
+    # Буферы «Заявки» считаются по-старому.
     po_pravilu = _mesta_po_pravilu()
     groups = []
     for r in rows:
@@ -10126,12 +10127,25 @@ def api_mesta_voronka():
     записанных на пробное. Разница между «учится» и «оплачено» поэтому
     складывается из четырёх разных состояний, и работа с ними разная:
     ходит без оплаты — дожим; посетил пробное — продажа; записан на
-    пробное — довести до занятия; подтвердил заявку — записать на дату."""
+    пробное — довести до занятия; подтвердил заявку — записать на дату.
+
+    13.11.2026, Борис (М2, «честное „оплатили“»). Для детей «Учится» оплата теперь —
+    оплаченный абонемент на ТЕКУЩИЙ месяц (mesta.oplatili_mesyac), а не «платил хоть раз
+    с июня»: страница писала «учится без оплаты — 0», когда ноябрь не оплатили 13 семей.
+    «Учится» без оплаты месяца делится на две стадии: «абонемент закончился» — за эту
+    группу или предмет в сезоне уже платили, нужно продление; «учится без оплаты» — не
+    платили ни разу. Абонемент того же предмета в другой группе и абонемент без привязки
+    к группе по-прежнему считаются оплатой. Пробные стадии считаются как раньше: купил
+    ли абонемент сезона вообще. Число «оплачено · цель 311» было накопленным счётом
+    «платил хоть раз с июня» — оно отдаётся дальше под своим именем, а рядом —
+    сегодняшние «ходят / оплатили месяц» теми же числами, что на «Местах»."""
     from . import mesta
     import re as _re
     today = date.today().isoformat()
+    segodnya = mesta._segodnya()
     with db.get_conn() as conn:
         paid_idx = mesta._paid_by_class(conn)
+        opl_mes = mesta.oplatili_mesyac(conn, segodnya)
         paid_users = set().union(*paid_idx.values()) if paid_idx else set()
         cls = {r[0]: r[1] for r in conn.execute(
             "SELECT id, name FROM classes WHERE name LIKE '2627_%' AND (status IS NULL OR status='opened')")}
@@ -10144,6 +10158,15 @@ def api_mesta_voronka():
             return (cname or "").split("_")[1].split(" ")[0] if "_" in (cname or "") else ""
         ended_by_user: dict[int, str] = {}
         has_active: set[int] = set()
+        # 13.11.2026: оплата текущего месяца по предмету (перевели в другую группу того же
+        # предмета — абонемент остался на прежней) и дата конца последнего оплаченного
+        # абонемента по предмету — для стадии «абонемент закончился»
+        paid_subj_mes: dict[int, set[str]] = {}
+        for a in opl_mes["abonementy"]:
+            for c in a["cids"]:
+                if c in cls:
+                    paid_subj_mes.setdefault(a["uid"], set()).add(_subj(cls[c]))
+        konec_subj: dict[tuple, str] = {}
         for uid, end, raw in conn.execute(
                 "SELECT user_id, end_date, raw FROM user_subscriptions WHERE begin_date >= ?",
                 (mesta.SEASON_SELL_FROM,)):
@@ -10159,15 +10182,24 @@ def api_mesta_voronka():
                 for c in set(r.get("classIds") or []) | ({r["mainClassId"]} if r.get("mainClassId") else set()):
                     if c in cls:
                         paid_subj.setdefault(uid, set()).add(_subj(cls[c]))
+            if end:
+                for c in set(r.get("classIds") or []) | ({r["mainClassId"]} if r.get("mainClassId") else set()):
+                    if c in cls:
+                        k = (uid, _subj(cls[c]))
+                        konec_subj[k] = max(konec_subj.get(k, ""), end[:10])
             if end and end < today:
                 ended_by_user[uid] = max(ended_by_user.get(uid, ""), end)
             else:
                 has_active.add(uid)
-        rows = conn.execute(
-            "SELECT j.user_id, j.class_id, j.status_id, u.name, u.phone FROM joins j "
+        # 13.11.2026: запись в группу, удалённая в МойКлассе (пометка mk_udaleno), — не запись:
+        # ребёнка в группе уже нет, и строки «учится без оплаты» по ней быть не должно
+        ud_joins = db.udalennye("joins", conn)
+        rows = [tuple(r)[1:] for r in conn.execute(
+            "SELECT j.id, j.user_id, j.class_id, j.status_id, u.name, u.phone FROM joins j "
             "LEFT JOIN users u ON u.id=j.user_id WHERE j.status_id IN (2,58132,83760,58131,99336)").fetchall()
-        live_any = {r[0] for r in conn.execute(
-            "SELECT user_id FROM joins WHERE status_id IN (2,58131,58132,83760)")}
+            if r[0] not in ud_joins]
+        live_any = {r[1] for r in conn.execute(
+            "SELECT id, user_id FROM joins WHERE status_id IN (2,58131,58132,83760)") if r[0] not in ud_joins}
         # был на занятии сезона, а живой записи в группу нет (в CRM «Отказался»,
         # «Новая заявка», «Отработка»): пришёл на пробное и не купил — это
         # самая тёплая продажа, её нельзя терять из-за статуса записи
@@ -10187,6 +10219,17 @@ def api_mesta_voronka():
         return (uid in paid_idx.get(cid, set()) or uid in paid_generic
                 or _subj(cls.get(cid, "")) in paid_subj.get(uid, set()))
 
+    def paid_month(uid: int, cid: int) -> bool:
+        """Текущий месяц оплачен: абонемент месяца на эту группу, без привязки к группе
+        или на тот же предмет в другой группе."""
+        return (uid in opl_mes["oplatili"].get(cid, set()) or uid in opl_mes["lyubaya"]
+                or _subj(cls.get(cid, "")) in paid_subj_mes.get(uid, set()))
+
+    def platil_ranshe(uid: int, cid: int) -> bool:
+        """За эту группу или этот предмет в сезоне уже платили (в любой месяц)."""
+        return (uid in paid_idx.get(cid, set()) or uid in paid_generic
+                or (uid, _subj(cls.get(cid, ""))) in konec_subj)
+
     def skip(name: str | None) -> bool:
         return bool(_re.search(r"фейк|тест", (name or "").lower()))
 
@@ -10204,12 +10247,21 @@ def api_mesta_voronka():
             continue
         row = {"uid": uid, "name": name, "phone": phone, "class_id": cid,
                "group": cname.replace("2627_", "")[:50]}
-        if paid_here(uid, cid):
+        if st == 2:
+            # 13.11.2026: «Учится» — смотрим оплату ТЕКУЩЕГО месяца (см. докстринг)
+            if paid_month(uid, cid):
+                continue
+            if platil_ranshe(uid, cid):
+                # платили раньше, а на этот месяц оплаченного абонемента нет — продление
+                if ("ended", uid) not in seen:
+                    seen.add(("ended", uid))
+                    konec = konec_subj.get((uid, _subj(cname))) or ended_by_user.get(uid, "")
+                    out["абонемент закончился"].append({**row, "конец": konec})
+                continue
+        elif paid_here(uid, cid):
             # оплачено именно здесь; но если все оплаченные абонементы
             # закончились и нового нет — продление
-            if st == 2 and uid in ended_by_user and uid not in has_active and ("ended", uid) not in seen:
-                seen.add(("ended", uid))
-                out["абонемент закончился"].append({**row, "конец": ended_by_user[uid]})
+            # (13.11.2026: для «Учится» это теперь считает ветка выше — по месяцу)
             continue
         seen.add((uid, st))
         if uid in paid_users:
@@ -10281,6 +10333,7 @@ def api_mesta_voronka():
     # уходят из списков совсем, в отдельный свёрнутый блок внизу страницы:
     # проверить, кто и что закрыл, по-прежнему можно, но в работе их нет.
     start = db.get_setting("voronka_start", "2026-09-14")
+    mes0 = opl_mes["m0"].isoformat()
     done_n = 0
     done_rows: list = []
     # Лена 15.09: карточки с отказом и с договорённостью «позже» не должны
@@ -10310,7 +10363,10 @@ def api_mesta_voronka():
                 snoozed.append({**r, "стадия": k})
                 continue
             c = r.get("комментарий") or {}
-            if c.get("человек") and (c.get("ts") or "") >= start:
+            # 13.11.2026: неоплату текущего месяца комментарий прошлых месяцев не закрывает —
+            # для двух «денежных» стадий «сделано» считается с 1-го числа этого месяца
+            s_daty = max(start, mes0) if k in ("учится без оплаты", "абонемент закончился") else start
+            if c.get("человек") and (c.get("ts") or "") >= s_daty:
                 done_n += 1
                 done_rows.append({**r, "стадия": k, "сделано": True})
                 continue
@@ -10319,8 +10375,17 @@ def api_mesta_voronka():
         lst[:] = keep
         lst.sort(key=lambda r: (r.get("дней_тишины") is None, -(r.get("дней_тишины") or 0)))
     snoozed.sort(key=lambda r: r["отложено_до"])
+    # 13.11.2026: сегодняшние «ходят / оплатили месяц» — теми же числами, что на «Местах»
+    try:
+        mi = mesta.tablica(segodnya)["итого"]
+        seychas = {"месяц": opl_mes["mesyac"], "детей_ходят": mi["детей_ходят"],
+                   "детей_оплатили": mi["детей_оплатили"], "детей_без_оплаты": mi["детей_без_оплаты"]}
+    except Exception:  # noqa: BLE001 — без этих карточек страница всё равно рабочая
+        logging.getLogger("kidsup.mesta").exception("воронка: числа «Мест»")
+        seychas = {"месяц": opl_mes["mesyac"], "детей_ходят": None, "детей_оплатили": None, "детей_без_оплаты": None}
     return {"оплачено_в_группах_сезона": len(first_sell),
             "оплачено_уникальных_всего": len(paid_users),
+            "сейчас": seychas, "с_даты_месяц": max(start, mes0), "сегодня": today,
             "без_оплаты": {k: len(v) for k, v in out.items()},
             "ждём_на_пробное": len(waiting),
             "сделано": done_n, "сделанные": done_rows,

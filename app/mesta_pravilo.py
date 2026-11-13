@@ -46,6 +46,7 @@ PRAVILO_PODROBNO = ("Всего мест — вместимость группы
 UCHITSYA = {2}                      # «Учится»
 PROBNYE = {58132, 58131}            # «Записался на пробное», «Посетил пробное» (как в бланках групп)
 BYL_NA_PROBNOM = 58131
+PODTVERDIL = 83760                  # «Подтвердил заявку»: даты занятия ещё нет — место не держит, показываем справкой
 WD = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
 BUDNI = ('пн', 'вт', 'ср', 'чт', 'пт')
 # Мини-сад, решение Бориса 15.10.2026: пн и ср до 6 детей (комнату 3 занимает логопед), вт, чт, пт — до 8
@@ -113,7 +114,8 @@ def poschitat(classes, joins, lessons, today: dt.date, managers: dict | None = N
 
     Возвращает:
       'groups'  — открытые группы: {'cid', 'name', 'polnoe', 'dir', 'cap', 'busy', 'prob', 'left',
-                  'teacher'}; у мини-сада и нулевого класса ещё 'days' {день: cap/busy/prob/left};
+                  'teacher', 'podtv'}; у мини-сада и нулевого класса ещё 'days' {день: cap/busy/prob/left};
+                  podtv — «Подтвердил заявку» (справка: в счёт мест не входит);
       'closed'  — закрытые для записи, с причиной 'why';
       'vne'     — вне статистики, но с тем же счётом (логопеды и прочее): для страницы подбора;
       'tot'     — итог по открытым группам без сада и нулевого: cap, busy, prob, left (сальдо),
@@ -161,12 +163,13 @@ def poschitat(classes, joins, lessons, today: dt.date, managers: dict | None = N
         u_uch = {u for u, ss in deti.items() if _vid(ss) == 'uch'}
         u_prob = {u for u, ss in deti.items() if _vid(ss) == 'prob'}
         u_byl = {u for u in u_prob if BYL_NA_PROBNOM in deti[u]}
+        u_podtv = {u for u, ss in deti.items() if PODTVERDIL in ss and _vid(ss) is None}
         fut = [x for x in les.get(cid, []) if x['date'] >= s_today]
         tk = Counter(t for x in fut for t in (x.get('teacher_ids') or []))
         teacher = managers.get(tk.most_common(1)[0][0], '') if tk else ''
         row = {'cid': cid, 'name': n.replace('_', ' ').strip(), 'polnoe': n, 'dir': dr,
                'cap': c.get('cap') or 0, 'busy': len(u_uch), 'prob': len(u_prob), 'teacher': teacher or '',
-               '_uch': u_uch, '_prob': u_prob, '_byl': u_byl}
+               'podtv': len(u_podtv), '_uch': u_uch, '_prob': u_prob, '_byl': u_byl}
         row['left'] = row['cap'] - row['busy'] - row['prob']
         if dr in ('Логопед', 'Прочее'):
             row['why'] = ('логопед — индивидуальные занятия' if dr == 'Логопед'
