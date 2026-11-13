@@ -272,6 +272,9 @@ NOVYE_VECHER1 = {"POST /api/obzvon/audit/vernut", "POST /api/blank-grupp/obnovit
 # «Стоп-листе» (с причиной; старый POST /api/otkazy/release остался для рутин) и кнопка
 # «обновить сейчас» на «Долгах» (страница больше не ходит в МойКласс при каждом открытии).
 NOVYE_VECHER1 |= {"POST /api/otkazy/snyat", "POST /api/dolgi/obnovit"}
+# 13.11.2026, вечер (проверка «вечера 1»): кнопка «вернуть в стоп-лист» у снятой записи — сняли не
+# ту строку, а вернуть её со страницы было нельзя.
+NOVYE_VECHER1 |= {"POST /api/otkazy/vernut"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
 # чтобы пропажа была видна и без снимка «до».
 # 13.11.2026, Борис (уборка, вечер 1): из списка вышли GET и POST /api/bez-oplaty/status —
@@ -399,8 +402,10 @@ def test_menu(c, m):
     # «Проверка МойКласса» (раздел «МойКласс», туда же переехала «Явка») — стало 14; у владельца
     # ушли «Аномалии», «Журнал», «Откуда заявки», «Камеры», «Архив» — стало 6. Точный состав,
     # замены и поиск проверяет раздел «Л».
-    proverka("у админа 14 пунктов: Смена, Группы, МойКласс, Деньги, Справка",
-             [r for r, _ in nav.menu("admin")] == ["Смена", "Группы", "МойКласс", "Деньги", "Справка"]
+    # 13.11.2026, вечер (проверка «вечера 1»): раздел называется «МойКласс (Лиза)» — как в
+    # утверждённом Борисом тексте «Вечера 1» и в макете меню (днём был записан «МойКласс»).
+    proverka("у админа 14 пунктов: Смена, Группы, МойКласс (Лиза), Деньги, Справка",
+             [r for r, _ in nav.menu("admin")] == ["Смена", "Группы", "МойКласс (Лиза)", "Деньги", "Справка"]
              and len(_adresa(nav.menu("admin"))) == 14, [r for r, _ in nav.menu("admin")])
     proverka("у владельца — те же и 6 своих последним разделом",
              nav.menu("owner")[:-1] == nav.menu("admin") and nav.menu("owner")[-1] == nav.OWNER
@@ -1329,31 +1334,62 @@ def _hity(baza, path=None, rol=None) -> int:
         con.close()
 
 
+def _dozhdatsya_fona(sek: float = 20) -> None:
+    """Дождаться фонового потока перепроверки заявок («zayavki-audit»): он стартует при открытии
+    пульта и пишет в базу стенда."""
+    import threading
+    for t in threading.enumerate():
+        if t.name == "zayavki-audit":
+            t.join(sek)
+
+
+def _otkryt_i_schitat(c, baza, put, rol, schitat=None, **kw):
+    """Открыть страницу «из браузера» и вернуть (ответ, прирост счётчика открытий).
+
+    13.11.2026, вечер (проверка «вечера 1»): раздел «Ж1» падал в одном прогоне из трёх (и у
+    исполнителя B — в одном из шести). Причина не в счётчике: db.page_hit открывает базу с
+    timeout=0 и при занятой базе запись НАРОЧНО пропускает (счётчик — справка, страницу не
+    держит), а открытие /pult запускает фоновый поток «zayavki-audit», который пишет в ту же
+    базу. На нагруженной машине запись попадала на его транзакцию. Поведение счётчика не
+    меняем; в тесте ждём фоновый поток и повторяем открытие до трёх раз, пока прирост нулевой.
+    Проверка та же и не слабее: прирост от одного открытия — ровно 1 (от двух было бы 2)."""
+    import time
+    schitat = schitat or put
+    r, prirost = None, 0
+    for _ in range(3):
+        _dozhdatsya_fona()
+        do = _hity(baza, schitat, rol)
+        r = c.get(put, **kw)
+        prirost = _hity(baza, schitat, rol) - do
+        if prirost:
+            break
+        time.sleep(0.5)
+    return r, prirost
+
+
 def test_schetchik_i_pereezdy(c, m, baza):
     import time
     from starlette.requests import Request
     BR = {"Accept": "text/html,application/xhtml+xml", "Sec-Fetch-Dest": "document"}
 
     print("Ж1. Счётчик открытий: что пишет")
-    do = _hity(baza, "/pult", "admin")
-    r = c.get("/pult", auth=ADMIN, headers=BR)
+    r, prirost = _otkryt_i_schitat(c, baza, "/pult", "admin", auth=ADMIN, headers=BR)
     proverka("GET /pult под admin из браузера → 200 и +1 в page_hits с rol=admin",
-             r.status_code == 200 and _hity(baza, "/pult", "admin") == do + 1, (r.status_code, do, _hity(baza, "/pult", "admin")))
+             r.status_code == 200 and prirost == 1, (r.status_code, prirost, _hity(baza, "/pult", "admin")))
     con = sqlite3.connect(baza)
     den = con.execute("SELECT day FROM page_hits WHERE path='/pult' AND rol='admin'").fetchall()
     kol = [x[1] for x in con.execute("PRAGMA table_info(page_hits)")]
     con.close()
     proverka("строка одна на день (UPSERT), день — сегодняшний по часам сервера, колонки day/path/rol/n",
              den == [(m.autopilot._today().isoformat(),)] and kol == ["day", "path", "rol", "n"], (den, kol))
-    do = _hity(baza, "/owner", "owner")
-    c.get("/owner", auth=VLADELEC, headers=BR)
-    proverka("GET /owner под владельцем → rol=owner (роль из request.state доходит до слоя)",
-             _hity(baza, "/owner", "owner") == do + 1)
+    _, prirost = _otkryt_i_schitat(c, baza, "/owner", "owner", auth=VLADELEC, headers=BR)
+    proverka("GET /owner под владельцем → rol=owner (роль из request.state доходит до слоя)", prirost == 1, prirost)
     kluch = m.db.get_setting("pedagog_key")
-    c.get(f"/english/karta?k={kluch}", headers=BR)
+    _otkryt_i_schitat(c, baza, f"/english/karta?k={kluch}", "pedagog", schitat="/english/karta", headers=BR)
     proverka("педагог по ключу: rol=pedagog, ключ из адреса в таблицу не попал",
              _hity(baza, "/english/karta", "pedagog") == 1 and _hity(baza, f"/english/karta?k={kluch}") == 0)
-    kod, loc = c.get("/groups", auth=ADMIN, headers=BR, follow_redirects=False).status_code, None
+    r, _ = _otkryt_i_schitat(c, baza, "/groups", "admin", auth=ADMIN, headers=BR, follow_redirects=False)
+    kod, loc = r.status_code, None
     proverka("303 со старого адреса (/groups) тоже считается — это основание адрес удалить",
              kod == 303 and _hity(baza, "/groups", "admin") == 1, (kod, _hity(baza, "/groups")))
 
@@ -1412,7 +1448,11 @@ def test_schetchik_i_pereezdy(c, m, baza):
              r.status_code == 200 and 'id="otkrytiya"' not in r.text and "Подробно" in r.text, r.status_code)
     con.execute("DROP TABLE page_hits")
     con.commit()
+    _dozhdatsya_fona()
     r = c.get("/pult", auth=ADMIN, headers=BR)
+    if r.status_code == 200 and _hity(baza, "/pult", "admin") <= 0:      # база была занята фоном — открываем ещё раз
+        _dozhdatsya_fona()
+        r = c.get("/pult", auth=ADMIN, headers=BR)
     proverka("таблицы нет вовсе → 200, таблица создалась заново и запись легла",
              r.status_code == 200 and _hity(baza, "/pult", "admin") == 1, (r.status_code, _hity(baza, "/pult", "admin")))
     con.execute("DROP TABLE page_hits")
@@ -1510,7 +1550,7 @@ def test_schetchik_i_pereezdy(c, m, baza):
              and "потолк" not in r.text.lower())
 
     print("Ж4. Блок «Какие страницы открывают» — только владельцу")
-    c.get("/students", auth=VLADELEC, headers=BR)
+    _otkryt_i_schitat(c, baza, "/students", "owner", auth=VLADELEC, headers=BR)
     r = c.get("/journal", auth=VLADELEC)
     blok = r.text.split('id="otkrytiya"', 1)[-1].split("<h2>Подробно</h2>")[0]
     proverka("у владельца блок есть: адрес, всего, по ролям",
@@ -2181,7 +2221,7 @@ def test_posle_proverki(c, m, tree, baza):
 MENU_ADMIN_V1 = [
     ("Смена", [("Пульт", "/pult"), ("Ответы", "/waiting"), ("Линия", "/liniya")]),
     ("Группы", [("Подбор группы", "/enrollment"), ("Места", "/mesta"), ("Бланки групп", "/blank-grupp")]),
-    ("МойКласс", [("Проверка МойКласса", "/proverka-mk"), ("Явка", "/yavka")]),
+    ("МойКласс (Лиза)", [("Проверка МойКласса", "/proverka-mk"), ("Явка", "/yavka")]),   # название — по утверждённому тексту «Вечера 1»
     ("Деньги", [("Без оплаты", "/voronka"), ("Долги", "/dolgi")]),
     ("Справка", [("Списки", "/admin/docs"), ("Описания занятий", "/courses"), ("Промоутеры", "/promo/grafik"),
                  ("База знаний", "/base")]),
@@ -2484,8 +2524,12 @@ def test_uborka_bezopasnost(c, m, tree, baza):
                          and n.lstrip("+") not in NOMERA_CENTRA)
         proverka(f"{put}: только выдуманные номера и номера центра", not chuzhie, chuzhie[:5])
     dost = open(os.path.join(tree, "app/dostavka.py"), encoding="utf-8").read()
+    # 13.11.2026, вечер (проверка «вечера 1»): ошибочный номер из опечатки здесь был вписан целиком —
+    # возможно, это телефон постороннего человека, а репозиторий публичный. Проверяем без него:
+    # запасной номер после get_setting("digest_phone") в файле один, и это номер сводки автопилота.
+    zapasnye = set(re.findall(r'get_setting\("digest_phone"\) or "(\d+)"', dost))
     proverka("запасной номер тревоги о канале — тот же, что у сводки автопилота (была опечатка в двух цифрах)",
-             'get_setting("digest_phone") or "79104526673"' in dost and "79104936673" not in dost)
+             zapasnye == {"79104526673"}, len(zapasnye))
 
     print("М2. Мёртвый код убран, а то, что убирать рано, — на месте")
     est = marshruty(m)
@@ -3176,15 +3220,22 @@ def test_ustarevshee(c, m, tree, baza):
         return t.split('id="ln-stop-list"', 1)[1].split("</div>", 1)[0] if 'id="ln-stop-list"' in t else ""
 
     t = c.get("/otkazy", auth=ADMIN).text
-    proverka("страница: 5 действующих записей, у каждой — «снять» с полем причины; снятая — в свёрнутом «Сняты — 1»",
-             "Стоп-лист: 5 семей" in t and t.count("<details class=snyat>") == 5 and t.count("name=prichina required") == 5
+    # 13.11.2026, вечер (проверка «вечера 1»): заголовок считает семьи, а не записи — у выдуманной
+    # семьи две записи (с телефона и из чата мессенджера), всего 5 записей у 4 семей; число
+    # записей названо рядом. Было «Стоп-лист: 5 семей».
+    proverka("страница: 5 действующих записей у 4 семей, у каждой записи — «снять» с полем причины; снятая — в свёрнутом «Сняты — 1»",
+             "Стоп-лист: 4 семьи, которым автоматика не пишет" in t and "Записей — 5" in t
+             and t.count("<details class=snyat>") == 5 and t.count("name=prichina required") == 5
              and "<details id=snyatye><summary>Сняты — 1</summary>" in t and "причина не записана" in t
              and "<details id=snyatye open" not in t, t.count("<details class=snyat>"))
     proverka("даты — «29.10.2026 14:44», а не «2026-10-29T14:44»; на телефоне запись идёт карточкой — кнопка «снять» не за краем экрана",
              "29.10.2026 14:44" in t and "2026-10-29T14:44" not in t and "@media (max-width:700px)" in t
              and ".tabl table,.tabl tbody,.tabl tr,.tabl td{display:block" in t)
-    proverka("кнопка шлёт телефон семьи, у чата без телефона — номер записи; старой подсказки про запрос в адресной строке нет",
-             t.count(f'data-phone="{semya}"') == 2 and t.count("data-id=") == 1 and "fetch('/api/otkazy/snyat'" in t
+    # 13.11.2026, вечер (проверка «вечера 1»): у чата без телефона кнопка шлёт ключ записи (chat), а не
+    # её номер (rowid) — номера меняются при пересборке списка, и старая вкладка сняла бы чужую семью.
+    proverka("кнопка шлёт телефон семьи, у чата без телефона — ключ записи (chat), не номер; старой подсказки про запрос в адресной строке нет",
+             t.count(f'data-phone="{semya}"') == 2 and t.count('data-chat="5139000002"') == 1 and "data-id=" not in t
+             and "telo.chat = f.dataset.chat" in t and "fetch('/api/otkazy/snyat'" in t
              and "/api/otkazy/release" not in t)
     proverka("до снятия: предохранитель отправок не пускает письмо семье — «клиент отказался»",
              ujdet(SEMYA)["уйдёт"] is False and "клиент отказался" in ujdet(SEMYA)["причина"]
@@ -3250,12 +3301,30 @@ def test_ustarevshee(c, m, tree, baza):
     r = c.post("/api/otkazy/snyat", json={"phone": SEMYA, "prichina": "второй раз"}, auth=VLADELEC, headers=SVOYA_STRANICA)
     proverka("повторное снятие той же семьи — 400; автор и причина первого снятия не затёрты",
              r.status_code == 400 and stroki("phone=?", (semya,)) == posle, r.status_code)
+    # 13.11.2026, вечер (проверка «вечера 1», два проверяющих): было «под общим входом имя берётся
+    # как прислано» — владелец под прежним паролем записывал в «Кто снял» «Лена», админ — «Борис».
+    # Теперь под общим входом имя из запроса не читается: подпись по роли. Чат без телефона
+    # снимается по ключу записи (chat); номер записи (id) — только если он всё ещё этой записи.
     bez_tel = stroki("chat='5139000002'")[0]["id"]
-    r = c.post("/api/otkazy/snyat", json={"id": bez_tel, "prichina": "чат оказался педагога, не клиента", "kto": "Лена"},
+    r = c.post("/api/otkazy/snyat", json={"chat": "5139000002", "id": bez_tel + 1000, "prichina": "чат оказался педагога, не клиента"},
                auth=VLADELEC, headers=SVOYA_STRANICA)
-    proverka("чат без телефона снимается по номеру записи; под общим входом имя берётся как прислано — как у галочек пульта",
-             r.status_code == 200 and r.json()["snyato"] == 1 and r.json()["phone"] == ""
-             and stroki("chat='5139000002'")[0]["snyal_kto"] == "Лена", r.text[:200])
+    proverka("номер записи не совпал с её ключом (список пересобрали, пока вкладка была открыта) — 400, ничего не снято",
+             r.status_code == 400 and "обновите" in r.text and stroki("chat='5139000002'")[0]["released"] == 0, r.text[:200])
+    r = c.post("/api/otkazy/snyat", json={"chat": "5139000002", "prichina": "чат оказался педагога, не клиента", "kto": "Лена"},
+               auth=VLADELEC, headers=SVOYA_STRANICA)
+    proverka("чат без телефона снимается по ключу записи; под общим входом присланное имя не берётся — подпись по роли",
+             r.status_code == 200 and r.json()["snyato"] == 1 and r.json()["phone"] == "" and r.json()["kto"] == "Борис"
+             and stroki("chat='5139000002'")[0]["snyal_kto"] == "Борис", r.text[:200])
+    with m.db.get_conn() as conn:
+        conn.execute("INSERT INTO otkazy (chat, phone, ts, text, source) VALUES ('5139000007', '', "
+                     "'2026-11-02T10:00:00+03:00', 'отмените запись', '')")
+    r = c.post("/api/otkazy/snyat", json={"id": stroki("chat='5139000007'")[0]["id"], "prichina": "проверка номера записи", "kto": "Борис"},
+               auth=ADMIN, headers=SVOYA_STRANICA)
+    proverka("по номеру записи (запрос руками) снять по-прежнему можно; админу под общим входом не подписаться «Борисом»",
+             r.status_code == 200 and r.json()["snyato"] == 1 and r.json()["kto"] == "админ"
+             and stroki("chat='5139000007'")[0]["snyal_kto"] == "админ", r.text[:200])
+    with m.db.get_conn() as conn:
+        conn.execute("DELETE FROM otkazy WHERE chat='5139000007'")
     nast_podpis = m.vhod.podpis
     m.vhod.podpis = lambda request, ot_imeni="": "Лиза"          # личный вход: vhod.podpis всегда отдаёт имя вошедшего
     try:
@@ -3265,7 +3334,8 @@ def test_ustarevshee(c, m, tree, baza):
         m.vhod.podpis = nast_podpis
     proverka("автор — с сервера (vhod.podpis): вошедшей Лизе не подписаться «Борисом»",
              r.status_code == 200 and r.json()["kto"] == "Лиза" and stroki("phone='9990003002'")[0]["snyal_kto"] == "Лиза"
-             and "vhod.podpis(request" in inspect.getsource(m.api_otkazy_snyat), r.text[:200])
+             and "vhod.podpis(request" in inspect.getsource(m._otkazy_kto)
+             and "_otkazy_kto(request" in inspect.getsource(m.api_otkazy_snyat), r.text[:200])
     with m.db.get_conn() as conn:
         conn.execute("INSERT INTO otkazy (chat, phone, ts, text, source) VALUES ('9990003004', '9990003004', "
                      "'2026-11-01T10:00:00+03:00', 'отмените запись', 'телефон чата')")
@@ -3291,7 +3361,8 @@ def test_ustarevshee(c, m, tree, baza):
              "Стоп-лист: 0 семей" in stranica and "Пока пусто" in stranica and "<summary>Сняты — 6</summary>" in stranica
              and "мама написала 12.11, что передумали" in snyatye and "админ<br>" in snyatye and "Лиза<br>" in snyatye
              and "чат оказался педагога, не клиента" in snyatye and re.search(r"админ<br>\d\d\.\d\d\.\d{4} \d\d:\d\d", snyatye) is not None
-             and snyatye.count("причина не записана") == 2 and "дата не записана" in snyatye, snyatye[:300])
+             and snyatye.count("причина не записана") == 2 and "дата не записана" in snyatye
+             and snyatye.count("вернуть в стоп-лист</button>") == 6, snyatye[:300])
     lenta = c.get("/api/otkazy", auth=ADMIN).json()["отказов"]
     proverka("/api/otkazy: прежние ключи на месте, добавлены id записи и «кто, когда, почему снял»",
              len(lenta) == 6 and {"чат", "телефон", "кто", "когда", "цитата", "как связали", "снят"} <= set(lenta[0])
@@ -3299,7 +3370,7 @@ def test_ustarevshee(c, m, tree, baza):
     r = c.post(f"/api/otkazy/add?phone={SEMYA}&text=" + quote("по телефону попросила больше не писать"), auth=ADMIN, headers=SVOYA_STRANICA)
     proverka("вернуть семью в стоп-лист руками (POST /api/otkazy/add) можно: запрет и плашка «Линии» снова действуют",
              r.status_code == 200 and r.json()["ok"] is True and otkaz.is_refused(SEMYA) and "В стоп-листе" in plashka_linii(semya)
-             and "Стоп-лист: 1 семей" in c.get("/otkazy", auth=ADMIN).text)
+             and "Стоп-лист: 1 семья, которой автоматика не пишет" in c.get("/otkazy", auth=ADMIN).text)
     with m.db.get_conn() as conn:
         conn.execute("DELETE FROM otkazy")
     proverka("таблица стоп-листа старого вида (без новых колонок) дополняется сама при открытии страницы или снятии, записи "

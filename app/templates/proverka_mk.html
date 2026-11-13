@@ -116,6 +116,7 @@
     <span class="metka kr">{{ g.vid }}</span>
     {% if g.podtverzhdeno %}<span class="metka sera">подтверждено владельцем</span>{% endif %}
     {% if g.tolko_vladelcu %}<span class="metka">видит только владелец</span>{% endif %}
+    {% if g.staryj_schet %}<span class="metka">старый счёт — ждёт вашего решения на «Долгах»; админам не показан</span>{% endif %}
     {% if g.ssylka %}<a href="{{ g.ssylka }}" target="_blank" rel="noopener">{{ g.ssylka_tekst }} ↗</a>
     {% elif g.ssylka_tekst %}<span>{{ g.ssylka_tekst }}</span>{% endif %}
   </div>
@@ -206,6 +207,10 @@
       не пропадает: проверь по карточке — возможно, уже исправлено.
       {% if rol == 'owner' %}Снять находку — кнопкой «не нарушение» на странице <a href="/audit">«Аномалии»</a>.{% endif %}</p>
     {% if kr.oshibka %}<div class="oshibka">Раздел сейчас не собрался: лента «Аномалии» не прочиталась. Клод видит это в журнале.</div>{% endif %}
+    {#- 13.11.2026, вечер: «Долг клиента» по старым счетам 2024–2025 админам красным не показываем — с ними
+        ничего делать не нужно, пока владелец не решил (блок «Старые счета» на «Долгах») -#}
+    {% if kr.starye_scheta %}<p class="r13-poyasn">Не показано: {{ kr.starye_scheta }} «долг клиента» по старым счетам —
+      они ждут решения владельца, делать с ними ничего не нужно (блок «Старые счета» на <a href="/dolgi">«Долгах»</a>).</p>{% endif %}
     {% for g in pervye %}{{ krasnaya(g) }}{% endfor %}
     {% if dalshe %}
     <details class="hvost"><summary>ещё {{ dalshe|length }} — показать все</summary>

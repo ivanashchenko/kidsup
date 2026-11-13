@@ -1809,21 +1809,55 @@ KRASNYE_VIDY = {
 }
 
 
+# 13.11.2026, вечер (проверка «вечера 1», копия базы 12.11): из 9 «денежных» красных находок у
+# админов 7 были «Долг клиента …» (ключ neg-balance) по семьям, весь долг которых — счета
+# 2024–2025 годов из блока «Старые счета — ждут решения владельца» на /dolgi, где сказано:
+# «админам с этими счетами ничего делать не нужно». Проверка заводит их заново 1-го числа
+# каждого месяца, то есть первые две недели месяца Лиза видела красные строки, с которыми
+# ей нечего делать. Такие находки админам не показываем (число называем отдельной строкой),
+# владельцу — показываем с пометкой. «Весь долг — старые счета» берётся из снимка «Долгов»
+# (sync_state, тот же, что у страницы /dolgi и /api/dolgi — его каждый вечер читает рутина);
+# снимка нет или он старше DOLGI_SNIMOK_CHASOV — показываем всё, как раньше.
+DOLGI_SNIMOK = "dolgi_snimok"          # тот же ключ, что main.DOLGI_KLYUCH (сверяет nav_testy)
+DOLGI_SNIMOK_CHASOV = 36
+
+
+def _dolzhniki_po_starym_schetam() -> set:
+    """user_id семей, у которых ВСЕ строки отчёта «Долгов» — в корзине «списать» (старые
+    счета, ждут решения владельца). Пусто — если снимка нет, он старый или не читается."""
+    try:
+        c = json.loads(db.get_state(DOLGI_SNIMOK) or "{}")
+        if not c or datetime.now() - datetime.fromisoformat(c["ts"]) > timedelta(hours=DOLGI_SNIMOK_CHASOV):
+            return set()
+        korziny: dict = defaultdict(set)
+        for r in (c.get("d") or {}).get("rows") or []:
+            if r.get("user_id"):
+                korziny[r["user_id"]].add(r.get("bucket"))
+        return {u for u, b in korziny.items() if b == {"списать"}}
+    except Exception:  # noqa: BLE001 — без снимка раздел показывает всё, как раньше
+        return set()
+
+
 def krasnye(vladelec: bool = False, seychas: datetime | None = None, dney: int = KRASNYE_DNEY) -> dict:
     """Красные находки ленты «Аномалии», записанные за последние dney дней, кроме снятых
     владельцем («не нарушение»). Находки одного ребёнка одного вида за один день склеены в
     одну строку (сверка честности пишет по две: абонемент и счёт). vladelec=False — только
-    виды из KRASNYE_ADMINAM. Лента не читается — пустой раздел с пометкой, страница жива."""
+    виды из KRASNYE_ADMINAM. Лента не читается — пустой раздел с пометкой, страница жива.
+    13.11.2026, вечер: «Долг клиента» по семье, весь долг которой — старые счета, ждущие
+    решения владельца, админам не показывается (starye_scheta — сколько таких), владельцу —
+    с пометкой staryj_schet."""
     seychas = seychas or _now()
     s_dnya = (seychas.date() - timedelta(days=max(1, dney) - 1)).isoformat()
-    itog = {"dney": dney, "s_dnya": s_dnya, "gruppy": [], "vsego": 0, "po_vidam": {}, "oshibka": ""}
+    itog = {"dney": dney, "s_dnya": s_dnya, "gruppy": [], "vsego": 0, "po_vidam": {}, "oshibka": "",
+            "starye_scheta": 0}
+    starye = _dolzhniki_po_starym_schetam()
     try:
         with db.get_conn() as conn:
             if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='audit_flags'").fetchone():
                 return itog
             udal = db.udalennye("users", conn)
             rows = [dict(r) for r in conn.execute(
-                "SELECT f.id, f.kind, f.title, f.detail, f.user_id, f.day, f.status, f.created_at, u.name "
+                "SELECT f.id, f.kind, f.key, f.title, f.detail, f.user_id, f.day, f.status, f.created_at, u.name "
                 "FROM audit_flags f LEFT JOIN users u ON u.id = f.user_id "
                 "WHERE f.level = 'high' AND COALESCE(f.status, 'new') != 'ok' AND substr(f.created_at, 1, 10) >= ? "
                 "ORDER BY substr(f.created_at, 1, 10) DESC, f.kind, f.id DESC", (s_dnya,))]
@@ -1838,6 +1872,10 @@ def krasnye(vladelec: bool = False, seychas: datetime | None = None, dney: int =
             continue
         naydeno = str(r["created_at"] or "")[:10]
         uid = r["user_id"]
+        staryj = (vid == "деньги" and str(r["key"] or "").startswith("neg-balance:") and uid in starye)
+        if staryj and not vladelec:
+            itog["starye_scheta"] += 1
+            continue
         g = gruppy.get((vid, uid, naydeno)) if uid else None
         if g is None:
             g = {"vid": vid, "vid_tekst": KRASNYE_VIDY.get(vid, vid), "uid": uid, "rebenok": r["name"] or "",
@@ -1852,6 +1890,7 @@ def krasnye(vladelec: bool = False, seychas: datetime | None = None, dney: int =
         if podrobno.startswith(nazv[:100]):          # сверка честности: название — обрезанный текст находки
             nazv, podrobno = podrobno, ""
         g["punkty"].append({"id": r["id"], "chto": nazv, "podrobno": podrobno})
+        g["staryj_schet"] = g.get("staryj_schet", False) or staryj
         g["podtverzhdeno"] = g["podtverzhdeno"] or r["status"] == "violation"
         itog["vsego"] += 1
         itog["po_vidam"][vid] = itog["po_vidam"].get(vid, 0) + 1
