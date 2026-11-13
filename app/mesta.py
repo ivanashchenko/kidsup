@@ -509,6 +509,9 @@ def tablica(today: date | None = None) -> dict:
         deti["записаны_на_пробное"] | log_deti["пробные"])
     return {"группы": out, "итого": itogo, "по_предметам": по_предметам,
             "по_дням": по_дням, "закрытые": закрытые,
+            # сколько групп закрыто только из-за пустого расписания: если их много, дело
+            # скорее в расписании или синхронизации, чем в наборе — страница предупредит
+            "без_занятий": sum(1 for g in sv["closed"] if g["why"] == mesta_pravilo.NET_ZANYATIY),
             "правило": mesta_pravilo.PRAVILO, "правило_подробно": mesta_pravilo.PRAVILO_PODROBNO,
             "месяц": opl["mesyac"], "сегодня": today.isoformat(),
             "логопед": logoped,
