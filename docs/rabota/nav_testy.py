@@ -1344,7 +1344,7 @@ def test_schetchik_i_pereezdy(c, m, baza):
     con.commit()
     con.close()
     m.db._page_hits_est = False
-    zamok = sqlite3.connect(baza, timeout=0)
+    zamok = sqlite3.connect(baza, timeout=30)      # сам замок ждёт: фоновые потоки стенда тоже пишут
     zamok.execute("BEGIN IMMEDIATE")
     t0 = time.time()
     try:
@@ -1426,8 +1426,8 @@ def test_schetchik_i_pereezdy(c, m, baza):
              and s["calls"]["talked"] <= s["calls"]["in"] + s["calls"]["out"], s["calls"])
     r = c.get("/journal", auth=VLADELEC)
     proverka("«Журнал»: раздел id=\"schetchiki\" — звонки, сообщения, записи по админам за 7 дней",
-             r.status_code == 200 and 'id="schetchiki"' in r.text and "Входящих звонков" in r.text
-             and "Отправлено сообщений" in r.text and "Записи в группы по админам" in r.text)
+             r.status_code == 200 and 'id="schetchiki"' in r.text and "входящих звонков" in r.text
+             and "отправлено сообщений" in r.text and "Записи в группы по админам" in r.text)
     proverka("SLA и «нагрузка» не перенесены", "SLA" not in r.text and "Нагрузка сегодня" not in r.text
              and "потолк" not in r.text.lower())
 

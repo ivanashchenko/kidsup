@@ -603,7 +603,9 @@ def page_hits_svod(s_dnya: str) -> tuple[dict, str]:
     вообще — чтобы «ни разу за 30 дней» не читали как правду на второй день работы счётчика)."""
     svod: dict = {}
     with get_conn() as conn:
-        conn.execute(_PAGE_HITS_SQL)
+        # таблицы ещё нет (счётчик ни разу не писал) — пусто; чтение базу на запись не берёт
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='page_hits'").fetchone():
+            return svod, ""
         for path, rol, n in conn.execute(
                 "SELECT path, rol, SUM(n) FROM page_hits WHERE day >= ? GROUP BY path, rol", (s_dnya,)):
             svod.setdefault(path, {})[rol] = int(n or 0)

@@ -29,16 +29,22 @@ API нет, но у записи, платежа и комментария ав�
 {#- 13.11.2026, шаг 2: счётчики со страницы /metrics («Дисциплина»). Сроки (SLA) и «нагрузка»
     не перенесены. Таблицы в обёртке с прокруткой — на телефоне страница вбок не едет. -#}
 {% if schet %}
+<style>
+/* списком, а не таблицей: на телефоне числа в правой колонке уезжали за край карточки */
+.schet-dnya { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.schet-dnya li { background: var(--card); border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 14px; }
+.schet-dnya b { display: inline-block; min-width: 2.2em; font-size: 17px; }
+@media (max-width: 600px) { .schet-tab th, .schet-tab td { padding: 8px 5px; font-size: 13px; }
+  .schet-tab th { letter-spacing: 0; font-size: 11px; } .schet-tab td:first-child { overflow-wrap: anywhere; white-space: normal; } }
+</style>
 <h2 id="schetchiki" style="scroll-margin-top:70px">Счётчики</h2>
 <h3>Звонки и сообщения за {{ day }}</h3>
-<div style="overflow-x:auto"><table class="data">
-  <tbody>
-    <tr><td>Входящих звонков (уникальных номеров)</td><td><b>{{ schet.calls['in'] }}</b></td></tr>
-    <tr><td>Исходящих звонков (уникальных номеров)</td><td><b>{{ schet.calls['out'] }}</b></td></tr>
-    <tr><td>Состоялось разговоров (уникальных номеров)</td><td><b>{{ schet.calls['talked'] }}</b></td></tr>
-    <tr><td>Отправлено сообщений</td><td><b>{{ schet.msgs }}</b></td></tr>
-  </tbody>
-</table></div>
+<ul class="schet-dnya">
+  <li><b>{{ schet.calls['in'] }}</b> входящих звонков (уникальных номеров)</li>
+  <li><b>{{ schet.calls['out'] }}</b> исходящих звонков (уникальных номеров)</li>
+  <li><b>{{ schet.calls['talked'] }}</b> состоялось разговоров (уникальных номеров)</li>
+  <li><b>{{ schet.msgs }}</b> отправлено сообщений</li>
+</ul>
 <p class="muted small">Звонки — из журнала АТС на сервере (его пишет Mango при каждом звонке),
 сообщения — отправленные через Wazzup.</p>
 
@@ -68,7 +74,7 @@ API нет, но у записи, платежа и комментария ав�
 {% if otkr.pervyy %}Счётчик работает с {{ otkr.pervyy }}{% if otkr.nepolnyy %} — это меньше {{ otkr.dney }} дней,
 «не открывали» пока значит «не открывали с этого дня»{% endif %}.{% else %}Записей пока нет: счётчик только включён.{% endif %}</p>
 {% if otkr.stroki %}
-<div style="overflow-x:auto"><table class="data">
+<div style="overflow-x:auto"><table class="data schet-tab">
   <thead><tr><th>Адрес</th><th>Всего</th><th>Админы</th><th>Владелец</th><th>Педагоги</th></tr></thead>
   <tbody>
   {% for r in otkr.stroki %}
