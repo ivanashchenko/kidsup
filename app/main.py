@@ -2212,16 +2212,19 @@ OWNER_FIELDS = [
 
 
 def _owner_ctx(request: Request = None, msg: str = "", vhody: dict | None = None,
-               mk: dict | None = None, pedagogi: dict | None = None) -> str:
+               mk: dict | None = None, pedagogi: dict | None = None, zapis_itog: dict | None = None) -> str:
     """Страница владельца. 12.11.2026: вверху блок «Входы» (vhod.blok_vladelca) — пароли
     админов, ключи Клода, отключение старых входов. Виден только владельцу, вошедшему через
     форму; пришедшему через серое окно — ссылка «войти через форму». vhody — итог действия
     из блока (сообщение, отказ, ключ на один показ).
     14.11.2026: под ним блок «Ключи педагогов» (pedklyuchi.blok_vladelca) — по тем же
-    правилам; pedagogi — итог действия из него (сообщение, отказ, ссылка на один показ)."""
-    from . import pedklyuchi
+    правилам; pedagogi — итог действия из него (сообщение, отказ, ссылка на один показ).
+    14.11.2026: и блок «Запись занятий» (zapis.blok_vladelca) — по тем же правилам; zapis_itog —
+    итог действия из него."""
+    from . import pedklyuchi, zapis
     blok = vhod.blok_vladelca_bezopasno(request, vhody) if request is not None else ""
     blok_ped = pedklyuchi.blok_vladelca_bezopasno(request, pedagogi) if request is not None else ""
+    blok_zap = zapis.blok_vladelca_bezopasno(request, zapis_itog) if request is not None else ""
     # 13.11.2026, Борис — меню, вечер 1: из меню ушли пять страниц владельца, три страницы
     # админов и строка «Ещё» на пульте. Сами страницы открываются как раньше; чтобы убранное
     # не потерялось, ссылки на всё собраны здесь (списки — в app/nav.py).
@@ -2262,16 +2265,17 @@ p.note{{color:#6c6a86;font-size:14px}}p.nav{{font-size:14.5px;margin:-6px 0 10px
 .redko{{background:#fff;border:1px solid #e4e2f0;border-left:4px solid #312783;border-radius:12px;padding:10px 14px;margin:14px 0}}
 .redko h2{{color:#312783;font-size:18px;margin:2px 0 4px}}.redko p{{margin:6px 0;line-height:1.7}}.redko a{{color:#312783;font-weight:600;white-space:nowrap}}</style></head><body><div class='w'>
 <h1>Настройки владельца</h1>
-<p class='nav'><a href='/boris/docs'>← Мои документы</a> · <a href='#pedagogi'>Ключи педагогов</a> · <a href='#mk'>Ключ МойКласса и выгрузка</a> · <a href='/kamery/nastroyka'>Камеры</a> · <a href='/arhiv'>Архив страниц</a> · <a href='#redko'>Редко нужное</a></p>
+<p class='nav'><a href='/boris/docs'>← Мои документы</a> · <a href='#pedagogi'>Ключи педагогов</a> · <a href='#zapis'>Запись занятий</a> · <a href='#mk'>Ключ МойКласса и выгрузка</a> · <a href='/kamery/nastroyka'>Камеры</a> · <a href='/arhiv'>Архив страниц</a> · <a href='#redko'>Редко нужное</a></p>
 <p class='note'>Эта страница и всё, что на ней, закрыто отдельным паролем владельца — общий пароль admin сюда не подходит. Значения хранятся как секреты и в ответах сервера не показываются. Пустое поле — оставить как есть.</p>
 {redko}
 {blok}
 {blok_ped}
+{blok_zap}
 {_mk_razdel(mk)}
 <h2 style='color:#312783;font-size:20px'>Ключи банка, кассы и сервисов</h2>
 {('<div class="msg">' + html.escape(msg) + '</div>') if msg else ''}
 <form method='post'>{''.join(rows)}<button type='submit'>Сохранить</button></form>
-</div><script>{vhod._SKRIPT_VH}</script><script>{pedklyuchi.SKRIPT}</script></body></html>"""
+</div><script>{vhod._SKRIPT_VH}</script><script>{pedklyuchi.SKRIPT}</script><script>{zapis.SKRIPT}</script></body></html>"""
 
 
 @app.get("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -2393,6 +2397,46 @@ def owner_pedagogi_get():
     """Браузер открыл адрес ответа блока заново (выгрузил вкладку, обновил страницу без
     повторной отправки формы) — на блок «Ключи педагогов» страницы владельца, а не 405 (R2 №7)."""
     return RedirectResponse("/owner#pedagogi", status_code=303)
+
+
+@app.post("/owner/zapis", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+async def owner_zapis(request: Request):
+    """Блок «Запись занятий» на /owner (14.11.2026, Борис — видео занятий «Музыка и речь» в архив
+    методики на Яндекс.Диск): включить/выключить, группы, камера, папка, логин и пароль приложения
+    Яндекса, «Пробная запись 2 минуты сейчас», «Выгрузить сейчас».
+
+    Правила — те же, что у /owner/vhody и /owner/pedagogi: только человек-владелец, вошедший
+    через форму (служебный ключ, прежний пароль в сером окне, админ — 403); каждое действие
+    подтверждается паролем владельца (moy_parol); одноразовая метка формы не даёт повторить
+    пробную запись обновлением страницы. Пароль приложения в ответ и в журнал не попадает."""
+    from . import zapis
+    k = vhod.iz(request)
+    if not (k.get("rol") == "owner" and k.get("sposob") == "forma"):
+        raise HTTPException(status_code=403, detail="Записью занятий управляет только владелец, вошедший через форму: app.kidsup.ru/vhod")
+    form = await request.form()
+    from starlette.concurrency import run_in_threadpool
+    try:
+        itog = await run_in_threadpool(zapis.deystvie_vladelca, request, form)
+    except Exception:  # noqa: BLE001 — понятная страница, а не ошибка 500
+        logging.getLogger("kidsup.zapis").exception("действие владельца с записью занятий не выполнено")
+        itog = {"osh": "Не получилось — ошибка записана в журнал сервера. Что успело измениться, видно ниже."}
+    stranica = await run_in_threadpool(_owner_ctx, request, "", None, None, None, itog)
+    return HTMLResponse(stranica, status_code=200 if not itog.get("osh") else 400,
+                        headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY"})
+
+
+@app.get("/owner/zapis", dependencies=OWNER_AUTH)
+def owner_zapis_get():
+    """Страницу ответа блока открыли заново — на блок «Запись занятий», а не 405."""
+    return RedirectResponse("/owner#zapis", status_code=303)
+
+
+@app.get("/api/zapis/sostoyanie", dependencies=OWNER_AUTH)
+def api_zapis_sostoyanie():
+    """Запись занятий без секретов: включена ли, фильтр, камеры, папка, логин, введён ли пароль
+    приложения (только да/нет), место на сервере, ближайшие занятия, последние записи, сбои."""
+    from . import zapis
+    return zapis.sostoyanie()
 
 
 @app.get("/api/pedagogi/sostoyanie", dependencies=OWNER_AUTH)
@@ -5769,7 +5813,11 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # вход в кабинет Яндекса через браузер на сервере: автотаргетинг и расширенный
             # геотаргетинг Директ через API не отдаёт вообще, а прайс в Яндекс Бизнесе
             # правится только руками. Логин и пароль — только сюда, не в чат
-            "yandex_web_login", "yandex_web_password"}
+            "yandex_web_login", "yandex_web_password",
+            # 14.11.2026, Борис: запись занятий «Музыка и речь» (app/zapis.py) — включение («0» — выкл.),
+            # фильтр групп, кабинет = камера = id, папка на Яндекс.Диске; логин и пароль приложения
+            # Яндекса для WebDAV (пароль — в SECRET_KEYS; меняется и в блоке «Запись занятий» на /owner)
+            "zapis_on", "zapis_filtr", "zapis_kamery", "zapis_papka", "yadisk_login", "yadisk_password"}
 
 
 # Значения, которые нельзя отдавать целиком даже по авторизованному запросу.
@@ -5786,7 +5834,9 @@ SECRET_KEYS = {"cam_password", "anthropic_api_key", "anthropic_proxy_secret", "t
                # 14.11.2026 (Борис, Т1): общий ключ педагогов — кто его знает, видит всех детей групп
                # английского. До этого дня /api/settings отдавал его целиком. После смены ключа
                # владельцем настройка пуста: новый ключ хранится только хешем (app/pedklyuchi.py).
-               "pedagog_key"}
+               "pedagog_key",
+               # 14.11.2026 (запись занятий): пароль приложения Яндекса — доступ ко всему Диску hello@
+               "yadisk_password"}
 
 
 def _mask(key: str, value: str | None) -> str | None:

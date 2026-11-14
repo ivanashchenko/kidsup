@@ -134,7 +134,9 @@ TOLKO_VYKLADKA: frozenset = frozenset({"/api/deploy", "/api/restart", "/api/back
 OKNO_VYKLADKI: frozenset = frozenset({"/api/deploy", "/api/restart"})   # их ключ рутин получает в аварийное окно
 # Страницы настроек — только человеку-владельцу: служебным ключам 403.
 # 14.11.2026: /owner/pedagogi — блок «Ключи педагогов» (app/pedklyuchi.py), те же правила, что у /owner/vhody.
-TOLKO_CHELOVEK: frozenset = frozenset({"/owner", "/owner/vhody", "/owner/pedagogi", "/settings", "/settings/test"})
+# 14.11.2026: /owner/zapis — блок «Запись занятий» (app/zapis.py): пароль приложения Яндекса, пробная запись.
+TOLKO_CHELOVEK: frozenset = frozenset({"/owner", "/owner/vhody", "/owner/pedagogi", "/owner/zapis", "/settings",
+                                       "/settings/test"})
 # Вновь закрытые от админов 12.11.2026 (список 5.2). До этого дня они были открыты общему
 # входу admin, и в день выкладки для него ничего не меняется: общий admin проходит по ним,
 # пока ключ рутин ни разу не сработал (у klod пуст posl_zapros). После первого запроса ключом
