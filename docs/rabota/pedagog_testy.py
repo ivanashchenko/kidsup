@@ -563,7 +563,7 @@ def test_referer_log_css():
              re.search(r"\.kn-ped-punkty \.kn-ped-punkt \{[^}]*display: flex;[^}]*align-items: center;[^}]*justify-content: center",
                        mob) is not None)
     proverka("…на 320 px (max-width: 359px) шрифт пунктов мельче; версия файлов шапки — 4",
-             re.search(r"@media \(max-width: 359px\) \{[^@]*\.kn-ped-punkt \{[^}]*font-size: 14px", css) is not None
+             re.search(r"@media \(max-width: 359px\) \{[^@]*\.kn-ped-punkt \{[^}]*font-size: 13px", css) is not None
              and m.nav.VERSIYA == "4")
 
 

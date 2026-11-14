@@ -195,7 +195,7 @@
 /* 14.11.2026 (R2 №6): iPhone SE первого поколения и другие 320 px — пункты педагога чуть мельче,
    чтобы «После первого занятия» реже уходило в две строки */
 @media (max-width: 359px) {
-  #kidsup-nav .kn-ped-punkty .kn-ped-punkt { font-size: 14px; padding: 9px 4px; }
+  #kidsup-nav .kn-ped-punkty .kn-ped-punkt { font-size: 13px; padding: 9px 4px; }      /* обычный — 14px */
   #kidsup-nav .kn-ped-punkty { gap: 6px; }
 }
 
