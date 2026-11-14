@@ -606,6 +606,32 @@ def test_nastroyka():
         db.set_setting("proverka_mk_vmesto_punktov", "0")
         ap.card_quality()
         proverka("качество карточек «0»: пункт как раньше", len(zadachi), 1)
+        # 14.11.2026, Ира: «если номер в отказе — не буду звонить и спрашивать дату рождения».
+        # Карточки в отказе/архиве/«не писать» в проверку не попадают; живые — как раньше.
+        class MkOtkaz:
+            def fetch_all(self, *a, **k):
+                return [{"id": 9102, "name": "79990001234", "phone": "79990001234", "attributes": [],
+                         "clientStateId": 125957},
+                        {"id": 9103, "name": "лид без имени", "phone": "", "attributes": [],
+                         "clientStateId": 345759}]
+
+            def close(self):
+                pass
+        zadachi.clear()
+        ap._client = lambda: MkOtkaz()
+        ap.card_quality()
+        proverka("качество карточек: карточки в отказе и архиве не берутся — пункта нет", zadachi, [])
+        class MkSmes(MkOtkaz):
+            def fetch_all(self, *a, **k):
+                return super().fetch_all() + [{"id": 9104, "name": "лид без имени", "phone": "",
+                                                "attributes": [], "clientStateId": 125951}]
+        ap._client = lambda: MkSmes()
+        ap.card_quality()
+        # в пункте считается только живая карточка: «без даты рождения 1», «без телефона 1»
+        # (текст пункта режется по длине, поэтому сверяем счёт, а не ссылки)
+        proverka("…а живая карточка рядом с ними — в пункте, отказные не считаются",
+                 (len(zadachi), "без даты рождения 1," in (zadachi[0] if zadachi else ""),
+                  "без телефона 1" in (zadachi[0] if zadachi else "")), (1, True, True))
         # выключатель возвращает и прежнее правило «явка и проведено — не Лизе»
         # 13.11.2026, Борис (М4): явку ведёт Лиза — было «„0“: пункт со словом „явка“ Лизе снова
         # нельзя». Теперь «явка» Лизе можно при любой настройке; «проведено» без слова «явка» при

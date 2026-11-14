@@ -3572,6 +3572,12 @@ def card_quality() -> None:
         # что не заполнено и ссылка на каждую карточку.
         nado: dict[int, dict] = {}
         for u in users:
+            # 14.11.2026, Ира в чате: «если этот номер стоит в отказе — я не буду им звонить
+            # и спрашивать имя и дату рождения ребёнка, это бред». Карточки в отказе, архиве,
+            # «не писать» и других закрытых статусах (DEAD_STATES) в проверку не берём:
+            # дозаполнять их не нужно, а звонить ради этого семье, которая отказалась, нельзя.
+            if u.get("clientStateId") in DEAD_STATES:
+                continue
             name = (u.get("name") or "").strip()
             attrs = {a.get("attributeAlias"): a.get("value") for a in (u.get("attributes") or [])}
             chego = []
