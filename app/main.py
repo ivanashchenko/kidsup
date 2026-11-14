@@ -5813,11 +5813,15 @@ SETTABLE = {"crm_tasks_off", "auto_join_groups", "group_chats", "admin_schedule"
             # вход в кабинет Яндекса через браузер на сервере: автотаргетинг и расширенный
             # геотаргетинг Директ через API не отдаёт вообще, а прайс в Яндекс Бизнесе
             # правится только руками. Логин и пароль — только сюда, не в чат
-            "yandex_web_login", "yandex_web_password",
-            # 14.11.2026, Борис: запись занятий «Музыка и речь» (app/zapis.py) — включение («0» — выкл.),
-            # фильтр групп, кабинет = камера = id, папка на Яндекс.Диске; логин и пароль приложения
-            # Яндекса для WebDAV (пароль — в SECRET_KEYS; меняется и в блоке «Запись занятий» на /owner)
-            "zapis_on", "zapis_filtr", "zapis_kamery", "zapis_papka", "yadisk_login", "yadisk_password"}
+            "yandex_web_login", "yandex_web_password"}
+
+# 15.11.2026 (проверка V1, №1): настройки записи занятий (app/zapis.py) — включение, группы, камеры,
+# папка, логин и пароль приложения Яндекса — меняются ТОЛЬКО в блоке «Запись занятий» на /owner:
+# владельцем, вошедшим через форму, с подтверждением своим паролем. Через POST /api/settings их
+# мог бы тихо поменять ключ выкладки (увести архив видео детей на чужой Диск, расширить запись на
+# все группы) — без пароля владельца и без «Важного». Поэтому их нет в SETTABLE, а запрос получает 400.
+ZAPIS_NASTROYKI = frozenset({"zapis_on", "zapis_filtr", "zapis_kamery", "zapis_papka", "yadisk_login",
+                             "yadisk_password"})
 
 
 # Значения, которые нельзя отдавать целиком даже по авторизованному запросу.
@@ -5867,6 +5871,9 @@ async def api_get_settings():
 async def api_set_setting(payload: dict):
     """{"key": "...", "value": "..."} — только ключи из SETTABLE."""
     key, value = (payload.get("key") or "").strip(), payload.get("value")
+    if key in ZAPIS_NASTROYKI:
+        raise HTTPException(400, f"{key}: настройки записи занятий меняются на /owner, блок «Запись занятий» — "
+                                 "владельцем, вошедшим через форму, с его паролем")
     if key not in SETTABLE or value is None:
         raise HTTPException(400, f"key должен быть одним из {sorted(SETTABLE)}")
     # 13.11.2026, вечер: то же, что на странице /owner, — ключ Марквиза только из знаков,

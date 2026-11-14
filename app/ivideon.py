@@ -145,6 +145,7 @@ def login_start(code: str = "") -> dict:
         return {"ok": True, "already": True, "login": dict(_login)}
     _login.clear()
     _login["state"] = "starting"
+    _login["zapusk"] = _time.time()          # когда вход запускали последний раз (пауза в potok_ssylka)
     _th.Thread(target=_login_worker, daemon=True).start()
     return {"ok": True, "started": True}
 
@@ -175,31 +176,48 @@ def _ssylka_flv(url: str) -> str:
     return url + "&format=flv"
 
 
+# Вход заново из potok_ssylka — не чаще раза в 15 минут: при слетевшей сессии запись пробует ссылку
+# каждые 30–60 с, и без паузы Ivideon получил бы десятки входов с паролем (и писем с кодом) за занятие —
+# так учётку могут закрыть, а с ней сломается и фото-явка (проверка V1, №8).
+VHOD_PAUZA_S = 15 * 60
+
+
+def _id_v_adrese(url: str, cam_id: str) -> bool:
+    """Адрес запроса плеера — поток именно этой камеры: /cameras/<id>:… (не «<id>X», не другой)."""
+    return bool(cam_id) and _re.search(r"/cameras/" + _re.escape(cam_id) + r"(?::|/|\?|$)", url or "") is not None
+
+
 def potok_ssylka(kamera: str = "Комната 1", cam_id: str = "", zhdat_s: int = 25) -> dict:
     """Свежая ссылка на живой поток камеры: {"ok": True, "url": …} или {"ok": False, "error": …}.
 
-    Браузер — на ~30 секунд и под общей блокировкой с кадрами фото-явки (kadry._snap_lock):
-    два Chromium разом сервер с 2 ГБ памяти не тянет, а 07.10 одновременный запуск уже давал
-    пустые кадры. Сессия — data/ivideon_state.json; слетела и Ivideon просит код из письма —
-    запускаем login_start() (код он достаёт из ящика сам), ссылка будет на следующей попытке."""
+    Браузер — на ~30 секунд и под общей блокировкой с кадрами фото-явки (kadry._snap_lock, вне
+    очереди кадров — kadry.brauzer_dlya_zapisi): два Chromium разом сервер с 2 ГБ памяти не тянет,
+    а 07.10 одновременный запуск уже давал пустые кадры.
+
+    15.11.2026 (проверка V1, №6 и №8): камера — строго по id: клик только по точному названию
+    («Комната 1», не «Комната 10»), и годится только запрос /cameras/<id>:… этой камеры; без id —
+    отказ без браузера. Сессия слетела (страница входа или «Подтвердите вход») — форму здесь не
+    отправляем: login_start() (он же достаёт код из письма), и не чаще раза в VHOD_PAUZA_S."""
     from playwright.sync_api import sync_playwright
     from . import kadry, mkweb
     login, pw = db.get_setting("ivideon_login") or "", db.get_setting("ivideon_password") or ""
     if not login or not pw:
         return {"ok": False, "error": "не заданы ivideon_login / ivideon_password на /owner"}
+    if not cam_id:
+        return {"ok": False, "error": "не задан id камеры (настройка «Камера» на /owner) — без него поток не беру"}
     if _login.get("state") in ("starting", "wait_code") and _time.time() - _login.get("since", _time.time()) < 900:
         return {"ok": False, "error": "идёт вход в Ivideon с кодом из письма — ссылка будет после входа"}
     st = _state_path()
     nashli: list[str] = []
-    nuzhen_kod = False
+    nuzhen_vhod = False
     oshibka = ""
 
     def lovit(req):
         u = req.url
-        if "/live_stream" in u and "access_token=" in u and (not cam_id or cam_id in u):
+        if "/live_stream" in u and "access_token=" in u and _id_v_adrese(u, cam_id):
             nashli.append(u)
 
-    with kadry._snap_lock, sync_playwright() as p:
+    with kadry.brauzer_dlya_zapisi(), sync_playwright() as p:
         b = mkweb._launch(p)
         try:
             kw = {"viewport": {"width": 1400, "height": 1000}, "locale": "ru-RU"}
@@ -210,21 +228,17 @@ def potok_ssylka(kamera: str = "Комната 1", cam_id: str = "", zhdat_s: in
             pg.on("request", lovit)
             pg.goto(HOME, wait_until="domcontentloaded", timeout=60000)
             pg.wait_for_timeout(3000)
-            if "/service/login" in pg.url:
-                pg.fill("input[name='LoginForm[username]']", login)
-                pg.fill("input[name='LoginForm[password]']", pw)
-                pg.click("button[type=submit]", timeout=15000)
-                pg.wait_for_timeout(8000)
-                if "/service/login" in pg.url or "Подтвердите вход" in pg.inner_text("body"):
-                    nuzhen_kod = True
-                else:
-                    ctx.storage_state(path=str(st))
-            if not nuzhen_kod:
+            if "/service/login" in pg.url or "Подтвердите вход" in pg.inner_text("body"):
+                nuzhen_vhod = True
+            else:
                 try:
                     tochno = pg.get_by_text(kamera, exact=True)
-                    (tochno if tochno.count() else pg.get_by_text(kamera)).nth(0).click(timeout=15000)
+                    if not tochno.count():
+                        raise LookupError("нет точного совпадения")
+                    tochno.nth(0).click(timeout=15000)
                 except Exception as e:  # noqa: BLE001
-                    oshibka = f"камера «{kamera}» не нашлась в списке Ivideon ({type(e).__name__})"
+                    oshibka = (f"камера «{kamera}» не нашлась в списке Ivideon по точному названию "
+                               f"({type(e).__name__}) — проверьте настройку «Камера» на /owner")
                 if not oshibka:
                     for _ in range(int(zhdat_s * 2)):
                         if nashli:
@@ -234,12 +248,18 @@ def potok_ssylka(kamera: str = "Комната 1", cam_id: str = "", zhdat_s: in
                         ctx.storage_state(path=str(st))
         finally:
             b.close()
-    if nuzhen_kod:
+    if nuzhen_vhod:
+        posl = float(_login.get("zapusk") or 0)
+        if _time.time() - posl < VHOD_PAUZA_S:
+            cherez = max(1, int((posl + VHOD_PAUZA_S - _time.time()) // 60) + 1)
+            return {"ok": False, "error": "сессия Ivideon слетела, вход уже запускали недавно — повторю через "
+                                          f"~{cherez} мин (не чаще раза в 15 минут, чтобы Ivideon не закрыл вход)"}
         login_start()
-        return {"ok": False, "error": "Ivideon просит код из письма — вход запущен, ссылка будет на следующей попытке"}
+        return {"ok": False, "error": "Ivideon просит войти заново — вход (с кодом из письма) запущен, ссылка будет на "
+                                      "следующей попытке"}
     if oshibka:
         return {"ok": False, "error": oshibka}
     url = _ssylka_flv(nashli[-1]) if nashli else ""
-    if not url:
-        return {"ok": False, "error": "плеер Ivideon не запросил поток за %d с" % zhdat_s}
+    if not url or not _id_v_adrese(url, cam_id):
+        return {"ok": False, "error": "плеер Ivideon не запросил поток этой камеры за %d с" % zhdat_s}
     return {"ok": True, "url": url}

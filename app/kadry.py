@@ -18,6 +18,7 @@ import json
 import logging
 import re
 import threading
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -34,6 +35,45 @@ _busy: set[str] = set()
 # четыре кадра оказались заставкой плеера (21,8 КБ, кнопка play)
 _snap_lock = threading.Lock()
 MIN_BYTES = 80000         # настоящий кадр 600 КБ – 1 МБ, заставка плеера ~22 КБ
+# 15.11.2026 (запись занятий, проверка V2 m7): браузер тот же, что у ссылки на поток для записи
+# (ivideon.potok_ssylka). Ссылка за 2 минуты до занятия не должна стоять в очереди за кадрами:
+# пока она ждёт, кадр браузер не берёт (уже начатый кадр доснимается — это до ~30 с).
+_zhdut_zapis = [0]
+_zhdut_lock = threading.Lock()
+
+
+class _BrauzerDlyaZapisi:
+    """with kadry.brauzer_dlya_zapisi(): — браузер для записи занятий, вне очереди кадров."""
+
+    def __enter__(self):
+        with _zhdut_lock:
+            _zhdut_zapis[0] += 1
+        try:
+            _snap_lock.acquire()
+        finally:
+            with _zhdut_lock:
+                _zhdut_zapis[0] -= 1
+        return self
+
+    def __exit__(self, *a):
+        _snap_lock.release()
+        return False
+
+
+def brauzer_dlya_zapisi() -> _BrauzerDlyaZapisi:
+    return _BrauzerDlyaZapisi()
+
+
+def _brauzer_dlya_kadra(maks_s: float = 900) -> None:
+    """Взять _snap_lock для кадра, пропуская вперёд ждущую запись занятий (не дольше maks_s)."""
+    t0 = time.monotonic()
+    while True:
+        dolgo = time.monotonic() - t0 > maks_s
+        if (not _zhdut_zapis[0] or dolgo) and _snap_lock.acquire(timeout=1):
+            if not _zhdut_zapis[0] or dolgo:
+                return
+            _snap_lock.release()           # пока брали, запись встала в очередь — она первая
+        time.sleep(0.2)
 
 
 def _init(conn) -> None:
@@ -100,8 +140,11 @@ def _do_snap(key: str, meta: dict, src: str) -> None:
         fname = f"{meta['ts'][11:16].replace(':', '')}_{meta['room']}_{meta['lesson_id']}{meta.get('suffix', '')}.png"
         path = DIR / day / fname
         for attempt in range(3):
-            with _snap_lock:
+            _brauzer_dlya_kadra()
+            try:
                 r = snap(src, path, wait_ms=9000 + 5000 * attempt)
+            finally:
+                _snap_lock.release()
             if r["ok"]:
                 break
             log.warning("кадр %s пустой (%s байт), попытка %s", key, r["bytes"], attempt + 1)

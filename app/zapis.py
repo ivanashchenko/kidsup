@@ -15,11 +15,24 @@
   без кабинета — первая камера списка (все занятия МиР идут в К1);
 • за 2 минуты до начала — свежая ссылка на живой поток (ivideon.potok_ssylka: браузер на
   ~30 секунд под общей с фото-явкой блокировкой kadry._snap_lock — два Chromium сервер с 2 ГБ
-  памяти не тянет). С начала−1 мин до конца+1 мин ffmpeg пишет поток БЕЗ перекодирования
-  (-c copy, -t — длительность, чтобы файл закрывался сам; mp4 с +faststart) в
+  памяти не тянет; запись проходит к браузеру раньше кадров). С начала−1 мин до конца+1 мин
+  ffmpeg пишет поток БЕЗ перекодирования (-c copy, -t — длительность) в
   data/zapisi/<дата>/«2026-11-16 10-00 МиР Гр4.mp4». Имён детей в имени файла нет;
-• оборвался поток — новая ссылка, и запись продолжается во вторую часть («… (часть 2).mp4»)
-  до конца занятия;
+• 15.11.2026 (после двух проверок): поток открывает сам сервер на Python — с проверкой
+  сертификата (certifi или системный бандл) и переадресациями — и подаёт его ffmpeg в stdin
+  (-i pipe:0). Так ссылка с токеном не попадает ни в командную строку ffmpeg, ни в его журнал,
+  а статический ffmpeg 7.0.2 (imageio-ffmpeg) вообще не ходит в сеть: имена хостов он разрешать
+  не умеет (статическая glibc — SIGSEGV на любом имени, проверено). Остановка (выключили запись,
+  сторож, конец потока) — закрытием входа: ffmpeg дописывает файл сам, на любой версии;
+• ffmpeg пишет фрагментированный mp4 (+frag_keyframe+empty_moov, фрагмент не длиннее 2 с):
+  его можно смотреть, даже если процесс убит жёстко (SIGKILL, сбой питания) — недописанный
+  последний фрагмент отрезается (mp4_obrezat). После занятия часть перепаковывается -c copy
+  в обычный mp4 с оглавлением в начале (+faststart); не вышло — уходит как есть;
+• часть — не больше ~900 МБ (у бесплатного Яндекс.Диска предел файла 1 ГБ): упёрлись —
+  сразу следующая часть («… (часть 2).mp4») по той же ссылке;
+• оборвался поток — новая ссылка, и запись продолжается во вторую часть до конца занятия.
+  «Пропущено»/«ошибка» до конца занятия не окончательны: каждый тик пересматривает (запись
+  снова включили, занятие вернули, сбой прошёл) и пишет с текущего момента;
 • после занятия файл уходит на Яндекс.Диск по WebDAV (логин и пароль приложения — настройки
   yadisk_login / yadisk_password; пароль — секрет, не печатается и не пишется в журнал):
   папки создаются MKCOL («/Архив методики/Музыка и речь/2026-11»), размер на Диске
@@ -28,8 +41,11 @@
 • диск сервера (20 ГБ): свободно меньше 3 ГБ — запись не начинается; невыгруженных записей
   больше 6 ГБ — занятие пропускается с причиной. Пока пароль Диска не введён, запись идёт,
   файлы ждут на сервере в пределах этих 6 ГБ;
-• сбои (поток, ffmpeg, Диск, место, нет пароля) — один пункт Борису в пульт в день на тип
-  сбоя, без телефонов и имён детей; подробности — на /owner, блок «Запись занятий».
+• сбои — один пункт Борису в пульт в день на тип и только окончательные: занятие так и не
+  записано или записано не целиком (по итогам, после конца занятия), Диск не принял файл два
+  раза подряд, нет пароля Диска. Удавшийся повтор пункта не даёт. Без телефонов и имён детей;
+  подробности — на /owner, блок «Запись занятий»;
+• права: видео 0600, папки 0700 — читает только служба.
 """
 from __future__ import annotations
 
@@ -37,6 +53,7 @@ import base64
 import html
 import http.client
 import logging
+import os
 import re
 import secrets
 import shutil
@@ -46,7 +63,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 
 from . import config, db
 
@@ -70,23 +87,38 @@ SSYLKA_ZA = timedelta(minutes=2)      # свежая ссылка на пото�
 NACHALO_ZA = timedelta(minutes=1)     # пишем с начала−1 мин…
 KONEC_POSLE = timedelta(minutes=1)    # …до конца+1 мин
 DLIT_BEZ_KONCA = timedelta(minutes=50)  # у занятия не указан конец — считаем 50 минут
-PROBA_S = 120                         # пробная запись — 2 минуты
+PROBA_S = 120                         # пробная запись — 2 минуты от начала записи (а не от нажатия)
+PROBA_ZHDAT_SSYLKU = timedelta(minutes=5)   # проба: столько пробуем получить поток, потом — отказ
+PROBA_RAZ_V = timedelta(minutes=5)    # пробная запись — не чаще раза в 5 минут и по одной
 GB = 1024 ** 3
+MB = 1024 ** 2
 MIN_SVOBODNO = 3 * GB                 # свободно меньше — запись не начинается
 MAX_LOKALNO = 6 * GB                  # невыгруженных больше — занятие пропускается
 REZERV = 1 * GB                       # столько оставляем свободным во время записи (-fs)
-MAX_FAYL = 4 * GB                     # одна часть записи не больше
+# одна часть записи не больше: у Яндекс.Диска без тарифа Яндекс 360 предел файла — 1 ГБ
+# (yandex.ru/support/disk/uploading.html); 900 МБ проходят при любом тарифе, и место под
+# перепаковку остаётся в REZERV
+MAX_FAYL = 900 * MB
 MIN_FAYL = 100_000                    # меньше — не запись (плеер отдал заставку или поток пуст)
 POVTOR_VYGRUZKI = timedelta(hours=1)
-RW_TIMEOUT_S = 20                     # поток молчит дольше — ffmpeg закрывает файл, берём новую ссылку
+RW_TIMEOUT_S = 20                     # поток молчит дольше — закрываем вход ffmpeg, берём новую ссылку
+STOP_S = 10                           # так часто запись проверяет «владелец выключил»
+ZAKRYT_S = 20                         # вход закрыт, а ffmpeg не вышел за столько — SIGTERM, затем SIGKILL
+# фрагментированный mp4: файл читается и после SIGKILL (фрагмент — по ключевому кадру, но не длиннее 2 с)
+FRAG = ("-movflags", "+frag_keyframe+empty_moov+default_base_moof", "-frag_duration", "2000000")
+POKRYTIE = 0.9                        # записано меньше 90 % занятия — «записано не целиком» (пункт по итогам)
 SROK_METKI = 24 * 3600
+CA_FAYLY = ("/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt", "/etc/ssl/cert.pem",
+            "/etc/ssl/ca-bundle.pem")
 
 _lock = threading.Lock()
 _busy: set[int] = set()               # id записей, у которых сейчас идёт поток
 _vygr_lock = threading.Lock()         # выгрузка на Диск — по одному файлу
-_METKI: dict = {}                     # одноразовые метки формы блока на /owner
+_METKI: dict = {}                     # метки формы блока на /owner, выданные сервером: метка → [когда, использована]
 _vosstanovleno = [False]
 _zvuk_aac = [False]                   # контейнер не принял звук как есть — звук в AAC (видео всё равно copy)
+_ZAPUSK = time.time()                 # хвосты в .rab старше запуска процесса — от прошлого процесса
+_kolonki = [False]
 
 
 # --- подменяемые точки (тесты) ----------------------------------------------------------------
@@ -121,6 +153,82 @@ def _poluchit_ssylku(kam: dict) -> dict:
     return ivideon.potok_ssylka(kam.get("imya") or "", kam.get("cam_id") or "")
 
 
+def _ca_fayl() -> str | None:
+    """Файл корневых сертификатов для проверки сервера потока: certifi, иначе системный бандл.
+    Нет ни того, ни другого — None, и поток не открывается (без проверки не ходим)."""
+    try:
+        import certifi
+        p = certifi.where()
+        if p and os.path.isfile(p):
+            return p
+    except Exception:  # noqa: BLE001
+        pass
+    return next((p for p in CA_FAYLY if os.path.isfile(p)), None)
+
+
+class PotokOshibka(Exception):
+    """Поток не открылся: текст — без адреса и токена."""
+
+
+def _otkryt_potok(url: str):
+    """Живой FLV по ссылке плеера → (соединение, ответ). HTTPS — только с проверкой сертификата
+    и имени хоста; до 5 переадресаций, с https на http не переходим. Ошибка — PotokOshibka.
+    Таймаут сокета RW_TIMEOUT_S: поток замолчал — чтение падает, запись этой части заканчивается."""
+    tek = url
+    nachalo = urlsplit(url).scheme
+    for _ in range(6):
+        u = urlsplit(tek)
+        if u.scheme == "https":
+            ca = _ca_fayl()
+            if not ca:
+                raise PotokOshibka("на сервере не найден файл корневых сертификатов — без проверки сертификата "
+                                   "поток не открываю")
+            conn = http.client.HTTPSConnection(u.hostname or "", u.port or 443, timeout=RW_TIMEOUT_S,
+                                               context=ssl.create_default_context(cafile=ca))
+        elif u.scheme == "http" and nachalo == "http":
+            conn = http.client.HTTPConnection(u.hostname or "", u.port or 80, timeout=RW_TIMEOUT_S)
+        else:
+            raise PotokOshibka("переадресация потока не на https — не иду")
+        try:
+            conn.request("GET", (u.path or "/") + (f"?{u.query}" if u.query else ""),
+                         headers={"User-Agent": "Mozilla/5.0 (KidsUP-zapis/1)", "Accept": "*/*"})
+            r = conn.getresponse()
+        except ssl.SSLCertVerificationError as e:
+            conn.close()
+            raise PotokOshibka(f"сертификат сервера потока не прошёл проверку ({e.verify_message or 'ошибка'})") from None
+        except (OSError, http.client.HTTPException) as e:
+            conn.close()
+            raise PotokOshibka(f"сервер потока не ответил: {type(e).__name__}") from None
+        if r.status in (301, 302, 303, 307, 308):
+            kuda = r.getheader("Location") or ""
+            conn.close()
+            if not kuda:
+                raise PotokOshibka(f"переадресация {r.status} без адреса")
+            tek = urljoin(tek, kuda)
+            continue
+        if r.status != 200:
+            conn.close()
+            raise PotokOshibka(f"сервер потока ответил {r.status}")
+        return conn, r
+    raise PotokOshibka("слишком много переадресаций потока")
+
+
+def _katalog(p: Path) -> Path:
+    """Папка записей (и папка дня под ней) с правами 0700: видео детей читает только служба."""
+    for d in ((DIR,) if p == DIR else (DIR, p)):
+        d.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            os.chmod(d, 0o700)
+        except OSError:
+            pass
+    return p
+
+
+def _rab() -> Path:
+    """Служебные файлы записи (журналы ffmpeg, перепаковка) — DIR/.rab, 0700; чистится при запуске."""
+    return _katalog(DIR / ".rab")
+
+
 # --- настройки ----------------------------------------------------------------------------------
 
 def vklyucheno() -> bool:
@@ -141,7 +249,9 @@ def komnata_norm(s: str) -> str:
 
 
 def razobrat_kamery(s: str) -> tuple[dict, list[str]]:
-    """«К1 = Комната 1 = <id>; К2 = Комната 2» → ({"К1": {...}}, [ошибки])."""
+    """«К1 = Комната 1 = <id>; К2 = Комната 2 = <id>» → ({"К1": {...}}, [ошибки]).
+    15.11.2026 (проверка V1, №6): id камеры обязателен — поток берётся только той камеры, чей id
+    стоит в адресе, а не «похожей по названию» («Комната 1» и «Комната 10»)."""
     out: dict = {}
     osh: list[str] = []
     for chast in re.split(r"[;\n]", s or ""):
@@ -157,7 +267,11 @@ def razobrat_kamery(s: str) -> tuple[dict, list[str]]:
         if len(imya) > 60 or re.search(r"[<>\"'`]", imya):
             osh.append(f"«{chast.strip()[:40]}»: название камеры — как в Ivideon, например «Комната 1»")
             continue
-        if cam and not re.fullmatch(r"[A-Za-z0-9_-]{4,64}", cam):
+        if not cam:
+            osh.append(f"«{chast.strip()[:40]}»: нужен id камеры — третья часть, например "
+                       f"«{kom} = {imya} = 100-…» (запись — только с камеры с этим id)")
+            continue
+        if not re.fullmatch(r"[A-Za-z0-9_-]{4,64}", cam):
             osh.append(f"«{chast.strip()[:40]}»: id камеры — латиница, цифры, «-» и «_»")
             continue
         if len(p) > 3:
@@ -255,15 +369,23 @@ def _razobrat(row, rooms: dict, udal: set, kam: dict) -> dict | None:
     kamera = kam.get(kom) if kom else None
     pochemu = ""
     pervaya = next(iter(kam.values()), None)
+    # кабинет не указан: первая камера (К1) — только у групп «Музыка и речь» (все они идут в К1);
+    # у других групп, попавших под фильтр, — не пишем, чтобы не снять чужое занятие
     if not kom and pervaya:
-        kamera = pervaya
-        pochemu = f"кабинет в МойКлассе не указан — пишем {pervaya['komnata']}"
+        if FILTR_PO_UMOLCHANIYU.casefold() in (cname or "").casefold():
+            kamera = pervaya
+            pochemu = (f"кабинет в МойКлассе не указан — пишем {pervaya['komnata']}: группы "
+                       f"«{FILTR_PO_UMOLCHANIYU}» идут в {pervaya['komnata']}")
+        else:
+            pochemu = "кабинет в МойКлассе не указан — укажите кабинет занятия"
     if st == 2:
         pochemu = "отменено в МойКлассе"
     elif int(lid) in udal:
         pochemu = "удалено в МойКлассе"
-    elif kamera is None:
+    elif kamera is None and kom:
         pochemu = f"кабинет {kom} — камеры для записи нет (настройка «Камера»)"
+    elif kamera is None and not pochemu:
+        pochemu = "кабинет в МойКлассе не указан"
     return {"lesson_id": int(lid), "day": day, "begin": begin, "end": end, "class_id": cid,
             "gruppa": korotkoe_imya(cname, cid), "komnata": kom or (kamera or {}).get("komnata", ""),
             "kamera": kamera, "pisat": st != 2 and int(lid) not in udal and kamera is not None,
@@ -305,7 +427,12 @@ def _init(conn) -> None:
     conn.execute("""CREATE TABLE IF NOT EXISTS zapis (
         id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, lesson_id INTEGER, day TEXT,
         begin_time TEXT, end_time TEXT, gruppa TEXT, komnata TEXT, kamera TEXT,
-        status TEXT, prichina TEXT, proba INTEGER DEFAULT 0, sozdano TEXT, obnovleno TEXT)""")
+        status TEXT, prichina TEXT, proba INTEGER DEFAULT 0, sozdano TEXT, obnovleno TEXT, itog TEXT)""")
+    # itog — итог занятия подведён (после конца): «ok», «не нужно» или какой пункт ушёл в пульт
+    if not _kolonki[0]:
+        if "itog" not in {r[1] for r in conn.execute("PRAGMA table_info(zapis)")}:
+            conn.execute("ALTER TABLE zapis ADD COLUMN itog TEXT")
+        _kolonki[0] = True
     conn.execute("""CREATE TABLE IF NOT EXISTS zapis_fayly (
         id INTEGER PRIMARY KEY AUTOINCREMENT, zapis_id INTEGER, chast INTEGER, fayl TEXT, imya TEXT,
         razmer INTEGER DEFAULT 0, status TEXT, oshibka TEXT, popytok INTEGER DEFAULT 0,
@@ -356,9 +483,14 @@ def _maska(s: str) -> str:
 # --- сбои → пульт -------------------------------------------------------------------------------
 
 SBOI = {
-    "potok": "не удалось получить видеопоток камеры",
-    "ffmpeg": "запись оборвалась или ffmpeg не смог писать",
-    "disk": "Яндекс.Диск не принял файл",
+    # 15.11.2026 (проверка V2, m3): пункт — только по окончательному сбою. «Не удалось получить
+    # поток», «оборвалась», «нет места» ставятся по итогам занятия (_itogi), когда оно уже кончилось
+    # и так и не записано (или записано меньше POKRYTIE); удавшийся повтор пункта не даёт
+    "potok": "занятие не записано — не удалось получить видеопоток камеры",
+    "ffmpeg": "занятие не записано — ffmpeg не смог писать",
+    "ne_zapisano": "занятие не записано",
+    "ne_tselikom": "занятие записано не целиком",
+    "disk": "Яндекс.Диск не принял файл (два раза подряд)",
     "mesto": "не хватает места на сервере — занятие не записано",
     "parol": "записи ждут на сервере — нет пароля приложения Яндекса",
 }
@@ -443,86 +575,259 @@ def _net_mesta(m: dict) -> str:
 
 
 def _predel_fayla(m: dict) -> int:
+    """Предел одной части (-fs): не больше MAX_FAYL (предел файла Диска), остатка до MAX_LOKALNO
+    и свободного места минус REZERV."""
     return int(min(MAX_FAYL, MAX_LOKALNO - m["lokalno"], m["svobodno"] - REZERV))
 
 
 # --- ffmpeg -------------------------------------------------------------------------------------
 
+def _korobki(path: Path) -> tuple[list[tuple[bytes, int, int]], int, bool]:
+    """Верхние коробки mp4: [(тип, начало, длина)], размер файла, дошли ли ровно до конца.
+    Недописанная (длиннее остатка файла) коробка в список не входит."""
+    out: list[tuple[bytes, int, int]] = []
+    razmer = path.stat().st_size
+    pos = 0
+    with open(path, "rb") as f:
+        while pos + 8 <= razmer:
+            f.seek(pos)
+            h = f.read(8)
+            n, tip = int.from_bytes(h[:4], "big"), h[4:8]
+            if n == 1:
+                hb = f.read(8)
+                if len(hb) < 8:
+                    break
+                n = int.from_bytes(hb, "big")
+            elif n == 0:
+                n = razmer - pos
+            if n < 8 or pos + n > razmer:
+                break
+            out.append((tip, pos, n))
+            pos += n
+    return out, razmer, pos == razmer
+
+
 def mp4_celyy(path: Path) -> bool:
-    """Файл mp4 закрыт: верхние коробки идут до конца файла и среди них есть оглавление (moov).
-    Оборванная без завершения запись оглавления не имеет — такой файл не открывается."""
+    """Файл mp4 читается: верхние коробки идут ровно до конца файла, оглавление (moov) есть, а у
+    фрагментированного (так идёт запись) за каждым moof следует его mdat. Оборванная без
+    завершения обычная запись оглавления не имеет — такой файл не открывается."""
     try:
-        razmer = path.stat().st_size
-        vidno = set()
-        with open(path, "rb") as f:
-            pos = 0
-            while pos + 8 <= razmer:
-                f.seek(pos)
-                h = f.read(8)
-                n, tip = int.from_bytes(h[:4], "big"), h[4:8]
-                if n == 1:
-                    n = int.from_bytes(f.read(8), "big")
-                elif n == 0:
-                    n = razmer - pos
-                if n < 8:
-                    return False
-                vidno.add(tip)
-                pos += n
-        return pos == razmer and b"moov" in vidno
+        kor, _, do_konca = _korobki(path)
+    except OSError:
+        return False
+    tipy = [k[0] for k in kor]
+    if not do_konca or b"moov" not in tipy:
+        return False
+    return all(t != b"moof" or (i + 1 < len(tipy) and tipy[i + 1] == b"mdat") for i, t in enumerate(tipy))
+
+
+def mp4_fragmentirovan(path: Path) -> bool:
+    try:
+        return any(k[0] == b"moof" for k in _korobki(path)[0])
     except OSError:
         return False
 
 
-def komanda(exe: str, url: str, path: Path, dlit: int, predel: int) -> list[str]:
+def mp4_obrezat(path: Path) -> bool:
+    """Запись оборвалась жёстко (SIGKILL, сбой питания, нехватка памяти): у фрагментированного
+    mp4 отрезать недописанный хвост — всё до последнего целого фрагмента смотрится. → годен ли
+    файл после этого. Обычный (не фрагментированный) mp4 без оглавления так не спасти."""
+    try:
+        kor, razmer, _ = _korobki(path)
+    except OSError:
+        return False
+    tipy = [k[0] for k in kor]
+    if b"moov" not in tipy or b"moof" not in tipy:
+        return mp4_celyy(path)
+    konec, i = 0, 0
+    while i < len(kor):
+        tip, pos, n = kor[i]
+        if tip == b"moof":
+            if i + 1 < len(kor) and kor[i + 1][0] == b"mdat":
+                konec = kor[i + 1][1] + kor[i + 1][2]
+                i += 2
+                continue
+            break                          # moof без своего mdat — недописанный фрагмент
+        konec = pos + n
+        i += 1
+    if 0 < konec < razmer:
+        try:
+            with open(path, "r+b") as f:
+                f.truncate(konec)
+        except OSError:
+            return False
+        log.warning("запись %s оборвалась жёстко — недописанный хвост отрезан (%s → %s байт)",
+                    path.name, razmer, konec)
+    return mp4_celyy(path)
+
+
+def komanda(exe: str, path: Path, dlit: int, predel: int) -> list[str]:
+    """Команда записи. Поток приходит в stdin (pipe:0) — ссылки с токеном в командной строке нет."""
     zvuk = ["-c:v", "copy", "-c:a", "aac", "-b:a", "64k"] if _zvuk_aac[0] else ["-c", "copy"]
-    return [exe, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-            "-rw_timeout", str(int(RW_TIMEOUT_S * 1_000_000)),   # столько секунд без данных — поток оборвался
-            "-i", url, "-t", str(int(dlit)),
+    return [exe, "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "flv", "-i", "pipe:0", "-t", str(int(dlit)),
             "-map", "0:v:0", "-map", "0:a:0?", *zvuk,
-            "-fs", str(int(predel)), "-movflags", "+faststart", "-f", "mp4", str(path)]
+            "-fs", str(int(predel)), *FRAG, "-f", "mp4", str(path)]
+
+
+def _nasos(resp, p, sost: dict) -> None:
+    """Поток → stdin ffmpeg. Конец потока, тишина RW_TIMEOUT_S, просьба остановиться (sost["stop"])
+    или выход ffmpeg (-t, -fs) — вход закрывается, ffmpeg дописывает файл и выходит сам."""
+    try:
+        while not sost["stop"]:
+            try:
+                ch = resp.read1(64 * 1024)
+            except TimeoutError:
+                sost["osh"] = f"поток молчал {RW_TIMEOUT_S} с"
+                break
+            except (OSError, http.client.HTTPException, ValueError) as e:
+                sost["osh"] = f"поток оборвался: {type(e).__name__}"
+                break
+            if not ch:
+                sost["osh"] = "сервер потока закрыл соединение"
+                break
+            try:
+                p.stdin.write(ch)
+            except (OSError, ValueError):
+                break                      # ffmpeg закончил сам (-t, -fs) или упал
+    finally:
+        try:
+            p.stdin.close()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            resp.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _zhurnal_otkryt(path: Path):
+    """Журнал ошибок ffmpeg: DIR/.rab, права 0600; удаляется сразу после части."""
+    zh = _rab() / f"{secrets.token_hex(6)}.ffmpeg.log"
+    return zh, os.fdopen(os.open(zh, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "wb")
 
 
 def _ffmpeg(url: str, path: Path, dlit: int, predel: int, stop=None) -> tuple[int, str]:
-    """Пишет поток в файл; → (код выхода, хвост ошибки без токена)."""
+    """Пишет поток в файл; → (код выхода, хвост ошибки без токена). -2 — поток не открылся.
+
+    Остановка (stop() — владелец выключил запись; сторож dlit+180 с) — закрытием входа: ffmpeg
+    дописывает фрагмент и выходит сам. Не вышел за ZAKRYT_S — SIGTERM, ещё через 10 с — SIGKILL
+    (фрагментированный mp4 после этого всё равно читается, см. mp4_obrezat)."""
     exe = _ffmpeg_exe()
     if not exe:
         return -1, "ffmpeg не найден на сервере"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    zhurnal = path.with_name("." + path.stem + ".ffmpeg.log")
-    t0 = time.monotonic()
-    with open(zhurnal, "wb") as err:
-        p = subprocess.Popen(komanda(exe, url, path, dlit, predel), stdin=subprocess.DEVNULL,
-                             stdout=subprocess.DEVNULL, stderr=err)
-        i = 0
-        while True:
-            try:
-                rc = p.wait(timeout=5)
-                break
-            except subprocess.TimeoutExpired:
-                i += 1
-                prosrocheno = time.monotonic() - t0 > dlit + 180
-                if prosrocheno or (stop is not None and i % 6 == 0 and stop()):
-                    p.terminate()            # ffmpeg по SIGTERM закрывает файл как положено
-                    try:
-                        rc = p.wait(timeout=60)
-                    except subprocess.TimeoutExpired:
-                        p.kill()
-                        rc = p.wait()
+    _katalog(path.parent)
+    try:
+        conn, resp = _otkryt_potok(url)
+    except PotokOshibka as e:
+        return -2, _maska(str(e))
+    zhurnal, err = _zhurnal_otkryt(path)
+    sost = {"stop": False, "osh": ""}
+    try:
+        with err:
+            p = subprocess.Popen(komanda(exe, path, dlit, predel), stdin=subprocess.PIPE,
+                                 stdout=subprocess.DEVNULL, stderr=err, umask=0o077)
+            nasos = threading.Thread(target=_nasos, args=(resp, p, sost), daemon=True, name="zapis-nasos")
+            nasos.start()
+            t0 = posl = time.monotonic()
+            zakryli = term = 0.0
+            while True:
+                try:
+                    rc = p.wait(timeout=1)
                     break
+                except subprocess.TimeoutExpired:
+                    pass
+                t = time.monotonic()
+                if not zakryli:
+                    prosrocheno = t - t0 > dlit + 180
+                    if not prosrocheno and stop is not None and t - posl >= STOP_S:
+                        posl = t
+                        prosrocheno = bool(stop())
+                    if prosrocheno:
+                        sost["stop"] = True    # насос закроет вход — ffmpeg допишет и выйдет
+                        zakryli = t
+                elif not term and t - zakryli > ZAKRYT_S:
+                    p.terminate()
+                    term = t
+                elif term and t - term > 10:
+                    p.kill()
+            sost["stop"] = True
+            nasos.join(RW_TIMEOUT_S + 5)
+    finally:
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001
+            pass
     try:
         hvost = zhurnal.read_bytes()[-2000:].decode("utf-8", "replace")
     except OSError:
         hvost = ""
     zhurnal.unlink(missing_ok=True)
-    hvost = " ".join(hvost.split())
+    hvost = " ".join((hvost + (" " + sost["osh"] if sost["osh"] else "")).split())
+    try:
+        if path.exists():
+            os.chmod(path, 0o600)
+    except OSError:
+        pass
     return rc, _maska(hvost)[-1000:]          # хранится и показывается хвост в 300 знаков (_pisat)
 
 
+def _peremuks(path: Path) -> str:
+    """Фрагментированный mp4 → обычный с оглавлением в начале (-c copy, +faststart): так файл
+    сразу открывают все плееры. → "" или почему не перепакован (тогда файл остаётся
+    фрагментированным — он тоже смотрится)."""
+    if not path.exists() or not mp4_fragmentirovan(path):
+        return ""
+    exe = _ffmpeg_exe()
+    if not exe:
+        return "перепаковка не сделана: ffmpeg не найден"
+    razmer = path.stat().st_size
+    if mesto()["svobodno"] < razmer + 200 * MB:
+        return "перепаковка не сделана: мало места на сервере"
+    tmp = _rab() / f"{secrets.token_hex(6)}.peremuks.mp4"
+    try:
+        r = subprocess.run([exe, "-hide_banner", "-loglevel", "error", "-y", "-i", str(path), "-map", "0", "-c", "copy",
+                            "-movflags", "+faststart", "-f", "mp4", str(tmp)], stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=1200, umask=0o077)
+        if not (r.returncode == 0 and tmp.exists() and mp4_celyy(tmp) and not mp4_fragmentirovan(tmp)
+                and tmp.stat().st_size >= razmer * 0.8):
+            hv = " ".join(r.stderr.decode("utf-8", "replace").split())[-120:]
+            return f"перепаковка не удалась ({r.returncode}{': ' + _maska(hv) if hv else ''}) — файл как есть"
+        os.replace(tmp, path)
+        os.chmod(path, 0o600)
+        return ""
+    except (OSError, subprocess.SubprocessError) as e:
+        return f"перепаковка не удалась ({type(e).__name__}) — файл как есть"
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _dovesti(fid: int) -> None:
+    """Готовая часть: фрагментированный mp4 → обычный (после занятия или перед выгрузкой)."""
+    with db.get_conn() as conn:
+        _init(conn)
+        f = conn.execute("SELECT * FROM zapis_fayly WHERE id=?", (fid,)).fetchone()
+    if not f or f["status"] != "gotov":
+        return
+    path = DIR / f["fayl"]
+    if not path.exists() or not mp4_fragmentirovan(path):
+        return
+    osh = _peremuks(path)
+    razmer = path.stat().st_size if path.exists() else 0
+    with db.get_conn() as conn:
+        conn.execute("UPDATE zapis_fayly SET razmer=?, zametka=? WHERE id=?",
+                     (razmer, "; ".join(x for x in (f["zametka"] or "", osh) if x)[:300], fid))
+    if osh:
+        log.warning("запись %s: %s", f["imya"], osh)
+
+
 def _imya_fayla(z: dict, chast: int) -> str:
-    vrem = (z.get("begin_time") or "00:00")[:5].replace(":", "-")
     if z.get("proba"):
+        # у пробы — время до секунды: две пробы не пишут в один файл (и на Диске не затирают друг друга)
+        vrem = (z.get("begin_time") or "00:00:00")[:8].replace(":", "-")
         osnova = f"{z['day']} {vrem} Проба {z.get('komnata') or ''}".strip()
     else:
+        vrem = (z.get("begin_time") or "00:00")[:5].replace(":", "-")
         osnova = f"{z['day']} {vrem} {z.get('gruppa') or 'Занятие'}"
     if chast > 1:
         osnova += f" (часть {chast})"
@@ -575,11 +880,13 @@ def _rabota_(zid: int) -> None:
     proba = bool(z["proba"])
     if proba:
         t_start = _seychas()
-        t_stop = t_start + timedelta(seconds=PROBA_S)
+        # 2 минуты считаются от начала записи (_pisat), а это — срок, до которого пробуем получить поток
+        t_stop = t_start + PROBA_ZHDAT_SSYLKU + timedelta(seconds=PROBA_S)
         kam = kamery().get(z["komnata"]) or next(iter(kamery().values()))
     else:
         # ждём «за 2 минуты до начала», заглядывая в расписание раз в минуту: занятие могли
-        # отменить или перенести, владелец — выключить запись
+        # отменить или перенести, владелец — выключить запись. Пропуск здесь не окончателен:
+        # tick пересматривает его каждую минуту до конца занятия
         while True:
             zan = _zanyatie(z["lesson_id"])
             if zan is None:
@@ -598,6 +905,7 @@ def _rabota_(zid: int) -> None:
             now = _seychas()
             if now >= t_ssylka:
                 break
+            _status(zid, "zhdyot", zan["pochemu"])
             _spat(min(60.0, (t_ssylka - now).total_seconds()))
         kam = zan["kamera"]
         t_start, t_stop = zan["begin"] - NACHALO_ZA, zan["end"] + KONEC_POSLE
@@ -612,17 +920,17 @@ def _rabota_(zid: int) -> None:
     if _seychas() >= t_stop - timedelta(seconds=15):
         itog = "занятие уже закончилось — сервер не успел начать запись" if not est else ""
     else:
-        m = mesto()
-        itog = _net_mesta(m)
-        if itog:
-            _sboy("mesto", f"{_kto(z)}: {itog}.")
-        else:
+        itog = _net_mesta(mesto())
+        if not itog:
             itog = _pisat(zid, z, kam, t_start, t_stop, chast, proba)
+    for f in _fayly(zid):                      # фрагментированные части → обычный mp4
+        if f["status"] == "gotov":
+            _dovesti(f["id"])
     gotovye = [f for f in _fayly(zid) if f["status"] in ("gotov", "vygruzhen")]
     z = _zapis(zid) or z
     if gotovye:
         n = len(gotovye)
-        _status(zid, "zapisano", "; ".join(x for x in (f"{n} части — поток обрывался" if n > 1 else "", itog) if x))
+        _status(zid, "zapisano", "; ".join(x for x in (f"{n} части" if n > 1 else "", itog) if x))
         vygruzit_zapis(zid)
     elif itog.startswith(PROPUSK):
         _status(zid, "propusk", itog)
@@ -638,31 +946,42 @@ def _kto(z: dict) -> str:
 
 def _pisat(zid: int, z: dict, kam: dict, t_start: datetime, t_stop: datetime, chast: int, proba: bool) -> str:
     """Ссылка → ffmpeg → часть; оборвалось — новая ссылка и следующая часть, до t_stop.
-    → "" (дописали до конца) или почему остановились раньше."""
+    → "" (дописали до конца) или почему остановились раньше. Пунктов в пульт здесь нет: итог
+    занятия подводит _itogi после его конца (удавшийся повтор — не сбой)."""
     neudach_ssylki = 0
     bystryh_padeniy = 0
     posl_osh = ""
     stop = (lambda: False) if proba else (lambda: not vklyucheno())
+    url_snova = ""                     # та же ссылка ещё раз: звук не для mp4, часть упёрлась в предел размера
+    pishem = False
+
+    def est_chasti():
+        return any(f["status"] in ("gotov", "vygruzhen") for f in _fayly(zid))
+
     while True:
         now = _seychas()
         if now >= t_stop - timedelta(seconds=15):
-            return "" if any(f["status"] in ("gotov", "vygruzhen") for f in _fayly(zid)) else posl_osh
+            return "" if est_chasti() else posl_osh
         if not proba and not vklyucheno():
             return "запись выключена владельцем во время занятия"
-        _status(zid, "ssylka")
-        try:
-            r = _poluchit_ssylku(kam) or {}
-        except Exception as e:  # noqa: BLE001
-            r = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:150]}"}
-        url = str(r.get("url") or "") if r.get("ok") else ""
-        if not url:
-            neudach_ssylki += 1
-            osh = _maska(r.get("error") or "нет ссылки")[:200]
-            posl_osh = f"не удалось получить поток: {osh}"
-            _status(zid, "ssylka", f"не удалось получить поток ({neudach_ssylki}-я попытка): {osh}")
-            _sboy("potok", f"{_kto(z)}: {osh}.")
-            _spat(30 if neudach_ssylki < 4 else 60)
-            continue
+        if url_snova:
+            url, url_snova = url_snova, ""
+        else:
+            _status(zid, "ssylka")
+            try:
+                r = _poluchit_ssylku(kam) or {}
+            except Exception as e:  # noqa: BLE001
+                r = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:150]}"}
+            url = str(r.get("url") or "") if r.get("ok") else ""
+            if not url:
+                neudach_ssylki += 1
+                osh = _maska(r.get("error") or "нет ссылки")[:200]
+                posl_osh = f"не удалось получить поток: {osh}"
+                _status(zid, "ssylka", f"не удалось получить поток ({neudach_ssylki}-я попытка): {osh}")
+                _spat(30 if neudach_ssylki < 4 else 60)
+                continue
+        if proba and not pishem:
+            t_stop = _seychas() + timedelta(seconds=PROBA_S)     # 2 минуты — от начала записи
         now = _seychas()
         if now < t_start:
             _spat((t_start - now).total_seconds())
@@ -672,10 +991,8 @@ def _pisat(zid: int, z: dict, kam: dict, t_start: datetime, t_stop: datetime, ch
             return ""
         m = mesto()
         predel = _predel_fayla(m)
-        if predel < 50 * 1024 * 1024:
-            pochemu = _net_mesta(m) or f"на сервере свободно {_gb(m['svobodno'])} ГБ — писать некуда"
-            _sboy("mesto", f"{_kto(z)}: {pochemu}.")
-            return pochemu
+        if predel < 50 * MB:
+            return _net_mesta(m) or f"на сервере свободно {_gb(m['svobodno'])} ГБ — писать некуда"
         imya = _imya_fayla(z, chast)
         otn = f"{z['day']}/{imya}"
         path = DIR / otn
@@ -684,36 +1001,58 @@ def _pisat(zid: int, z: dict, kam: dict, t_start: datetime, t_stop: datetime, ch
             fid = conn.execute("INSERT INTO zapis_fayly (zapis_id, chast, fayl, imya, status, nachalo) "
                                "VALUES (?,?,?,?,'pishetsya',?)", (zid, chast, otn, imya, _iso(now))).lastrowid
         _status(zid, "pishetsya", "")
+        pishem = True
         rc, err = _ffmpeg(url, path, dlit, predel, stop)
         razmer = path.stat().st_size if path.exists() else 0
-        celyy = razmer >= MIN_FAYL and mp4_celyy(path)
+        celyy = razmer >= MIN_FAYL and (mp4_celyy(path) or mp4_obrezat(path))
+        razmer = path.stat().st_size if path.exists() else 0
         konec = _seychas()
         zvuk_ne_tot = not _zvuk_aac[0] and rc != 0 and bool(ZVUK_NE_DLYA_MP4.search(err))
+        # упёрлись в -fs: ffmpeg выходит с кодом 0 и закрытым файлом — это не обрыв
+        upor = celyy and razmer >= predel - max(64 * 1024, min(2 * MB, predel // 50))
         err = err[-300:]
+        if celyy:
+            zametka = "" if rc == 0 and not err else f"ffmpeg {rc}: {err}"
+            if upor:
+                zametka = f"достигнут предел размера части ({_mb(predel)})"
         with db.get_conn() as conn:
             if celyy:
                 conn.execute("UPDATE zapis_fayly SET status='gotov', razmer=?, konec=?, zametka=? WHERE id=?",
-                             (razmer, _iso(konec), "" if rc == 0 else f"ffmpeg {rc}: {err}"[:300], fid))
+                             (razmer, _iso(konec), zametka[:300], fid))
             else:
                 conn.execute("UPDATE zapis_fayly SET status='bityy', razmer=0, konec=?, zametka=? WHERE id=?",
                              (_iso(konec), (f"ffmpeg {rc}: {err}" if err or rc else "файл пустой")[:300], fid))
         if not celyy:
             path.unlink(missing_ok=True)
-            posl_osh = f"ffmpeg не записал файл ({rc}: {err[-120:]})" if (rc or err) else "ffmpeg не записал файл"
+            if rc == -2:
+                posl_osh = f"поток не открылся: {err[-160:]}"
+            else:
+                posl_osh = f"ffmpeg не записал файл ({rc}: {err[-120:]})" if (rc or err) else "ffmpeg не записал файл"
         if zvuk_ne_tot:
             _zvuk_aac[0] = True              # mp4 не берёт этот звук как есть: видео по-прежнему copy, звук — в AAC
             log.warning("звук потока не ложится в mp4 как есть — дальше звук в AAC (видео без перекодирования)")
+            url_snova = url                  # ссылка свежая — второй раз браузер не нужен
             continue
         if konec >= t_stop - timedelta(seconds=15):
-            return "" if any(f["status"] in ("gotov", "vygruzhen") for f in _fayly(zid)) else posl_osh
+            return "" if est_chasti() else posl_osh
         if not proba and not vklyucheno():
             return "запись выключена владельцем во время занятия"
+        if upor:
+            chast += 1
+            if predel < MAX_FAYL:
+                opis = (f"часть {chast - 1}: достигнут предел размера — на сервере мало места "
+                        f"(свободно {_gb(m['svobodno'])} ГБ, ждут выгрузки {_gb(m['lokalno'])} ГБ)")
+            else:
+                opis = f"часть {chast - 1} достигла {_mb(predel)} (предел файла Диска) — пишу часть {chast}"
+            _status(zid, "pishetsya", opis)
+            url_snova = url                  # та же ссылка: разрыв между частями — секунды
+            continue
         # оборвалось раньше конца занятия: новая ссылка и следующая часть
         ushlo = (konec - now).total_seconds()
         opis = (f"{_kto(z)}: часть {chast} оборвалась через {int(ushlo // 60)} мин"
-                + (f" (ffmpeg {rc}: {err[-120:]})" if (rc or err) else "") + " — продолжаю в следующую часть.")
+                + (f" (ffmpeg {rc}: {err[-120:]})" if (rc or err) else "")
+                + " — продолжаю в следующую часть.")
         _status(zid, "pishetsya", opis)
-        _sboy("ffmpeg", opis)
         if celyy:
             chast += 1
         bystryh_padeniy = bystryh_padeniy + 1 if ushlo < 30 else 0
@@ -831,6 +1170,7 @@ def proverit_disk() -> dict:
 
 
 def _vygruzit_fayl(fid: int) -> bool:
+    _dovesti(fid)                            # часть осталась фрагментированной (перезапуск сервера) — перепаковать
     with db.get_conn() as conn:
         _init(conn)
         f = conn.execute("SELECT * FROM zapis_fayly WHERE id=?", (fid,)).fetchone()
@@ -870,7 +1210,10 @@ def _vygruzit_fayl(fid: int) -> bool:
         with db.get_conn() as conn:
             conn.execute("UPDATE zapis_fayly SET popytok=COALESCE(popytok,0)+1, posl_popytka=?, oshibka=? WHERE id=?",
                          (_iso(), osh, fid))
-        _sboy("disk", f"{f['imya']}: {osh}. Повтор раз в час, файл ждёт на сервере.")
+        # пункт в пульт — со второй неудачи подряд (удачная выгрузка файл с сервера убирает, так что
+        # popytok ≥ 2 у ждущего файла — это неудачи подряд); первая может пройти через час сама
+        if int(f.get("popytok") or 0) + 1 >= 2:
+            _sboy("disk", f"{f['imya']}: {osh}. Повтор раз в час, файл ждёт на сервере.")
         return False
     path.unlink(missing_ok=True)
     try:
@@ -930,10 +1273,25 @@ def _k_vygruzke(srazu: bool) -> list[int]:
 # --- минутный цикл ------------------------------------------------------------------------------
 
 def _vosstanovit() -> None:
-    """После перезапуска сервера: части, которые «писались», — закрытый файл в выгрузку, битый — прочь."""
+    """После перезапуска сервера: части, которые «писались», — в выгрузку (фрагментированный mp4
+    после жёсткого обрыва — с отрезанным недописанным хвостом), негодные — прочь; хвосты
+    прошлого процесса (журналы ffmpeg, недоделанная перепаковка) — прочь; права 0600/0700."""
     if _vosstanovleno[0]:
         return
     _vosstanovleno[0] = True
+    if DIR.exists():
+        _katalog(DIR)
+        for x in DIR.rglob("*"):
+            try:
+                if x.is_dir():
+                    os.chmod(x, 0o700)
+                elif x.parent.name == ".rab" or x.name.endswith(".ffmpeg.log"):
+                    if x.stat().st_mtime < _ZAPUSK:
+                        x.unlink(missing_ok=True)      # в журнале ffmpeg мог остаться адрес потока
+                else:
+                    os.chmod(x, 0o600)
+            except OSError:
+                pass
     with db.get_conn() as conn:
         _init(conn)
         rows = [dict(r) for r in conn.execute("SELECT * FROM zapis_fayly WHERE status='pishetsya'")]
@@ -943,11 +1301,11 @@ def _vosstanovit() -> None:
         if f["zapis_id"] in zanyaty:
             continue
         path = DIR / f["fayl"]
-        ok = path.exists() and path.stat().st_size >= MIN_FAYL and mp4_celyy(path)
+        ok = path.exists() and path.stat().st_size >= MIN_FAYL and (mp4_celyy(path) or mp4_obrezat(path))
         with db.get_conn() as conn:
             if ok:
                 conn.execute("UPDATE zapis_fayly SET status='gotov', razmer=?, zametka=? WHERE id=?",
-                             (path.stat().st_size, "запись прервал перезапуск сервера", f["id"]))
+                             (path.stat().st_size, "запись прервал перезапуск сервера — сохранено до обрыва", f["id"]))
             else:
                 conn.execute("UPDATE zapis_fayly SET status='bityy', razmer=0, zametka=? WHERE id=?",
                              ("запись прервал перезапуск сервера — файл не закрылся", f["id"]))
@@ -955,14 +1313,88 @@ def _vosstanovit() -> None:
             path.unlink(missing_ok=True)
 
 
+# итог «пропущено» с такой причиной — не сбой: пункта Борису нет
+NE_SBOY = ("отменено в МойКлассе", "удалено в МойКлассе", "занятие перенесено", "занятие пропало",
+           "запись выключена владельцем")
+
+
+def _t_stop_zapisi(z: dict) -> datetime | None:
+    end = _vremya(z.get("day") or "", z.get("end_time"))
+    return end + KONEC_POSLE if end else None
+
+
+def _do_konca(z: dict) -> bool:
+    """Части записи покрывают занятие до конца (запись не обрывалась раньше)."""
+    t_stop = _t_stop_zapisi(z)
+    konec = max((f["konec"] or "" for f in _fayly(z["id"]) if f["status"] in ("gotov", "vygruzhen")), default="")
+    if not t_stop or not konec:
+        return False
+    try:
+        return datetime.fromisoformat(konec) >= t_stop - timedelta(minutes=1)
+    except ValueError:
+        return False
+
+
+def _itogi(now: datetime) -> None:
+    """Итог закончившихся занятий — один раз на запись: занятие так и не записано или записано
+    меньше POKRYTIE → пункт Борису (по типу причины, один в день на тип, дальше — счётчик на
+    /owner). Пропуски по делу (отменено, перенесено, выключено владельцем) — без пункта."""
+    with db.get_conn() as conn:
+        _init(conn)
+        rows = [dict(r) for r in conn.execute(
+            "SELECT * FROM zapis WHERE proba=0 AND itog IS NULL AND day >= ?",
+            ((now.date() - timedelta(days=2)).isoformat(),))]
+    with _lock:
+        zanyaty = set(_busy)
+    for z in rows:
+        t_stop = _t_stop_zapisi(z)
+        if t_stop is None or now < t_stop or z["id"] in zanyaty:
+            continue
+        chasti = [f for f in _fayly(z["id"]) if f["status"] in ("gotov", "vygruzhen")]
+        prichina = z.get("prichina") or ""
+        if z["status"] in AKTIVNYE:            # поток пропал (перезапуск сервера после конца занятия)
+            z["status"] = "zapisano" if chasti else "oshibka"
+            prichina = prichina or "запись прервал перезапуск сервера"
+            _status(z["id"], z["status"], prichina)
+        itog, tip = "ok", ""
+        if not chasti:
+            if z["status"] == "propusk" and prichina.startswith(NE_SBOY):
+                itog = "не нужно"
+            else:
+                tip = ("mesto" if prichina.startswith("на сервере") else
+                       "potok" if prichina.startswith(("не удалось получить поток", "поток не открылся")) else
+                       "ffmpeg" if prichina.startswith("ffmpeg") else "ne_zapisano")
+                itog = tip
+                _sboy(tip, f"{_kto(z)}: {prichina or STATUSY.get(z['status'], z['status'])}.")
+        else:
+            t_start = (_vremya(z["day"], z.get("begin_time")) or t_stop) - NACHALO_ZA
+            vsego = max(1.0, (t_stop - t_start).total_seconds())
+            zapisano = 0.0
+            for f in chasti:
+                try:
+                    a_, b_ = datetime.fromisoformat(f["nachalo"]), datetime.fromisoformat(f["konec"])
+                except (TypeError, ValueError):
+                    continue
+                zapisano += max(0.0, (min(b_, t_stop) - max(a_, t_start)).total_seconds())
+            if zapisano < POKRYTIE * vsego and "запись выключена владельцем" not in prichina:
+                tip = itog = "ne_tselikom"
+                pr = re.sub(r"^\d+ части;?\s*", "", prichina)
+                _sboy(tip, f"{_kto(z)}: записано {int(zapisano // 60)} мин из {int(vsego // 60)}"
+                           + (f" ({len(chasti)} части)" if len(chasti) > 1 else "") + (f" — {pr}" if pr else "") + ".")
+        with db.get_conn() as conn:
+            conn.execute("UPDATE zapis SET itog=? WHERE id=?", (itog, z["id"]))
+
+
 def tick(now: datetime | None = None) -> list[int]:
-    """Раз в минуту из цикла автопилота: запустить потоки записи ближайших занятий,
-    повторить выгрузку, напомнить о пароле. → id записей, чьи потоки запущены."""
+    """Раз в минуту из цикла автопилота: запустить потоки записи ближайших занятий, пересмотреть
+    пропущенные (до конца занятия), подвести итог закончившихся, повторить выгрузку, напомнить о
+    пароле. → id записей, чьи потоки запущены."""
     now = (now or _seychas()).replace(tzinfo=None)
     _vosstanovit()
     zapushcheno: list[int] = []
     if vklyucheno():
         day = now.date().isoformat()
+        net_mesta = None
         for zan in zanyatiya(day):
             if not zan["pisat"]:
                 continue
@@ -977,9 +1409,36 @@ def tick(now: datetime | None = None) -> list[int]:
                              (key, zan["lesson_id"], day, zan["begin"].strftime("%H:%M"), zan["end"].strftime("%H:%M"),
                               zan["gruppa"], zan["kamera"]["komnata"], zan["kamera"]["imya"], "zhdyot", zan["pochemu"],
                               _iso(now), _iso(now)))
-                r = conn.execute("SELECT id, status FROM zapis WHERE key=?", (key,)).fetchone()
-            if r and r["status"] in AKTIVNYE and _start(int(r["id"])):
-                zapushcheno.append(int(r["id"]))
+                r = conn.execute("SELECT * FROM zapis WHERE key=?", (key,)).fetchone()
+            if not r:
+                continue
+            r = dict(r)
+            zid = int(r["id"])
+            with _lock:
+                if zid in _busy:
+                    continue
+            if r["status"] not in AKTIVNYE:
+                # 15.11.2026 (проверка V2, M1): «пропущено»/«ошибка»/запись, кончившаяся раньше времени, —
+                # не окончательны, пока занятие идёт. Запись снова включили, занятие вернули в МойКлассе,
+                # прошёл сбой базы или потока — пишем с этого момента (следующей частью)
+                if r["status"] in ("zapisano", "vygruzheno") and _do_konca(r):
+                    continue
+                if net_mesta is None:
+                    net_mesta = _net_mesta(mesto())
+                if net_mesta:
+                    continue                    # места по-прежнему нет — не дёргаем поток каждую минуту
+                log.info("запись %s (%s): было «%s: %s» — пересмотр, пишу с %s", zid, _kto(r), r["status"],
+                         r.get("prichina") or "", now.strftime("%H:%M"))
+                with db.get_conn() as conn:
+                    conn.execute("UPDATE zapis SET status='zhdyot', prichina=?, obnovleno=? WHERE id=?",
+                                 (f"пересмотр в {now.strftime('%H:%M')}: было «{(r.get('prichina') or '')[:120]}»",
+                                  _iso(now), zid))
+            if _start(zid):
+                zapushcheno.append(zid)
+    try:
+        _itogi(now)
+    except Exception:  # noqa: BLE001
+        log.exception("итоги записи занятий не подведены")
     # выгрузка: повтор раз в час; без пароля — напоминание владельцу
     if parol_zadan():
         if _k_vygruzke(False) and not _vygr_lock.locked():
@@ -1005,20 +1464,52 @@ def _mnogo(n: int, odin: str, dva: str, pyat: str) -> str:
     return dva if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14) else pyat
 
 
+def _proba_nelzya(conn, now: datetime, zanyaty: set) -> str:
+    """Почему пробу сейчас начинать нельзя; "" — можно. Вызывать под _lock (proba) или через _proba_nelzya_seychas."""
+    if any(r[0] in zanyaty for r in conn.execute("SELECT id FROM zapis WHERE proba=1 AND status IN (?,?,?)",
+                                                 AKTIVNYE)):
+        return "Пробная запись уже идёт — дождитесь её конца (2–3 минуты) и обновите страницу."
+    posl = conn.execute("SELECT MAX(sozdano) FROM zapis WHERE proba=1").fetchone()[0]
+    try:
+        posl_t = datetime.fromisoformat(posl) if posl else None
+    except ValueError:
+        posl_t = None
+    if posl_t and posl_t <= now < posl_t + PROBA_RAZ_V:
+        return (f"Пробную запись можно запускать не чаще раза в {int(PROBA_RAZ_V.total_seconds() // 60)} минут — "
+                f"следующую можно после {(posl_t + PROBA_RAZ_V).strftime('%H:%M')}.")
+    return ""
+
+
+def _proba_nelzya_seychas() -> str:
+    with _lock:
+        zanyaty = set(_busy)
+    with db.get_conn() as conn:
+        _init(conn)
+        return _proba_nelzya(conn, _seychas(), zanyaty)
+
+
 def proba(komnata: str = "") -> dict:
-    """«Пробная запись 2 минуты сейчас» с первой камеры списка (К1): пишет и выгружает."""
+    """«Пробная запись 2 минуты сейчас» с первой камеры списка (К1): пишет и выгружает.
+    15.11.2026 (проверки V1 №5, V2 m1/m2): по одной и не чаще раза в PROBA_RAZ_V — каждая проба
+    держит браузер ~30 с и запускает ffmpeg; 2 минуты считаются от начала записи; имя файла —
+    со временем до секунды. → {"ok": True, …} или {"ok": False, "error": …}."""
     kam = kamery()
     k = kam.get(komnata_norm(komnata)) if komnata else None
     k = k or next(iter(kam.values()))
     now = _seychas()
-    key = "proba-" + now.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(2)
-    with db.get_conn() as conn:
-        _init(conn)
-        zid = conn.execute("INSERT INTO zapis (key, lesson_id, day, begin_time, end_time, gruppa, komnata, kamera, "
-                           "status, prichina, proba, sozdano, obnovleno) VALUES (?,NULL,?,?,?,?,?,?,'zhdyot','',1,?,?)",
-                           (key, now.date().isoformat(), now.strftime("%H:%M"),
-                            (now + timedelta(seconds=PROBA_S)).strftime("%H:%M"), "Проба", k["komnata"], k["imya"],
-                            _iso(now), _iso(now))).lastrowid
+    with _lock:
+        zanyaty = set(_busy)
+        with db.get_conn() as conn:
+            _init(conn)
+            nelzya = _proba_nelzya(conn, now, zanyaty)
+            if nelzya:
+                return {"ok": False, "error": nelzya}
+            key = "proba-" + now.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(2)
+            zid = conn.execute("INSERT INTO zapis (key, lesson_id, day, begin_time, end_time, gruppa, komnata, kamera, "
+                               "status, prichina, proba, sozdano, obnovleno) VALUES (?,NULL,?,?,?,?,?,?,'zhdyot','',1,?,?)",
+                               (key, now.date().isoformat(), now.strftime("%H:%M:%S"),
+                                (now + timedelta(seconds=PROBA_S)).strftime("%H:%M"), "Проба", k["komnata"], k["imya"],
+                                _iso(now), _iso(now))).lastrowid
     _start(int(zid))
     return {"ok": True, "zapis_id": int(zid), "kamera": k}
 
@@ -1038,7 +1529,13 @@ def _den(day: str) -> str:
     return f"{DNI[d.weekday()]} {d.strftime('%d.%m')}"
 
 
-def blizhaishie(now: datetime | None = None, n: int = 10) -> list[dict]:
+def avtopilot_vklyuchen() -> bool:
+    """tick зовётся из цикла автопилота: выключен автопилот — занятия не записываются."""
+    return (db.get_setting("autopilot", "off") or "off") == "on"
+
+
+def blizhaishie(now: datetime | None = None, n: int = 60) -> list[dict]:
+    """Занятия под фильтр на 7 дней вперёд (не больше n строк) и что с их записью."""
     now = (now or _seychas()).replace(tzinfo=None)
     d0 = now.date()
     zan = _zanyatiya_gde("l.date >= ? AND l.date <= ?", (d0.isoformat(), (d0 + timedelta(days=7)).isoformat()))
@@ -1046,13 +1543,16 @@ def blizhaishie(now: datetime | None = None, n: int = 10) -> list[dict]:
         _init(conn)
         po_klyuchu = {r["key"]: dict(r) for r in conn.execute(
             "SELECT key, status, prichina FROM zapis WHERE day >= ? AND proba=0", (d0.isoformat(),))}
+    avtopilot = avtopilot_vklyuchen()
     out = []
     for z in zan:
-        if z["end"] + KONEC_POSLE <= now:
+        if z["end"] + KONEC_POSLE <= now or z["begin"] >= now + timedelta(days=7):
             continue
         st = po_klyuchu.get(_klyuch(z))
         if not vklyucheno():
             sost = "запись выключена"
+        elif not avtopilot and z["pisat"]:
+            sost = "запись не будет: автопилот выключен"
         elif st and st["status"] != "zhdyot":
             sost = STATUSY.get(st["status"], st["status"]) + (f": {st['prichina']}" if st.get("prichina") else "")
         elif z["pisat"]:
@@ -1104,6 +1604,10 @@ def poslednie(n: int = 15) -> list[dict]:
             vid = "osh" if osh and posl else "idet"
         elif z["status"] in ("propusk", "oshibka"):
             sost, vid = STATUSY[z["status"]] + (f": {z['prichina']}" if z.get("prichina") else ""), "osh"
+            konec = _t_stop_zapisi(z)
+            if not z["proba"] and konec and _seychas() < konec - timedelta(minutes=1):
+                sost += " · пока занятие идёт, сервер каждую минуту пересматривает и начнёт запись, если условия вернутся"
+                vid = "zhdet"
         else:
             sost, vid = STATUSY.get(z["status"], z["status"]) + (f": {z['prichina']}" if z.get("prichina") else ""), "idet"
         out.append({"id": z["id"], "day": z["day"], "den": _den(z["day"]), "begin": (z["begin_time"] or "")[:5],
@@ -1127,7 +1631,8 @@ def sostoyanie() -> dict:
     """Всё о записи без секретов: пароля Диска и токенов потока здесь нет."""
     m = mesto()
     b, n = _zhdut()
-    return {"vklyucheno": vklyucheno(), "filtr": filtry(), "kamery": list(kamery().values()), "papka": papka(),
+    return {"vklyucheno": vklyucheno(), "avtopilot": avtopilot_vklyuchen(),
+            "filtr": filtry(), "kamery": list(kamery().values()), "papka": papka(),
             "login": login_diska(), "parol_zadan": parol_zadan(), "ffmpeg": bool(_ffmpeg_exe()),
             "mesto": {"vsego_gb": round(m["vsego"] / GB, 1), "svobodno_gb": round(m["svobodno"] / GB, 1),
                       "na_servere_gb": round(m["lokalno"] / GB, 2), "zhdut_vygruzki": n,
@@ -1141,22 +1646,37 @@ def _e(s) -> str:
     return html.escape(str(s if s is not None else ""), quote=True)
 
 
-def _metka_zanyat(klyuch: tuple) -> bool:
+def _metka_vydat() -> str:
+    """Одноразовая метка формы блока: выдаёт и помнит сервер (проверка V1, №5 — раньше годилась
+    любая присланная метка, а без метки форма не проверялась вовсе)."""
+    m_ = secrets.token_urlsafe(18)
     t = time.time()
     with _lock:
-        if klyuch in _METKI and t - _METKI[klyuch] < SROK_METKI:
-            return False
-        _METKI[klyuch] = t
-        if len(_METKI) > 2000:
-            for k_, v_ in list(_METKI.items()):
-                if t - v_ >= SROK_METKI:
-                    del _METKI[k_]
-    return True
+        _METKI[m_] = [t, False]
+        if len(_METKI) > 500:
+            for k_, v_ in sorted(_METKI.items(), key=lambda x: x[1][0])[:len(_METKI) - 400]:
+                del _METKI[k_]
+    return m_
 
 
-def _metka_osvobodit(klyuch: tuple) -> None:
+def _metka_vzyat(m_: str) -> str:
+    """"" — метка годна (теперь использована); "povtor" — эта форма уже отправлялась; "net" — метки
+    нет, она чужая или устарела (сервер перезапускался, страница открыта давно)."""
     with _lock:
-        _METKI.pop(klyuch, None)
+        x = _METKI.get(m_) if m_ else None
+        if not x or time.time() - x[0] > SROK_METKI:
+            return "net"
+        if x[1]:
+            return "povtor"
+        x[1] = True
+        return ""
+
+
+def _metka_vernut(m_: str) -> None:
+    """Действие отказано по полям формы — ту же форму можно поправить и отправить снова."""
+    with _lock:
+        if m_ in _METKI:
+            _METKI[m_][1] = False
 
 
 def _iz_formy(f) -> tuple[dict, list[str], list[str]]:
@@ -1200,11 +1720,16 @@ def _iz_formy(f) -> tuple[dict, list[str], list[str]]:
         elif lg != login_diska():
             zapisat["yadisk_login"] = lg
             chto.append("логин Яндекса")
+    # пароль приложения Яндекса — 16 латинских букв; пробелы (их бывает при копировании) убираются.
+    # Другой формат — почти наверняка основной пароль почты, а он открывает весь аккаунт (V1, №7)
     pw = "".join(pole("yadisk_password").split())
     if pw:
-        if len(pw) < 8 or len(pw) > 64:
-            otkazy.append("Пароль приложения: в нём 16 латинских букв — скопируйте его целиком со страницы Яндекс ID.")
-        elif pw != _parol_diska():
+        if not re.fullmatch(r"[A-Za-z]{16}", pw):
+            otkazy.append("Пароль приложения: это 16 латинских букв (Яндекс показывает их как «abcd efgh ijkl mnop» — "
+                          "пробелы можно оставить). Обычный пароль от почты сюда не подходит: создайте пароль "
+                          "приложения «Файлы (WebDAV)» на id.yandex.ru — инструкция ниже.")
+        elif pw.lower() != _parol_diska():
+            pw = pw.lower()
             zapisat["yadisk_password"] = pw
             chto.append("пароль приложения Яндекса")
     return zapisat, chto, otkazy
@@ -1225,19 +1750,28 @@ def deystvie_vladelca(request, f) -> dict:
     if prichina:
         return {"osh": prichina}
     metka = pole("metka").strip()[:64]
-    klyuch = (metka, d)
-    if metka and not _metka_zanyat(klyuch):
+    sost_metki = _metka_vzyat(metka)
+    if sost_metki == "povtor":
         request.state.chto = "запись занятий: повтор формы — не выполнено"
         return {"msg": "Уже сделано: эта форма уже отправлялась (страницу обновили) — повторять не стали."}
+    if sost_metki:
+        request.state.chto = "запись занятий: форма без метки сервера — не выполнено"
+        return {"osh": "Форма устарела (сервер перезапускался или страница открыта давно) — ничего не изменено. "
+                       "Ниже — свежая форма: повторите действие."}
     zapisat, chto, otkazy = _iz_formy(f)
     if otkazy:
-        if metka:
-            _metka_osvobodit(klyuch)
+        _metka_vernut(metka)
         return {"osh": " ".join(otkazy) + " Ничего не изменено."}
     if d not in ("sohranit", "proba", "vygruzit"):
-        if metka:
-            _metka_osvobodit(klyuch)
+        _metka_vernut(metka)
         return {"osh": "Неизвестное действие — ничего не изменено."}
+    pr_proba = None
+    if d == "proba":                          # проба не началась бы — не сохраняем и поля (что на экране — то и есть)
+        pr_proba = _proba_nelzya_seychas()
+        if pr_proba:
+            _metka_vernut(metka)
+            request.state.chto = "запись занятий: пробная запись — отказ"
+            return {"osh": pr_proba + " Ничего не изменено."}
     for k_, v_ in zapisat.items():
         db.set_setting(k_, v_)
     msg = []
@@ -1257,6 +1791,9 @@ def deystvie_vladelca(request, f) -> dict:
     b, n = _zhdut()
     if d == "proba":
         r = proba()
+        if not r.get("ok"):
+            request.state.chto = "запись занятий: " + (", ".join(chto + ["пробная запись — отказ"]))
+            return {"osh": " ".join(msg + [r.get("error") or "Пробная запись не началась."])}
         k = r["kamera"]
         msg.append(f"Пробная запись началась: 2 минуты с камеры {k['komnata']} («{k['imya']}»). Через 4–5 минут "
                    "обновите страницу — в «Последних записях» появится строка «Проба»"
@@ -1329,7 +1866,11 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
         h.append(f"<div class='osh' role='alert'><b>Место на сервере:</b> {_e(m['net_mesta'])}.</div>")
     if not s["ffmpeg"]:
         h.append("<div class='osh'>На сервере не найден ffmpeg — записывать нечем.</div>")
-    sv = [f"Запись: <b>{'включена' if s['vklyucheno'] else 'выключена'}</b>",
+    if s["vklyucheno"] and not s["avtopilot"]:
+        h.append("<div class='osh' role='alert' id='zapis-avtopilot'><b>Запись не будет: автопилот выключен.</b> Занятия "
+                 "записывает минутный цикл автопилота — пока он выключен (настройка autopilot), сервер ничего не пишет, "
+                 "кроме пробной записи.</div>")
+    sv = [f"Запись: <b>{'включена' if s['vklyucheno'] and s['avtopilot'] else 'включена, но не будет: автопилот выключен' if s['vklyucheno'] else 'выключена'}</b>",
           f"Свободно на сервере: <b>{str(m['svobodno_gb']).replace('.', ',')} ГБ</b> из "
           f"{str(m['vsego_gb']).replace('.', ',')} ГБ",
           f"Ждут выгрузки: <b>{m['zhdut_vygruzki']}</b>"
@@ -1342,14 +1883,14 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
             f"<li>{_e(_den(x['day']))}: {_e(x['chto'])}" + (f" — {x['raz']} {_mnogo(x['raz'], 'раз', 'раза', 'раз')}" if x["raz"] > 1 else "")
             + f". <span class='tih'>Первый: {_e(x['pervyy'])}</span></li>" for x in s["sboi"]) + "</ul>")
 
-    h.append("<h3>Ближайшие занятия</h3>")
+    h.append("<h3>Ближайшие занятия (7 дней)</h3>")
     if s["blizhaishie"]:
         h.append("<div class='zp-sp' id='zapis-blizh'>" + "".join(
             f"<div class='zp-r'><b>{_e(x['den'])} {_e(x['begin'])}–{_e(x['end'])}</b> · <span class='zp-g'>{_e(x['gruppa'])}"
             f"</span> · {_e(x['komnata'] or '—')}<div class='{'zp-ok' if x['pisat'] else 'zp-osh'}'>{_e(x['sostoyanie'])}</div></div>"
             for x in s["blizhaishie"]) + "</div>")
     else:
-        h.append("<p class='tih' id='zapis-blizh'>На неделю вперёд занятий под фильтр групп нет (или расписание ещё "
+        h.append("<p class='tih' id='zapis-blizh'>На 7 дней вперёд занятий под фильтр групп нет (или расписание ещё "
                  "не синхронизировано).</p>")
 
     h.append("<h3>Последние записи</h3>")
@@ -1363,7 +1904,7 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
 
     kam_s = "; ".join(f"{v['komnata']} = {v['imya']}" + (f" = {v['cam_id']}" if v["cam_id"] else "") for v in s["kamery"])
     h.append("<form method='post' action='/owner/zapis' id='zapis-forma' autocomplete='off'>"
-             f"<input type='hidden' name='metka' value='{_e(secrets.token_urlsafe(18))}'>"
+             f"<input type='hidden' name='metka' value='{_e(_metka_vydat())}'>"
              "<input type='hidden' name='polya' value='1'>"
              "<input type='text' name='username' value='boris' autocomplete='username' hidden>"
              "<div class='moy'><b>Ваш нынешний пароль</b><input type='password' name='moy_parol' "
@@ -1375,8 +1916,9 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
              "<div class='zp-pole'><b>Какие группы</b><small>Часть названия группы в МойКлассе; несколько — через «;». "
              "Отменённые и удалённые занятия не пишутся.</small>"
              f"<input type='text' name='filtr' value='{_e('; '.join(s['filtr']))}' maxlength='200'></div>"
-             "<div class='zp-pole'><b>Камера</b><small>Кабинет = камера в Ivideon = id камеры, например «К1 = Комната 1 = "
-             "100-…». Несколько кабинетов — через «;».</small>"
+             "<div class='zp-pole'><b>Камера</b><small>Кабинет = камера в Ivideon (точное название) = id камеры "
+             "(обязателен: поток берётся только с камеры с этим id), например «К1 = Комната 1 = 100-…». Несколько "
+             "кабинетов — через «;». Занятие «Музыки и речи» без кабинета в МойКлассе пишется с первой камеры.</small>"
              f"<input type='text' name='kamery' value='{_e(kam_s)}' maxlength='300'></div>"
              "<div class='zp-pole'><b>Папка на Яндекс.Диске</b><small>Внутри — папки по месяцам: «…/2026-11».</small>"
              f"<input type='text' name='papka' value='{_e(s['papka'])}' maxlength='200'></div>"
@@ -1394,7 +1936,8 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
              + ("<button type='submit' name='deystvie' value='vygruzit'>Выгрузить на Диск сейчас</button>"
                 if m["zhdut_vygruzki"] else "")
              + "</div><p class='tih'>Пробная запись пишет 2 минуты с первой камеры списка и выгружает файл «… Проба К1.mp4» "
-             "в ту же папку месяца — так видно, что камера, сервер и Диск работают, до первого занятия.</p>"
+             "в ту же папку месяца — так видно, что камера, сервер и Диск работают, до первого занятия. По одной и не "
+             "чаще раза в 5 минут.</p>"
              "<details id='zapis-kak'><summary>Как получить пароль приложения Яндекса</summary><ol>"
              f"<li>Откройте <a href='https://id.yandex.ru/security' target='_blank' rel='noopener'>id.yandex.ru</a> под "
              f"<b>{_e(s['login'])}</b>.</li><li>«Безопасность» → «Пароли приложений».</li>"
