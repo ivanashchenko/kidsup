@@ -281,6 +281,11 @@ NOVYE_PEDAGOGI = {"POST /owner/pedagogi", "GET /api/pedagogi/sostoyanie"}
 # 14.11.2026, после проверки (R2 №7 и №1): GET /owner/pedagogi — переход на блок /owner#pedagogi вместо 405
 # (страницу ответа открыли заново); POST /api/pedagog/otkryl — маяк «страницу педагога открыли» со страницы.
 NOVYE_PEDAGOGI |= {"GET /owner/pedagogi", "POST /api/pedagog/otkryl"}
+# 14.11.2026, Борис — видеозапись занятий «Музыка и речь» в архив методики (app/zapis.py, проверки —
+# docs/rabota/zapis_testy.py): действия блока «Запись занятий» на /owner (только владелец через форму,
+# с подтверждением паролем; адрес — в vhod.TOLKO_CHELOVEK), переход на блок вместо 405 и состояние
+# записи без секретов (только чтение, под входом владельца).
+NOVYE_ZAPIS = {"POST /owner/zapis", "GET /owner/zapis", "GET /api/zapis/sostoyanie"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
 # чтобы пропажа была видна и без снимка «до».
 # 13.11.2026, Борис (уборка, вечер 1): из списка вышли GET и POST /api/bez-oplaty/status —
@@ -316,11 +321,11 @@ def test_marshruty(m, fajl_do):
              do - posle == PROPALI | UBRANY_VHOD | UBRANY_VECHER1,
              sorted((do - posle) ^ (PROPALI | UBRANY_VHOD | UBRANY_VECHER1)))
     vse_novye = (NOVYE | NOVYE_ZVONKI_1211 | NOVYE_PROVERKA_MK | NOVYE_VHOD | NOVYE_SHAPKA | NOVYE_PEREEZDY
-                 | NOVYE_VECHER1 | NOVYE_PEDAGOGI)
+                 | NOVYE_VECHER1 | NOVYE_PEDAGOGI | NOVYE_ZAPIS)
     proverka("появились ровно три: «Архив» и признак «архив» у документов (и просмотр старых звонков 12.11, "
              "пять адресов страницы «Проверка МойКласса», адреса личных входов, счётчик бейджа шапки и лист "
              "«Будущие направления» для бланков 13.11; два POST вместо записи через GET — вечер 1; "
-             "два адреса блока «Ключи педагогов» и ещё два после проверки — 14.11)",
+             "два адреса блока «Ключи педагогов» и ещё два после проверки, три адреса блока «Запись занятий» — 14.11)",
              posle - do == vse_novye, sorted((posle - do) ^ vse_novye))
     nuzhny = [x.strip() for x in NUZHNY.replace("\n", " · ").split(" · ") if x.strip()]
     net = [x for x in nuzhny if x not in posle]

@@ -4,7 +4,9 @@
 04.10.2026 Борис дал пользователю kidsup.claude@yandex.ru доступ ко всем
 камерам (настройки ivideon_login / ivideon_password на /owner). Вход — через
 my.ivideon.com в браузере на сервере, сессия хранится в data/ivideon_state.json.
-Ничего не меняем: ни настроек камер, ни доступов, ни записи.
+Ничего не меняем: ни настроек камер, ни доступов, ни записи в облаке Ivideon.
+14.11.2026: potok_ssylka() — ссылка на живой поток камеры для записи занятий на нашем
+сервере (app/zapis.py); в самом Ivideon от этого ничего не меняется.
 """
 from __future__ import annotations
 
@@ -149,3 +151,95 @@ def login_start(code: str = "") -> dict:
 
 def login_status() -> dict:
     return {**_login, "has_state": _state_path().exists()}
+
+
+# 14.11.2026, Борис — запись занятий «Музыка и речь» (app/zapis.py). Плеер my.ivideon.com на
+# камере делает запрос openapi-…ivideon.com/cameras/<id>:0/live_stream?…&access_token=…&
+# format=ws-fmp4; тот же адрес с format=flv отдаёт живой FLV (H.264 + звук), его ffmpeg пишет
+# без перекодирования. Токена нет ни в localStorage, ни в доступных cookie — ловим адрес из
+# сетевого запроса страницы. Срок жизни токена неизвестен: ссылку берут свежую перед каждым
+# занятием и после обрыва. Адрес с токеном не печатаем и не пишем в журнал.
+
+import re as _re
+from urllib.parse import urlsplit as _urlsplit
+
+
+def _ssylka_flv(url: str) -> str:
+    """Адрес из запроса плеера → тот же адрес с format=flv; чужой адрес → ""."""
+    u = _urlsplit(url or "")
+    if u.scheme != "https" or not (u.hostname or "").endswith(".ivideon.com") or "/live_stream" not in u.path \
+            or "access_token=" not in (u.query or ""):
+        return ""
+    if _re.search(r"(^|&)format=", u.query):
+        return _re.sub(r"(?<=[?&])format=[^&]*", "format=flv", url, count=1)
+    return url + "&format=flv"
+
+
+def potok_ssylka(kamera: str = "Комната 1", cam_id: str = "", zhdat_s: int = 25) -> dict:
+    """Свежая ссылка на живой поток камеры: {"ok": True, "url": …} или {"ok": False, "error": …}.
+
+    Браузер — на ~30 секунд и под общей блокировкой с кадрами фото-явки (kadry._snap_lock):
+    два Chromium разом сервер с 2 ГБ памяти не тянет, а 07.10 одновременный запуск уже давал
+    пустые кадры. Сессия — data/ivideon_state.json; слетела и Ivideon просит код из письма —
+    запускаем login_start() (код он достаёт из ящика сам), ссылка будет на следующей попытке."""
+    from playwright.sync_api import sync_playwright
+    from . import kadry, mkweb
+    login, pw = db.get_setting("ivideon_login") or "", db.get_setting("ivideon_password") or ""
+    if not login or not pw:
+        return {"ok": False, "error": "не заданы ivideon_login / ivideon_password на /owner"}
+    if _login.get("state") in ("starting", "wait_code") and _time.time() - _login.get("since", _time.time()) < 900:
+        return {"ok": False, "error": "идёт вход в Ivideon с кодом из письма — ссылка будет после входа"}
+    st = _state_path()
+    nashli: list[str] = []
+    nuzhen_kod = False
+    oshibka = ""
+
+    def lovit(req):
+        u = req.url
+        if "/live_stream" in u and "access_token=" in u and (not cam_id or cam_id in u):
+            nashli.append(u)
+
+    with kadry._snap_lock, sync_playwright() as p:
+        b = mkweb._launch(p)
+        try:
+            kw = {"viewport": {"width": 1400, "height": 1000}, "locale": "ru-RU"}
+            if st.exists():
+                kw["storage_state"] = str(st)
+            ctx = b.new_context(**kw)
+            pg = ctx.new_page()
+            pg.on("request", lovit)
+            pg.goto(HOME, wait_until="domcontentloaded", timeout=60000)
+            pg.wait_for_timeout(3000)
+            if "/service/login" in pg.url:
+                pg.fill("input[name='LoginForm[username]']", login)
+                pg.fill("input[name='LoginForm[password]']", pw)
+                pg.click("button[type=submit]", timeout=15000)
+                pg.wait_for_timeout(8000)
+                if "/service/login" in pg.url or "Подтвердите вход" in pg.inner_text("body"):
+                    nuzhen_kod = True
+                else:
+                    ctx.storage_state(path=str(st))
+            if not nuzhen_kod:
+                try:
+                    tochno = pg.get_by_text(kamera, exact=True)
+                    (tochno if tochno.count() else pg.get_by_text(kamera)).nth(0).click(timeout=15000)
+                except Exception as e:  # noqa: BLE001
+                    oshibka = f"камера «{kamera}» не нашлась в списке Ivideon ({type(e).__name__})"
+                if not oshibka:
+                    for _ in range(int(zhdat_s * 2)):
+                        if nashli:
+                            break
+                        pg.wait_for_timeout(500)
+                    if nashli:
+                        ctx.storage_state(path=str(st))
+        finally:
+            b.close()
+    if nuzhen_kod:
+        login_start()
+        return {"ok": False, "error": "Ivideon просит код из письма — вход запущен, ссылка будет на следующей попытке"}
+    if oshibka:
+        return {"ok": False, "error": oshibka}
+    url = _ssylka_flv(nashli[-1]) if nashli else ""
+    if not url:
+        return {"ok": False, "error": "плеер Ivideon не запросил поток за %d с" % zhdat_s}
+    return {"ok": True, "url": url}
