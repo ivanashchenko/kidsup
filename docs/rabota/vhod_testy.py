@@ -974,6 +974,32 @@ def test_pedagog():
     proverka("педагог без входа — без меню", r.status_code == 200 and 'id="nav-razdely"' not in r.text)
 
 
+def test_predel_promahov():
+    """14.11.2026, повторная проверка Т1–Т3 (V1): прежний общий ключ педагогов пускается и в
+    паузу, поэтому промахи окна с адреса ничем не ограничивались — таблица popytki росла на
+    каждый запрос. Теперь с адреса за час пишется не больше PREDEL_PROMAHOV_CHAS."""
+    print("15а. Предел промахов окна с одного адреса за час")
+    v = m.vhod
+    schet, adr = v.OKNO + "pedagog_proba", "198.51.100.77"
+    v._PROMAHI_CHAS.clear()
+    for i in range(100):
+        v._promah_okna(schet, adr, f"nevernyy-klyuch-{i}")
+    with baza_vhodov() as b:
+        n = b.execute("SELECT COUNT(*) FROM popytki WHERE login=? AND adres=?", (schet, adr)).fetchone()[0]
+        idx = [r[1] for r in b.execute("PRAGMA index_list(popytki)")]
+    proverka(f"100 разных неверных ключей с адреса → записано не больше {v.PREDEL_PROMAHOV_CHAS}",
+             0 < n <= v.PREDEL_PROMAHOV_CHAS, n)
+    v._promah_okna(schet, "198.51.100.78", "nevernyy-klyuch-drugoy")
+    with baza_vhodov() as b:
+        n2 = b.execute("SELECT COUNT(*) FROM popytki WHERE login=? AND adres=?",
+                       (schet, "198.51.100.78")).fetchone()[0]
+    proverka("с другого адреса промах считается как обычно", n2 == 1, n2)
+    proverka("индекс popytki(login, ts) для тревоги о 50 промахах есть", "idx_popytki_login" in idx, idx)
+    with baza_vhodov() as b:
+        b.execute("DELETE FROM popytki WHERE login=?", (schet,))
+    v._PROMAHI_CHAS.clear()
+
+
 # --- 16. Режим без входа -----------------------------------------------------------------------------
 
 def test_bez_vhoda_rezhim(work):
@@ -2569,6 +2595,7 @@ def main():
     test_next()
     test_publichnye()
     test_pedagog()
+    test_predel_promahov()
     test_bez_vhoda_rezhim(work)
     test_zagolovki()
     test_vhod_js()
