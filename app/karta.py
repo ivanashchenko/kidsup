@@ -85,6 +85,112 @@ def _pedagog(cls: str) -> str:
     return "Маша" if "пн-ср" in cls else ("Илья" if "вт-чт" in cls else "")
 
 
+# 14.11.2026, личные ключи педагогов (Борис 13.11: «каждому педагогу своя ссылка, видит только
+# своих детей»). _pedagog() выше — подпись в заголовке группы, по названию; для доступа она
+# не годится: в ней нет ни id сотрудника, ни полного имени. Кто ведёт группу на самом деле,
+# записано в занятиях МойКласса (lessons.raw → teacherIds) — оттуда и берём.
+OKNO_PEDAGOGA = 28        # дней назад и вперёд: занятия этого окна показывают, кто ведёт группу
+DOLYA_PEDAGOGA = 0.25     # ведёт не меньше четверти занятий окна — педагог группы; разовая замена — нет
+GRUPPY_SQL = ("(c.name LIKE '2627_АЯ%' OR c.name LIKE '2627_Мини-сад%' OR c.name LIKE '2627_Нулевой класс%') "
+              "AND c.name NOT LIKE '%аявк%' AND (c.status IS NULL OR c.status = 'opened')")
+
+
+def _imya_gruppy(name: str) -> str:
+    """Название группы МойКласса → как группа названа в карточке (сад и нулевой класс — одной строкой)."""
+    cls = (name or "").replace("2627_АЯ_", "").replace("2627_", "")
+    for k, v in SAD.items():
+        if cls.startswith(k):
+            return v
+    return cls
+
+
+def _chastye(schet: dict, vsego: int) -> set:
+    return {t for t, n in schet.items() if vsego and n >= DOLYA_PEDAGOGA * vsego}
+
+
+def pedagogi_grupp(conn) -> dict:
+    """Кто ведёт английский в группах карточки: {группа, как в карточке: {id сотрудника МойКласса}}.
+
+    По занятиям группы за OKNO_PEDAGOGA дней назад и вперёд: педагог группы — тот, кто стоит
+    преподавателем не меньше чем в четверти занятий, где преподаватель указан (одна замена
+    группу чужому педагогу не открывает; новый педагог виден, как только на него переписали
+    будущие занятия). Занятия, удалённые в МойКлассе, не считаются.
+    Мини-сад и нулевой класс: английский там только пн и ср, и в занятии стоят двое —
+    воспитатель и педагог английского. Берём тех, кто ведёт пн/ср, но не ведёт остальные дни;
+    если так никого не осталось (английский ведёт сам воспитатель) — тех из них, кто ведёт
+    группы «АЯ». Пустое множество — педагога по данным определить нельзя: такая группа
+    личному ключу не показывается, владелец видит предупреждение на /owner."""
+    from datetime import timedelta
+    t = date.today()
+    d0, d1 = (t - timedelta(days=OKNO_PEDAGOGA)).isoformat(), (t + timedelta(days=OKNO_PEDAGOGA)).isoformat()
+    gruppy = {r["id"]: r["name"] or "" for r in conn.execute(f"SELECT c.id, c.name FROM classes c WHERE {GRUPPY_SQL}")}
+    out: dict = {_imya_gruppy(n): set() for n in gruppy.values() if _imya_gruppy(n)}
+    if not gruppy:
+        return out
+    udaleno = db.udalennye("lessons", conn)
+    # по группе: [счёт педагогов в «английские» дни, занятий в эти дни, счёт в прочие дни, занятий в прочие дни]
+    schet = {cid: [{}, 0, {}, 0] for cid in gruppy}
+    for r in conn.execute("SELECT id, class_id, date, raw FROM lessons WHERE date BETWEEN ? AND ? "
+                          f"AND class_id IN ({','.join('?' * len(gruppy))})", (d0, d1, *gruppy)):
+        if r["id"] in udaleno:
+            continue
+        try:
+            ped = [int(x) for x in (json.loads(r["raw"] or "{}").get("teacherIds") or [])]
+            den = date.fromisoformat(str(r["date"])[:10]).weekday()
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if not ped:
+            continue
+        sad = any(gruppy[r["class_id"]].replace("2627_", "").startswith(k) for k in SAD)
+        e = schet[r["class_id"]]
+        i = 0 if (not sad or den in (0, 2)) else 2
+        e[i + 1] += 1
+        for x in set(ped):
+            e[i][x] = e[i].get(x, 0) + 1
+    aya = set()                       # кто ведёт группы «АЯ» — на случай, когда в саду английский ведёт воспитатель
+    for cid, name in gruppy.items():
+        if not any(name.replace("2627_", "").startswith(k) for k in SAD):
+            svoi = _chastye(schet[cid][0], schet[cid][1])
+            aya |= svoi
+            out[_imya_gruppy(name)] |= svoi
+    for cid, name in gruppy.items():
+        if any(name.replace("2627_", "").startswith(k) for k in SAD):
+            angl = _chastye(schet[cid][0], schet[cid][1])
+            svoi = angl - _chastye(schet[cid][2], schet[cid][3])
+            out[_imya_gruppy(name)] |= (svoi or (angl & aya))
+    return out
+
+
+def gruppy_s_pedagogami() -> list[dict]:
+    """Группы карточки, в которых есть дети: [{"группа", "детей", "педагоги": [id сотрудников]}].
+    Лёгкий запрос (без отметок, видео и переписки) — для блока «Ключи педагогов» на /owner."""
+    with db.get_conn() as conn:
+        deti = _deti(conn)
+        ped = pedagogi_grupp(conn)
+    schet: dict = {}
+    for d in deti:
+        schet[d["группа"]] = schet.get(d["группа"], 0) + 1
+    return [{"группа": g, "детей": n, "педагоги": sorted(ped.get(g, ()))} for g, n in sorted(schet.items())]
+
+
+def gruppy_pedagoga(mk_ids) -> set:
+    """Группы карточки, которые ведёт сотрудник (сотрудники) с такими id в МойКлассе."""
+    ids = {int(x) for x in (mk_ids or ()) if x is not None}
+    if not ids:
+        return set()
+    with db.get_conn() as conn:
+        return {g for g, ped in pedagogi_grupp(conn).items() if ped & ids}
+
+
+def deti_grupp(gruppy) -> set:
+    """user_id детей, которые сидят в этих группах карточки (тот же отбор, что на странице)."""
+    gruppy = set(gruppy or ())
+    if not gruppy:
+        return set()
+    with db.get_conn() as conn:
+        return {d["user_id"] for d in _deti(conn) if d["группа"] in gruppy}
+
+
 def _dorozhka(cls: str) -> str:
     if any(x in cls for x in PRO):
         return "pro"
@@ -159,19 +265,12 @@ def _deti(conn) -> list[dict]:
         "SELECT j.user_id, j.status_id, j.class_id, c.name AS cls, u.name AS kid, u.phone "
         "FROM joins j JOIN classes c ON c.id = j.class_id "
         "LEFT JOIN users u ON u.id = j.user_id "
-        f"WHERE j.status_id IN ({q}) AND (c.name LIKE '2627_АЯ%' "
-        "OR c.name LIKE '2627_Мини-сад%' OR c.name LIKE '2627_Нулевой класс%') "
-        "AND c.name NOT LIKE '%аявк%' "
-        "AND (c.status IS NULL OR c.status = 'opened')", tuple(LIVE)).fetchall()
+        f"WHERE j.status_id IN ({q}) AND {GRUPPY_SQL}", tuple(LIVE)).fetchall()
     out = {}
     for r in rows:
-        cls = (r["cls"] or "").replace("2627_АЯ_", "").replace("2627_", "")
-        for k, v in SAD.items():
-            if cls.startswith(k):
-                if r["class_id"] in sad_est and (r["user_id"], r["class_id"]) not in sad_pn_sr:
-                    cls = ""          # ходит только вт/чт/пт — английского у него нет
-                    break
-                cls = v
+        cls = _imya_gruppy(r["cls"])
+        if cls in SAD.values() and r["class_id"] in sad_est and (r["user_id"], r["class_id"]) not in sad_pn_sr:
+            continue                  # ходит только вт/чт/пт — английского у него нет
         if not cls:
             continue
         key = (r["user_id"], cls)
@@ -183,13 +282,18 @@ def _deti(conn) -> list[dict]:
     return sorted(out.values(), key=lambda x: (x["педагог"], x["группа"], x["имя"] or ""))
 
 
-def rows() -> dict:
+def rows(tolko_gruppy=None) -> dict:
+    """tolko_gruppy — множество групп (как они названы в карточке): педагогу с личным ключом
+    показываем только его группы, и все счётчики страницы считаются по ним же (14.11.2026).
+    None — все группы, как раньше."""
     today = date.today()
     month = today.isoformat()[:7]
     tek = tekushchaya_tochka(today)
     with db.get_conn() as conn:
         _ensure(conn)
         deti = _deti(conn)
+        if tolko_gruppy is not None:
+            deti = [d for d in deti if d["группа"] in tolko_gruppy]
         saved = {}
         for r in conn.execute("SELECT user_id, tochka, marks, video_date, note, ts, "
                               "report, report_date FROM speech_cards"):

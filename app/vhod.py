@@ -111,6 +111,7 @@ ZAPISI = (
 # открывает /api/ads/vk-users-list и /api/ads/vk/image.
 SLUZH_TOCHNO: frozenset = frozenset({
     "/api/vhod/sostoyanie",                                   # состояние входов без секретов
+    "/api/pedagogi/sostoyanie",                               # ключи педагогов: состояние без секретов (14.11.2026)
     "/api/boris-docs", "/api/boris-docs/remove",              # страницы владельцу («Места в группах», «Сверка оплат»)
     "/api/admin-docs", "/api/admin-docs/remove",              # списки-задания админам
     "/api/hooppy/post", "/api/hooppy/posty", "/api/hooppy/udalit",   # «Посты из фото и видео педагогов»
@@ -132,7 +133,8 @@ SLUZH_TOLKO_CHTENIE: tuple = ("/boris/docs", "/export/raw", "/kadry/file")   # �
 TOLKO_VYKLADKA: frozenset = frozenset({"/api/deploy", "/api/restart", "/api/backup/db", "/api/settings"})
 OKNO_VYKLADKI: frozenset = frozenset({"/api/deploy", "/api/restart"})   # их ключ рутин получает в аварийное окно
 # Страницы настроек — только человеку-владельцу: служебным ключам 403.
-TOLKO_CHELOVEK: frozenset = frozenset({"/owner", "/owner/vhody", "/settings", "/settings/test"})
+# 14.11.2026: /owner/pedagogi — блок «Ключи педагогов» (app/pedklyuchi.py), те же правила, что у /owner/vhody.
+TOLKO_CHELOVEK: frozenset = frozenset({"/owner", "/owner/vhody", "/owner/pedagogi", "/settings", "/settings/test"})
 # Вновь закрытые от админов 12.11.2026 (список 5.2). До этого дня они были открыты общему
 # входу admin, и в день выкладки для него ничего не меняется: общий admin проходит по ним,
 # пока ключ рутин ни разу не сработал (у klod пуст posl_zapros). После первого запроса ключом
@@ -229,7 +231,20 @@ CREATE TABLE IF NOT EXISTS hvost (
     den TEXT NOT NULL, login TEXT NOT NULL, adres TEXT NOT NULL, chem TEXT NOT NULL,
     n INTEGER NOT NULL DEFAULT 0, posl TEXT, PRIMARY KEY (den, login, adres, chem));
 CREATE TABLE IF NOT EXISTS otmetki (klyuch TEXT PRIMARY KEY, znachenie TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS pedagog_klyuchi (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, vid TEXT NOT NULL DEFAULT 'lichnyy', imya TEXT NOT NULL DEFAULT '',
+    mk_id INTEGER, hesh TEXT NOT NULL DEFAULT '', hesh_prezhniy TEXT, vydan TEXT, posl TEXT,
+    vkl INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS pedagog_vhody (
+    den TEXT NOT NULL, vid TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, posl TEXT, PRIMARY KEY (den, vid));
 """
+# 14.11.2026, ключи педагогов (app/pedklyuchi.py): pedagog_klyuchi — кому выдан личный ключ
+# (имя и id сотрудника МойКласса), SHA-256 ключа, когда выдан, когда последний раз открывал,
+# включён ли; строка vid='obshchiy' — общий ключ после того, как владелец его сменил или
+# выключил. pedagog_vhody — сколько раз за день страницы открывали общим ключом. Лежат здесь,
+# а не в основной базе: kidsup.db возвращается с ночной копией, и восстановление из неё
+# оживило бы отменённые ключи.
+KOPIYA_TABLICY = ("pedagog_klyuchi",)     # кроме vhody и otmetki, целиком уходят в копию рядом
 
 TAYMAUT = 5                          # сколько секунд ждать запертый файл (было 30: вход не должен висеть)
 SBOY_PAUZA = 60                      # после неудачной подготовки файла — минуту не пробовать заново
@@ -370,21 +385,26 @@ def _baza():
 
 def _obnovit_kopiyu() -> None:
     """Копия рядом: только учётные записи (соль + хеш) и отметки, без сеансов и попыток. Обновляется при
-    каждом изменении входов; восстановление не воскрешает закрытые сеансы."""
+    каждом изменении входов; восстановление не воскрешает закрытые сеансы.
+    14.11.2026: туда же — ключи педагогов (KOPIYA_TABLICY, только хеши): без них пропажа
+    основного файла оставила бы всех педагогов с недействительными ссылками."""
     try:
         k = _put_kopii()
         tmp = k.with_name(k.name + ".tmp")
         if tmp.exists():
             tmp.unlink()
         with _baza() as c:
-            stroki = [tuple(r) for r in c.execute("SELECT * FROM vhody")]
-            stolbcy = [d[0] for d in c.execute("SELECT * FROM vhody LIMIT 0").description]
+            celikom = {}
+            for tab in ("vhody",) + KOPIYA_TABLICY:
+                celikom[tab] = ([d[0] for d in c.execute(f"SELECT * FROM {tab} LIMIT 0").description],
+                                [tuple(r) for r in c.execute(f"SELECT * FROM {tab}")])
             otmetki = [tuple(r) for r in c.execute("SELECT klyuch, znachenie FROM otmetki")]
         con = sqlite3.connect(tmp)
         try:
             con.executescript(SHEMA)
-            con.executemany(f"INSERT INTO vhody ({','.join(chr(34) + s + chr(34) for s in stolbcy)}) "
-                            f"VALUES ({','.join('?' * len(stolbcy))})", stroki)
+            for tab, (stolbcy, stroki) in celikom.items():
+                con.executemany(f"INSERT INTO {tab} ({','.join(chr(34) + s + chr(34) for s in stolbcy)}) "
+                                f"VALUES ({','.join('?' * len(stolbcy))})", stroki)
             con.executemany("INSERT OR REPLACE INTO otmetki (klyuch, znachenie) VALUES (?,?)", otmetki)
             con.commit()
         finally:
@@ -886,11 +906,28 @@ def _starye(request, credentials):
             "boris" if _ravny(user, "boris") else "")
     if not kogo:
         return k                 # незнакомый логин: войти им нельзя, считать нечего
-    adr = adres(request)
-    schet = OKNO + kogo
+    p = schet_sekreta(OKNO + kogo, adres(request), pw, k is not None, kogo)
+    if p > 0:
+        raise PauzaVhoda(p)
+    return k
+
+
+def schet_sekreta(schet: str, adr: str, sekret: str, veren: bool, nazvanie: str = "",
+                  schitat: bool = True, trevoga: str = "") -> float:
+    """Счёт перебора для входа, где секрет приходит с каждым запросом: серое окно (общий admin,
+    прежний boris — _starye) и ключи педагогов из ссылки (app/pedklyuchi.py, 14.11.2026).
+    → сколько секунд паузы: 0 — секрет рассмотрен (верный пускать, неверный записан промахом);
+    больше 0 — отказать, даже если секрет верный.
+    Правила — те, что описаны у _starye: пауза останавливает неверные секреты и верный,
+    присланный с этого адреса впервые; знакомый верный (был за последние 12 часов) её не
+    замечает; удача вне паузы стирает промахи; один и тот же неверный секрет с одного адреса
+    считается раз в час. schet — имя счётчика, начинается с OKNO (в правило формы «один адрес,
+    любые логины» такие промахи не входят). schitat=False — неверный секрет промахом не
+    считать (устаревшая ссылка педагога — не перебор). trevoga — свой текст сообщения
+    владельцу о 50 промахах за час (см. _posle_promaha)."""
     t = seychas()
-    otp = _otpechatok(adr, kogo, pw)
-    if k is not None:
+    if veren:
+        otp = _otpechatok(adr, schet, sekret)
         with _ZAMOK:
             znakom = abs(t - _UDACHI.get(otp, -1e18)) < SROK_UDACHI
         try:
@@ -899,7 +936,7 @@ def _starye(request, credentials):
             _zhaloba("vhod: счётчик попыток не прочитан")
             p = 0
         if p > 0 and not znakom:
-            raise PauzaVhoda(p)
+            return p
         with _ZAMOK:
             _UDACHI[otp] = t
             if len(_UDACHI) > 5000:
@@ -913,19 +950,20 @@ def _starye(request, credentials):
                     _EST_PROMAHI.discard((schet, adr))
             except Exception:  # noqa: BLE001
                 _zhaloba("vhod: промахи после удачного входа не стёрты")
-        return k
+        return 0.0
     try:
         p = _pauza_okna(schet, adr)
     except Exception:  # noqa: BLE001
         _zhaloba("vhod: счётчик попыток не прочитан")
         p = 0
     if p > 0:
-        raise PauzaVhoda(p)
-    try:
-        _promah_okna(schet, adr, pw, kogo)
-    except Exception:  # noqa: BLE001
-        _zhaloba("vhod: промах не записан")
-    return None
+        return p
+    if schitat:
+        try:
+            _promah_okna(schet, adr, sekret, nazvanie, trevoga)
+        except Exception:  # noqa: BLE001
+            _zhaloba("vhod: промах не записан")
+    return 0.0
 
 
 def kto(request, credentials):
@@ -1473,7 +1511,7 @@ def _pauza_okna(schet: str, adres_: str) -> float:
     return pauza(schet, adres_, "", po_adresu=False)
 
 
-def _promah_okna(schet: str, adres_: str, pw: str, nazvanie: str = "") -> None:
+def _promah_okna(schet: str, adres_: str, pw: str, nazvanie: str = "", trevoga: str = "") -> None:
     """Неверный пароль в окне. Один и тот же неверный пароль с одного адреса засчитывается
     один раз в час: старая вкладка с устаревшим паролем не должна запереть весь центр."""
     t = seychas()
@@ -1490,12 +1528,13 @@ def _promah_okna(schet: str, adres_: str, pw: str, nazvanie: str = "") -> None:
     popytka(schet, adres_)
     with _ZAMOK:
         _EST_PROMAHI.add((schet, adres_))
-    _posle_promaha(schet, nazvanie)
+    _posle_promaha(schet, nazvanie, trevoga)
 
 
-def _posle_promaha(login: str, nazvanie: str = "") -> None:
+def _posle_promaha(login: str, nazvanie: str = "", trevoga: str = "") -> None:
     """Один логин с разных адресов: 50 промахов за час — сообщение Борису (вход не закрывается).
-    nazvanie — как назвать вход в сообщении (у счётчиков серого окна — admin или boris)."""
+    nazvanie — как назвать вход в сообщении (у счётчиков серого окна — admin или boris).
+    trevoga — свой текст сообщения с местом {n} для числа промахов (ключи педагогов)."""
     if not login:
         return
     nazvanie = nazvanie or login
@@ -1508,6 +1547,9 @@ def _posle_promaha(login: str, nazvanie: str = "") -> None:
         if t - _SOOBSHCHENO.get(login, 0) < 3600:
             return
         _SOOBSHCHENO[login] = t
+    if trevoga:
+        soobshchit_borisu(trevoga.replace("{n}", str(n)), chto=f"много неверных ключей: {nazvanie}")
+        return
     soobshchit_borisu(f"app.kidsup.ru: за час {n} неверных паролей ко входу «{nazvanie}» с разных адресов. "
                       "Вход не закрыт. Если это не вы и не админы — задайте этому входу новый пароль на /owner.",
                       chto=f"много неверных паролей: {nazvanie}")
@@ -2306,6 +2348,8 @@ def imya_v_zhurnal(k: dict) -> str:
         return "Борис (прежний пароль)" if k.get("login") == "boris" else "общий вход"
     if s == "otkryto":
         return "без входа"
+    if s == "pedklyuch":                     # 14.11.2026: педагог с личным ключом из ссылки
+        return "педагог " + (k.get("imya") or "")
     return k.get("imya") or ""
 
 
@@ -2374,7 +2418,10 @@ def sloy_zagolovki(request, resp) -> None:
         # Старым входам в сером окне (общий admin, прежний boris) кеш не трогаем: пока владелец
         # ничего не включил, страницы ведут себя как раньше (кнопка «Назад» возвращает страницу
         # с прокруткой и недописанным текстом). У окна браузера выхода всё равно нет.
-        if "cache-control" not in resp.headers and iz(request).get("sposob") != "staryy":
+        # 14.11.2026: педагогу с личным ключом (sposob "pedklyuch") — тоже как раньше: страницы
+        # педагога открывались по ссылке без этих заголовков, и «Назад» не должен стирать
+        # недописанные три строки.
+        if "cache-control" not in resp.headers and iz(request).get("sposob") not in ("staryy", "pedklyuch"):
             resp.headers["Cache-Control"] = "no-store"
         if "x-frame-options" not in resp.headers:
             resp.headers["X-Frame-Options"] = "DENY"
