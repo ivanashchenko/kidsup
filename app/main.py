@@ -3265,7 +3265,10 @@ def _voshedshiy_po_ssylke(request: Request, credentials, strogo: bool = True):
 # браузеры мессенджеров). Запросы со своих страниц идут с referrerPolicy: 'same-origin' в fetch:
 # при no-referrer браузер без Sec-Fetch-Site (Safari до 16.4) прислал бы «Origin: null», и
 # проверка «запрос со своей страницы» (vhod._istochnik) отказала бы отметкам карточки.
-BEZ_REFERERA = {"Referrer-Policy": "no-referrer"}
+# Повторная проверка V2 №2 (14.11): same-origin вместо no-referrer — чужим сайтам адрес с ключом
+# всё так же не уходит, а свои запросы старых Safari/Firefox («Выйти / сменить», «Синхронизировать»
+# на /english/karta) не получают 403 из-за «Origin: null».
+BEZ_REFERERA = {"Referrer-Policy": "same-origin"}
 
 
 @app.get("/pedagog", response_class=HTMLResponse)
@@ -5669,7 +5672,7 @@ def _wazzup_process(payload: dict) -> None:
 
 
 # 12.11.2026 — шаг 1 «скрыть старое»: по смене версии в /api/health видно, что новая сборка поднялась
-APP_VERSION = "2026-11-13.3"   # .3 — «вечер 1»: меню по решениям М1–М4, места по единому правилу, стоп-лист «снять/вернуть», раздел красных находок, ключи вебхуков настройкой
+APP_VERSION = "2026-11-14.1"   # 14.1 — ключи педагогов (Т1–Т3: личные ключи, «После первого занятия» в шапке, смена общего ключа), качество карточек без «отказа». 13.3 — «вечер 1»: меню по решениям М1–М4, места по единому правилу, стоп-лист «снять/вернуть», раздел красных находок, ключи вебхуков настройкой
 
 
 @app.get("/api/net", dependencies=OWNER_AUTH)

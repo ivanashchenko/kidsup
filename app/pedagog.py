@@ -128,8 +128,14 @@ def _pervyy(uid) -> dict | None:
         kids = _spisok_pervyh().get("kids") or []
     except Exception:  # noqa: BLE001 — CRM недоступна: проверить ребёнка не по чему
         log.warning("pedagog: список первых занятий не получен", exc_info=True)
-        return None
+        return NET_SVYAZI
     return next((dict(kd) for kd in kids if str(kd.get("uid")) == str(uid)), None)
+
+
+# 14.11.2026, повторная проверка V2 №1: МойКласс не ответил — это не «ребёнка нет в списке».
+# Педагогу нельзя советовать «обновите страницу»: при недоступном МойКлассе обновление даёт
+# ошибку и стирает набранный текст. Отдельный ответ — «нажмите ещё раз через минуту».
+NET_SVYAZI = {"_net_svyazi": True}
 
 
 def _imya_rebenka(name: str) -> str:
@@ -182,6 +188,9 @@ def save(payload: dict, ped: dict | None = None, imya_iz_klyucha: bool = True) -
     if not uid or not teacher:
         return {"ok": False, "error": "нужны ребёнок и педагог"}
     kid = _pervyy(uid)
+    if kid is NET_SVYAZI:
+        return {"ok": False, "error": "МойКласс сейчас не отвечает — НЕ обновляйте страницу, "
+                                      "чтобы не потерять текст; нажмите «Сохранить» ещё раз через минуту"}
     if kid is None:
         return {"ok": False, "error": "этого ребёнка нет в списке первых занятий за сегодня и вчера — "
                                       "обновите страницу и выберите ребёнка из списка"}

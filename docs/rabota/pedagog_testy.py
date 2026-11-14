@@ -348,6 +348,27 @@ def test_spisok_pervyh():
     r = c.post("/api/pedagog/save", json={"k": PED, "uid": 0, "teacher": "Образцов Игорь", "visit": False})
     proverka("…без ребёнка — прежний отказ «нужны ребёнок и педагог»",
              r.json() == {"ok": False, "error": "нужны ребёнок и педагог"}, r.text[:100])
+    # Повторная проверка V2 №1 (14.11): МойКласс не ответил и в памяти ребёнка нет (перезапуск) —
+    # не «обновите страницу» (обновление при лежащем МойКлассе даёт ошибку и стирает текст).
+    from app import pedagog as pg
+    bylo_spisok = pg._spisok_pervyh
+    with pg._PERVYE_ZAMOK:
+        bylo_kesh = dict(pg._PERVYE)
+        pg._PERVYE.clear()
+
+    def _lezhit(*a, **kw):
+        raise RuntimeError("стенд: МойКласс не отвечает")
+    pg._spisok_pervyh = _lezhit
+    try:
+        r = c.post("/api/pedagog/save", json={"k": PED, "uid": "9001", "teacher": "Образцов Игорь", "visit": True,
+                                              "can": "стенд: умеет", "next_group": "стенд: группа"})
+    finally:
+        pg._spisok_pervyh = bylo_spisok
+        with pg._PERVYE_ZAMOK:
+            pg._PERVYE.update(bylo_kesh)
+    err = r.json().get("error", "")
+    proverka("МойКласс не отвечает → «НЕ обновляйте страницу… нажмите ещё раз через минуту», без «обновите страницу»",
+             r.json().get("ok") is False and "НЕ обновляйте страницу" in err and "обновите страницу и" not in err, err[:100])
 
 
 def test_perebor_prezhniy():
@@ -528,8 +549,8 @@ def test_referer_log_css():
     c = kl("198.51.100.4")
     for adres in (f"/pedagog?k={PED}", f"/english/karta?k={PED}", f"/english/metodika?k={PED}", "/pedagog?k=ne-tot"):
         r = c.get(adres, headers=STR)
-        proverka(f"{adres.replace(PED, '<ключ>')}: Referrer-Policy: no-referrer",
-                 r.headers.get("referrer-policy") == "no-referrer", (r.status_code, r.headers.get("referrer-policy")))
+        proverka(f"{adres.replace(PED, '<ключ>')}: Referrer-Policy: same-origin",
+                 r.headers.get("referrer-policy") == "same-origin", (r.status_code, r.headers.get("referrer-policy")))
     t = c.get(f"/english/karta?k={PED}", headers=STR).text
     proverka("карточка: запросы на свой сервер — с referrerPolicy 'same-origin' (иначе старый Safari шлёт «Origin: null»)",
              t.count("referrerPolicy: 'same-origin'") == 3)
@@ -1050,7 +1071,7 @@ def test_zanovo_i_otklyuchit(K: dict):
     r = kl("198.51.100.31").get(f"/english/karta?k={staryy}", headers=STR)
     proverka("прежняя ссылка Игоря в браузере: «Карточка речи» → «Ссылка недействительна. Попросите новую…», без окна пароля",
              r.status_code == 403 and "Ссылка недействительна. Попросите новую у администратора" in r.text
-             and "www-authenticate" not in r.headers and r.headers.get("referrer-policy") == "no-referrer", r.status_code)
+             and "www-authenticate" not in r.headers and r.headers.get("referrer-policy") == "same-origin", r.status_code)
     r = kl("198.51.100.31").get("/english/karta?k=ne-tot-" + secrets.token_hex(4), headers=STR)
     proverka("…а просто неверный ключ — как раньше (401 с окном: не «устаревшая ссылка»)", r.status_code == 401, r.status_code)
     r = kl().get(f"/english/karta?k={staryy}", auth=OBSHCHIY_ADMIN, headers=STR)
