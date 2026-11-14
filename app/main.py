@@ -32,6 +32,10 @@ db.init_db()
 # 12.11.2026, личные входы: ключ автоматики сервера (только в памяти этого процесса),
 # файл входов data/vhody.db, журнал действий. Сбой здесь старым входам не мешает.
 vhod.zapusk()
+# 14.11.2026, ключи педагогов (R1 №4): журнал доступа uvicorn пишет путь со строкой запроса —
+# значение k=… (ключ педагога в ссылке) в нём заменяется звёздочками.
+from . import pedklyuchi as _pedklyuchi  # noqa: E402
+_pedklyuchi.maskirovat_log()
 
 # Перечень адресов (/openapi.json, /docs, /redoc) без входа не отдаём: служебному сайту он
 # не нужен, а чужому показывает все адреса владельца и выкладки с параметрами.
@@ -2294,6 +2298,14 @@ def _nastroyka_ne_goditsya(key: str, value: str) -> str:
         return (f"Марквиз — ключ не сохранён: в нём могут быть только латинские буквы, цифры, «-» и «_», "
                 f"не короче {MARQUIZ_KLYUCH_MIN} знаков. Ключ стоит в адресе вебхука — другие знаки адрес ломают, "
                 f"и заявки квиза перестают приходить.")
+    # 14.11.2026, после проверки (R2 №9): владелец сменил или выключил общий ключ педагогов на /owner —
+    # настройка pedagog_key больше ни на что не влияет (app/pedklyuchi.py, _nayti). Молча принять её —
+    # значит выдать нерабочую ссылку без объяснений.
+    if key == "pedagog_key":
+        from . import pedklyuchi
+        if pedklyuchi.obshchiy_snyat():
+            return ("общий ключ теперь меняется на /owner, блок «Ключи педагогов» — настройка pedagog_key "
+                    "после смены общего ключа не действует")
     return ""
 
 
@@ -2374,6 +2386,13 @@ async def owner_pedagogi(request: Request):
     stranica = await run_in_threadpool(_owner_ctx, request, "", None, None, itog)
     return HTMLResponse(stranica, status_code=200 if not itog.get("osh") else 400,
                         headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY"})
+
+
+@app.get("/owner/pedagogi", dependencies=OWNER_AUTH)
+def owner_pedagogi_get():
+    """Браузер открыл адрес ответа блока заново (выгрузил вкладку, обновил страницу без
+    повторной отправки формы) — на блок «Ключи педагогов» страницы владельца, а не 405 (R2 №7)."""
+    return RedirectResponse("/owner#pedagogi", status_code=303)
 
 
 @app.get("/api/pedagogi/sostoyanie", dependencies=OWNER_AUTH)
@@ -3241,29 +3260,42 @@ def _voshedshiy_po_ssylke(request: Request, credentials, strogo: bool = True):
     return kto if kto and kto["rol"] != "avto" else None
 
 
+# 14.11.2026, после проверки (R1 №11): ключ педагога стоит в адресе страницы — браузер не должен
+# отдавать этот адрес в заголовке Referer чужим сайтам (шрифты методички, старые встроенные
+# браузеры мессенджеров). Запросы со своих страниц идут с referrerPolicy: 'same-origin' в fetch:
+# при no-referrer браузер без Sec-Fetch-Site (Safari до 16.4) прислал бы «Origin: null», и
+# проверка «запрос со своей страницы» (vhod._istochnik) отказала бы отметкам карточки.
+BEZ_REFERERA = {"Referrer-Policy": "no-referrer"}
+
+
 @app.get("/pedagog", response_class=HTMLResponse)
 def pedagog_page(request: Request, k: str = "",
                  credentials: HTTPBasicCredentials | None = Depends(_security)):
     """Страница педагога без админского пароля: вход по ключу из ссылки — общему или личному
-    (app/pedklyuchi.py). С личным ключом имя педагога подставлено и не выбирается."""
+    (app/pedklyuchi.py). С личным ключом имя педагога подставлено и не выбирается.
+    14.11.2026, после проверки: ссылку педагога открыл вошедший админ или владелец — имя не
+    подставляется и не запирается (R1 №8, R2 №3); в данных страницы нет телефонов родителей
+    (R1 №1); браузеру без Sec-Fetch-* страница сама скажет «открыли» (маяк, R2 №1)."""
     from . import pedagog, pedklyuchi
     ped = pedklyuchi.proverit(k, request)
-    stranica = pedagog.page(k, ped or {})
+    if not ped:
+        return HTMLResponse(pedagog.page(k, {}), headers=BEZ_REFERERA)
+    # 13.11.2026, проверка шага 2: у маршрута нет зависимости входа, роль никто не ставил —
+    # счётчик открытий писал «?», и в сводке «Всего» не сходилось с колонками.
+    request.state.rol = "pedagog"
+    # 14.11.2026: ссылку открыл вошедший админ или владелец (проверяет выданную ссылку) —
+    # страница та же, но «педагог открывал» не отмечается и в счёт общего ключа не идёт.
+    try:
+        admin = _voshedshiy_po_ssylke(request, credentials, strogo=False) is not None
+    except Exception:  # noqa: BLE001 — сбой проверки входа страницу педагога не ломает
+        admin = False
+    pedklyuchi.v_zapros(request, ped, admin=admin)
+    mayak = pedklyuchi.mayak_js(k, "/pedagog") if pedklyuchi.nuzhen_mayak(request) else ""
+    stranica = pedagog.page(k, ped, imya_iz_klyucha=not admin, mayak=mayak)
     # 13.11.2026: шапка педагога («KidsUP · педагогам») — только при верном ключе.
     # Маршрут без входа, поэтому шапка всегда педагогическая: меню админов сюда не попадает.
-    if ped:
-        # 13.11.2026, проверка шага 2: у маршрута нет зависимости входа, роль никто не ставил —
-        # счётчик открытий писал «?», и в сводке «Всего» не сходилось с колонками.
-        request.state.rol = "pedagog"
-        # 14.11.2026: ссылку открыл вошедший админ или владелец (проверяет выданную ссылку) —
-        # страница та же, но «педагог открывал» не отмечается и в счёт общего ключа не идёт.
-        try:
-            admin = _voshedshiy_po_ssylke(request, credentials, strogo=False) is not None
-        except Exception:  # noqa: BLE001 — сбой проверки входа страницу педагога не ломает
-            admin = False
-        pedklyuchi.v_zapros(request, ped, admin=admin)
-        stranica = nav.wrap(stranica, _shapka(request))
-    return HTMLResponse(stranica)
+    stranica = nav.wrap(stranica, _shapka(request))
+    return HTMLResponse(stranica, headers=BEZ_REFERERA)
 
 
 @app.post("/api/pedagog/save")
@@ -3273,10 +3305,13 @@ def api_pedagog_save(request: Request, payload: dict = Body(...),
     ключом педагог — тот, кому выдан ключ (pedagog.save не читает имя из запроса).
     14.11.2026: сохранил вошедший админ или владелец (открыл ссылку педагога) — он остаётся
     собой, как на странице /pedagog: в журнале «кто что сделал» — он, «педагог открывал» не
-    отмечается. Педагогу без входа всё как раньше."""
+    отмечается, педагог в заметке — тот, кого он выбрал в списке (не имя из ключа).
+    Педагогу без входа всё как раньше. Ребёнок — только из списка первых занятий страницы
+    (pedagog._pervyy), для любого ключа."""
     from . import pedagog, pedklyuchi
     payload = payload or {}
     ped = pedklyuchi.proverit(str(payload.get("k") or ""), request)
+    admin = None
     if ped:
         try:
             admin = _voshedshiy_po_ssylke(request, credentials, strogo=False)
@@ -3286,7 +3321,31 @@ def api_pedagog_save(request: Request, payload: dict = Body(...),
         if admin is not None:
             request.state.kto = admin
         request.state.chto = "педагог: заметка после первого занятия"
-    return pedagog.save(payload, ped or {})
+    return pedagog.save(payload, ped or {}, imya_iz_klyucha=admin is None)
+
+
+@app.post("/api/pedagog/otkryl")
+def api_pedagog_otkryl(request: Request, payload: dict = Body(...),
+                       credentials: HTTPBasicCredentials | None = Depends(_security)):
+    """Маяк «страницу педагога открыли» (14.11.2026, R2 №1): шлёт сама страница после загрузки —
+    только браузерам, по заголовкам которых переход не виден (Safari до 16.4 и другие без
+    Sec-Fetch-*). Робот предпросмотра скрипт не выполняет. {"k", "put": "/pedagog" |
+    "/english/karta"} → {"ok"}. Ничего не меняет, кроме справочных отметок: личный ключ —
+    «последний раз открывал», общий — +1 к открытиям за день (pedklyuchi.sloy_zapis). В журнал
+    «кто что сделал» не пишется. Ключ — в теле, как у /api/pedagog/save."""
+    from . import pedklyuchi
+    payload = payload if isinstance(payload, dict) else {}
+    ped = pedklyuchi.proverit(str(payload.get("k") or ""), request)
+    if not ped:
+        return {"ok": False}
+    try:
+        admin = _voshedshiy_po_ssylke(request, credentials, strogo=False) is not None
+    except Exception:  # noqa: BLE001
+        admin = False
+    pedklyuchi.v_zapros(request, ped, admin=admin, zhurnal=False)
+    put = str(payload.get("put") or "")
+    request.state.pedagog_mayak = put if put in pedklyuchi.STRANICY else ""
+    return {"ok": True}
 
 
 @app.get("/boris")
@@ -11102,7 +11161,7 @@ def check_pedagog_or_admin(request: Request,
     (_karta_gruppy, _karta_svoy). Общий ключ — как раньше: все группы английского."""
     from . import pedklyuchi
     k = request.query_params.get("k") or request.headers.get("X-Pedagog-Key") or ""
-    ped = pedklyuchi.proverit(k, request) if k else None
+    ped, ustarel = pedklyuchi.proverit_podrobno(k, request) if k else (None, False)
     if ped:
         # 12.11.2026: педагогу меню админов не рисуем. Но ссылку с ключом открывает и
         # админ — его браузер сам шлёт вход, и он остаётся админом со своим меню.
@@ -11116,7 +11175,30 @@ def check_pedagog_or_admin(request: Request,
         request.state.rol = "pedagog"
         pedklyuchi.v_zapros(request, ped)
         return
+    # 14.11.2026, после проверки (R2 №4): педагог открыл старую ссылку из чата (общий ключ
+    # сменён, личный выдан заново или отключён) — страница «Ссылка недействительна», как у
+    # /pedagog, а не окно пароля или форма входа сотрудников. Только самой странице в браузере;
+    # вошедший админ остаётся собой, запросам /api — прежние ответы.
+    if (ustarel and request.method in ("GET", "HEAD") and request.url.path.rstrip("/") == "/english/karta"
+            and "text/html" in (request.headers.get("accept") or "")):
+        kto = _voshedshiy_po_ssylke(request, credentials)
+        if kto:
+            request.state.kto = kto
+            _zapomnit(request, vhod.rol_menyu(kto))
+            return
+        raise SsylkaUstarela()
     check_auth(credentials, request)
+
+
+class SsylkaUstarela(Exception):
+    """Страница «Карточки речи» по устаревшей ссылке педагога → «Ссылка недействительна»."""
+
+
+@app.exception_handler(SsylkaUstarela)
+async def _ssylka_ustarela(request: Request, exc: SsylkaUstarela):
+    from . import pedagog
+    return HTMLResponse(pedagog.NEDEYSTVITELNA, status_code=403,
+                        headers={**BEZ_REFERERA, "Cache-Control": "no-store"})
 
 
 PAUTH = [Depends(check_pedagog_or_admin)]
@@ -11165,11 +11247,17 @@ def _karta_kid(uid: int) -> dict:
 
 @app.get("/english/karta", response_class=HTMLResponse, dependencies=PAUTH)
 def english_karta_page(request: Request, k: str = ""):
-    """Карточка речи: форма к разделу 10 методички (см. app/karta.py)."""
+    """Карточка речи: форма к разделу 10 методички (см. app/karta.py).
+    14.11.2026, после проверки: без Referer чужим сайтам (ключ в адресе, R1 №11); браузеру без
+    Sec-Fetch-* страница педагога сама скажет «открыли» (маяк, R2 №1)."""
+    from markupsafe import Markup
     from . import karta, pedklyuchi
     ped = pedklyuchi.lichnyy(request)
-    return render(request, "karta.html", active="karta", k=karta.rows(_karta_gruppy(request)), pk=k,
-                  lichnyy=(ped.get("imya") or "педагог") if ped else "")
+    mayak = pedklyuchi.mayak_js(k, "/english/karta") if k and pedklyuchi.nuzhen_mayak(request) else ""
+    resp = render(request, "karta.html", active="karta", k=karta.rows(_karta_gruppy(request)), pk=k,
+                  lichnyy=(ped.get("imya") or "педагог") if ped else "", mayak=Markup(mayak))
+    resp.headers.update(BEZ_REFERERA)
+    return resp
 
 
 @app.get("/api/english/karta", dependencies=PAUTH)
@@ -11752,7 +11840,9 @@ def english_metodika_page():
     f = BASE / "static" / "english_metodika.html"
     if not f.exists():
         raise HTTPException(404, "страница не собрана")
-    return HTMLResponse(f.read_text(encoding="utf-8"))
+    # 14.11.2026 (R1 №11): с «Карточки речи» сюда приходят с ключом педагога в адресе (?k= нужен
+    # ссылкам обратно на карточку), а страница тянет шрифты с fonts.googleapis.com — без Referer.
+    return HTMLResponse(f.read_text(encoding="utf-8"), headers=BEZ_REFERERA)
 
 
 @app.get("/podgotovka/metodika", response_class=HTMLResponse)

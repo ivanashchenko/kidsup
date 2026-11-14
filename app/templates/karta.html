@@ -171,13 +171,16 @@ table.kt td,table.kt th{font-size:13px;padding:.25rem .35rem}
 
 <p id="out" class="muted" style="position:sticky;bottom:0;background:#fff;padding:.5rem 0"></p>
 <script>
+{#- 14.11.2026 (R1 №11): страница отдаётся с Referrer-Policy: no-referrer (ключ в адресе). Запросы на свой сервер —
+    с referrerPolicy: 'same-origin': иначе браузер без Sec-Fetch-Site (Safari до 16.4) прислал бы «Origin: null»,
+    и сервер принял бы отметку за запрос с чужого сайта. -#}
 const PK = {{ (pk or '')|tojson }};
 const out = document.getElementById('out');
 const u = p => PK ? p + (p.includes('?') ? '&' : '?') + 'k=' + encodeURIComponent(PK) : p;
 async function post(url, body, quiet) {
   if (!quiet) out.textContent = 'Сохраняю…';
   try {
-    const r = await fetch(u(url), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    const r = await fetch(u(url), {method: 'POST', referrerPolicy: 'same-origin', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { out.textContent = (j.detail || 'Ошибка') ; return {ok: false, ...j}; }
     if (!quiet) out.textContent = j.ok === false ? 'Не сохранилось' : 'Сохранено ' + new Date().toLocaleTimeString('ru-RU');
@@ -203,7 +206,7 @@ document.querySelectorAll('button.vup').forEach(b => b.addEventListener('click',
   const ext = (f.name.split('.').pop() || 'mp4').toLowerCase();
   b.disabled = true; out.textContent = 'Загружаю ' + (f.size / 1048576).toFixed(0) + ' МБ… большие файлы сервер ещё сжимает — не закрывайте страницу';
   try {
-    const r = await fetch(u(`/api/english/karta/video-upload?user_id=${uid}&date=${d}&ext=${ext}`), {method: 'POST', body: f});
+    const r = await fetch(u(`/api/english/karta/video-upload?user_id=${uid}&date=${d}&ext=${ext}`), {method: 'POST', referrerPolicy: 'same-origin', body: f});
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { out.textContent = j.detail || 'Не загрузилось'; b.disabled = false; return; }
     const box = document.querySelector(`.vfiles[data-uid="${uid}"]`);
@@ -316,7 +319,7 @@ document.querySelectorAll('.vvod').forEach(box => {
   const uid = +box.dataset.uid;
   box.querySelector('.show-vvod').addEventListener('click', async ev => {
     ev.preventDefault();
-    const r = await fetch(u(`/api/english/karta/vvodnoe?user_id=${uid}&pochemu=${encodeURIComponent(box.querySelector('.pochemu').value)}`));
+    const r = await fetch(u(`/api/english/karta/vvodnoe?user_id=${uid}&pochemu=${encodeURIComponent(box.querySelector('.pochemu').value)}`), {referrerPolicy: 'same-origin'});
     const j = await r.json();
     const ta = box.querySelector('.vvtext'); ta.value = j.tekst || ''; ta.style.display = '';
     box.querySelector('.send-vvod').style.display = '';
@@ -345,4 +348,6 @@ function apply(b) {
 document.querySelectorAll('#flt button').forEach(b => b.addEventListener('click', () => apply(b)));
 apply(document.querySelector('#flt button.on'));
 </script>
+{#- 14.11.2026 (R2 №1): браузеру без Sec-Fetch-* — «страницу открыли» со страницы (pedklyuchi.mayak_js) -#}
+{{ mayak or '' }}
 {% endblock %}
