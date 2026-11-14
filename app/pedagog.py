@@ -8,7 +8,13 @@
   • в таблицу karta_notes — оттуда /karta подставляет строки администратору,
   • комментарием в карточку ребёнка в МойКлассе,
   • пунктом в инбокс дежурного: «карта готова — отправить маме».
-Явку педагог тоже отмечает здесь: сервер ставит visit/skip на записи занятия."""
+Явку педагог тоже отмечает здесь: сервер ставит visit/skip на записи занятия.
+
+14.11.2026 (Борис, Т3): ключ в ссылке бывает общий (как раньше, pedagog_key) и личный —
+выданный одному педагогу. Проверяет оба app/pedklyuchi.py. С личным ключом имя педагога
+подставлено и не выбирается: сервер берёт его из ключа, а не из запроса. Список детей —
+тот же, что и по общему ключу: первые занятия сегодня и вчера по всему центру (первое
+занятие могут отдать любому педагогу, в том числе на замену)."""
 from __future__ import annotations
 import json, html as H, datetime as dt, logging
 from . import db
@@ -58,13 +64,18 @@ def notes_for(uid: int | None = None, days: int = 3) -> list[dict]:
 
 
 def key_ok(k: str) -> bool:
-    want = db.get_setting("pedagog_key", "")
-    return bool(want) and k == want
+    """Ключ из ссылки годится — общий или личный (без счёта перебора: его ведёт main.py)."""
+    from . import pedklyuchi
+    return pedklyuchi.proverit(k) is not None
 
 
-def page(k: str) -> str:
-    from . import karta_razvitiya as karta
-    if not key_ok(k):
+def page(k: str, ped: dict | None = None) -> str:
+    """ped — кто пришёл по ключу (pedklyuchi.proverit; main.py проверяет ключ один раз, со
+    счётом перебора, и передаёт итог сюда). Без него ключ проверяется здесь."""
+    from . import karta_razvitiya as karta, pedklyuchi
+    if ped is None:
+        ped = pedklyuchi.proverit(k)
+    if not ped:
         return "<h2 style='font-family:sans-serif;margin:2rem'>Ссылка недействительна. Попросите новую у администратора.</h2>"
     data = karta._kids(days=2)
     kids = data.get("kids", []) if isinstance(data, dict) else []
@@ -73,16 +84,26 @@ def page(k: str) -> str:
     for kd in kids:
         kd["done"] = kd["uid"] in done
     cfg = {"kids": kids, "teachers": teachers, "examples": EXAMPLES, "k": k}
+    if ped.get("vid") == pedklyuchi.LICHNYY:
+        # личный ключ: педагог известен — в списке только он, выбрать другого нельзя
+        cfg["teachers"], cfg["ya"] = [ped.get("imya") or ""], ped.get("imya") or ""
     return TEMPLATE.replace("__CFG__", json.dumps(cfg, ensure_ascii=False).replace("</", "<\\/"))
 
 
-def save(payload: dict) -> dict:
-    if not key_ok(str(payload.get("k") or "")):
+def save(payload: dict, ped: dict | None = None) -> dict:
+    """ped — как в page(). С личным ключом педагог — тот, кому выдан ключ: имя из запроса не
+    читается (чужим именем заметку не подписать)."""
+    from . import pedklyuchi
+    if ped is None:
+        ped = pedklyuchi.proverit(str(payload.get("k") or ""))
+    if not ped:
         return {"ok": False, "error": "ключ не подходит"}
     uid = payload.get("uid")
     can, nxt, start = (str(payload.get(x) or "").strip() for x in ("can", "next_group", "start"))
     visit = payload.get("visit")  # True / False / None
     teacher = str(payload.get("teacher") or "").strip()
+    if ped.get("vid") == pedklyuchi.LICHNYY:
+        teacher = (ped.get("imya") or "").strip()
     child = str(payload.get("child") or "").strip()
     if not uid or not teacher:
         return {"ok": False, "error": "нужны ребёнок и педагог"}
@@ -193,8 +214,12 @@ textarea{min-height:70px}
 <script>
 const CFG=__CFG__; const $=id=>document.getElementById(id); const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 $('teacher').innerHTML+=CFG.teachers.map(t=>`<option>${esc(t)}</option>`).join('');
+if(CFG.ya){ /* 14.11.2026: личный ключ — педагог известен серверу, выбирать не из кого */
+ $('teacher').innerHTML=`<option>${esc(CFG.ya)}</option>`; $('teacher').value=CFG.ya; $('teacher').disabled=true;
+}else{
 try{ const t=localStorage.getItem('pedagog_name'); if(t) $('teacher').value=t; }catch(e){}
 $('teacher').addEventListener('change',()=>{try{localStorage.setItem('pedagog_name',$('teacher').value)}catch(e){}});
+}
 let cur=null, visit=null;
 function firstName(n){const w=String(n||'').trim().split(/\s+/);return w.length>=2?w[1]:(w[0]||'');}
 $('kids').innerHTML = CFG.kids.length? CFG.kids.map((k,i)=>`<div class="kid ${k.done?'done':''}" data-i="${i}"><span><b>${esc(k.name)}</b><br><span class="t">${esc(k.group)}</span></span><span class="t">${esc(k.date.slice(5).replace('-','.'))} ${esc(k.time)}${k.done?' · есть':''}</span></div>`).join('') : '<div class="ex">первых занятий за два дня в расписании нет</div>';

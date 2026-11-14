@@ -31,6 +31,15 @@ COURSE_HINT = {
 }
 
 
+ROL_PEDAGOG = 63600      # роль «педагог» у сотрудника в МойКлассе
+
+
+def eto_pedagog(m: dict) -> bool:
+    """Сотрудник МойКласса — работающий педагог. Один отбор для списка «Я — педагог» на
+    странице /pedagog и для списка «Ключи педагогов» на /owner (app/pedklyuchi.py)."""
+    return ROL_PEDAGOG in (m.get("roles") or []) and bool(m.get("isWork", True))
+
+
 def _b64(p: pathlib.Path, mime: str) -> str:
     return f"data:{mime};base64," + base64.b64encode(p.read_bytes()).decode()
 
@@ -83,7 +92,7 @@ def _kids(days: int = 2) -> list[dict]:
         try:
             ms = mk.get("/v1/company/managers", {"limit": 200})
             ms = ms if isinstance(ms, list) else ms.get("managers", [])
-            teachers = sorted(m["name"] for m in ms if 63600 in (m.get("roles") or []) and m.get("isWork", True))
+            teachers = sorted(m["name"] for m in ms if eto_pedagog(m))
         except Exception:
             teachers = []
     finally:

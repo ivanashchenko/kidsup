@@ -141,6 +141,15 @@ async def _vhod_sloy(request, call_next):
             await run_in_threadpool(vhod.sloy_zapis, request, resp.status_code)
         except Exception:  # noqa: BLE001
             logging.getLogger("kidsup.vhod").exception("слой входа после ответа")
+    # 14.11.2026, ключи педагогов: «последний раз открывал» личным ключом (не чаще раза в 5
+    # минут) и счёт открытий общим ключом — после ответа, в потоке, короткой записью.
+    if getattr(request.state, "pedagog", None):
+        try:
+            from starlette.concurrency import run_in_threadpool
+            from . import pedklyuchi
+            await run_in_threadpool(pedklyuchi.sloy_zapis, request, resp.status_code)
+        except Exception:  # noqa: BLE001
+            logging.getLogger("kidsup.pedklyuchi").exception("слой ключей педагогов после ответа")
     return resp
 
 
@@ -490,16 +499,21 @@ def _shapka(request: Request, kto: bool = True) -> str:
     шапка и на страницах base.html, и на страницах со своим HTML.
 
     Педагогу (роль "pedagog", пришёл по ключу из ссылки) — строка «KidsUP · педагогам» с
-    одним пунктом. Ключ попадает в ссылки шапки, только если совпал с настройкой
-    pedagog_key: чужую строку из адреса в страницу не переносим.
+    двумя пунктами: «Карточка речи» и «После первого занятия» (14.11.2026, Т2). Ключ
+    попадает в ссылки шапки, только если это тот самый ключ из адреса, который принял
+    app/pedklyuchi.py (общий или личный): чужую строку из адреса в страницу не переносим.
+    Педагогу с личным ключом без групп английского «Карточка речи» в шапке не показывается.
     kto=False — без полоски «Вы: Лена · Выйти / сменить»: пульт рисует её сам.
     (13.11.2026, после проверки: пульт тоже берёт полоску из шапки — kto=False сейчас никто не зовёт.)"""
     try:
         rol = _rol(request)
         if rol == "pedagog":
+            from . import pedklyuchi
             k = request.query_params.get("k") or ""
-            want = db.get_setting("pedagog_key", "")
-            return nav.shapka("pedagog", request.url.path, k=k if (want and k and vhod._ravny(k, want)) else "")
+            ped = getattr(request.state, "pedagog", None) or {}
+            proveren = bool(k and ped.get("k") and vhod._ravny(k, ped["k"]))
+            karta_est = ped.get("vid") != pedklyuchi.LICHNYY or bool(pedklyuchi.gruppy(ped))
+            return nav.shapka("pedagog", request.url.path, k=k if proveren else "", karta=karta_est)
         return nav.shapka(rol, request.url.path, kto_html=str(_kto_shapka(request)) if kto else "")
     except Exception:  # noqa: BLE001 — шапка страницу не ломает
         logging.getLogger("kidsup.nav").exception("общая шапка")
@@ -2194,12 +2208,16 @@ OWNER_FIELDS = [
 
 
 def _owner_ctx(request: Request = None, msg: str = "", vhody: dict | None = None,
-               mk: dict | None = None) -> str:
+               mk: dict | None = None, pedagogi: dict | None = None) -> str:
     """Страница владельца. 12.11.2026: вверху блок «Входы» (vhod.blok_vladelca) — пароли
     админов, ключи Клода, отключение старых входов. Виден только владельцу, вошедшему через
     форму; пришедшему через серое окно — ссылка «войти через форму». vhody — итог действия
-    из блока (сообщение, отказ, ключ на один показ)."""
+    из блока (сообщение, отказ, ключ на один показ).
+    14.11.2026: под ним блок «Ключи педагогов» (pedklyuchi.blok_vladelca) — по тем же
+    правилам; pedagogi — итог действия из него (сообщение, отказ, ссылка на один показ)."""
+    from . import pedklyuchi
     blok = vhod.blok_vladelca_bezopasno(request, vhody) if request is not None else ""
+    blok_ped = pedklyuchi.blok_vladelca_bezopasno(request, pedagogi) if request is not None else ""
     # 13.11.2026, Борис — меню, вечер 1: из меню ушли пять страниц владельца, три страницы
     # админов и строка «Ещё» на пульте. Сами страницы открываются как раньше; чтобы убранное
     # не потерялось, ссылки на всё собраны здесь (списки — в app/nav.py).
@@ -2240,15 +2258,16 @@ p.note{{color:#6c6a86;font-size:14px}}p.nav{{font-size:14.5px;margin:-6px 0 10px
 .redko{{background:#fff;border:1px solid #e4e2f0;border-left:4px solid #312783;border-radius:12px;padding:10px 14px;margin:14px 0}}
 .redko h2{{color:#312783;font-size:18px;margin:2px 0 4px}}.redko p{{margin:6px 0;line-height:1.7}}.redko a{{color:#312783;font-weight:600;white-space:nowrap}}</style></head><body><div class='w'>
 <h1>Настройки владельца</h1>
-<p class='nav'><a href='/boris/docs'>← Мои документы</a> · <a href='#mk'>Ключ МойКласса и выгрузка</a> · <a href='/kamery/nastroyka'>Камеры</a> · <a href='/arhiv'>Архив страниц</a> · <a href='#redko'>Редко нужное</a></p>
+<p class='nav'><a href='/boris/docs'>← Мои документы</a> · <a href='#pedagogi'>Ключи педагогов</a> · <a href='#mk'>Ключ МойКласса и выгрузка</a> · <a href='/kamery/nastroyka'>Камеры</a> · <a href='/arhiv'>Архив страниц</a> · <a href='#redko'>Редко нужное</a></p>
 <p class='note'>Эта страница и всё, что на ней, закрыто отдельным паролем владельца — общий пароль admin сюда не подходит. Значения хранятся как секреты и в ответах сервера не показываются. Пустое поле — оставить как есть.</p>
 {redko}
 {blok}
+{blok_ped}
 {_mk_razdel(mk)}
 <h2 style='color:#312783;font-size:20px'>Ключи банка, кассы и сервисов</h2>
 {('<div class="msg">' + html.escape(msg) + '</div>') if msg else ''}
 <form method='post'>{''.join(rows)}<button type='submit'>Сохранить</button></form>
-</div><script>{vhod._SKRIPT_VH}</script></body></html>"""
+</div><script>{vhod._SKRIPT_VH}</script><script>{pedklyuchi.SKRIPT}</script></body></html>"""
 
 
 @app.get("/owner", response_class=HTMLResponse, dependencies=OWNER_AUTH)
@@ -2329,6 +2348,41 @@ async def owner_vhody(request: Request):
     stranica = await run_in_threadpool(_owner_ctx, request, "", itog)
     return HTMLResponse(stranica, status_code=200 if not itog.get("osh") else 400,
                         headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY"})
+
+
+@app.post("/owner/pedagogi", response_class=HTMLResponse, dependencies=OWNER_AUTH)
+async def owner_pedagogi(request: Request):
+    """Блок «Ключи педагогов» на /owner (14.11.2026, Борис — Т1 и Т3): выдать личный ключ,
+    выдать заново, отключить; сменить общий ключ, выключить, включить снова.
+
+    Правила — те же, что у /owner/vhody: только человек-владелец, вошедший через форму (ни
+    служебный ключ, ни прежний пароль в сером окне, ни админ — 403); запрос с чужого сайта
+    отсекает проверка входа; каждое действие подтверждается паролем владельца (поле
+    moy_parol) — см. pedklyuchi.deystvie_vladelca. Ответ — та же страница с сообщением;
+    выданная ссылка показывается один раз и не кешируется."""
+    from . import pedklyuchi
+    k = vhod.iz(request)
+    if not (k.get("rol") == "owner" and k.get("sposob") == "forma"):
+        raise HTTPException(status_code=403, detail="Ключами педагогов управляет только владелец, вошедший через форму: app.kidsup.ru/vhod")
+    form = await request.form()
+    from starlette.concurrency import run_in_threadpool
+    try:
+        itog = await run_in_threadpool(pedklyuchi.deystvie_vladelca, request, form)
+    except Exception:  # noqa: BLE001 — сбой файла входов: понятная страница, а не ошибка 500
+        logging.getLogger("kidsup.pedklyuchi").exception("действие владельца с ключами педагогов не выполнено")
+        itog = {"osh": "Не получилось — ошибка записана в журнал сервера. Что успело измениться, видно ниже."}
+    stranica = await run_in_threadpool(_owner_ctx, request, "", None, None, itog)
+    return HTMLResponse(stranica, status_code=200 if not itog.get("osh") else 400,
+                        headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY"})
+
+
+@app.get("/api/pedagogi/sostoyanie", dependencies=OWNER_AUTH)
+def api_pedagogi_sostoyanie():
+    """Ключи педагогов без ключей и хешей — владельцу и служебным ключам ассистента: общий
+    ключ (прежний, сменён или выключен; открытий за 7 дней), кому выдан личный ключ, когда и
+    когда им открывали, какие группы английского увидит педагог, группы без педагога."""
+    from . import pedklyuchi
+    return pedklyuchi.sostoyanie()
 
 
 @app.get("/api/vhod/sostoyanie", dependencies=OWNER_AUTH)
@@ -3172,25 +3226,55 @@ def _suggest_by_age(age: float | None) -> str:
     return "13+ — не наш возраст"
 
 
+def _voshedshiy_po_ssylke(request: Request, credentials, strogo: bool = True):
+    """Ссылку педагога (с верным ключом) открыл вошедший — админ, владелец, служебный ключ:
+    он остаётся собой. vhod.kto() на форму входа не уводит: вошедший (метка, ключ, старый
+    вход) возвращается, иначе None — тогда это педагог. strogo — чужой фоновый запрос (403
+    из vhod.kto) пробрасывается, как было у «Карточки речи»; на /pedagog такой проверки
+    не было, и там она не появляется."""
+    try:
+        kto = vhod.kto(request, credentials)
+    except HTTPException as e:
+        if e.status_code == 403 and strogo:
+            raise
+        kto = None
+    return kto if kto and kto["rol"] != "avto" else None
+
+
 @app.get("/pedagog", response_class=HTMLResponse)
-def pedagog_page(request: Request, k: str = ""):
-    """Страница педагога без админского пароля: вход по ключу из ссылки (pedagog_key)."""
-    from . import pedagog
-    stranica = pedagog.page(k)
-    # 13.11.2026: шапка педагога («KidsUP · педагогам», один пункт) — только при верном ключе.
+def pedagog_page(request: Request, k: str = "",
+                 credentials: HTTPBasicCredentials | None = Depends(_security)):
+    """Страница педагога без админского пароля: вход по ключу из ссылки — общему или личному
+    (app/pedklyuchi.py). С личным ключом имя педагога подставлено и не выбирается."""
+    from . import pedagog, pedklyuchi
+    ped = pedklyuchi.proverit(k, request)
+    stranica = pedagog.page(k, ped or {})
+    # 13.11.2026: шапка педагога («KidsUP · педагогам») — только при верном ключе.
     # Маршрут без входа, поэтому шапка всегда педагогическая: меню админов сюда не попадает.
-    if pedagog.key_ok(k):
+    if ped:
         # 13.11.2026, проверка шага 2: у маршрута нет зависимости входа, роль никто не ставил —
         # счётчик открытий писал «?», и в сводке «Всего» не сходилось с колонками.
         request.state.rol = "pedagog"
-        stranica = nav.wrap(stranica, nav.shapka("pedagog", request.url.path, k=k))
+        # 14.11.2026: ссылку открыл вошедший админ или владелец (проверяет выданную ссылку) —
+        # страница та же, но «педагог открывал» не отмечается и в счёт общего ключа не идёт.
+        try:
+            admin = _voshedshiy_po_ssylke(request, credentials, strogo=False) is not None
+        except Exception:  # noqa: BLE001 — сбой проверки входа страницу педагога не ломает
+            admin = False
+        pedklyuchi.v_zapros(request, ped, admin=admin)
+        stranica = nav.wrap(stranica, _shapka(request))
     return HTMLResponse(stranica)
 
 
 @app.post("/api/pedagog/save")
-def api_pedagog_save(payload: dict = Body(...)):
-    from . import pedagog
-    return pedagog.save(payload or {})
+def api_pedagog_save(request: Request, payload: dict = Body(...)):
+    from . import pedagog, pedklyuchi
+    payload = payload or {}
+    ped = pedklyuchi.proverit(str(payload.get("k") or ""), request)
+    if ped:
+        pedklyuchi.v_zapros(request, ped)
+        request.state.chto = "педагог: заметка после первого занятия"
+    return pedagog.save(payload, ped or {})
 
 
 @app.get("/boris")
@@ -5619,7 +5703,11 @@ SECRET_KEYS = {"cam_password", "anthropic_api_key", "anthropic_proxy_secret", "t
                "vk_token", "tg_bot_token", "vk_ads_client_secret", "vk_ads_token", "vk_ads_refresh_token", "mk_web_password", "yandex_web_password",
                # 13.11.2026: ключи вебхуков — тот, кто их знает, может слать нам заявки и «сообщения
                # клиентов». lead_hook_key до этого дня отдавался в /api/settings целиком.
-               "marquiz_key", "wazzup_hook_key", "lead_hook_key"}
+               "marquiz_key", "wazzup_hook_key", "lead_hook_key",
+               # 14.11.2026 (Борис, Т1): общий ключ педагогов — кто его знает, видит всех детей групп
+               # английского. До этого дня /api/settings отдавал его целиком. После смены ключа
+               # владельцем настройка пуста: новый ключ хранится только хешем (app/pedklyuchi.py).
+               "pedagog_key"}
 
 
 def _mask(key: str, value: str | None) -> str | None:
@@ -10994,30 +11082,65 @@ def check_pedagog_or_admin(request: Request,
                            credentials: HTTPBasicCredentials | None = Depends(_security)):
     """Карточка речи открывается педагогу по ключу из ссылки (?k=, как /pedagog),
     администратору — по обычному паролю. Решение 25.09: педагоги сами ведут
-    карточку и отправляют родителям отчёты через сервер центра."""
+    карточку и отправляют родителям отчёты через сервер центра.
+
+    14.11.2026 (Борис, Т3): ключ бывает общий и личный — оба проверяет pedklyuchi.proverit.
+    По личному сервер знает, кто педагог: request.state.pedagog (и request.state.kto — для
+    журнала), а «Карточка речи» показывает и принимает только детей его групп
+    (_karta_gruppy, _karta_svoy). Общий ключ — как раньше: все группы английского."""
+    from . import pedklyuchi
     k = request.query_params.get("k") or request.headers.get("X-Pedagog-Key") or ""
-    want = db.get_setting("pedagog_key", "")
-    if want and k and vhod._ravny(k, want):
+    ped = pedklyuchi.proverit(k, request) if k else None
+    if ped:
         # 12.11.2026: педагогу меню админов не рисуем. Но ссылку с ключом открывает и
         # админ — его браузер сам шлёт вход, и он остаётся админом со своим меню.
         # Без входа — всегда педагог. Личные входы: vhod.kto() на форму не уводит —
         # вошедший (метка, ключ, старый вход) остаётся собой, иначе — педагог.
-        try:
-            kto = vhod.kto(request, credentials)
-        except HTTPException as e:
-            if e.status_code == 403:
-                raise
-            kto = None
-        if kto and kto["rol"] != "avto":
+        kto = _voshedshiy_po_ssylke(request, credentials)
+        if kto:
             request.state.kto = kto
             _zapomnit(request, vhod.rol_menyu(kto))
             return
         request.state.rol = "pedagog"
+        pedklyuchi.v_zapros(request, ped)
         return
     check_auth(credentials, request)
 
 
 PAUTH = [Depends(check_pedagog_or_admin)]
+
+
+def _karta_gruppy(request: Request):
+    """Какие группы «Карточки речи» видит пришедший: None — все (админ, владелец, общий ключ);
+    множество названий — педагог с личным ключом, только его группы (может быть пустым)."""
+    from . import pedklyuchi
+    ped = pedklyuchi.lichnyy(request)
+    return None if ped is None else pedklyuchi.gruppy(ped)
+
+
+def _karta_svoy(request: Request, uid) -> None:
+    """Педагог с личным ключом и ребёнок не из его групп — 403. Одинаково для «такой ребёнок
+    есть, но у другого педагога» и «такого ребёнка нет»: ответ не подсказывает, чей он.
+    Админу, владельцу и общему ключу — без ограничений, как раньше."""
+    gruppy = _karta_gruppy(request)
+    if gruppy is None:
+        return
+    from . import karta
+    try:
+        uid = int(uid or 0)
+    except (TypeError, ValueError):
+        uid = 0
+    if uid not in karta.deti_grupp(gruppy):
+        request.state.chto = "педагог: ребёнок не из его групп — отказ"
+        raise HTTPException(403, "Этот ребёнок не из ваших групп")
+
+
+def _karta_avtor(request: Request, prislali) -> str:
+    """Кто отметил: педагог с личным ключом — его имя (сервер не верит имени из запроса);
+    иначе — что прислали, как раньше."""
+    from . import pedklyuchi
+    ped = pedklyuchi.lichnyy(request)
+    return (ped.get("imya") or "") if ped else str(prislali or "")
 
 
 def _karta_kid(uid: int) -> dict:
@@ -11031,20 +11154,23 @@ def _karta_kid(uid: int) -> dict:
 @app.get("/english/karta", response_class=HTMLResponse, dependencies=PAUTH)
 def english_karta_page(request: Request, k: str = ""):
     """Карточка речи: форма к разделу 10 методички (см. app/karta.py)."""
-    from . import karta
-    return render(request, "karta.html", active="karta", k=karta.rows(), pk=k)
+    from . import karta, pedklyuchi
+    ped = pedklyuchi.lichnyy(request)
+    return render(request, "karta.html", active="karta", k=karta.rows(_karta_gruppy(request)), pk=k,
+                  lichnyy=(ped.get("imya") or "педагог") if ped else "")
 
 
 @app.get("/api/english/karta", dependencies=PAUTH)
-def api_english_karta():
+def api_english_karta(request: Request):
     from . import karta
-    return karta.rows()
+    return karta.rows(_karta_gruppy(request))
 
 
 @app.post("/api/english/karta", dependencies=PAUTH)
-def api_english_karta_save(payload: dict = Body(...)):
+def api_english_karta_save(request: Request, payload: dict = Body(...)):
     """Отметки по одному ребёнку и одной точке замера."""
     from . import karta
+    _karta_svoy(request, payload.get("user_id"))
     try:
         # поле, которого нет в запросе, не трогаем — см. karta.save
         return karta.save(int(payload.get("user_id") or 0),
@@ -11052,7 +11178,7 @@ def api_english_karta_save(payload: dict = Body(...)):
                           payload.get("marks"),
                           payload.get("video_date"),
                           payload.get("note"),
-                          str(payload.get("author") or ""),
+                          _karta_avtor(request, payload.get("author")),
                           payload.get("report"),
                           payload.get("report_date"))
     except ValueError as e:
@@ -11060,21 +11186,23 @@ def api_english_karta_save(payload: dict = Body(...)):
 
 
 @app.post("/api/english/karta/video", dependencies=PAUTH)
-def api_english_karta_video(payload: dict = Body(...)):
+def api_english_karta_video(request: Request, payload: dict = Body(...)):
     """Видео ребёнка снято: {"user_id", "date", "remove": false}. Раз в месяц (методичка, раздел 10)."""
     from . import karta
+    _karta_svoy(request, payload.get("user_id"))
     try:
         return karta.save_video(int(payload.get("user_id") or 0), str(payload.get("date") or ""),
-                                bool(payload.get("remove")), str(payload.get("author") or ""))
+                                bool(payload.get("remove")), _karta_avtor(request, payload.get("author")))
     except ValueError as e:
         raise HTTPException(400, str(e))
 
 
 @app.post("/api/english/karta/note", dependencies=PAUTH)
-def api_english_karta_note(payload: dict = Body(...)):
+def api_english_karta_note(request: Request, payload: dict = Body(...)):
     from . import karta
+    _karta_svoy(request, payload.get("user_id"))
     return karta.save_note(int(payload.get("user_id") or 0), str(payload.get("note") or ""),
-                           str(payload.get("author") or ""))
+                           _karta_avtor(request, payload.get("author")))
 
 
 @app.post("/api/english/karta/video-upload", dependencies=PAUTH)
@@ -11083,18 +11211,21 @@ async def api_english_karta_video_upload(request: Request, user_id: int = 0, dat
     """Ролик с телефона педагога — телом запроса. Сжимается до 720p, если больше 15 МБ."""
     from . import deti_video, karta
     import asyncio
+    await asyncio.to_thread(_karta_svoy, request, user_id)     # до чтения тела: чужому ребёнку ролик не грузим
+    avtor = _karta_avtor(request, "")
     raw = await request.body()
     try:
-        r = await asyncio.to_thread(deti_video.save, user_id, raw, ext, date)
+        r = await asyncio.to_thread(deti_video.save, user_id, raw, ext, date, avtor)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    karta.save_video(user_id, r["date"])
+    karta.save_video(user_id, r["date"], author=avtor)
     return r
 
 
 @app.post("/api/english/karta/video-delete", dependencies=PAUTH)
-def api_english_karta_video_delete(payload: dict = Body(...)):
+def api_english_karta_video_delete(request: Request, payload: dict = Body(...)):
     from . import deti_video, karta
+    _karta_svoy(request, payload.get("user_id"))
     tok = str(payload.get("token") or "")
     vids = {v["token"]: v for v in deti_video.spisok(int(payload.get("user_id") or 0))}
     if tok not in vids:
@@ -11129,10 +11260,11 @@ def api_english_video_status():
 
 
 @app.post("/api/english/karta/chernovik", dependencies=PAUTH)
-def api_english_karta_chernovik(payload: dict = Body(...)):
+def api_english_karta_chernovik(request: Request, payload: dict = Body(...)):
     """Черновик отчёта из отметок карточки: {"user_id", "tochka", "vvod": {...}}.
     Поля педагога сохраняются, чтобы черновик не терялся при перезагрузке."""
     from . import karta, karta_otchet
+    _karta_svoy(request, payload.get("user_id"))
     uid = int(payload.get("user_id") or 0)
     tochka = str(payload.get("tochka") or "")
     vvod = payload.get("vvod") or {}
@@ -11146,16 +11278,18 @@ def api_english_karta_chernovik(payload: dict = Body(...)):
 
 
 @app.get("/api/english/karta/vvodnoe", dependencies=PAUTH)
-def api_english_karta_vvodnoe(user_id: int, pochemu: str = ""):
+def api_english_karta_vvodnoe(request: Request, user_id: int, pochemu: str = ""):
     from . import karta_otchet
+    _karta_svoy(request, user_id)
     return {"tekst": karta_otchet.vvodnoe(_karta_kid(user_id), pochemu)}
 
 
 @app.post("/api/english/karta/otpravit", dependencies=PAUTH)
-def api_english_karta_otpravit(payload: dict = Body(...)):
+def api_english_karta_otpravit(request: Request, payload: dict = Body(...)):
     """Отправить родителю лично от имени центра: {"user_id", "kind": otchet|vestochka|vvodnoe|video,
     "podpis", "tekst", "video_token", "tochka", "ignore_warnings": false}."""
     from . import karta, karta_otchet as ko, deti_video
+    _karta_svoy(request, payload.get("user_id"))
     uid = int(payload.get("user_id") or 0)
     kind = str(payload.get("kind") or "")
     if kind not in ("otchet", "vestochka", "vvodnoe", "video"):
@@ -11188,7 +11322,7 @@ def api_english_karta_otpravit(payload: dict = Body(...)):
         if not rep.get("zvonok"):
             raise HTTPException(400, "Сначала звонок родителю: " + d["флаг"] +
                                 ". Отметьте «звонок был» и соберите черновик заново.")
-    r = ko.otpravit(d, kind, teksty, video_url, tochka)
+    r = ko.otpravit(d, kind, teksty, video_url, tochka, _karta_avtor(request, ""))
     if r.get("ok") and kind == "otchet":
         karta.save(uid, tochka, None, report_date=date.today().isoformat())
     return r

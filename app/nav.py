@@ -14,6 +14,7 @@
 
 Раздел владельца админу не рисуется совсем (а не прячется стилем): его нет в menu("admin").
 Педагогу, открывшему страницу по ключу из ссылки, меню не положено — menu("pedagog") пуст.
+У него своя шапка из двух страниц (PEDAGOG, _shapka_pedagoga).
 
 Меню — не защита: оно только показывает или не показывает ссылку. Кто что может открыть,
 решают AUTH и OWNER_AUTH на самих маршрутах (app/main.py).
@@ -409,23 +410,32 @@ def _css() -> str:
     return f'<link rel="stylesheet" href="/static/nav.css?v={VERSIYA}">'
 
 
-def _shapka_pedagoga(path: str, k: str) -> str:
-    """Педагог открыл страницу по ключу из ссылки: одна строка, один пункт. Ни поиска,
-    ни бейджа, ни панели, ни скрипта — шапка ничего не опрашивает (опросы /api без входа
+# Страницы педагога (14.11.2026, Борис, Т2: «вторая страница „После первого занятия“» — в шапке).
+PEDAGOG = [("Карточка речи", "/english/karta"), ("После первого занятия", "/pedagog")]
+
+
+def _shapka_pedagoga(path: str, k: str, karta: bool = True) -> str:
+    """Педагог открыл страницу по ключу из ссылки: одна строка, два пункта — «Карточка речи»
+    и «После первого занятия» (до 14.11.2026 был один), текущий подсвечен. Ни поиска, ни
+    бейджа, ни панели, ни скрипта — шапка ничего не опрашивает (опросы /api без входа
     давали окно пароля каждые три минуты, 08.11). Ключ — только в ссылках и только
-    проверенный: main.py передаёт его, если он совпал с настройкой pedagog_key."""
-    adres = "/english/karta" + (f"?k={quote(str(k), safe='')}" if k else "")
-    tut = " kn-tut" if path == "/english/karta" else ""
-    tekushchaya = ' aria-current="page"' if tut else ""
+    проверенный: main.py передаёт его, если его принял app/pedklyuchi.py.
+    karta=False — педагог с личным ключом, у которого нет групп английского: «Карточку
+    речи» ему не показываем."""
+    hvost = f"?k={quote(str(k), safe='')}" if k else ""
+    punkty = [(n, a) for n, a in PEDAGOG if karta or a != "/english/karta"]
+    ssylki = "".join(
+        f'<a class="kn-ped-punkt{" kn-tut" if a == path else ""}" href="{_e(a + hvost)}"'
+        f'{" aria-current=" + chr(34) + "page" + chr(34) if a == path else ""}>{_e(n)}</a>'
+        for n, a in punkty)
     return (f'<div {KOREN} class="kn kn-ped">{_css()}<div class="kn-verh">'
-            f'<a class="kn-logo" href="{_e(adres)}"><img src="/static/logo.svg" alt="" width="30" height="30">'
+            f'<a class="kn-logo" href="{_e(punkty[0][1] + hvost)}"><img src="/static/logo.svg" alt="" width="30" height="30">'
             f'<span>KidsUP</span><span class="kn-ped-podpis">· педагогам</span></a>'
-            f'<a class="kn-ped-punkt{tut}" href="{_e(adres)}"'
-            f'{tekushchaya}>Карточка речи</a></div></div>')
+            f'{ssylki}</div></div>')
 
 
 def shapka(rol: str, path: str, k: str = "", kto_html: str = "",
-           schet_url: str = "/api/waiting/schet") -> str:
+           schet_url: str = "/api/waiting/schet", karta: bool = True) -> str:
     """Общая шапка страницы под роль: "owner", "admin" или "pedagog".
 
     path — адрес страницы (request.url.path), по нему подсвечивается пункт и раскрывается
@@ -437,7 +447,7 @@ def shapka(rol: str, path: str, k: str = "", kto_html: str = "",
     Телефон: одна строка сверху (не липкая), внизу панель из четырёх кнопок; «☰ Разделы»
     открывает лист на весь экран. Раскладку делает nav.css, разметка одна."""
     if rol == "pedagog":
-        return _shapka_pedagoga(path, k)
+        return _shapka_pedagoga(path, k, karta)
     razdely = menu(rol)
     if not razdely:
         return ""

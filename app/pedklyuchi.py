@@ -195,9 +195,9 @@ def _zapisat(zaprosy: list) -> bool:
     """Короткая запись в файл входов мимо vhod._baza(): запертый файл ждём не дольше полсекунды и
     общую отметку «файл заперт» не ставим — из-за справочной отметки вход админов ждать не должен.
     → False — не записано (попробуем на следующем запросе)."""
-    try:
-        con = sqlite3.connect(vhod._put(), timeout=0.5)
-    except sqlite3.Error:
+    try:      # mode=rw: файла нет — не создаём пустой (его готовит и восстанавливает из копии vhod._baza)
+        con = sqlite3.connect(vhod._put().resolve().as_uri() + "?mode=rw", uri=True, timeout=0.5)
+    except (sqlite3.Error, OSError, ValueError):
         return False
     try:
         for sql, par in zaprosy:
