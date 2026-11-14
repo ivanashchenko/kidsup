@@ -227,6 +227,7 @@ CREATE TABLE IF NOT EXISTS ustroystva (
     obshchiy INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS popytki (ts REAL NOT NULL, login TEXT NOT NULL DEFAULT '', adres TEXT NOT NULL DEFAULT '');
 CREATE INDEX IF NOT EXISTS idx_popytki ON popytki(adres, login, ts);
+CREATE INDEX IF NOT EXISTS idx_popytki_login ON popytki(login, ts);
 CREATE TABLE IF NOT EXISTS hvost (
     den TEXT NOT NULL, login TEXT NOT NULL, adres TEXT NOT NULL, chem TEXT NOT NULL,
     n INTEGER NOT NULL DEFAULT 0, posl TEXT, PRIMARY KEY (den, login, adres, chem));
@@ -1408,6 +1409,8 @@ _EST_PROMAHI: set = set()                # (счётчик окна, адрес)
 _UDACHI: dict = {}                       # отпечаток (адрес, логин, верный пароль) → когда был удачный вход
 SROK_UDACHI = 12 * 3600                  # сколько «знакомый верный» вход в окне не замечает паузу
 _POVTOR: dict = {}                       # (адрес, логин, отпечаток пароля) → когда засчитан
+_PROMAHI_CHAS: dict = {}                 # (счётчик окна, адрес) → (начало часа, записано промахов)
+PREDEL_PROMAHOV_CHAS = 60                # больше промахов окна с адреса за час не пишем (см. _promah_okna)
 _PROC_KLYUCH = secrets.token_bytes(32)   # отпечатки неверных паролей — только в памяти процесса
 _SOOBSHCHENO: dict = {}                  # логин → когда сообщили Борису о 50 промахах
 
@@ -1525,6 +1528,20 @@ def _promah_okna(schet: str, adres_: str, pw: str, nazvanie: str = "", trevoga: 
         bylo = _POVTOR.get(kl)
         if bylo is not None and t - bylo < 3600:
             return
+        # 14.11.2026, проверка V1: прежний общий ключ педагогов пускается и в паузу, поэтому
+        # промахи с адреса больше ничем не ограничены — без предела таблица popytki росла
+        # на каждый запрос, а подсчёт паузы и тревоги дорожал до секунд. Записываем не
+        # больше PREDEL_PROMAHOV_CHAS с адреса за час: тревога на 50 к этому времени уже ушла.
+        nach, n_ = _PROMAHI_CHAS.get((schet, adres_), (t, 0))
+        if t - nach >= 3600:
+            nach, n_ = t, 0
+        if n_ >= PREDEL_PROMAHOV_CHAS:
+            return
+        _PROMAHI_CHAS[(schet, adres_)] = (nach, n_ + 1)
+        if len(_PROMAHI_CHAS) > 5000:
+            for k_, (v_, _n) in list(_PROMAHI_CHAS.items()):
+                if t - v_ >= 3600:
+                    del _PROMAHI_CHAS[k_]
         _POVTOR[kl] = t
         if len(_POVTOR) > 5000:
             for k_, v_ in list(_POVTOR.items()):
