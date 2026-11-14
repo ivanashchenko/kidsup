@@ -725,8 +725,12 @@ def _ffmpeg(url: str, path: Path, dlit: int, predel: int, stop=None) -> tuple[in
     sost = {"stop": False, "osh": ""}
     try:
         with err:
-            p = subprocess.Popen(komanda(exe, path, dlit, predel), stdin=subprocess.PIPE,
-                                 stdout=subprocess.DEVNULL, stderr=err, umask=0o077)
+            try:
+                p = subprocess.Popen(komanda(exe, path, dlit, predel), stdin=subprocess.PIPE,
+                                     stdout=subprocess.DEVNULL, stderr=err, umask=0o077)
+            except OSError as e:
+                zhurnal.unlink(missing_ok=True)
+                return -1, f"ffmpeg не запустился: {type(e).__name__}"
             nasos = threading.Thread(target=_nasos, args=(resp, p, sost), daemon=True, name="zapis-nasos")
             nasos.start()
             t0 = posl = time.monotonic()
@@ -878,6 +882,8 @@ def _rabota_(zid: int) -> None:
     if not z:
         return
     proba = bool(z["proba"])
+    # запись перезапущена пересмотром после выключения владельцем — пробел в записи по делу, не сбой
+    vykl_bylo = "запись выключ" in (z.get("prichina") or "")
     if proba:
         t_start = _seychas()
         # 2 минуты считаются от начала записи (_pisat), а это — срок, до которого пробуем получить поток
@@ -930,7 +936,8 @@ def _rabota_(zid: int) -> None:
     z = _zapis(zid) or z
     if gotovye:
         n = len(gotovye)
-        _status(zid, "zapisano", "; ".join(x for x in (f"{n} части" if n > 1 else "", itog) if x))
+        _status(zid, "zapisano", "; ".join(x for x in (f"{n} части" if n > 1 else "", itog,
+                                                       "запись выключали и включили снова" if vykl_bylo else "") if x))
         vygruzit_zapis(zid)
     elif itog.startswith(PROPUSK):
         _status(zid, "propusk", itog)
@@ -991,7 +998,7 @@ def _pisat(zid: int, z: dict, kam: dict, t_start: datetime, t_stop: datetime, ch
             return ""
         m = mesto()
         predel = _predel_fayla(m)
-        if predel < 50 * MB:
+        if predel < min(50 * MB, MAX_FAYL // 2):
             return _net_mesta(m) or f"на сервере свободно {_gb(m['svobodno'])} ГБ — писать некуда"
         imya = _imya_fayla(z, chast)
         otn = f"{z['day']}/{imya}"
@@ -1304,8 +1311,11 @@ def _vosstanovit() -> None:
         ok = path.exists() and path.stat().st_size >= MIN_FAYL and (mp4_celyy(path) or mp4_obrezat(path))
         with db.get_conn() as conn:
             if ok:
-                conn.execute("UPDATE zapis_fayly SET status='gotov', razmer=?, zametka=? WHERE id=?",
-                             (path.stat().st_size, "запись прервал перезапуск сервера — сохранено до обрыва", f["id"]))
+                # конец части — когда файл писали последний раз (для итога «записано не целиком»)
+                konec = _seychas() - timedelta(seconds=max(0.0, time.time() - path.stat().st_mtime))
+                conn.execute("UPDATE zapis_fayly SET status='gotov', razmer=?, konec=?, zametka=? WHERE id=?",
+                             (path.stat().st_size, _iso(konec), "запись прервал перезапуск сервера — сохранено до обрыва",
+                              f["id"]))
             else:
                 conn.execute("UPDATE zapis_fayly SET status='bityy', razmer=0, zametka=? WHERE id=?",
                              ("запись прервал перезапуск сервера — файл не закрылся", f["id"]))
@@ -1376,7 +1386,7 @@ def _itogi(now: datetime) -> None:
                 except (TypeError, ValueError):
                     continue
                 zapisano += max(0.0, (min(b_, t_stop) - max(a_, t_start)).total_seconds())
-            if zapisano < POKRYTIE * vsego and "запись выключена владельцем" not in prichina:
+            if zapisano < POKRYTIE * vsego and "запись выключ" not in prichina:
                 tip = itog = "ne_tselikom"
                 pr = re.sub(r"^\d+ части;?\s*", "", prichina)
                 _sboy(tip, f"{_kto(z)}: записано {int(zapisano // 60)} мин из {int(vsego // 60)}"
@@ -1887,7 +1897,8 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
     if s["blizhaishie"]:
         h.append("<div class='zp-sp' id='zapis-blizh'>" + "".join(
             f"<div class='zp-r'><b>{_e(x['den'])} {_e(x['begin'])}–{_e(x['end'])}</b> · <span class='zp-g'>{_e(x['gruppa'])}"
-            f"</span> · {_e(x['komnata'] or '—')}<div class='{'zp-ok' if x['pisat'] else 'zp-osh'}'>{_e(x['sostoyanie'])}</div></div>"
+            f"</span> · {_e(x['komnata'] or '—')}<div class='"
+            f"{'zp-ok' if x['pisat'] and s['vklyucheno'] and s['avtopilot'] else 'zp-osh'}'>{_e(x['sostoyanie'])}</div></div>"
             for x in s["blizhaishie"]) + "</div>")
     else:
         h.append("<p class='tih' id='zapis-blizh'>На 7 дней вперёд занятий под фильтр групп нет (или расписание ещё "

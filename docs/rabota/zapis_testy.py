@@ -89,6 +89,7 @@ YA_PAROL = "".join(secrets.choice("abcdefghijklmnopqrstuvwxyz") for _ in range(1
 TOKEN = "stendtok" + secrets.token_hex(12)                                 # «access_token» потока
 SEKRETY = [YA_PAROL, TOKEN]
 ZAHVAT: list = []
+ORIG: dict = {}                                                           # настоящие функции, подменённые стендом
 m = None
 z = None                                                                  # app.zapis
 
@@ -135,6 +136,7 @@ ZANYATIYA = [
 _ORIG_CONNECT = socket.socket.connect
 _ORIG_CONNECT_EX = socket.socket.connect_ex
 _ORIG_CREATE = socket.create_connection
+PROKSI_DO: dict = {}
 SVOI_PORTY: set = set()           # порты своих подставок (WebDAV, живой FLV по http и https)
 ZAPRET: list = []                 # попытки соединиться мимо них: (что, куда, откуда)
 MESTNYE = ("127.0.0.1", "::1", "localhost")
@@ -638,7 +640,7 @@ def test_vremya():
     proverka("ffmpeg вызван один раз: с 09:59 до 10:51 → -t 3120", len(v) == 1 and arg(a, "-t") == "3120", [arg(x, "-t") for x in v])
     proverka("…без перекодирования (-c copy), видео и звук (если есть), выход — фрагментированный mp4 "
              "(+frag_keyframe+empty_moov, фрагмент ≤ 2 с — читается и после SIGKILL)",
-             arg(a, "-c") == "copy" and arg(a, "-f") == "mp4" and "0:v:0" in a and "0:a:0?" in a and "-vcodec" not in a
+             arg(a, "-c") == "copy" and a[-3:-1] == ["-f", "mp4"] and "0:v:0" in a and "0:a:0?" in a and "-vcodec" not in a
              and arg(a, "-movflags") == "+frag_keyframe+empty_moov+default_base_moof"
              and arg(a, "-frag_duration") == "2000000" and "-nostdin" not in a, a)
     proverka("B1/S3: вход — stdin (-f flv -i pipe:0): ссылки с токеном в командной строке ffmpeg нет; поток открыл "
@@ -1042,7 +1044,8 @@ def test_owner():
     # пробная запись с /owner — метка из самой страницы
     n_v = len(vyzovy())
     postavit(datetime(2026, 11, 20, 18, 5))
-    metka = re.search(r"name='metka' value='([^']+)'", c.get("/owner", headers=STR).text).group(1)
+    h = c.get("/owner", headers=STR).text
+    metka = re.search(r"name='metka' value='([^']+)'", h[h.index("id='zapis-forma'"):]).group(1)
     r = c.post("/owner/zapis", data={"deystvie": "proba", "moy_parol": VLADELEC[1], "metka": metka}, headers=SVOI)
     kuda = "/Архив методики/Музыка и речь/2026-11/2026-11-20 18-05-00 Проба К1.mp4"
     proverka("«Пробная запись 2 минуты сейчас» → «Пробная запись началась: 2 минуты с камеры К1 («Комната 1»)»",
@@ -1164,7 +1167,8 @@ def test_ssylka():
              ivideon._ssylka_flv(plohaya.replace("ivideon.com", "example.com")) == ""
              and ivideon._ssylka_flv(plohaya.replace("https://", "http://")) == ""
              and ivideon._ssylka_flv(plohaya.replace("access_token", "x")) == "")
-    S = {"zamok": [], "klik": [], "konteksty": 0, "zakryt": 0, "login": False}
+    S = {"zamok": [], "klik": [], "konteksty": 0, "zakryt": 0, "login": False, "poryadok": []}
+    MOY_ID = "100-TYpMigSeczbQqK032w6QzZ"
 
     class Zapros:
         def __init__(self, url):
@@ -1175,7 +1179,10 @@ def test_ssylka():
             self.pg, self.tekst, self.exact = pg, tekst, exact
 
         def count(self):
-            return 1 if not self.exact or self.tekst == "Комната 1" else 0
+            # на странице есть «Комната 1» и «Комната 10»; точное совпадение — только у одной из них
+            if self.exact:
+                return 1 if self.tekst in ("Комната 1", "Комната 10") else 0
+            return 2
 
         def nth(self, i):
             return self
@@ -1185,7 +1192,11 @@ def test_ssylka():
             for fn in self.pg.obr:
                 fn(Zapros("https://openapi-alpha-eu01.ivideon.com/cameras/100-CHUZHAYA:0/live_stream?op=GET"
                           f"&access_token={TOKEN}&format=ws-fmp4"))
-                fn(Zapros(plohaya))
+                # id длиннее нашего (наш id — в его начале): тоже чужая камера
+                fn(Zapros(f"https://openapi-alpha-eu01.ivideon.com/cameras/{MOY_ID}X:0/live_stream?op=GET"
+                          f"&access_token={TOKEN}&format=ws-fmp4"))
+                if self.tekst == "Комната 1":
+                    fn(Zapros(plohaya))
 
     class Stranica:
         def __init__(self):
@@ -1202,7 +1213,7 @@ def test_ssylka():
             pass
 
         def fill(self, *a):
-            pass
+            S["forma_vhoda"] = True
 
         def click(self, *a, **kw):
             pass
@@ -1231,6 +1242,7 @@ def test_ssylka():
     class Chromium:
         def launch(self, **kw):
             S["zamok"].append(kadry._snap_lock.locked())
+            S["poryadok"].append("zapis")
             return Brauzer()
 
     class PW:
@@ -1247,41 +1259,105 @@ def test_ssylka():
     sapi.sync_playwright = lambda: PW()
     bylo = {k_: sys.modules.get(k_) for k_ in ("playwright", "playwright.sync_api")}
     sys.modules["playwright"], sys.modules["playwright.sync_api"] = pw_mod, sapi
-    bylo_login, bylo_st = ivideon.login_start, ivideon._state_path
+    bylo_login, bylo_st, bylo_worker = ivideon.login_start, ivideon._state_path, ivideon._login_worker
     zvali_login = []
-    ivideon.login_start = lambda code="": zvali_login.append(1) or {"ok": True}
+
+    def login_stenda(code=""):                    # как настоящий login_start: помнит, когда запускали вход
+        zvali_login.append(1)
+        ivideon._login.update(state="ok", zapusk=time.time())
+        return {"ok": True}
+    ivideon.login_start = login_stenda
     ivideon._state_path = lambda: Path(m.config.DATA_DIR) / "ivideon_state.json"   # не в data/ репозитория
     try:
         m.db.set_setting("ivideon_login", "stend@example.org")
         m.db.set_setting("ivideon_password", "stend-" + secrets.token_hex(4))
-        r = ivideon.potok_ssylka("Комната 1", "100-TYpMigSeczbQqK032w6QzZ", zhdat_s=1)
+        r = ivideon.potok_ssylka("Комната 1", MOY_ID, zhdat_s=1)
         proverka("ссылка поймана из запроса плеера своей камеры (чужая камера отброшена), format=flv",
-                 r.get("ok") and "100-TYpMigSeczbQqK032w6QzZ" in r["url"] and "format=flv" in r["url"]
+                 r.get("ok") and MOY_ID + ":" in r["url"] and "format=flv" in r["url"]
                  and "CHUZHAYA" not in r["url"], {k_: v_ for k_, v_ in r.items() if k_ != "url"})
-        proverka("клик — по тексту «Комната 1» (сначала точное совпадение); браузер закрыт",
-                 S["klik"] == [("Комната 1", True)] and S["zakryt"] == 1, S["klik"])
+        proverka("S6: клик — только по точному названию «Комната 1»; запрос камеры с id «<наш>X» отброшен; браузер закрыт",
+                 S["klik"] == [("Комната 1", True)] and S["zakryt"] == 1 and MOY_ID + "X" not in r.get("url", ""),
+                 S["klik"])
         proverka("Chromium запускается только под блокировкой кадров (kadry._snap_lock)", S["zamok"] == [True], S["zamok"])
         # кадры держат браузер — ссылка ждёт
         kadry._snap_lock.acquire()
         gotovo = []
-        t = threading.Thread(target=lambda: gotovo.append(ivideon.potok_ssylka("Комната 1", "", zhdat_s=1)), daemon=True)
+        t = threading.Thread(target=lambda: gotovo.append(ivideon.potok_ssylka("Комната 1", MOY_ID, zhdat_s=1)),
+                             daemon=True)
         t.start()
         time.sleep(0.4)
         zhdala = not gotovo
         kadry._snap_lock.release()
         t.join(5)
         proverka("пока кадр фото-явки держит браузер, ссылка ждёт; отпустил — получила", zhdala and gotovo and gotovo[0]["ok"])
-        S["login"] = True
+
+        # m7: кадр и ссылка ждут браузер одновременно — ссылка для записи проходит первой
+        bylo_snap = kadry.snap
+        kadry.snap = lambda src, path, wait_ms=0: S["poryadok"].append("kadr") or {"ok": True, "bytes": 10 ** 6,
+                                                                                    "text": "LIVE"}
+        itogi_m7 = []
+        try:
+            for i in range(3):
+                S["poryadok"].clear()
+                kadry._snap_lock.acquire()               # браузер занят: идёт другой кадр
+                tk = threading.Thread(target=kadry._do_snap, args=(f"stend-m7-{i}", {
+                    "day": DEN, "ts": f"{DEN}T10:10", "room": "К1", "lesson_id": 1}, "https://open.ivideon.com/embed/x"),
+                    daemon=True)
+                tk.start()
+                time.sleep(0.3)                          # кадр встал в очередь первым
+                tz = threading.Thread(target=lambda: ivideon.potok_ssylka("Комната 1", MOY_ID, zhdat_s=1), daemon=True)
+                tz.start()
+                time.sleep(0.3)
+                kadry._snap_lock.release()
+                tk.join(10)
+                tz.join(10)
+                itogi_m7.append(list(S["poryadok"]))
+        finally:
+            kadry.snap = bylo_snap
+        proverka("m7: кадр фото-явки встал в очередь раньше, но ссылка для записи берёт браузер первой (3 раза из 3)",
+                 all(x == ["zapis", "kadr"] for x in itogi_m7), itogi_m7)
+
+        n_br = len(S["zamok"])
         r = ivideon.potok_ssylka("Комната 1", "", zhdat_s=1)
-        proverka("сессия Ivideon слетела и просит код → ошибка словами и запуск входа с кодом из письма (login_start)",
-                 not r["ok"] and "код из письма" in r["error"] and zvali_login == [1], r)
+        proverka("S6: без id камеры — отказ без браузера", not r["ok"] and "id камеры" in r["error"]
+                 and len(S["zamok"]) == n_br, r)
+        S["klik"].clear()
+        r = ivideon.potok_ssylka("Комната 10", MOY_ID, zhdat_s=1)
+        proverka("S6: «Комната 10» с id камеры К1 — поток этой камеры не запрошен: отказ; клик — только точный, "
+                 "не «по части названия»", not r["ok"] and S["klik"] == [("Комната 10", True)], (r, S["klik"]))
+        S["klik"].clear()
+        r = ivideon.potok_ssylka("Комната 3", MOY_ID, zhdat_s=1)
+        proverka("S6: точного названия в списке нет — отказ «по точному названию», клика нет",
+                 not r["ok"] and "по точному названию" in r["error"] and not S["klik"], r)
+
+        S["login"] = True
+        S.pop("forma_vhoda", None)
+        ivideon._login.clear()
+        r = ivideon.potok_ssylka("Комната 1", MOY_ID, zhdat_s=1)
+        proverka("сессия Ivideon слетела → ошибка словами и запуск входа с кодом из письма (login_start); форму входа "
+                 "сам potok_ssylka не заполняет", not r["ok"] and "кодом из письма" in r["error"] and zvali_login == [1]
+                 and "forma_vhoda" not in S, r)
+        r = ivideon.potok_ssylka("Комната 1", MOY_ID, zhdat_s=1)
+        proverka("S8: через минуту снова слетела — вход второй раз НЕ запускается («не чаще раза в 15 минут»)",
+                 not r["ok"] and "не чаще раза в 15 минут" in r["error"] and zvali_login == [1], r)
+        ivideon._login["zapusk"] -= ivideon.VHOD_PAUZA_S + 1
+        r = ivideon.potok_ssylka("Комната 1", MOY_ID, zhdat_s=1)
+        proverka("S8: прошло 15 минут — вход запускается снова", not r["ok"] and zvali_login == [1, 1], r)
         S["login"] = False
+        ivideon._login.clear()
+        ivideon._login_worker = lambda: None
+        bylo_login()
+        proverka("S8: настоящий login_start запоминает время запуска входа (по нему — пауза)",
+                 abs(float(ivideon._login.get("zapusk") or 0) - time.time()) < 5, dict(ivideon._login))
+        ivideon._login.clear()
         m.db.set_setting("ivideon_password", "")
-        r = ivideon.potok_ssylka("Комната 1", "")
-        proverka("нет пароля Ivideon → отказ без браузера", not r["ok"] and "ivideon_password" in r["error"]
-                 and S["zamok"] == [True, True, True], r)
+        n_br = len(S["zamok"])
+        r = ivideon.potok_ssylka("Комната 1", MOY_ID)
+        proverka("нет пароля Ivideon → отказ без браузера; все запуски браузера — под блокировкой",
+                 not r["ok"] and "ivideon_password" in r["error"] and len(S["zamok"]) == n_br and all(S["zamok"]), r)
     finally:
-        ivideon.login_start, ivideon._state_path = bylo_login, bylo_st
+        ivideon.login_start, ivideon._state_path, ivideon._login_worker = bylo_login, bylo_st, bylo_worker
+        ivideon._login.clear()
         for k_, v_ in bylo.items():
             if v_ is None:
                 sys.modules.pop(k_, None)
@@ -1294,35 +1370,63 @@ def test_ssylka():
 # --- К. Перезапуск сервера посреди записи ----------------------------------------------------------
 
 def test_perezapusk():
-    print("К. Перезапуск посреди записи: закрытая часть — в выгрузку, незакрытая — прочь; запись продолжается")
+    print("К. Перезапуск посреди записи: закрытая часть и фрагментированная после SIGKILL — в выгрузку, незакрытая — прочь")
     postavit(datetime(2026, 11, 21, 16, 40))
+    ZAG = b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2"
+    MOOV = (16).to_bytes(4, "big") + b"moov" + b"\x00" * 8
     with osnovnaya() as o:
         z._init(o)
         o.execute("INSERT INTO zapis (key, lesson_id, day, begin_time, end_time, gruppa, komnata, kamera, status, "
                   "prichina, proba, sozdano, obnovleno) VALUES ('2026-11-21:7108', 7108, '2026-11-21', '16:30', '17:20', 'МиР Гр7', "
                   "'К1', 'Комната 1', 'pishetsya', '', 0, '2026-11-21T16:00:00', '2026-11-21T16:29:00')")
         zid = o.execute("SELECT id FROM zapis WHERE key='2026-11-21:7108'").fetchone()[0]
-        for ch, imya, moov in ((1, "2026-11-21 16-30 МиР Гр7.mp4", True), (2, "2026-11-21 16-30 МиР Гр7 (часть 2).mp4", False)):
+        chasti = ((1, "2026-11-21 16-30 МиР Гр7.mp4", "celyy"), (2, "2026-11-21 16-30 МиР Гр7 (часть 2).mp4", "frag_oborvan"),
+                  (3, "2026-11-21 16-30 МиР Гр7 (часть 3).mp4", "bez_moov"))
+        for ch, imya, vid in chasti:
             p = z.DIR / "2026-11-21" / imya
             p.parent.mkdir(parents=True, exist_ok=True)
             with open(p, "wb") as f:
-                f.write(b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2")
-                if moov:
-                    f.write((16).to_bytes(4, "big") + b"moov" + b"\x00" * 8)
-                f.write((8 + 200000).to_bytes(4, "big") + b"mdat" + b"\x00" * (200000 if moov else 1000))
+                f.write(ZAG)
+                if vid == "celyy":
+                    f.write(MOOV + (8 + 200000).to_bytes(4, "big") + b"mdat" + b"\x00" * 200000)
+                elif vid == "frag_oborvan":            # три целых фрагмента и недописанный четвёртый (SIGKILL)
+                    f.write(MOOV)
+                    for _ in range(3):
+                        f.write((16).to_bytes(4, "big") + b"moof" + b"\x00" * 8 + (8 + 70000).to_bytes(4, "big")
+                                + b"mdat" + b"\x00" * 70000)
+                    f.write((16).to_bytes(4, "big") + b"moof" + b"\x00" * 8 + (8 + 70000).to_bytes(4, "big")
+                            + b"mdat" + b"\x00" * 500)
+                else:
+                    f.write((8 + 200000).to_bytes(4, "big") + b"mdat" + b"\x00" * 1000)
             o.execute("INSERT INTO zapis_fayly (zapis_id, chast, fayl, imya, status, nachalo) VALUES (?,?,?,?,"
                       "'pishetsya', '2026-11-21T16:29:00')", (zid, ch, f"2026-11-21/{imya}", imya))
         o.commit()
+    # хвосты прошлого процесса: журнал ffmpeg с адресом потока (в .rab и по старой раскладке — рядом с видео)
+    rab = z.DIR / ".rab"
+    rab.mkdir(parents=True, exist_ok=True)
+    hvosty = [rab / "stend.ffmpeg.log", rab / "stend.peremuks.mp4", z.DIR / "2026-11-21" / ".stend.ffmpeg.log"]
+    for x in hvosty:
+        x.write_text(f"Error opening input https://x/live_stream?access_token={TOKEN}")
+        os.utime(x, (time.time() - 3600, time.time() - 3600))
+    z._ZAPUSK = time.time()
     z._vosstanovleno[0] = False
-    n0 = len(vyzovy())
+    n0, r0 = len(vyzovy()), len(remuksy())
     z.tick()
     ff = fayly(zid)
-    proverka("после перезапуска: часть 1 (закрыта) — выгружена, часть 2 (без оглавления) — битая, удалена",
-             [(f["chast"], f["status"]) for f in ff][:2] == [(1, "vygruzhen"), (2, "bityy")], [(f["chast"], f["status"]) for f in ff])
-    proverka("запись продолжилась частью 2 с 16:40 до 17:21 (-t 2460) и тоже ушла на Диск",
+    proverka("после перезапуска: часть 1 (закрыта) — выгружена, часть 3 (обычный mp4 без оглавления) — битая, удалена",
+             [(f["chast"], f["status"]) for f in ff][:3] == [(1, "vygruzhen"), (2, "vygruzhen"), (3, "bityy")],
+             [(f["chast"], f["status"]) for f in ff])
+    proverka("B1: часть 2 (фрагментированная, процесс убит посреди фрагмента) — недописанный хвост отрезан, часть "
+             "сохранена, перепакована и выгружена: 3 фрагмента = 210 000 байт кадров",
+             ff[1]["status"] == "vygruzhen" and "сохранено до обрыва" in (ff[1]["zametka"] or "")
+             and DAV["files"].get("/Архив методики/Музыка и речь/2026-11/" + ff[1]["imya"]) == 210000 + 48
+             and len(remuksy()) >= r0 + 1, (ff[1], DAV["files"].get("/Архив методики/Музыка и речь/2026-11/" + ff[1]["imya"])))
+    proverka("запись продолжилась частью 3 с 16:40 до 17:21 (-t 2460) и тоже ушла на Диск",
              len(vyzovy()) == n0 + 1 and arg(vyzovy()[-1], "-t") == "2460"
-             and ff[-1]["imya"] == "2026-11-21 16-30 МиР Гр7 (часть 2).mp4" and ff[-1]["status"] == "vygruzhen"
+             and ff[-1]["imya"] == "2026-11-21 16-30 МиР Гр7 (часть 3).mp4" and ff[-1]["status"] == "vygruzhen"
              and not lokalnye(), [(f["imya"], f["status"]) for f in ff])
+    proverka("S3/m9: хвосты прошлого процесса (журналы ffmpeg с адресом потока, недоделанная перепаковка) удалены",
+             not any(x.exists() for x in hvosty), [x.name for x in hvosty if x.exists()])
 
 
 # --- М. Занятие перенесли на другой день ------------------------------------------------------------
@@ -1356,14 +1460,267 @@ def test_perenos():
              and "/Архив методики/Музыка и речь/2026-11/2026-11-23 11-00 МиР Гр4.mp4" in DAV["files"], rows)
 
 
+# --- Н. Пересмотр «пропущено/ошибка» до конца занятия (M1) ------------------------------------------
+
+def _odin_raz(imya_atr, deystvie):
+    """Подменить z.<imya_atr> на один вызов: сначала deystvie(), потом настоящая функция."""
+    bylo = getattr(z, imya_atr)
+
+    def f(*a, **k):
+        setattr(z, imya_atr, bylo)
+        deystvie()
+        return bylo(*a, **k)
+    setattr(z, imya_atr, f)
+    return bylo
+
+
+def test_peresmotr():
+    print("Н. «Пропущено»/«ошибка» не окончательны до конца занятия: включили, вернули, сбой прошёл — пишем")
+    den = "2026-11-24"
+
+    def dnevnye():
+        return [x for x in punkty() if x["day"] == den]
+
+    # S1: владелец снял галочку, пока поток ждал (09:32), и вернул (09:40)
+    n0 = len(vyzovy())
+    bylo = _odin_raz("_spat", lambda: m.db.set_setting("zapis_on", "0"))
+    postavit(datetime(2026, 11, 24, 9, 31))
+    try:
+        z.tick()
+    finally:
+        z._spat = bylo
+    zap = zapis_po_uroku(7116)
+    proverka("S1: выключили, пока ждали, — «пропущено: запись выключена владельцем», ffmpeg не звали",
+             zap["status"] == "propusk" and "выключена владельцем" in zap["prichina"] and len(vyzovy()) == n0, zap)
+    post = next(x for x in z.poslednie(100) if x["id"] == zap["id"])
+    proverka("…на /owner видно, что это не окончательно: «сервер каждую минуту пересматривает»",
+             "пересматривает" in post["sostoyanie"], post["sostoyanie"])
+    postavit(datetime(2026, 11, 24, 9, 35))
+    proverka("…пока запись выключена, тик её не трогает", z.tick() == [] and zapis_po_uroku(7116)["status"] == "propusk")
+    m.db.set_setting("zapis_on", "1")
+    postavit(datetime(2026, 11, 24, 9, 40))
+    r = z.tick()
+    zap = zapis_po_uroku(7116)
+    v = vyzovy()[n0:]
+    proverka("M1/S1: включили в 09:40 — тик пересмотрел, занятие записано целиком (-t 3120) и выгружено",
+             r == [zap["id"]] and zap["status"] == "vygruzheno" and [arg(a, "-t") for a in v] == ["3120"], (r, zap, len(v)))
+
+    # S2: админ отменил занятие в МойКлассе (11:35) и вернул (11:45)
+    n0 = len(vyzovy())
+
+    def otmenit():
+        with osnovnaya() as o:
+            o.execute("UPDATE lessons SET status=2 WHERE id=7117")
+    bylo = _odin_raz("_spat", otmenit)
+    postavit(datetime(2026, 11, 24, 11, 31))
+    try:
+        z.tick()
+    finally:
+        z._spat = bylo
+    zap = zapis_po_uroku(7117)
+    proverka("S2: отменили, пока ждали, — «пропущено: отменено в МойКлассе»",
+             zap["status"] == "propusk" and "отменено" in zap["prichina"] and len(vyzovy()) == n0, zap)
+    with osnovnaya() as o:
+        o.execute("UPDATE lessons SET status=0 WHERE id=7117")
+    postavit(datetime(2026, 11, 24, 11, 45))
+    z.tick()
+    zap = zapis_po_uroku(7117)
+    proverka("M1/S2: вернули в 11:45 — записано и выгружено", zap["status"] == "vygruzheno" and len(vyzovy()) == n0 + 1, zap)
+
+    # S3: одна ошибка базы, пока поток ждал
+    n0 = len(vyzovy())
+
+    def sboy_bazy():
+        raise sqlite3.OperationalError("database is locked")
+    bylo = _odin_raz("_zanyatie", sboy_bazy)
+    postavit(datetime(2026, 11, 24, 14, 31))
+    try:
+        z.tick()
+    finally:
+        z._zanyatie = bylo
+    zap = zapis_po_uroku(7118)
+    proverka("S3: «database is locked» — запись в «ошибка: сбой записи: OperationalError»",
+             zap["status"] == "oshibka" and "OperationalError" in zap["prichina"] and len(vyzovy()) == n0, zap)
+    postavit(datetime(2026, 11, 24, 14, 40))
+    z.tick()
+    zap = zapis_po_uroku(7118)
+    proverka("M1/S3: следующий тик — записано и выгружено", zap["status"] == "vygruzheno" and len(vyzovy()) == n0 + 1, zap)
+    postavit(datetime(2026, 11, 24, 16, 0))
+    z.tick()
+    proverka("…итоги дня: все три занятия записаны — пунктов в пульт нет (повтор удался)",
+             not dnevnye() and all(zapis_po_uroku(x)["itog"] == "ok" for x in (7116, 7117, 7118)),
+             (dnevnye(), [zapis_po_uroku(x)["itog"] for x in (7116, 7117, 7118)]))
+
+    # выключили посреди занятия (часть закрылась) и включили снова — запись продолжается следующей частью
+    n0 = len(vyzovy())
+    scenariy({"dolya": 0.3})
+    ff_nast = z._ffmpeg
+
+    def ff_i_vyklyuchit(*a, **k):
+        z._ffmpeg = ff_nast
+        r_ = ff_nast(*a, **k)
+        m.db.set_setting("zapis_on", "0")           # владелец снял галочку, пока шла часть 1
+        return r_
+    z._ffmpeg = ff_i_vyklyuchit
+    postavit(datetime(2026, 11, 26, 11, 31))
+    try:
+        z.tick()
+    finally:
+        z._ffmpeg = ff_nast
+    zap = zapis_po_uroku(7123)
+    ff = fayly(zap["id"])
+    proverka("выключили посреди занятия — часть 1 закрыта и выгружена, «запись выключена владельцем во время занятия»",
+             zap["status"] == "vygruzheno" and "во время занятия" in zap["prichina"]
+             and [f["status"] for f in ff] == ["vygruzhen"], (zap, ff))
+    m.db.set_setting("zapis_on", "1")
+    postavit(datetime(2026, 11, 26, 12, 20))
+    z.tick()
+    zap = zapis_po_uroku(7123)
+    ff = fayly(zap["id"])
+    v = vyzovy()[n0:]
+    proverka("M1: включили в 12:20 — запись продолжена «(часть 2)» с 12:20 до 12:51 (-t 1860), выгружена",
+             [f["imya"] for f in ff] == ["2026-11-26 12-00 МиР Гр4.mp4", "2026-11-26 12-00 МиР Гр4 (часть 2).mp4"]
+             and all(f["status"] == "vygruzhen" for f in ff) and [arg(a, "-t") for a in v] == ["3120", "1860"]
+             and "выключали" in zap["prichina"], ([f["imya"] for f in ff], [arg(a, "-t") for a in v], zap["prichina"]))
+    postavit(datetime(2026, 11, 26, 13, 0))
+    z.tick()
+    proverka("…итог: пробел в записи — по воле владельца, пункта «записано не целиком» нет",
+             not [x for x in punkty() if x["day"] == "2026-11-26"] and zapis_po_uroku(7123)["itog"] == "ok",
+             [x["text"] for x in punkty() if x["day"] == "2026-11-26"])
+
+
+# --- О. Части по пределу размера, звук G.711, пункт по итогам занятия -------------------------------
+
+def test_chasti():
+    print("О. Части ≤ предела размера по той же ссылке; G.711 — та же ссылка; не записано — один пункт по итогам")
+    # L1: предел части упёрся (здесь — 1,5 МБ вместо 900 МБ): сразу следующая часть, по той же ссылке
+    bylo_max = z.MAX_FAYL
+    z.MAX_FAYL = 1_500_000
+    n0, s0, p0 = len(vyzovy()), len(SSYLKI["vyzovy"]), len(POTOK["vyzovy"])
+    postavit(datetime(2026, 11, 25, 9, 31))
+    try:
+        z.tick()
+    finally:
+        z.MAX_FAYL = bylo_max
+    zap = zapis_po_uroku(7119)
+    ff = fayly(zap["id"])
+    v = vyzovy()[n0:]
+    proverka("L1: часть упёрлась в предел — «… .mp4», «(часть 2)», «(часть 3)», все выгружены, каждая ≤ предела",
+             [f["imya"] for f in ff] == ["2026-11-25 10-00 МиР Гр4.mp4", "2026-11-25 10-00 МиР Гр4 (часть 2).mp4",
+                                        "2026-11-25 10-00 МиР Гр4 (часть 3).mp4"]
+             and all(f["status"] == "vygruzhen" and f["razmer"] <= 1_500_000 + 65536 for f in ff)
+             and all(arg(a, "-fs") == "1500000" for a in v), [(f["imya"], f["razmer"], f["status"]) for f in ff])
+    proverka("m6/L1: ссылка бралась один раз — следующие части по той же ссылке (разрыв — секунды, без браузера)",
+             len(SSYLKI["vyzovy"]) - s0 == 1 and len(POTOK["vyzovy"]) - p0 == 3
+             and len(set(POTOK["vyzovy"][p0:])) == 1, (len(SSYLKI["vyzovy"]) - s0, len(POTOK["vyzovy"]) - p0))
+    proverka("m4: в заметке части — «достигнут предел размера части», а не «оборвалась»",
+             all("достигнут предел размера" in (f["zametka"] or "") for f in ff[:2])
+             and "оборвалась" not in (zap["prichina"] or ""), [f["zametka"] for f in ff])
+
+    # поток так и не дали до конца занятия — один пункт, после конца
+    SSYLKI["otkazy"] = 10 ** 6
+    postavit(datetime(2026, 11, 25, 11, 31))
+    try:
+        z.tick()
+    finally:
+        SSYLKI["otkazy"] = 0
+    zap = zapis_po_uroku(7120)
+    proverka("поток не дали ни разу — «не записано: не удалось получить поток…», токен замаскирован",
+             zap["status"] == "oshibka" and "не удалось получить поток" in zap["prichina"] and TOKEN not in zap["prichina"],
+             zap)
+    proverka("…пока поток пытался (и тик в 11:31 ещё до конца занятия) — пункта нет",
+             not [x for x in punkty() if x["day"] == "2026-11-25"])
+    postavit(datetime(2026, 11, 25, 12, 52))
+    z.tick()
+    z.tick()
+    p = [x for x in punkty() if x["day"] == "2026-11-25"]
+    proverka("M1/m3: занятие кончилось, так и не записано — ровно один пункт Борису «занятие не записано — не удалось "
+             "получить видеопоток камеры»", len(p) == 1 and "не удалось получить видеопоток" in p[0]["text"]
+             and "12:00 МиР Гр4" in p[0]["text"] and p[0]["who"] == "Борис" and zapis_po_uroku(7120)["itog"] == "potok",
+             [x["text"] for x in p])
+    tekst = " ".join(x["text"] for x in punkty())
+    proverka("в пунктах пульта — ни телефонов, ни имён детей, ни токена; есть время, группа и ссылка на /owner#zapis",
+             not re.search(r"(?<!\d)(?:\+?7|8)?9\d{9}(?!\d)", tekst) and "Тестов" not in tekst and TOKEN not in tekst
+             and "app.kidsup.ru/owner#zapis" in tekst and "МиР Гр4" in tekst, tekst[:200])
+
+    # m6: звук G.711 — повтор той же ссылкой, без второго браузера
+    z._zvuk_aac[0] = False
+    scenariy({"rc": 234, "pusto": True, "dolya": 0.0003,
+              "err": "[mp4 @ 0x1] Could not find tag for codec pcm_alaw in stream #1, codec not currently supported in container"},
+             {})
+    n0, s0, p0 = len(vyzovy()), len(SSYLKI["vyzovy"]), len(POTOK["vyzovy"])
+    postavit(datetime(2026, 11, 26, 9, 31))
+    try:
+        z.tick()
+    finally:
+        z._zvuk_aac[0] = False
+    v = vyzovy()[n0:]
+    zap = zapis_po_uroku(7122)
+    proverka("m6: звук G.711 mp4 не принял — сразу повтор со звуком в AAC той же ссылкой (браузер не открывали второй раз)",
+             len(v) == 2 and arg(v[1], "-c:a") == "aac" and arg(v[1], "-c:v") == "copy"
+             and len(SSYLKI["vyzovy"]) - s0 == 1 and len(POTOK["vyzovy"]) - p0 == 2 and zap["status"] == "vygruzheno",
+             (len(v), len(SSYLKI["vyzovy"]) - s0, zap["status"]))
+
+
 # --- Л. Настоящий ffmpeg (если есть на машине) -----------------------------------------------------
 
+# дочерний процесс: тот же _ffmpeg() из app/zapis.py пишет живой поток, пока его группу не остановят
+# сигналом — как systemctl restart (SIGTERM всем процессам службы) или жёстко (SIGKILL)
+DOCHERNIY = r'''
+import importlib.util, sys, types
+from pathlib import Path
+koren, exe, url, out = sys.argv[1:5]
+app = types.ModuleType("app"); app.__path__ = []
+cfg = types.ModuleType("app.config"); cfg.DATA_DIR = Path(out).parent
+dbm = types.ModuleType("app.db"); dbm.get_setting = lambda k, d="": d
+sys.modules.update({"app": app, "app.config": cfg, "app.db": dbm})
+spec = importlib.util.spec_from_file_location("app.zapis", koren + "/app/zapis.py")
+z = importlib.util.module_from_spec(spec); sys.modules["app.zapis"] = z; spec.loader.exec_module(z)
+z._ffmpeg_exe = lambda: exe
+print("start", flush=True)
+z._ffmpeg(url, Path(out), 300, 10 ** 9)
+'''
+
+
+def nastoyashchiy_exe() -> str:
+    """ffmpeg для раздела Л: ZAPIS_FFMPEG (например, 7.0.2 из imageio-ffmpeg, как на сервере), иначе
+    imageio-ffmpeg, иначе системный."""
+    exe = os.environ.get("ZAPIS_FFMPEG") or ""
+    if not exe:
+        try:
+            import imageio_ffmpeg
+            exe = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:  # noqa: BLE001
+            exe = shutil.which("ffmpeg") or ""
+    return exe if exe and os.path.exists(exe) else ""
+
+
+def _ffmpeg_po_puti(put: str) -> list:
+    """Процессы, в командной строке которых есть этот путь: [(pid, [аргументы])]."""
+    out = []
+    for d_ in Path("/proc").iterdir() if Path("/proc").exists() else []:
+        if not d_.name.isdigit():
+            continue
+        try:
+            cl = (d_ / "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        if put.encode() in cl:
+            out.append((int(d_.name), [x.decode("utf-8", "replace") for x in cl if x]))
+    return out
+
+
 def test_nastoyashchiy_ffmpeg(work: str):
-    exe = shutil.which("ffmpeg")
-    print("Л. Настоящий ffmpeg на локальном FLV (H.264 + звук): команда записи, обрыв, звук не для mp4")
+    exe = nastoyashchiy_exe()
+    print("Л. Настоящий ffmpeg на локальном живом FLV: запись, обрыв, остановка (stop, SIGTERM, SIGKILL), HTTPS")
     if not exe:
         print("  (пропущено: ffmpeg на этой машине не найден)")
         return
+    try:
+        versiya = subprocess.run([exe, "-version"], capture_output=True, text=True, timeout=30).stdout.split("\n")[0]
+    except Exception:  # noqa: BLE001
+        versiya = "?"
+    print(f"  ffmpeg: {versiya[:70]}")
     d = Path(work) / "nastoyashchiy"
     d.mkdir(exist_ok=True)
 
@@ -1381,21 +1738,57 @@ def test_nastoyashchiy_ffmpeg(work: str):
         print(f"  (пропущено: тестовый FLV не собрался: {type(e).__name__})")
         return
     REZHIM = {"obryv": 0.0, "zavis": False}
+    ADRESA = {}
 
     class Potok(BaseHTTPRequestHandler):
         def log_message(self, *a):
             pass
 
         def do_GET(self):
-            put = urlsplit(self.path).path
-            data = FLV.get(put)
+            u = urlsplit(self.path)
+            if u.path in ("/redir", "/redir_http"):
+                kuda = (f"http://127.0.0.1:{ADRESA['http']}/aac.flv?" if u.path == "/redir_http" else "/aac.flv?") + u.query
+                self.send_response(302)
+                self.send_header("Location", kuda)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            if u.path == "/403":
+                self.send_response(403)
+                self.send_header("Content-Length", "9")
+                self.end_headers()
+                self.wfile.write(b"forbidden")
+                return
+            if u.path == "/live":                  # живой поток: отдаётся в реальном времени, пока его читают
+                src = subprocess.Popen([exe, "-hide_banner", "-loglevel", "error", "-re", "-f", "lavfi", "-i",
+                                        "testsrc=size=320x240:rate=25", "-f", "lavfi", "-i",
+                                        "sine=frequency=440:sample_rate=44100", "-c:v", "libx264", "-preset", "ultrafast",
+                                        "-tune", "zerolatency", "-g", "25", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                                        "-b:a", "32k", "-f", "flv", "pipe:1"], stdout=subprocess.PIPE,
+                                       stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                self.send_response(200)
+                self.send_header("Content-Type", "video/x-flv")
+                self.end_headers()
+                try:
+                    while True:
+                        ch = src.stdout.read1(65536)
+                        if not ch:
+                            break
+                        self.wfile.write(ch)
+                except OSError:
+                    pass
+                finally:
+                    src.kill()
+                    src.wait()
+                return
+            data = FLV.get(u.path)
             if data is None:
                 self.send_response(404)
                 self.end_headers()
                 return
             self.send_response(200)
             self.send_header("Content-Type", "video/x-flv")
-            self.end_headers()                     # живой поток: без Content-Length
+            self.end_headers()                     # как у живого потока: без Content-Length
             n = int(len(data) * REZHIM["obryv"]) if REZHIM["obryv"] else len(data)
             try:
                 self.wfile.write(data[:n])
@@ -1406,16 +1799,36 @@ def test_nastoyashchiy_ffmpeg(work: str):
                 pass
 
     srv = ThreadingHTTPServer(("127.0.0.1", 0), Potok)
+    srv.daemon_threads = True
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    baza = f"http://127.0.0.1:{srv.server_address[1]}"
-    proksi = {k_: os.environ.pop(k_) for k_ in list(os.environ) if k_.lower() in ("http_proxy", "https_proxy", "all_proxy")}
-    bylo_exe, bylo_rw = z._ffmpeg_exe, z.RW_TIMEOUT_S
+    ADRESA["http"] = srv.server_address[1]
+    SVOI_PORTY.add(ADRESA["http"])
+    baza = f"http://127.0.0.1:{ADRESA['http']}"
+    # HTTPS с самоподписанным сертификатом на 127.0.0.1 (openssl есть почти везде; нет — TLS-проверки пропускаются)
+    srv_s, baza_s, cert = None, "", d / "stend_c.pem"
+    if shutil.which("openssl"):
+        r_ = subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(d / "stend_k.pem"),
+                             "-out", str(cert), "-days", "2", "-subj", "/CN=127.0.0.1",
+                             "-addext", "subjectAltName=IP:127.0.0.1"], capture_output=True, timeout=60)
+        if r_.returncode == 0:
+            import ssl
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ctx.load_cert_chain(str(cert), str(d / "stend_k.pem"))
+            srv_s = ThreadingHTTPServer(("127.0.0.1", 0), Potok)
+            srv_s.daemon_threads = True
+            srv_s.socket = ctx.wrap_socket(srv_s.socket, server_side=True)
+            threading.Thread(target=srv_s.serve_forever, daemon=True).start()
+            SVOI_PORTY.add(srv_s.server_address[1])
+            baza_s = f"https://127.0.0.1:{srv_s.server_address[1]}"
+    bylo = (z._ffmpeg_exe, z.RW_TIMEOUT_S, z.STOP_S, z._otkryt_potok, z._ca_fayl)
     z._ffmpeg_exe = lambda: exe
+    z._otkryt_potok = ORIG["otkryt_potok"]          # настоящий: Python открывает поток сам
+    q = f"?access_token={TOKEN}&format=flv"
     try:
-        def zapisat(put, imya, dlit):
+        def zapisat(put, imya, dlit, stop=None, baza_=None):
             out = d / imya
             t0 = time.monotonic()
-            rc, err = z._ffmpeg(f"{baza}{put}?access_token={TOKEN}&format=flv", out, dlit, 10 ** 9)
+            rc, err = z._ffmpeg(f"{baza_ or baza}{put}{q}", out, dlit, 10 ** 9, stop)
             return out, rc, err, time.monotonic() - t0
 
         def korobki(p):
@@ -1436,22 +1849,41 @@ def test_nastoyashchiy_ffmpeg(work: str):
                                capture_output=True, text=True, timeout=30)
             return [x.strip() for x in r.stdout.split() if x.strip()]
 
+        def dlitelnost(p):
+            """Сколько секунд видео в файле — ffprobe, а без него — тем же ffmpeg («Duration:»)."""
+            pr = shutil.which("ffprobe")
+            if pr:
+                r = subprocess.run([pr, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(p)],
+                                   capture_output=True, text=True, timeout=60)
+                try:
+                    return float(r.stdout.strip().split()[0])
+                except (ValueError, IndexError):
+                    return 0.0
+            r = subprocess.run([exe, "-hide_banner", "-i", str(p)], capture_output=True, text=True, timeout=60)
+            m_ = re.search(r"Duration: (\d+):(\d+):([\d.]+)", r.stderr)
+            return int(m_[1]) * 3600 + int(m_[2]) * 60 + float(m_[3]) if m_ else 0.0
+
         out, rc, err, _ = zapisat("/aac.flv", "polnyy.mp4", 3)
+        proverka("целый поток, -t 3: код 0, файл — фрагментированный mp4 (moov, затем moof+mdat), читается",
+                 rc == 0 and z.mp4_celyy(out) and z.mp4_fragmentirovan(out), (rc, err, korobki(out)[:6]))
+        osh = z._peremuks(out)
         kb = korobki(out)
-        proverka("целый поток, -t 3: код 0, mp4 закрыт (оглавление есть), +faststart — moov перед mdat",
-                 rc == 0 and z.mp4_celyy(out) and "moov" in kb and kb.index("moov") < kb.index("mdat"), (rc, err, kb))
+        proverka("…перепаковка -c copy: обычный mp4, +faststart — moov перед mdat, фрагментов нет",
+                 osh == "" and z.mp4_celyy(out) and not z.mp4_fragmentirovan(out) and kb.index("moov") < kb.index("mdat"),
+                 (osh, kb))
         kd = kodeki(out)
         proverka("…без перекодирования: внутри h264 и aac" if kd is not None else "…(ffprobe нет — кодеки не проверены)",
                  kd is None or kd == ["h264", "aac"], kd)
         REZHIM["obryv"] = 0.4
         out, rc, err, _ = zapisat("/aac.flv", "obryv.mp4", 30)
-        proverka("поток оборвался на 40 %: ffmpeg вышел сам, файл закрыт и открывается (часть годится в архив)",
+        proverka("поток оборвался на 40 %: вход закрылся, ffmpeg дописал файл сам — часть годится в архив",
                  z.mp4_celyy(out) and out.stat().st_size > z.MIN_FAYL // 10, (rc, err, out.stat().st_size if out.exists() else 0))
         REZHIM["zavis"] = True
         z.RW_TIMEOUT_S = 2
         out, rc, err, sek = zapisat("/aac.flv", "zavis.mp4", 30)
-        proverka("поток завис (сервер молчит 25 с): по -rw_timeout (2 с) ffmpeg закрыл файл за секунды, а не ждал",
-                 z.mp4_celyy(out) and sek < 15, (rc, round(sek, 1)))
+        proverka("поток завис (сервер молчит 25 с): через RW_TIMEOUT_S (2 с) вход закрыт, файл дописан за секунды",
+                 z.mp4_celyy(out) and sek < 15 and "молчал" in err, (rc, round(sek, 1), err[-80:]))
+        z.RW_TIMEOUT_S = bylo[1]
         REZHIM.update(obryv=0.0, zavis=False)
         z._zvuk_aac[0] = False
         out, rc, err, _ = zapisat("/alaw.flv", "alaw.mp4", 3)
@@ -1462,12 +1894,110 @@ def test_nastoyashchiy_ffmpeg(work: str):
         kd = kodeki(out)
         proverka("…со звуком в AAC (видео по-прежнему copy) — записалось", rc == 0 and z.mp4_celyy(out)
                  and (kd is None or kd == ["h264", "aac"]), (rc, err, kd))
-        proverka("токен ссылки в хвост ошибки ffmpeg не попадает", TOKEN not in err)
+        z._zvuk_aac[0] = False
+        proverka("токен ссылки в хвост ошибки не попадает", TOKEN not in err)
+
+        # B1: остановка по stop() (владелец выключил запись; сторож) — живой поток
+        z.STOP_S = 1
+        t_stop = time.monotonic() + 6
+        rez = {}
+        out = d / "stop.mp4"
+        th = threading.Thread(target=lambda: rez.update(r=zapisat("/live", "stop.mp4", 300,
+                                                                  stop=lambda: time.monotonic() > t_stop)), daemon=True)
+        th.start()
+        vidno = []
+        for _ in range(40):
+            time.sleep(0.25)
+            vidno = _ffmpeg_po_puti(str(out))
+            if vidno:
+                break
+        th.join(60)
+        z.STOP_S = bylo[2]
+        _, rc, err, sek = rez.get("r") or (None, None, "", 99)
+        dl = dlitelnost(out) if out.exists() else 0.0
+        proverka("B1: «выключили запись» посреди живого потока — ffmpeg закончил за секунды (а не через 60 с и SIGKILL), "
+                 "файл закрыт и смотрится", rc is not None and sek < 15 and z.mp4_celyy(out) and dl >= 3.0,
+                 (rc, round(sek, 1), round(dl, 2), err[-100:]))
+        proverka("S3: в командной строке ffmpeg (/proc/<pid>/cmdline) токена нет — поток идёт через stdin (pipe:0)",
+                 bool(vidno) and all(TOKEN not in " ".join(a_) and "pipe:0" in a_ for _, a_ in vidno)
+                 or not Path("/proc").exists(), [a_[-6:] for _, a_ in vidno][:1])
+        proverka("S4: файл записи — 0600", oct(out.stat().st_mode & 0o777) == "0o600" if out.exists() else False)
+        osh = z._peremuks(out)
+        proverka("…перепакован в обычный mp4, длительность та же", osh == "" and not z.mp4_fragmentirovan(out)
+                 and abs(dlitelnost(out) - dl) < 1.0, (osh, dl))
+
+        # B1: выкладка посреди занятия — SIGTERM всей группе службы; и жёсткая остановка — SIGKILL
+        doch = d / "dochka.py"
+        doch.write_text(DOCHERNIY, encoding="utf-8")
+        for sig, imya, opis in ((signal.SIGTERM, "gruppa_term.mp4", "SIGTERM всей группе (systemctl restart)"),
+                                (signal.SIGKILL, "gruppa_kill.mp4", "SIGKILL всей группе (жёстко, как при нехватке памяти)")):
+            out = d / imya
+            out.unlink(missing_ok=True)
+            pr = subprocess.Popen([sys.executable, str(doch), KOREN, exe, f"{baza}/live{q}", str(out)],
+                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
+            pr.stdout.readline()
+            t0 = time.monotonic()
+            while time.monotonic() - t0 < 15 and not (out.exists() and out.stat().st_size > 400_000):
+                time.sleep(0.25)
+            time.sleep(1.0)
+            try:
+                os.killpg(pr.pid, sig)
+            except OSError:
+                pass
+            try:
+                pr.wait(20)
+            except subprocess.TimeoutExpired:
+                pr.kill()
+            t1 = time.monotonic()
+            while _ffmpeg_po_puti(str(out)) and time.monotonic() - t1 < 25:
+                time.sleep(0.25)
+            zhivye = _ffmpeg_po_puti(str(out))
+            for pid_, _ in zhivye:
+                try:
+                    os.kill(pid_, signal.SIGKILL)
+                except OSError:
+                    pass
+            celyy = out.exists() and (z.mp4_celyy(out) or z.mp4_obrezat(out))
+            dl = dlitelnost(out) if celyy else 0.0
+            proverka(f"B1: {opis} посреди записи — ffmpeg не остался сиротой, файл остался и смотрится "
+                     f"(ffprobe: ≥ 3 с)", not zhivye and celyy and dl >= 3.0,
+                     (len(zhivye), out.stat().st_size if out.exists() else 0, round(dl, 2)))
+            osh = z._peremuks(out) if celyy else "нет файла"
+            proverka("…после этого перепакован -c copy (как перед выгрузкой) и смотрится",
+                     osh == "" and not z.mp4_fragmentirovan(out) and dlitelnost(out) >= 3.0, osh)
+
+        # S2: HTTPS — сертификат проверяется
+        if baza_s:
+            out, rc, err, _ = zapisat("/aac.flv", "tls_chuzhoy.mp4", 3, baza_=baza_s)
+            proverka("S2: самоподписанный сертификат (как у подставного сервера посередине) → отказ «сертификат … не "
+                     "прошёл проверку», ffmpeg не запускался, файла нет",
+                     rc == -2 and "не прошёл проверку" in err and not out.exists(), (rc, err[-120:]))
+            z._ca_fayl = lambda: str(cert)
+            out, rc, err, _ = zapisat("/aac.flv", "tls_svoy.mp4", 3, baza_=baza_s)
+            proverka("S2: тот же сервер, когда его сертификат — в списке доверенных: поток записан (проверка не мешает "
+                     "настоящему)", rc == 0 and z.mp4_celyy(out), (rc, err[-120:]))
+            out, rc, err, _ = zapisat("/redir_http", "tls_vniz.mp4", 3, baza_=baza_s)
+            proverka("S2: переадресация с https на http — отказ", rc == -2 and "не на https" in err, (rc, err[-80:]))
+            z._ca_fayl = lambda: None
+            out, rc, err, _ = zapisat("/aac.flv", "tls_bez_ca.mp4", 3, baza_=baza_s)
+            proverka("S2: нет файла корневых сертификатов — поток не открывается (без проверки не ходим)",
+                     rc == -2 and "корневых сертификатов" in err, (rc, err[-80:]))
+            z._ca_fayl = bylo[4]
+            proverka("S2: файл корневых сертификатов на этой машине находится (certifi или системный)",
+                     bool(z._ca_fayl()) and os.path.isfile(z._ca_fayl()), z._ca_fayl())
+        else:
+            print("  (TLS-проверки пропущены: нет openssl для сертификата стенда)")
+        out, rc, err, _ = zapisat("/redir", "redir.mp4", 3)
+        proverka("переадресация 302 на сервер потока — проходит, записано", rc == 0 and z.mp4_celyy(out), (rc, err[-80:]))
+        out, rc, err, _ = zapisat("/403", "z403.mp4", 3)
+        proverka("ответ 403 — сразу «сервер потока ответил 403», без ffmpeg", rc == -2 and "ответил 403" in err
+                 and not out.exists(), (rc, err))
     finally:
         z._zvuk_aac[0] = False
-        z._ffmpeg_exe, z.RW_TIMEOUT_S = bylo_exe, bylo_rw
-        os.environ.update(proksi)
+        z._ffmpeg_exe, z.RW_TIMEOUT_S, z.STOP_S, z._otkryt_potok, z._ca_fayl = bylo
         srv.shutdown()
+        if srv_s:
+            srv_s.shutdown()
         shutil.rmtree(d, ignore_errors=True)
 
 
@@ -1498,11 +2028,13 @@ def main():
     ap_ = argparse.ArgumentParser()
     ap_.add_argument("--work", default="")
     a = ap_.parse_args()
+    global PROKSI_DO
+    PROKSI_DO = {k_: v_ for k_, v_ in os.environ.items() if k_.lower() in ("http_proxy", "https_proxy", "all_proxy")}
     sys.stdout = _Tee(sys.stdout)
     work = a.work or tempfile.mkdtemp(prefix="zapis_")
     os.makedirs(work, exist_ok=True)
     m = lt.zapustit(KOREN, work)
-    _otkryt_lokalnyy()
+    _zakryt_set_strozhe()
     lt.zasejat(os.path.join(work, "kidsup.db"))
     zasejat(os.path.join(work, "kidsup.db"))
     m.vhod.zapusk(True)
@@ -1513,8 +2045,15 @@ def main():
     for mod in pkgutil.iter_modules(app.__path__):
         importlib.import_module(f"app.{mod.name}")
     lt._postavit_lovushki()
-    from app import autopilot as ap, zapis
+    from app import autopilot as ap, mango, zapis
     z = zapis
+
+    # T1 (проверка V2, m10): пульт админа (/pult → заявки сезона → zayavki._calls_index) звал mango.calls —
+    # httpx уходил через агент-прокси песочницы на app.mango-office.ru. На стенде Манго выключено
+    def _mango_na_stende(*a, **k):
+        raise RuntimeError("Манго на стенде выключено (zapis_testy)")
+    ORIG["mango_call"] = mango._call
+    mango._call = _mango_na_stende
     zh = _LogVZahvat()
     zh.setFormatter(logging.Formatter("%(name)s %(levelname)s %(message)s"))
     logging.getLogger().addHandler(zh)
@@ -1532,8 +2071,12 @@ def main():
     z._potok = lambda fn, *args: fn(*args)            # потоки — по очереди, в этом же потоке
     z._ffmpeg_exe = lambda: str(ff)
     z._poluchit_ssylku = ssylka_stenda
+    ORIG["otkryt_potok"] = getattr(z, "_otkryt_potok", None)   # (на прежнем коде её нет — тест должен упасть по разделам)
+    z._otkryt_potok = potok_stenda
     z._disk_usage = lambda: Usage(20 * GB, 5 * GB, 15 * GB)
+    m.db.set_setting("autopilot", "on")                # tick зовёт цикл автопилота; сам цикл на стенде не запущен
     srv = ThreadingHTTPServer(("127.0.0.1", 0), _Dav)
+    SVOI_PORTY.add(srv.server_address[1])
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     z.WEBDAV = f"http://127.0.0.1:{srv.server_address[1]}"
     DAV["auth"] = dav_avt(YA_LOGIN, YA_PAROL)
@@ -1544,22 +2087,49 @@ def main():
     proverka("подставной WebDAV — на 127.0.0.1, настоящий адрес Диска в коде — webdav.yandex.ru",
              z.WEBDAV.startswith("http://127.0.0.1:") and 'WEBDAV = "https://webdav.yandex.ru"'
              in Path(z.__file__).read_text(encoding="utf-8"))
-    test_vybor()
-    test_vremya()
-    test_obryv()
-    test_vygruzka()
-    c = test_owner()
-    test_bez_parolya(c)
-    test_mesto()
-    test_ssylka()
-    test_perezapusk()
-    test_perenos()
-    test_sekrety(c)
-    test_nastoyashchiy_ffmpeg(work)
+    def razdel(fn, *a_):
+        """Раздел упал исключением — это ошибка раздела, следующие разделы всё равно идут."""
+        try:
+            return fn(*a_)
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            proverka(f"раздел {fn.__name__} дошёл до конца", False, f"{type(e).__name__}: {str(e)[:200]}")
+            traceback.print_exc()
+            return None
+
+    razdel(test_vybor)
+    razdel(test_vremya)
+    razdel(test_obryv)
+    razdel(test_vygruzka)
+    c = razdel(test_owner) or vladelec()
+    razdel(test_bez_parolya, c)
+    razdel(test_mesto)
+    razdel(test_ssylka)
+    razdel(test_perezapusk)
+    razdel(test_perenos)
+    razdel(test_peresmotr)
+    razdel(test_chasti)
+    razdel(test_sekrety, c)
+    razdel(test_nastoyashchiy_ffmpeg, work)
 
     proverka("ни одной отправки клиентам", not lt.LOVUSHKI, lt.LOVUSHKI)
     chuzhie = [x for x in lt.SET if any("zapis" in f or "ivideon" in f for f in x[1])]
     proverka("запись и Ivideon не ходили в сеть мимо 127.0.0.1", not chuzhie, chuzhie)
+    proverka("T1: за весь прогон — ни одной попытки соединиться мимо своих подставок (ни прокси песочницы, ни "
+             "внешние адреса)", not ZAPRET, ZAPRET[:5])
+    # замок действительно закрыт: нарочная попытка выйти наружу (не уходит дальше этого процесса)
+    import httpx
+    try:
+        httpx.get("https://app.mango-office.ru/", timeout=5)
+        vyshlo = True
+    except Exception:  # noqa: BLE001
+        vyshlo = False
+    proverka("T1: нарочная попытка httpx на внешний адрес обрывается в процессе теста"
+             + (" — на соединении с прокси песочницы" if _proksi_sredy() else ""),
+             not vyshlo and (not _proksi_sredy() or any(x[1] == "прокси песочницы" for x in ZAPRET)), ZAPRET[-1:])
+    ZAPRET.clear()
+    proverka("T1: переменные прокси песочницы на месте (их не снимали — закрыто в самом процессе)",
+             all(os.environ.get(k_) == v_ for k_, v_ in PROKSI_DO.items()), sorted(PROKSI_DO))
     srv.shutdown()
     vyvod = "".join(ZAHVAT)
     proverka("в выводе тестов и журнале приложения нет ни пароля приложения, ни токена потока",
