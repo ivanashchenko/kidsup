@@ -61,11 +61,19 @@ def download(dst: str) -> None:
                 break
         else:
             raise SystemExit(f'не скачалась таблица {t}')
-    # пометки «удалено в МойКлассе» — необязательны: старый сервер ответит 404, документ соберётся без них
+    # пометки «удалено в МойКлассе» — необязательны: старый сервер ответит 404, документ соберётся без них.
+    # 14.11.2026: запрос был один, без повтора — обрыв связи (curl 35) молча давал страницу без пометок:
+    # 47 групп и 91 место вместо 45 и 95 на сайте. Повторяем, как остальные таблицы; сдаёмся только
+    # на настоящем отказе сервера (404 — такого адреса нет).
     out = os.path.join(dst, UDALENO + '.json')
-    p = subprocess.run(['curl', '-sS', '-K', '-', '-m', '120', '-o', out, '-w', '%{http_code}',
-                        f'{BASE}/export/raw/{UDALENO}.json'], input=cfg, capture_output=True, text=True)
-    if p.stdout.strip() != '200' and os.path.exists(out):
+    kod = ''
+    for _ in range(4):
+        p = subprocess.run(['curl', '-sS', '-K', '-', '-m', '120', '-o', out, '-w', '%{http_code}',
+                            f'{BASE}/export/raw/{UDALENO}.json'], input=cfg, capture_output=True, text=True)
+        kod = p.stdout.strip()
+        if kod in ('200', '404'):
+            break
+    if kod != '200' and os.path.exists(out):
         os.remove(out)
 
 
