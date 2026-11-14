@@ -14,9 +14,17 @@
 выданный одному педагогу. Проверяет оба app/pedklyuchi.py. С личным ключом имя педагога
 подставлено и не выбирается: сервер берёт его из ключа, а не из запроса. Список детей —
 тот же, что и по общему ключу: первые занятия сегодня и вчера по всему центру (первое
-занятие могут отдать любому педагогу, в том числе на замену)."""
+занятие могут отдать любому педагогу, в том числе на замену).
+
+14.11.2026, после проверки (R1 №1, для любого ключа, и общего тоже): телефона родителя в
+данных страницы больше нет — странице он не нужен. Сохранение принимает только ребёнка из
+того списка, который сервер сам построил для страницы (karta_razvitiya._kids за те же два
+дня, _pervye), и телефон, имя, группу, направление, дату и время занятия берёт оттуда же, а
+не из запроса: по ссылке нельзя написать комментарий в карточку любого клиента МойКласса или
+поставить явку на чужое занятие. Ссылку педагога открыл вошедший админ или владелец —
+имя педагога не подставляется: он выбирает из списка, как по общему ключу (R1 №8, R2 №3)."""
 from __future__ import annotations
-import json, html as H, datetime as dt, logging
+import json, html as H, datetime as dt, logging, threading, time
 from . import db
 
 log = logging.getLogger("kidsup.pedagog")
@@ -69,30 +77,97 @@ def key_ok(k: str) -> bool:
     return pedklyuchi.proverit(k) is not None
 
 
-def page(k: str, ped: dict | None = None) -> str:
+NEDEYSTVITELNA = "<h2 style='font-family:sans-serif;margin:2rem'>Ссылка недействительна. Попросите новую у администратора.</h2>"
+
+# Дети первых занятий, которых сервер последний раз показал на странице: uid → (ребёнок, когда).
+# Сохранение принимает только их (R1 №1). Помним SROK_PERVYH: страницу открыли — заметку пишут
+# в течение 15 минут, но телефон мог пролежать открытым и дольше; после срока — список заново.
+_PERVYE: dict = {}
+_PERVYE_ZAMOK = threading.Lock()
+SROK_PERVYH = 6 * 3600
+POLYA_STRANICY = ("uid", "name", "group", "course", "date", "time", "visit")     # без телефона родителя
+
+
+def _zapomnit_pervyh(kids: list) -> None:
+    t = time.monotonic()
+    with _PERVYE_ZAMOK:
+        for kd in kids:
+            try:
+                _PERVYE[int(kd["uid"])] = (dict(kd), t)
+            except (KeyError, TypeError, ValueError):
+                continue
+        for u, (_, kogda) in list(_PERVYE.items()):
+            if t - kogda >= SROK_PERVYH:
+                del _PERVYE[u]
+
+
+def _spisok_pervyh() -> dict:
+    """karta_razvitiya._kids(days=2) — тот же список, что у страницы; запоминается в _PERVYE."""
+    from . import karta_razvitiya as karta
+    data = karta._kids(days=2)
+    kids = data.get("kids", []) if isinstance(data, dict) else []
+    _zapomnit_pervyh(kids)
+    return data if isinstance(data, dict) else {}
+
+
+def _pervyy(uid) -> dict | None:
+    """Ребёнок из списка первых занятий, который сервер строит для страницы, или None.
+    Сначала — запомненный показ страницы; нет в нём (перезапуск, срок вышел) — список заново."""
+    try:
+        uid = int(uid)
+    except (TypeError, ValueError):
+        return None
+    if uid <= 0:
+        return None
+    t = time.monotonic()
+    with _PERVYE_ZAMOK:
+        e = _PERVYE.get(uid)
+    if e is not None and t - e[1] < SROK_PERVYH:
+        return dict(e[0])
+    try:
+        kids = _spisok_pervyh().get("kids") or []
+    except Exception:  # noqa: BLE001 — CRM недоступна: проверить ребёнка не по чему
+        log.warning("pedagog: список первых занятий не получен", exc_info=True)
+        return None
+    return next((dict(kd) for kd in kids if str(kd.get("uid")) == str(uid)), None)
+
+
+def _imya_rebenka(name: str) -> str:
+    """Как firstName() на странице: из «Фамилия Имя» — имя, из одного слова — оно само."""
+    w = str(name or "").split()
+    return w[1] if len(w) >= 2 else (w[0] if w else "")
+
+
+def page(k: str, ped: dict | None = None, imya_iz_klyucha: bool = True, mayak: str = "") -> str:
     """ped — кто пришёл по ключу (pedklyuchi.proverit; main.py проверяет ключ один раз, со
-    счётом перебора, и передаёт итог сюда). Без него ключ проверяется здесь."""
-    from . import karta_razvitiya as karta, pedklyuchi
+    счётом перебора, и передаёт итог сюда). Без него ключ проверяется здесь.
+    imya_iz_klyucha=False — ссылку педагога открыл вошедший админ или владелец: имя не
+    подставляется, выбор из списка. mayak — <script> «страницу открыли» (pedklyuchi.mayak_js)."""
+    from . import pedklyuchi
     if ped is None:
         ped = pedklyuchi.proverit(k)
     if not ped:
-        return "<h2 style='font-family:sans-serif;margin:2rem'>Ссылка недействительна. Попросите новую у администратора.</h2>"
-    data = karta._kids(days=2)
-    kids = data.get("kids", []) if isinstance(data, dict) else []
-    teachers = data.get("teachers", []) if isinstance(data, dict) else []
+        return NEDEYSTVITELNA
+    data = _spisok_pervyh()
+    kids = [{p: kd.get(p) for p in POLYA_STRANICY} for kd in data.get("kids", []) or []]
+    teachers = data.get("teachers", []) or []
     done = {(n["uid"]) for n in notes_for(days=2)}
     for kd in kids:
         kd["done"] = kd["uid"] in done
     cfg = {"kids": kids, "teachers": teachers, "examples": EXAMPLES, "k": k}
-    if ped.get("vid") == pedklyuchi.LICHNYY:
+    if ped.get("vid") == pedklyuchi.LICHNYY and imya_iz_klyucha:
         # личный ключ: педагог известен — в списке только он, выбрать другого нельзя
         cfg["teachers"], cfg["ya"] = [ped.get("imya") or ""], ped.get("imya") or ""
-    return TEMPLATE.replace("__CFG__", json.dumps(cfg, ensure_ascii=False).replace("</", "<\\/"))
+    stranica = TEMPLATE.replace("__CFG__", json.dumps(cfg, ensure_ascii=False).replace("</", "<\\/"))
+    return stranica.replace("</body>", mayak + "</body>", 1) if mayak else stranica
 
 
-def save(payload: dict, ped: dict | None = None) -> dict:
+def save(payload: dict, ped: dict | None = None, imya_iz_klyucha: bool = True) -> dict:
     """ped — как в page(). С личным ключом педагог — тот, кому выдан ключ: имя из запроса не
-    читается (чужим именем заметку не подписать)."""
+    читается (чужим именем заметку не подписать). imya_iz_klyucha=False — сохранил вошедший
+    админ или владелец по ссылке педагога: педагог — тот, кого он выбрал в списке.
+    Ребёнок — только из списка первых занятий страницы (_pervyy); телефон, имя ребёнка,
+    группа, направление, дата и время — из этого списка, не из запроса."""
     from . import pedklyuchi
     if ped is None:
         ped = pedklyuchi.proverit(str(payload.get("k") or ""))
@@ -102,19 +177,26 @@ def save(payload: dict, ped: dict | None = None) -> dict:
     can, nxt, start = (str(payload.get(x) or "").strip() for x in ("can", "next_group", "start"))
     visit = payload.get("visit")  # True / False / None
     teacher = str(payload.get("teacher") or "").strip()
-    if ped.get("vid") == pedklyuchi.LICHNYY:
+    if ped.get("vid") == pedklyuchi.LICHNYY and imya_iz_klyucha:
         teacher = (ped.get("imya") or "").strip()
-    child = str(payload.get("child") or "").strip()
     if not uid or not teacher:
         return {"ok": False, "error": "нужны ребёнок и педагог"}
+    kid = _pervyy(uid)
+    if kid is None:
+        return {"ok": False, "error": "этого ребёнка нет в списке первых занятий за сегодня и вчера — "
+                                      "обновите страницу и выберите ребёнка из списка"}
     if visit is not False and not (can and nxt):
         return {"ok": False, "error": "заполните хотя бы «что умеет» и «куда идём»"}
+    uid = int(kid["uid"])
+    child = _imya_rebenka(kid.get("name"))
+    phone, course, group = (str(kid.get(x) or "") for x in ("phone", "course", "group"))
+    den, vremya = str(kid.get("date") or ""), str(kid.get("time") or "")
     now = dt.datetime.now()
     with db.get_conn() as conn:
         _init(conn)
         conn.execute("INSERT INTO karta_notes (ts, day, uid, child, phone, course, grp, teacher, visit, can, next_group, start) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                     (now.isoformat(timespec="minutes"), now.date().isoformat(), int(uid), child, str(payload.get("phone") or ""),
-                      str(payload.get("course") or ""), str(payload.get("group") or ""), teacher,
+                     (now.isoformat(timespec="minutes"), now.date().isoformat(), uid, child, phone,
+                      course, group, teacher,
                       None if visit is None else int(bool(visit)), can, nxt, start))
     out = {"ok": True, "crm": "", "visit": "", "inbox": ""}
     # МойКласс: комментарий в карточку и отметка явки на записи занятия
@@ -123,16 +205,16 @@ def save(payload: dict, ped: dict | None = None) -> dict:
         from . import sync
         mk = MoyklassClient(sync.get_api_key())
         try:
-            txt = (f"Педагог {teacher}, первое занятие {payload.get('course') or ''} {payload.get('group') or ''}: "
+            txt = (f"Педагог {teacher}, первое занятие {course} {group}: "
                    + ("НЕ ПРИШЁЛ. " if visit is False else "")
                    + (f"Умеет: {can} | Куда идём: {nxt} | Начнём: {start}" if can or nxt else ""))
             mk.post("/v1/company/userComments", {"userId": int(uid), "comment": txt[:1000], "showToUser": False})
             out["crm"] = "комментарий записан"
-            if visit is not None and payload.get("date"):
-                recs = mk.get("/v1/company/lessonRecords", {"userId": int(uid), "date": [payload["date"], payload["date"]], "includeLessons": "true", "limit": 10})
+            if visit is not None and den:
+                recs = mk.get("/v1/company/lessonRecords", {"userId": uid, "date": [den, den], "includeLessons": "true", "limit": 10})
                 recs = (recs.get("lessonRecords") if isinstance(recs, dict) else recs) or []
                 for r in recs:
-                    if (r.get("lesson") or {}).get("beginTime", "")[:5] == str(payload.get("time") or "")[:5] or len(recs) == 1:
+                    if (r.get("lesson") or {}).get("beginTime", "")[:5] == vremya[:5] or len(recs) == 1:
                         try:
                             mk.post(f"/v1/company/lessonRecords/{r['id']}", {"visit": bool(visit), "skip": not bool(visit), "test": bool(r.get("test"))})
                             out["visit"] = "явка отмечена в CRM"
@@ -155,12 +237,12 @@ def save(payload: dict, ped: dict | None = None) -> dict:
             conn.execute("""CREATE TABLE IF NOT EXISTS plan_inbox (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT, ts TEXT,
                             who TEXT, text TEXT, phone TEXT, source TEXT, done INTEGER DEFAULT 0)""")
             if visit is False:
-                text = f"{child}: педагог {teacher} отметил — НЕ пришёл на первое занятие ({payload.get('group') or ''}). Позвонить сегодня, предложить новую дату."
+                text = f"{child}: педагог {teacher} отметил — НЕ пришёл на первое занятие ({group}). Позвонить сегодня, предложить новую дату."
             else:
                 text = (f"{child}: педагог {teacher} заполнил карту развития — открыть /karta, выбрать ребёнка (строки уже подставлены), "
                         f"вставить ссылку на оплату и отправить маме в течение часа. Куда идём: {nxt[:80]}")
             conn.execute("INSERT INTO plan_inbox (day, ts, who, text, phone, source) VALUES (?,?,?,?,?,?)",
-                         (now.date().isoformat(), now.isoformat(timespec="minutes"), who, text[:400], str(payload.get("phone") or "")[:20], f"педагог {now.strftime('%H:%M')}"))
+                         (now.date().isoformat(), now.isoformat(timespec="minutes"), who, text[:400], phone[:20], f"педагог {now.strftime('%H:%M')}"))
         out["inbox"] = f"пункт поставлен: {who}"
     except Exception as e:
         out["inbox"] = f"инбокс: {str(e)[:60]}"
@@ -229,7 +311,8 @@ $('yes').onclick=()=>{visit=true;$('yes').className='on-yes';$('no').className='
 $('no').onclick=()=>{visit=false;$('no').className='on-no';$('yes').className='';$('form').style.display='none';};
 $('save').onclick=()=>{ if(!$('teacher').value){alert('Выберите себя в списке педагогов');return;} if(!cur){alert('Выберите ребёнка');return;} if(visit===null){alert('Отметьте, был ли ребёнок');return;}
  $('status').textContent='Сохраняю…';
- fetch('/api/pedagog/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({k:CFG.k,uid:cur.uid,child:firstName(cur.name),phone:cur.phone,course:cur.course,group:cur.group,date:cur.date,time:cur.time,teacher:$('teacher').value,visit:visit,can:$('can').value,next_group:$('next_group').value,start:$('start').value})})
+ /* 14.11.2026: телефона родителя в данных страницы нет; ребёнка, телефон, группу, дату и время сервер берёт из своего списка по uid */
+ fetch('/api/pedagog/save',{method:'POST',referrerPolicy:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({k:CFG.k,uid:cur.uid,child:firstName(cur.name),course:cur.course,group:cur.group,date:cur.date,time:cur.time,teacher:$('teacher').value,visit:visit,can:$('can').value,next_group:$('next_group').value,start:$('start').value})})
  .then(r=>r.json()).then(j=>{ if(j.ok){ $('status').innerHTML='<span class=ok>Сохранено. '+esc(j.crm)+'. '+esc(j.visit)+'. '+esc(j.inbox)+'</span>'; ['can','next_group','start'].forEach(id=>$(id).value=''); visit=null; $('yes').className='';$('no').className=''; document.querySelector('.kid.sel')?.classList.add('done'); } else $('status').innerHTML='<span class=err>'+esc(j.error||'ошибка')+'</span>'; })
  .catch(e=>{$('status').innerHTML='<span class=err>Ошибка сети: '+esc(e)+'</span>';}); };
 </script></body></html>"""

@@ -914,7 +914,7 @@ def _starye(request, credentials):
 
 
 def schet_sekreta(schet: str, adr: str, sekret: str, veren: bool, nazvanie: str = "",
-                  schitat: bool = True, trevoga: str = "") -> float:
+                  schitat: bool = True, trevoga: str = "", otkazyvat: bool = True) -> float:
     """Счёт перебора для входа, где секрет приходит с каждым запросом: серое окно (общий admin,
     прежний boris — _starye) и ключи педагогов из ссылки (app/pedklyuchi.py, 14.11.2026).
     → сколько секунд паузы: 0 — секрет рассмотрен (верный пускать, неверный записан промахом);
@@ -925,7 +925,11 @@ def schet_sekreta(schet: str, adr: str, sekret: str, veren: bool, nazvanie: str 
     считается раз в час. schet — имя счётчика, начинается с OKNO (в правило формы «один адрес,
     любые логины» такие промахи не входят). schitat=False — неверный секрет промахом не
     считать (устаревшая ссылка педагога — не перебор). trevoga — свой текст сообщения
-    владельцу о 50 промахах за час (см. _posle_promaha)."""
+    владельцу о 50 промахах за час (см. _posle_promaha).
+    otkazyvat=False (14.11.2026, прежний общий ключ педагогов — app/pedklyuchi.py): паузой
+    не отказывать никому — верный секрет пускается и в паузу, как было до счётчика; неверный
+    промахом считается и в паузу (иначе пауза глушила бы и сам счёт, и тревогу о 50 промахах).
+    Удача стирает промахи адреса, как всегда, — только вне паузы."""
     t = seychas()
     if veren:
         otp = _otpechatok(adr, schet, sekret)
@@ -936,7 +940,7 @@ def schet_sekreta(schet: str, adr: str, sekret: str, veren: bool, nazvanie: str 
         except Exception:  # noqa: BLE001
             _zhaloba("vhod: счётчик попыток не прочитан")
             p = 0
-        if p > 0 and not znakom:
+        if p > 0 and not znakom and otkazyvat:
             return p
         with _ZAMOK:
             _UDACHI[otp] = t
@@ -957,14 +961,14 @@ def schet_sekreta(schet: str, adr: str, sekret: str, veren: bool, nazvanie: str 
     except Exception:  # noqa: BLE001
         _zhaloba("vhod: счётчик попыток не прочитан")
         p = 0
-    if p > 0:
+    if p > 0 and otkazyvat:
         return p
     if schitat:
         try:
             _promah_okna(schet, adr, sekret, nazvanie, trevoga)
         except Exception:  # noqa: BLE001
             _zhaloba("vhod: промах не записан")
-    return 0.0
+    return 0.0 if otkazyvat else max(0.0, p)
 
 
 def kto(request, credentials):

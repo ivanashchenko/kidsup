@@ -30,18 +30,34 @@ pedagog_klyuchi: кому выдан (имя педагога, как в спи�
 места — строкой таблицы и настройкой pedagog_obshchiy_snyat основной базы: основная база,
 восстановленная из старой копии, или пропавший файл входов не оживят прежний ключ.
 
-Перебор — общий счётчик vhod.schet_sekreta (те же правила, что у серого окна): пять разных
-неверных ключей с одного адреса за час — пауза; в паузу верный ключ, которого сервер с
-этого адреса ещё не видел, получает тот же отказ, что и неверный. Устаревшая ссылка
-(прежний ключ педагога, отключённый ключ, прежний общий) перебором не считается: её
-откроют из старого сообщения ещё не раз, и запирать из-за этого Wi-Fi центра нельзя.
+Перебор — общий счётчик vhod.schet_sekreta: неверные ключи с адреса считаются промахами (один
+и тот же неверный ключ с адреса — раз в час), 50 промахов за час — сообщение владельцу.
+Устаревшая ссылка (прежний ключ педагога, отключённый ключ, прежний общий) перебором не
+считается: её откроют из старого сообщения ещё не раз, и запирать из-за этого Wi-Fi центра
+нельзя. Пауза никому не отказывает (правки после проверки, 14.11.2026):
+  • ключ из таблицы pedagog_klyuchi — 40 случайных знаков, подобрать его нельзя: пускается
+    всегда, и удача им промахи адреса не стирает (иначе «4 случайных + свой» прятал бы перебор
+    от тревоги);
+  • прежний общий ключ из pedagog_key — пока владелец его не сменил, он работает как до этого
+    изменения: и в паузу; его удача стирает промахи адреса, как было у серого окна.
+Устаревшим считается и личный ключ сотрудника, которого выгрузка МойКласса отмечает «не
+работает» (isWork=false); если о сотруднике данных нет — ключ работает.
 
-Ключ и ссылка не пишутся ни в журнал, ни в лог, ни в настройки.
+«Последний раз открывал» и счёт открытий общим ключом (sloy_zapis) — только то, что открыл
+человек в браузере: переход по ссылке (Sec-Fetch-Dest: document / Sec-Fetch-Mode: navigate),
+фоновый запрос со страницы (/api/…) или «маяк» страницы для браузеров без Sec-Fetch-*;
+роботы предпросмотра ссылок мессенджеров (ROBOTY) не считаются.
+
+Ключ не пишется ни в журнал «кто что сделал» (там путь без строки запроса), ни в настройки.
+В журнале доступа uvicorn значение k=… в адресе заменяется звёздочками (maskirovat_log —
+фильтр на логгер uvicorn.access, ставит app/main.py). Журнал доступа Caddy, если он включён на
+сервере, видит адрес целиком — это настройка сервера, не приложения.
 """
 from __future__ import annotations
 
 import json
 import logging
+import re
 import secrets
 import sqlite3
 import string
@@ -63,6 +79,16 @@ STRANICY = ("/pedagog", "/english/karta")  # открытие этих стра�
 TREVOGA = ("app.kidsup.ru: за час {n} неверных ключей педагогов с разных адресов. Страницы педагогов не "
            "закрыты. Если это не педагоги со старыми ссылками — смените общий ключ и выдайте личные заново: "
            "/owner, блок «Ключи педагогов».")
+# Роботы предпросмотра ссылок (14.11.2026, R1 №7 и R2 №1): мессенджер сам открывает ссылку, чтобы
+# собрать карточку предпросмотра, — WhatsApp с телефона отправителя, Telegram со своих серверов.
+# Это не «педагог открывал». Сравнение — по части User-Agent, без учёта регистра. Общего «bot»
+# нет нарочно: «CUBOT» — марка телефонов, их браузер так и подписывается.
+ROBOTY = ("telegrambot", "whatsapp", "facebookexternalhit", "facebot", "vkshare", "viber", "skypeuripreview",
+          "slackbot", "slack-imgproxy", "discordbot", "twitterbot", "linkedinbot", "pinterest", "redditbot",
+          "embedly", "iframely", "googlebot", "bingbot", "yandexbot", "yandex.com/bots", "applebot",
+          "mail.ru_bot", "odklbot", "bitlybot", "duckduckbot", "petalbot", "bytespider", "snapchat")
+MAYAK = "/api/pedagog/otkryl"              # «страницу открыли» — со страницы, когда переход не виден по заголовкам
+SROK_METKI = 24 * 3600                     # одноразовая метка формы блока на /owner помнится сутки
 
 
 # --- таблица -----------------------------------------------------------------------------------
@@ -96,8 +122,40 @@ def _prezhnie(r, eshche: str = "") -> str | None:
 
 # --- кто пришёл ----------------------------------------------------------------------------------
 
+def uvolen(mk_id) -> bool:
+    """Сотрудник МойКласса отмечен в локальной выгрузке «не работает» (isWork=false). Нет строки,
+    нет поля или выгрузка не читается — False: без данных ключ не отключаем (14.11.2026, R1 №3)."""
+    if mk_id is None:
+        return False
+    try:
+        with db.get_conn() as c:
+            r = c.execute("SELECT raw FROM managers WHERE id=?", (int(mk_id),)).fetchone()
+        raw = json.loads(r["raw"] or "{}") if r is not None else {}
+    except Exception:  # noqa: BLE001
+        return False
+    return isinstance(raw, dict) and raw.get("isWork") is False
+
+
+def _uvolennye() -> set:
+    """id сотрудников, которых выгрузка МойКласса отмечает «не работает» (для блока на /owner)."""
+    out = set()
+    try:
+        with db.get_conn() as c:
+            for r in c.execute("SELECT id, raw FROM managers"):
+                try:
+                    raw = json.loads(r["raw"] or "{}")
+                except ValueError:
+                    continue
+                if isinstance(raw, dict) and raw.get("isWork") is False:
+                    out.add(r["id"])
+    except Exception:  # noqa: BLE001
+        vhod._zhaloba("pedklyuchi: выгрузка сотрудников не прочитана")
+    return out
+
+
 def _nayti(k: str) -> tuple[dict | None, bool]:
-    """→ (кто пришёл или None, ключ устарел: прежний, отключённый или снятый общий)."""
+    """→ (кто пришёл или None, ключ устарел: прежний, отключённый, снятый общий или личный
+    ключ уволенного сотрудника)."""
     h = vhod.hesh_klyucha(k)
     try:
         rows = _stroki()
@@ -111,9 +169,11 @@ def _nayti(k: str) -> tuple[dict | None, bool]:
             naydeno = r
         elif sovpal or any(vhod._ravny(x, h) for x in (r["hesh_prezhniy"] or "").split()):
             ustarel = True
+    if naydeno is not None and naydeno["vid"] == LICHNYY and uvolen(naydeno["mk_id"]):
+        return None, True           # уволен в МойКлассе: ссылка устарела, как отключённая
     if naydeno is not None:
         return {"vid": naydeno["vid"], "id": naydeno["id"], "imya": naydeno["imya"] or "",
-                "mk_id": naydeno["mk_id"], "k": k}, False
+                "mk_id": naydeno["mk_id"], "k": k, "prezhniy": False}, False
     # Прежний общий ключ из настройки pedagog_key — пока владелец его не сменил и не выключил.
     # Снят он, если так говорит хоть одно из двух хранилищ; не читается одно — решает второе.
     try:
@@ -123,8 +183,28 @@ def _nayti(k: str) -> tuple[dict | None, bool]:
     if not snyat and (rows is None or _obshchaya(rows) is None):
         want = db.get_setting("pedagog_key", "")
         if want and vhod._ravny(k, want):
-            return {"vid": OBSHCHIY, "id": 0, "imya": "", "mk_id": None, "k": k}, False
+            return {"vid": OBSHCHIY, "id": 0, "imya": "", "mk_id": None, "k": k, "prezhniy": True}, False
     return None, ustarel
+
+
+def proverit_podrobno(k, request=None) -> tuple[dict | None, bool]:
+    """Как proverit(), но → (кто пришёл или None, ссылка устарела). Устаревшая — ключ был
+    настоящим, но его сменили, выдали заново, отключили или сотрудник уволен: страница
+    «Карточки речи» отвечает такому «Ссылка недействительна», а не окном пароля (R2 №4)."""
+    k = str(k or "")
+    if not k:
+        return None, False
+    kto, ustarel = _nayti(k)
+    if request is not None and not (kto is not None and not kto.get("prezhniy")):
+        # ключ из таблицы (40 случайных знаков) счётчик не трогает: подобрать его нельзя, а его
+        # удача не должна стирать промахи адреса. Прежний общий и неверные — в счёт; паузой
+        # никому не отказываем (otkazyvat=False): прежний общий работает как до счётчика.
+        try:
+            vhod.schet_sekreta(SCHET, vhod.adres(request), k, kto is not None, "ключи педагогов",
+                               schitat=not ustarel, trevoga=TREVOGA, otkazyvat=False)
+        except Exception:  # noqa: BLE001 — сбой счётчика ссылку педагогу не закрывает
+            vhod._zhaloba("pedklyuchi: счёт перебора не сработал")
+    return kto, ustarel
 
 
 def proverit(k, request=None) -> dict | None:
@@ -134,22 +214,87 @@ def proverit(k, request=None) -> dict | None:
     {"vid": "obshchiy", …} — общий ключ. None — ключ не подошёл: вызывающий отвечает так же,
     как отвечал на неверный ключ всегда (страница «Ссылка недействительна», «ключ не
     подходит», для карточки речи — обычная проверка входа).
-    С request считается перебор (vhod.schet_sekreta): в паузу и верный ключ, незнакомый
-    серверу с этого адреса, получает None — иначе перебор узнавал бы удачу по ответу."""
-    k = str(k or "")
-    if not k:
-        return None
-    kto, ustarel = _nayti(k)
-    if request is not None:
+    С request неверный ключ считается промахом (vhod.schet_sekreta) — для тревоги владельцу;
+    верному ключу пауза не отказывает (см. описание модуля)."""
+    return proverit_podrobno(k, request)[0]
+
+
+def obshchiy_snyat() -> bool:
+    """Прежний общий ключ (настройка pedagog_key) снят: владелец сменил или выключил общий ключ.
+    Достаточно одного из двух хранилищ — как в _nayti."""
+    try:
+        if _snyat():
+            return True
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        return _obshchaya(_stroki()) is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+# --- кто открыл: человек или робот предпросмотра ----------------------------------------------------
+
+def robot(request) -> bool:
+    """Запрос робота предпросмотра ссылок (или без User-Agent вовсе)."""
+    ua = (request.headers.get("user-agent") or "").strip().lower()
+    return not ua or any(r in ua for r in ROBOTY)
+
+
+def navigaciya(request) -> bool:
+    """Страницу открыл браузер переходом: Sec-Fetch-Dest: document или Sec-Fetch-Mode: navigate
+    (как в счётчике открытий main._schet_chto_pisat, но без «нет заголовка — значит документ»).
+    Предзагрузка (Sec-Purpose: prefetch) — не открытие."""
+    h = request.headers
+    if "prefetch" in (h.get("sec-purpose") or h.get("purpose") or h.get("x-moz") or "").lower():
+        return False
+    return ((h.get("sec-fetch-dest") or "").lower() == "document"
+            or (h.get("sec-fetch-mode") or "").lower() == "navigate")
+
+
+def nuzhen_mayak(request) -> bool:
+    """Страница педагога ушла браузеру, по заголовкам которого переход не виден (Safari до 16.4,
+    старые браузеры без Sec-Fetch-*), — страница сама скажет «открыли» (mayak_js). Робот
+    скрипт страницы не выполняет и маяк не шлёт."""
+    ped = getattr(getattr(request, "state", None), "pedagog", None)
+    return bool(ped) and not ped.get("ne_schitat") and not robot(request) and not navigaciya(request)
+
+
+def mayak_js(k: str, put: str) -> str:
+    """<script>: после загрузки страницы — POST MAYAK {k, put}. Ошибки молча: справочная отметка."""
+    telo = json.dumps({"k": str(k or ""), "put": put}, ensure_ascii=False).replace("</", "<\\/")
+    return ("<script>(function(){var b=" + telo + ";function s(){try{fetch('" + MAYAK + "',{method:'POST',"
+            "headers:{'Content-Type':'application/json'},body:JSON.stringify(b),credentials:'same-origin',"
+            "referrerPolicy:'same-origin'}).catch(function(){})}catch(e){}}"
+            "if(document.prerendering){document.addEventListener('prerenderingchange',s,{once:true})}else{s()}})();</script>")
+
+
+# --- журнал доступа uvicorn: ключ из адреса — звёздочками (R1 №4) -------------------------------------
+
+_K_V_ADRESE = re.compile(r"([?&]k=)[^&#\s\"]+")
+
+
+class _MaskaKlyucha(logging.Filter):
+    """uvicorn пишет в журнал доступа путь со строкой запроса: «GET /pedagog?k=… HTTP/1.1» —
+    ключ педагога (и общий, и личный) лёг бы в journald. Значение k=… заменяем на «***»."""
+
+    def filter(self, record) -> bool:
         try:
-            p = vhod.schet_sekreta(SCHET, vhod.adres(request), k, kto is not None, "ключи педагогов",
-                                   schitat=not ustarel, trevoga=TREVOGA)
-        except Exception:  # noqa: BLE001 — сбой счётчика ссылку педагогу не закрывает
-            vhod._zhaloba("pedklyuchi: счёт перебора не сработал")
-            p = 0
-        if p > 0:
-            return None
-    return kto
+            if isinstance(record.args, tuple) and record.args:
+                record.args = tuple(_K_V_ADRESE.sub(r"\1***", a) if isinstance(a, str) else a for a in record.args)
+            if isinstance(record.msg, str) and "k=" in record.msg:
+                record.msg = _K_V_ADRESE.sub(r"\1***", record.msg)
+        except Exception:  # noqa: BLE001 — журнал не ломаем
+            pass
+        return True
+
+
+def maskirovat_log() -> None:
+    """Поставить фильтр на логгер uvicorn.access (один раз; фильтры логгера переживают настройку
+    журналов самим uvicorn — dictConfig их не снимает)."""
+    lg = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, _MaskaKlyucha) for f in lg.filters):
+        lg.addFilter(_MaskaKlyucha())
 
 
 def _mk_ids(ped: dict) -> set:
@@ -176,14 +321,15 @@ def gruppy(ped: dict) -> set:
     return ped["gruppy"]
 
 
-def v_zapros(request, ped: dict, admin: bool = False) -> None:
+def v_zapros(request, ped: dict, admin: bool = False, zhurnal: bool = True) -> None:
     """Педагог в запросе — по образцу личных входов: request.state.pedagog (кто, каким ключом)
     и, для личного ключа, request.state.kto — тогда слой после ответа пишет изменяющие запросы
     в журнал «кто что сделал» под именем педагога (путь без ключа). admin=True — ту же ссылку
-    открыл вошедший админ или владелец: открытием педагога это не считается."""
+    открыл вошедший админ или владелец: открытием педагога это не считается. zhurnal=False —
+    без строки в журнале (маяк «страницу открыли» — не действие педагога)."""
     ped["ne_schitat"] = bool(admin)
     request.state.pedagog = ped
-    if ped.get("vid") == LICHNYY and not admin:
+    if ped.get("vid") == LICHNYY and not admin and zhurnal:
         request.state.kto = vhod._k("", ped.get("imya") or "", "pedagog", SPOSOB)
 
 
@@ -225,12 +371,29 @@ def _nachalo() -> list:
     return [("INSERT OR IGNORE INTO pedagog_vhody (den, vid, n, posl) VALUES ('', 'nachalo', 0, ?)", (vhod._iso(),))]
 
 
+def _otkrytie(request) -> tuple[bool, bool]:
+    """→ (открыли страницу педагога, запрос со страницы). Открыли — переход браузера на одну из
+    STRANICY или маяк страницы (request.state.pedagog_mayak); со страницы — любой /api/…
+    (отметки, сохранение, GET /api/english/karta). Робот предпросмотра — ни то, ни другое."""
+    if robot(request):
+        return False, False
+    put = request.url.path.rstrip("/")
+    otkryli = ((request.method.upper() == "GET" and put in STRANICY and navigaciya(request))
+               or getattr(request.state, "pedagog_mayak", "") in STRANICY)
+    return otkryli, put.startswith("/api/")
+
+
 def sloy_zapis(request, kod: int) -> None:
     """После ответа, фоновой задачей (posle_otveta). Личный ключ: «последний раз открывал» — не чаще
-    раза в 5 минут на ключ. Общий ключ: +1 к открытиям страниц за день (только GET страниц
-    педагога, не запросы со страницы). Запись не удалась — счёт остаётся в памяти до следующей."""
+    раза в 5 минут на ключ, и только то, что открыл человек в браузере (_otkrytie: переход, маяк
+    или запрос со страницы; роботы предпросмотра мессенджеров — нет). Общий ключ: +1 к открытиям
+    страниц за день — переход браузера на страницу педагога или её маяк (не запросы со страницы).
+    Запись не удалась — счёт остаётся в памяти до следующей."""
     ped = getattr(request.state, "pedagog", None)
     if not ped or ped.get("ne_schitat") or not 200 <= kod < 400:
+        return
+    otkryli, so_stranicy = _otkrytie(request)
+    if not (otkryli or so_stranicy):
         return
     t = vhod.seychas()
     zaprosy = []
@@ -242,7 +405,7 @@ def sloy_zapis(request, kod: int) -> None:
             if pisat:
                 _POSL[ped["id"]] = t
                 zaprosy.append(("UPDATE pedagog_klyuchi SET posl=? WHERE id=?", (vhod._iso(t), ped["id"])))
-        elif request.method.upper() == "GET" and request.url.path.rstrip("/") in STRANICY:
+        elif otkryli:
             e = _ZHDUT.setdefault(vhod._iso(t)[:10], [0, ""])
             e[0], e[1] = e[0] + 1, vhod._iso(t)
         zhdut = {d: list(v) for d, v in _ZHDUT.items()}
@@ -289,7 +452,7 @@ def pedagogi_spisok() -> list:
     локальной выгрузки, без запроса в МойКласс. Плюс те, кто по занятиям ведёт группы
     английского, даже если роль у них не отмечена."""
     from . import karta, karta_razvitiya
-    out, imena = {}, {}
+    out, imena, uvoleny = {}, {}, set()
     with db.get_conn() as c:
         for r in c.execute("SELECT id, name, raw FROM managers"):
             imena[r["id"]] = (r["name"] or "").strip()
@@ -297,10 +460,14 @@ def pedagogi_spisok() -> list:
                 raw = json.loads(r["raw"] or "{}")
             except ValueError:
                 raw = {}
+            if not isinstance(raw, dict):
+                raw = {}
+            if raw.get("isWork") is False:
+                uvoleny.add(r["id"])
             if karta_razvitiya.eto_pedagog(raw) and imena[r["id"]]:
                 out[r["id"]] = imena[r["id"]]
         vedut = set().union(*karta.pedagogi_grupp(c).values())
-    for mk_id in vedut:
+    for mk_id in vedut - uvoleny:          # уволенному ключ не выдаём, даже если он ещё стоит в занятиях
         out.setdefault(mk_id, imena.get(mk_id) or f"сотрудник МойКласса №{mk_id}")
     return [{"mk_id": i, "imya": n} for i, n in sorted(out.items(), key=lambda x: (x[1].casefold(), x[0]))]
 
@@ -443,10 +610,11 @@ def sostoyanie() -> dict:
     lichnye = [r for r in rows if r["vid"] == LICHNYY]
     po_id = {r["mk_id"]: r for r in lichnye if r["mk_id"] is not None}
     pedagogi, v_spiske = [], set()
+    uvoleny = _uvolennye()
 
     def kartochka(mk_id, imya, r, est: bool) -> dict:
         svoi = [g for g in gr if mk_id is not None and mk_id in g["педагоги"]]
-        return {"mk_id": mk_id, "imya": imya, "v_spiske": est,
+        return {"mk_id": mk_id, "imya": imya, "v_spiske": est, "uvolen": mk_id is not None and mk_id in uvoleny,
                 "gruppy": [_korotko(g["группа"]) for g in svoi], "detey": sum(g["детей"] for g in svoi),
                 "klyuch": None if r is None else {
                     "id": r["id"], "vkl": bool(r["vkl"]), "vydan": r["vydan"], "posl": r["posl"]}}
@@ -460,9 +628,11 @@ def sostoyanie() -> dict:
         if r["id"] not in v_spiske:
             pedagogi.append(kartochka(r["mk_id"], r["imya"], r, False))
     pedagogi.sort(key=lambda p: (not p["gruppy"], not p["v_spiske"], p["imya"].casefold()))
-    s_klyuchom = [p for p in pedagogi if p["klyuch"] and p["klyuch"]["vkl"]]
+    # с действующим ключом: включён и сотрудник не уволен (ключ уволенного не принимается, _nayti)
+    s_klyuchom = [p for p in pedagogi if p["klyuch"] and p["klyuch"]["vkl"] and not p["uvolen"]]
     return {
         "seychas": vhod._iso(t), "fayl_vhodov": fayl, "obshchiy": obshchiy, "pedagogi": pedagogi,
+        "uvoleny_s_klyuchom": [p["imya"] for p in pedagogi if p["uvolen"] and p["klyuch"] and p["klyuch"]["vkl"]],
         "s_klyuchom": len(s_klyuchom), "otkryvali": sum(1 for p in s_klyuchom if p["klyuch"]["posl"]),
         "gruppy_bez_pedagoga": [_korotko(g["группа"]) for g in gr if not g["педагоги"]],
         "grupp_angliyskogo": len(gr),
@@ -471,11 +641,49 @@ def sostoyanie() -> dict:
 
 # --- действия владельца ----------------------------------------------------------------------------
 
+_METKI: dict = {}           # (метка формы, действие) → когда выполнено: повтор формы действие не повторяет
+
+
+def novaya_metka() -> str:
+    return secrets.token_urlsafe(18)
+
+
+def _metka_zanyat(klyuch: tuple) -> bool:
+    """Занять метку формы под действие. → False — по этой метке это действие уже сделано (или
+    делается прямо сейчас: двойное нажатие)."""
+    t = vhod.seychas()
+    with _ZAMOK:
+        if klyuch in _METKI and t - _METKI[klyuch] < SROK_METKI:
+            return False
+        _METKI[klyuch] = t
+        if len(_METKI) > 2000:
+            for k_, v_ in list(_METKI.items()):
+                if t - v_ >= SROK_METKI:
+                    del _METKI[k_]
+    return True
+
+
+def _metka_osvobodit(klyuch: tuple) -> None:
+    with _ZAMOK:
+        _METKI.pop(klyuch, None)
+
+
+def _lichnyh_rabotaet() -> int:
+    """Сколько личных ключей сейчас открывают страницы: включён, сотрудник не уволен."""
+    uv = _uvolennye()
+    return sum(1 for r in _stroki() if r["vid"] == LICHNYY and r["vkl"] and r["hesh"] and r["mk_id"] not in uv)
+
+
 def deystvie_vladelca(request, f) -> dict:
     """POST /owner/pedagogi. f — поля формы. Зовёт только обработчик владельца, уже проверивший:
     человек-владелец, вошёл через форму. Каждое действие подтверждается его паролем
     (vhod.podtverdit), как в блоке «Входы». → {"msg"|"osh": текст, "ssylki": [(подпись, ссылка)] —
-    показать один раз}. В журнал идёт только название действия и имя педагога."""
+    показать один раз}. В журнал идёт только название действия и имя педагога.
+
+    14.11.2026, после проверки (R2 №7): в форме — одноразовая метка (поле metka). Обновили
+    страницу ответа и браузер отправил форму ещё раз — то же действие по той же метке не
+    повторяется (иначе «Сменить общий ключ» сменил бы его снова, и только что разосланная
+    ссылка умерла бы у всех педагогов): ответ «уже сделано»."""
     def pole(n):
         return str(f.get(n) or "")
     d, _, arg = pole("deystvie").strip().partition(":")
@@ -483,7 +691,25 @@ def deystvie_vladelca(request, f) -> dict:
     prichina = vhod.podtverdit(request, pole("moy_parol"))
     if prichina:
         return {"osh": prichina}
+    metka = pole("metka").strip()[:64]
+    klyuch = (metka, pole("deystvie").strip()[:40])
+    if metka and not _metka_zanyat(klyuch):
+        request.state.chto = "ключи педагогов: повтор формы — не выполнено"
+        return {"msg": "Уже сделано: это действие по этой форме уже выполнено (страницу обновили или форму отправили "
+                       "ещё раз) — повторять его не стали. Ссылка была показана один раз; если её не успели "
+                       "скопировать — выдайте ключ заново кнопкой ниже."}
+    try:
+        itog = _deystvie(request, d, arg)
+    except Exception:
+        if metka:
+            _metka_osvobodit(klyuch)
+        raise
+    if metka and itog.get("osh"):
+        _metka_osvobodit(klyuch)       # отказ ничего не сделал — повторить с той же формы можно
+    return itog
 
+
+def _deystvie(request, d: str, arg: str) -> dict:
     def gotovo(chto, msg, **kw):
         request.state.chto = "ключи педагогов: " + chto
         return {"msg": msg, **kw}
@@ -523,6 +749,9 @@ def deystvie_vladelca(request, f) -> dict:
                               ("Общая ссылка — «Карточка речи»", ssylka(klyuch, "/english/karta"))], komu="")
 
     if d == "obshchiy_vykl":
+        if _lichnyh_rabotaet() == 0:    # R2 №8: одним нажатием все педагоги остались бы без обеих страниц
+            return {"osh": "Общий ключ не выключен: ни одной действующей личной ссылки не выдано — все педагоги "
+                           "потеряли бы обе страницы. Сначала выдайте личные ключи, потом выключайте общий."}
         obshchiy_vyklyuchit()
         vhod.otmetit_vazhnoe("общий ключ педагогов выключен", vhod.imya_v_zhurnal(vhod.iz(request)) or "владелец")
         return gotovo("общий ключ педагогов выключен",
@@ -575,10 +804,19 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
     itog = itog or {}
     s = sostoyanie()
     ob = s["obshchiy"]
-    h = ["<section class='vh' id='pedagogi'><h2>Ключи педагогов</h2>"
-         "<p class='tih'>Педагоги открывают «Карточку речи» и «После первого занятия» без пароля, по ссылке с ключом. "
-         "Личная ссылка — одному педагогу: на «Карточке речи» он видит только детей своих групп, а в записях видно, "
-         "кто что отметил. Общая ссылка — одна на всех, показывает всех детей групп английского.</p>"]
+    h = ["<section class='vh' id='pedagogi'><h2>Ключи педагогов</h2>"]
+    if s.get("uvoleny_s_klyuchom"):
+        # R1 №3: ключ сотрудника, которого МойКласс отмечает «не работает», не принимается (_nayti) —
+        # но владелец должен увидеть это сразу, наверху блока, а не серой припиской в списке
+        imena = ", ".join(s["uvoleny_s_klyuchom"])
+        h.append(f"<div class='osh' role='alert' id='ped-uvoleny'><b>Ключ выдан уволенному сотруднику:</b> {e(imena)}. "
+                 "В МойКлассе отмечено «не работает» — его личная ссылка уже не открывается. Нажмите «Отключить» "
+                 "у этого педагога ниже, чтобы ключ не ожил, если отметку в МойКлассе снимут по ошибке.</div>")
+    h.append("<p class='tih'>Педагоги открывают «Карточку речи» и «После первого занятия» без пароля, по ссылке с ключом. "
+             "Личная ссылка — одному педагогу: на «Карточке речи» он видит только детей своих групп, а в записях видно, "
+             "кто что отметил. На «После первого занятия» по личной ссылке видны дети на первых занятиях всего центра "
+             "за сегодня и вчера — имя, группа и время, без телефонов родителей; заметку можно сохранить только по "
+             "ребёнку из этого списка. Общая ссылка — одна на всех, показывает всех детей групп английского.</p>")
     if itog.get("osh"):
         h.append(f"<div class='osh' role='alert' id='ped-itog'>{e(itog['osh'])}</div>")
     if itog.get("msg"):
@@ -597,6 +835,7 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
                           if itog.get("komu") else "Её можно отправить в чат педагогов, как прежнюю. ")
                  + "После закрытия этой страницы ссылку не увидеть — только выдать новую.</p></div>")
     h.append("<form method='post' action='/owner/pedagogi' id='ped-forma' autocomplete='off'>"
+             f"<input type='hidden' name='metka' value='{e(novaya_metka())}'>"
              "<input type='text' name='username' value='boris' autocomplete='username' hidden>"
              "<div class='moy'><b>Ваш нынешний пароль</b><input type='password' name='moy_parol' "
              "autocomplete='current-password'><p class='tih'>Нужен для любого действия в этом блоке: введите и нажмите "
@@ -624,7 +863,14 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
     if len(s_) >= 16:                    # «2026-11-14T15:13:53» → «14.11 15:13» (kogda дала бы «с только что»)
         stroka += f" <span class='tih'>Открытия считаются с {e(s_[8:10] + '.' + s_[5:7] + ' ' + s_[11:16])}.</span>"
     h.append(f"<p id='ped-sostoyanie'>{stroka}</p>")
-    if ob["rabotaet"]:
+    if ob["rabotaet"] and s["s_klyuchom"] == 0:
+        # R2 №8: ни одной действующей личной ссылки — «Выключить» оставил бы всех педагогов без страниц
+        h.append("<div class='vb'><button type='submit' name='deystvie' value='obshchiy_smenit' data-sprosit='Сменить общий "
+                 "ключ? Прежняя общая ссылка сразу перестанет открываться у всех педагогов — новую нужно будет разослать.'>"
+                 "Сменить общий ключ</button></div>"
+                 "<p class='tih'>«Сменить» — новый общий ключ, ссылка показывается один раз. Выключить общий ключ можно, "
+                 "когда выданы личные ссылки: сейчас ни одной действующей нет.</p>")
+    elif ob["rabotaet"]:
         h.append("<div class='vb'><button type='submit' name='deystvie' value='obshchiy_smenit' data-sprosit='Сменить общий "
                  "ключ? Прежняя общая ссылка сразу перестанет открываться у всех педагогов — новую нужно будет разослать.'>"
                  "Сменить общий ключ</button>"
@@ -645,8 +891,9 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
     if bez:
         n = len(bez)
         h.append(f"<div class='pr' id='ped-bez'><b>У {n} {_mnogo(n, 'группы', 'групп', 'групп')} английского не определён "
-                 f"педагог:</b> {e(', '.join(bez))}. В занятиях этих групп в МойКлассе не указан преподаватель "
-                 "(смотрим 4 недели назад и вперёд). Личным ключам такие группы не показываются; по общему ключу и "
+                 f"педагог:</b> {e(', '.join(bez))}. В занятиях этих групп в МойКлассе не указан преподаватель или ни "
+                 "у кого нет больше четверти занятий группы (смотрим 4 недели назад и вперёд). Личным ключам такие "
+                 "группы не показываются; по общему ключу и "
                  "админам они видны. Исправить — указать преподавателя в занятиях группы в МойКлассе.</div>")
     if not s["pedagogi"]:
         h.append("<p>Список педагогов пуст: в локальной выгрузке МойКласса нет сотрудников с ролью «педагог». "
@@ -654,7 +901,9 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
     for p in s["pedagogi"]:
         kl = p["klyuch"]
         zag = f"<b>{e(p['imya'])}</b>"
-        if not p["v_spiske"]:
+        if p["uvolen"]:
+            zag += " · <b style='color:#B3261E'>в МойКлассе «не работает» — ключ не принимается</b>"
+        elif not p["v_spiske"]:
             zag += " · нет в списке педагогов МойКласса"
         if p["gruppy"]:
             n = p["detey"]
@@ -683,7 +932,8 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
                  f"<div class='vs'>{st} · {gr}</div>" + (f"<div class='vb'>{''.join(kn)}</div>" if kn else "") + "</div>")
     h.append("<p class='tih'>Ссылка показывается один раз, в момент выдачи; сервер хранит только её отпечаток. "
              "Потерялась — «Выдать заново»: старая перестанет работать. Группы педагога берутся из занятий МойКласса: "
-             "кто стоит преподавателем не меньше чем в четверти занятий группы за 4 недели назад и вперёд.</p>")
+             "кто стоит преподавателем больше чем в четверти всех занятий группы (и не меньше чем в двух) за 4 недели "
+             "назад и вперёд — двухнедельная замена группу не открывает.</p>")
     h.append("</form></section>")
     return "".join(h)
 

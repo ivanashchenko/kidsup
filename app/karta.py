@@ -90,7 +90,13 @@ def _pedagog(cls: str) -> str:
 # не годится: в ней нет ни id сотрудника, ни полного имени. Кто ведёт группу на самом деле,
 # записано в занятиях МойКласса (lessons.raw → teacherIds) — оттуда и берём.
 OKNO_PEDAGOGA = 28        # дней назад и вперёд: занятия этого окна показывают, кто ведёт группу
-DOLYA_PEDAGOGA = 0.25     # ведёт не меньше четверти занятий окна — педагог группы; разовая замена — нет
+# Педагог группы — тот, кто ведёт БОЛЬШЕ четверти всех занятий окна (в том числе занятий, где
+# преподаватель не указан) и не меньше MIN_ZANYATIY. 14.11.2026, после проверки (R1 №2, R2 №10):
+# доля считалась только среди занятий с преподавателем — одно занятие в группе, где больше
+# никто не указан, открывало всю группу; двухнедельная замена в группе дважды в неделю (4 из 16 —
+# ровно четверть) открывала её заменяющему ещё на месяц.
+DOLYA_PEDAGOGA = 0.25
+MIN_ZANYATIY = 2
 GRUPPY_SQL = ("(c.name LIKE '2627_АЯ%' OR c.name LIKE '2627_Мини-сад%' OR c.name LIKE '2627_Нулевой класс%') "
               "AND c.name NOT LIKE '%аявк%' AND (c.status IS NULL OR c.status = 'opened')")
 
@@ -105,20 +111,43 @@ def _imya_gruppy(name: str) -> str:
 
 
 def _chastye(schet: dict, vsego: int) -> set:
-    return {t for t, n in schet.items() if vsego and n >= DOLYA_PEDAGOGA * vsego}
+    return {t for t, n in schet.items() if vsego and n >= MIN_ZANYATIY and n > DOLYA_PEDAGOGA * vsego}
+
+
+def _prepodavateli(raw: dict) -> list:
+    """teacherIds занятия → id сотрудников. Плохие значения (None, мусорная строка, ноль)
+    пропускаются по одному, а не всё занятие (R2 №11); число или строка цифр вместо списка —
+    один id."""
+    t = raw.get("teacherIds") if isinstance(raw, dict) else None
+    out = []
+    for x in (t if isinstance(t, list) else [t]):
+        if isinstance(x, bool):
+            continue
+        if isinstance(x, int):
+            v = x
+        elif isinstance(x, str) and x.strip().isdigit():
+            v = int(x.strip())
+        else:
+            continue
+        if v > 0:
+            out.append(v)
+    return out
 
 
 def pedagogi_grupp(conn) -> dict:
     """Кто ведёт английский в группах карточки: {группа, как в карточке: {id сотрудника МойКласса}}.
 
     По занятиям группы за OKNO_PEDAGOGA дней назад и вперёд: педагог группы — тот, кто стоит
-    преподавателем не меньше чем в четверти занятий, где преподаватель указан (одна замена
-    группу чужому педагогу не открывает; новый педагог виден, как только на него переписали
-    будущие занятия). Занятия, удалённые в МойКлассе, не считаются.
+    преподавателем больше чем в четверти ВСЕХ занятий окна (занятия без преподавателя тоже
+    в счёте) и не меньше чем в двух (_chastye): разовая и двухнедельная замена группу чужому
+    педагогу не открывают; новый педагог виден, как только на него переписали будущие
+    занятия. Занятия, удалённые в МойКлассе, не считаются.
     Мини-сад и нулевой класс: английский там только пн и ср, и в занятии стоят двое —
-    воспитатель и педагог английского. Берём тех, кто ведёт пн/ср, но не ведёт остальные дни;
-    если так никого не осталось (английский ведёт сам воспитатель) — тех из них, кто ведёт
-    группы «АЯ». Пустое множество — педагога по данным определить нельзя: такая группа
+    воспитатель и педагог английского. Берём тех, кто ведёт пн/ср, но не ведёт остальные дни,
+    и из них — сначала тех, кто ведёт группы «АЯ» (R2 №2: иначе другой специалист пн/ср или
+    воспитатель, если в окне заведены только пн/ср, тоже получал бы сад); нет таких — всех, кто
+    остался; не осталось никого (английский ведёт сам воспитатель) — тех ведущих пн/ср, кто
+    ведёт группы «АЯ». Пустое множество — педагога по данным определить нельзя: такая группа
     личному ключу не показывается, владелец видит предупреждение на /owner."""
     from datetime import timedelta
     t = date.today()
@@ -135,12 +164,13 @@ def pedagogi_grupp(conn) -> dict:
         if r["id"] in udaleno:
             continue
         try:
-            ped = [int(x) for x in (json.loads(r["raw"] or "{}").get("teacherIds") or [])]
             den = date.fromisoformat(str(r["date"])[:10]).weekday()
-        except (TypeError, ValueError, AttributeError):
+        except (TypeError, ValueError):
             continue
-        if not ped:
-            continue
+        try:
+            ped = _prepodavateli(json.loads(r["raw"] or "{}"))
+        except (TypeError, ValueError):
+            ped = []                  # занятие без читаемого преподавателя — всё равно в счёте занятий
         sad = any(gruppy[r["class_id"]].replace("2627_", "").startswith(k) for k in SAD)
         e = schet[r["class_id"]]
         i = 0 if (not sad or den in (0, 2)) else 2
@@ -157,7 +187,7 @@ def pedagogi_grupp(conn) -> dict:
         if any(name.replace("2627_", "").startswith(k) for k in SAD):
             angl = _chastye(schet[cid][0], schet[cid][1])
             svoi = angl - _chastye(schet[cid][2], schet[cid][3])
-            out[_imya_gruppy(name)] |= (svoi or (angl & aya))
+            out[_imya_gruppy(name)] |= ((svoi & aya) or svoi or (angl & aya))
     return out
 
 
@@ -374,7 +404,9 @@ def save(user_id: int, tochka: str, marks: dict, video_date: str | None = None,
          note: str | None = None, author: str = "", report: dict | None = None,
          report_date: str | None = None) -> dict:
     """None в любом поле — «не трогать»: форма присылает только то, что видно
-    на экране, и не должна стирать отчёт или видео другой точки."""
+    на экране, и не должна стирать отчёт или видео другой точки.
+    author — кто поставил отметки: без отметок (marks=None — черновик отчёта, отметка «отчёт
+    отправлен») прежний автор остаётся (14.11.2026, R1 №9: черновик стирал автора)."""
     if tochka not in {k for k, _, _ in TOCHKI}:
         raise ValueError("неизвестная точка замера")
     if int(user_id) <= 0:
@@ -384,11 +416,12 @@ def save(user_id: int, tochka: str, marks: dict, video_date: str | None = None,
         marks = {k: v for k, v in marks.items() if k in keys and v in OTVETY}
     with db.get_conn() as conn:
         _ensure(conn)
-        old = conn.execute("SELECT marks, video_date, note, report, report_date FROM speech_cards "
+        old = conn.execute("SELECT marks, video_date, note, report, report_date, author FROM speech_cards "
                            "WHERE user_id=? AND tochka=?", (int(user_id), tochka)).fetchone()
         if old is not None:
             if marks is None:
                 marks = json.loads(old["marks"] or "{}")
+                author = old["author"] or ""
             video_date = old["video_date"] or "" if video_date is None else video_date
             note = old["note"] or "" if note is None else note
             if report is None:
