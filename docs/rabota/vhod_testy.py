@@ -76,6 +76,10 @@ OTKRYTYE_DO = {
     "POST /hook/lead", "POST /kamery", "POST /mango/events", "POST /mango/{rest:path}", "POST /marquiz/webhook",
     "POST /wazzup/webhook"}
 NOVYE_OTKRYTYE = {"GET /vhod", "POST /vhod", "POST /vyhod"}
+# 14.11.2026, ключи педагогов после проверки (R2 №1): маяк «страницу педагога открыли» — шлёт сама
+# страница педагога (вход по ключу из ссылки, как POST /api/pedagog/save); ключ — в теле запроса,
+# меняет только справочную отметку «открывал» (app/pedklyuchi.py, sloy_zapis).
+NOVYE_OTKRYTYE |= {"POST /api/pedagog/otkryl"}
 # 13.11.2026, сверка безопасности: GET /api/net без входа отдавал правила файрвола и домены
 # Caddy — закрыт нарочно (только владелец). Снимок выше не трогаем, ожидание — минус этот адрес.
 ZAKRYTY_NAROCHNO = {"GET /api/net"}
@@ -405,7 +409,8 @@ def test_obhod():
     print("2. Обход всех адресов: открытые заморожены, защищённые без входа — 401, никогда 200")
     otkr, zashch = zashchishchennye()
     zhdem = (OTKRYTYE_DO - ZAKRYTY_NAROCHNO) | NOVYE_OTKRYTYE
-    proverka(f"открытых адресов {len(zhdem)}: прежние 42 (сайт, вебхуки) без /api/net (закрыт 13.11) и три адреса входа — и только они",
+    proverka(f"открытых адресов {len(zhdem)}: прежние 42 (сайт, вебхуки) без /api/net (закрыт 13.11), три адреса входа "
+             "и маяк страницы педагога (14.11) — и только они",
              otkr == zhdem, sorted(otkr ^ zhdem))
     proverka("защищённых адресов не меньше 420", len(zashch) >= 420, len(zashch))
     c = kl(raise_server_exceptions=False)

@@ -278,6 +278,9 @@ NOVYE_VECHER1 |= {"POST /api/otkazy/vernut"}
 # 14.11.2026, Борис — Т1 и Т3 (ключи педагогов, app/pedklyuchi.py): действия блока «Ключи педагогов»
 # на /owner (только владелец через форму) и состояние ключей без секретов (владельцу и ключам рутин).
 NOVYE_PEDAGOGI = {"POST /owner/pedagogi", "GET /api/pedagogi/sostoyanie"}
+# 14.11.2026, после проверки (R2 №7 и №1): GET /owner/pedagogi — переход на блок /owner#pedagogi вместо 405
+# (страницу ответа открыли заново); POST /api/pedagog/otkryl — маяк «страницу педагога открыли» со страницы.
+NOVYE_PEDAGOGI |= {"GET /owner/pedagogi", "POST /api/pedagog/otkryl"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
 # чтобы пропажа была видна и без снимка «до».
 # 13.11.2026, Борис (уборка, вечер 1): из списка вышли GET и POST /api/bez-oplaty/status —
@@ -317,7 +320,7 @@ def test_marshruty(m, fajl_do):
     proverka("появились ровно три: «Архив» и признак «архив» у документов (и просмотр старых звонков 12.11, "
              "пять адресов страницы «Проверка МойКласса», адреса личных входов, счётчик бейджа шапки и лист "
              "«Будущие направления» для бланков 13.11; два POST вместо записи через GET — вечер 1; "
-             "два адреса блока «Ключи педагогов» — 14.11)",
+             "два адреса блока «Ключи педагогов» и ещё два после проверки — 14.11)",
              posle - do == vse_novye, sorted((posle - do) ^ vse_novye))
     nuzhny = [x.strip() for x in NUZHNY.replace("\n", " · ").split(" · ") if x.strip()]
     net = [x for x in nuzhny if x not in posle]
@@ -2497,6 +2500,8 @@ BEZ_VHODA_IZM = {
     "POST /events/{rest:path}": "подпись Mango",
     "POST /events/sms": "подпись Mango: без неё статус пишется с пометкой «подпись не сошлась»",
     "POST /api/pedagog/save": "ключ педагога в теле запроса",
+    # 14.11.2026 (ключи педагогов, после проверки): маяк страницы педагога — только справочная отметка «открывал»
+    "POST /api/pedagog/otkryl": "ключ педагога в теле запроса; меняет только отметку «открывал»",
     "POST /api/tg/webhook/{secret}": "секрет в адресе",
     "POST /hook/lead": "ключ ?key= (настройка lead_hook_key)",
     "POST /marquiz/webhook": "ключ ?key= (настройка marquiz_key, до неё — прежний ключ)",
@@ -2763,7 +2768,8 @@ def test_uborka_bezopasnost(c, m, tree, baza):
                 pod_vhodom.append((metod, r.path, VLADELEC if "check_owner" in zavis else ADMIN))
             else:
                 bez_vhoda.add(f"{metod} {r.path}")
-    proverka("изменяющих адресов без зависимости входа — ровно тринадцать известных (вебхуки, сайт, вход); новый ломает тест",
+    proverka("изменяющих адресов без зависимости входа — ровно четырнадцать известных (вебхуки, сайт, вход; 14.11 — маяк "
+             "страницы педагога); новый ломает тест",
              bez_vhoda == set(BEZ_VHODA_IZM), sorted(bez_vhoda ^ set(BEZ_VHODA_IZM)))
     for imya, zag in (("фоновый запрос с чужого сайта (Sec-Fetch-Site: cross-site)", CHUZHOY_FON),
                       ("переход-форма с чужого сайта (cross-site, navigate)", {"sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate"}),

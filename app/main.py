@@ -3338,6 +3338,8 @@ def api_pedagog_otkryl(request: Request, payload: dict = Body(...),
     «кто что сделал» не пишется. Ключ — в теле, как у /api/pedagog/save."""
     from . import pedklyuchi
     payload = payload if isinstance(payload, dict) else {}
+    if vhod.chuzhoy_fon(request):          # «открыли» — только со своей страницы
+        return {"ok": False}
     ped = pedklyuchi.proverit(str(payload.get("k") or ""), request)
     if not ped:
         return {"ok": False}
