@@ -82,6 +82,25 @@ DETI = {GR1: [9003] + [9300 + i for i in range(7)], GR6: [9800, 9801], GR5: [992
         SAD: [9500 + i for i in range(5)], NUL: [9600 + i for i in range(3)]}
 SVOY, CHUZHOY, NICHEY, NET = 9003, 9800, 9920, 123456     # ребёнок Анны, Игоря, группы без педагога, несуществующий
 
+# 14.11.2026, после проверки (R1 №1): «После первого занятия» сохраняет заметку только по ребёнку из
+# списка, который сервер сам строит для страницы (karta_razvitiya._kids — первые занятия за два дня из
+# МойКласса). На стенде МойКласса нет, список пуст — подставляем выдуманный (main(), pervye_stenda):
+# те же дети 9001–9003, по которым проверки и раньше сохраняли заметки.
+PERVYE = [
+    {"uid": 9001, "name": "Тестова Ева", "phone": lt.SEMYA, "group": "ПШ_вт-пт_17:00", "course": "Подготовка к школе",
+     "date": date.today().isoformat(), "time": "17:00", "visit": False},
+    {"uid": 9002, "name": "Тестов Марк", "phone": lt.SEMYA, "group": "ПШ_вт-пт_16:00", "course": "Подготовка к школе",
+     "date": date.today().isoformat(), "time": "16:00", "visit": False},
+    {"uid": 9003, "name": "Пробная Алиса", "phone": lt.KLIENT, "group": "АЯ_пн-ср_16:00", "course": "Английский язык",
+     "date": date.today().isoformat(), "time": "16:00", "visit": False},
+]
+CHUZHOY_NOMER = "79990007777"                                # выдуманный номер «из запроса»
+
+
+def pervye_stenda(days: int = 2) -> dict:
+    return {"kids": [dict(x) for x in PERVYE],
+            "teachers": sorted(n for _, n, r_, w in SOTRUDNIKI if 63600 in r_ and w)}
+
 
 # --- обвязка ---------------------------------------------------------------------------------------
 
@@ -290,6 +309,86 @@ def test_kak_ranshe():
     proverka("/api/settings: общий ключ целиком больше не отдаётся (только хвост и длина)",
              nastr.status_code == 200 and PED not in nastr.text and nastr.json()["pedagog_key"].startswith("…"),
              nastr.status_code)
+
+
+def cfg_stranicy(t: str) -> dict:
+    return json.loads(re.search(r"const CFG=(\{.*?\}); const \$", t, re.S).group(1))
+
+
+def test_spisok_pervyh():
+    print("А2. «После первого занятия»: без телефонов на странице; сохранить можно только ребёнка из списка сервера")
+    c = kl("198.51.100.3")
+    r = c.get(f"/pedagog?k={PED}", headers=STR)
+    cfg = cfg_stranicy(r.text)
+    proverka("в данных страницы нет телефонов родителей — ни поля phone, ни самих номеров",
+             cfg["kids"] and all("phone" not in x for x in cfg["kids"]) and lt.SEMYA not in r.text and lt.KLIENT not in r.text,
+             sorted(cfg["kids"][0]) if cfg["kids"] else "пусто")
+    proverka("…а страница по-прежнему отправляет ребёнка по uid (сохранение без телефона на странице)",
+             "uid:cur.uid" in r.text and "phone:cur.phone" not in r.text)
+    with osnovnaya() as o:
+        do = (o.execute("SELECT COUNT(*) FROM karta_notes").fetchone()[0], o.execute("SELECT COUNT(*) FROM plan_inbox").fetchone()[0])
+    r = c.post("/api/pedagog/save", json={"k": PED, "uid": 555777, "child": "Чужой", "teacher": "Образцов Игорь", "visit": True,
+                                          "can": "x", "next_group": "y", "phone": CHUZHOY_NOMER, "date": "2026-01-01", "time": "10:00"})
+    with osnovnaya() as o:
+        posle = (o.execute("SELECT COUNT(*) FROM karta_notes").fetchone()[0], o.execute("SELECT COUNT(*) FROM plan_inbox").fetchone()[0])
+    proverka("общий ключ, ребёнка нет в списке первых занятий → понятный отказ; ни заметки, ни пункта дежурной",
+             r.status_code == 200 and r.json().get("ok") is False and "нет в списке первых занятий" in r.json().get("error", "")
+             and posle == do, (r.text[:120], do, posle))
+    r = c.post("/api/pedagog/save", json={"k": PED, "uid": "9001", "child": "Чужое имя", "teacher": "Образцов Игорь", "visit": True,
+                                          "can": "стенд: умеет", "next_group": "стенд: группа", "phone": CHUZHOY_NOMER,
+                                          "group": "Чужая группа", "course": "Чужое", "date": "2026-01-01", "time": "10:00"})
+    with osnovnaya() as o:
+        z = o.execute("SELECT uid, child, phone, course, grp, teacher FROM karta_notes ORDER BY id DESC LIMIT 1").fetchone()
+        inbox = o.execute("SELECT text, phone FROM plan_inbox ORDER BY id DESC LIMIT 1").fetchone()
+    proverka("ребёнок из списка: телефон, имя, группа и направление — из списка сервера, присланные — нет",
+             r.json().get("ok") is True and tuple(z) == (9001, "Ева", lt.SEMYA, "Подготовка к школе", "ПШ_вт-пт_17:00", "Образцов Игорь"),
+             z and tuple(z))
+    proverka("…пункт дежурной — с телефоном из списка, не из запроса",
+             inbox is not None and inbox["phone"] == lt.SEMYA and CHUZHOY_NOMER not in inbox["text"], inbox and inbox["phone"])
+    r = c.post("/api/pedagog/save", json={"k": PED, "uid": 0, "teacher": "Образцов Игорь", "visit": False})
+    proverka("…без ребёнка — прежний отказ «нужны ребёнок и педагог»",
+             r.json() == {"ok": False, "error": "нужны ребёнок и педагог"}, r.text[:100])
+
+
+def test_perebor_prezhniy():
+    print("А3. Прежний общий ключ до действий владельца: пауза ему не отказывает, промахи считаются, тревога приходит")
+    adr = "203.0.113.20"
+    x = kl(adr)
+    for i in range(5):
+        x.get(f"/pedagog?k=prezh{i}{secrets.token_hex(8)}")
+    with baza_vhodov() as b:
+        n5 = b.execute("SELECT COUNT(*) FROM popytki WHERE login=? AND adres=?", (pk.SCHET, adr)).fetchone()[0]
+    proverka("пять разных неверных ключей с адреса записаны промахами", n5 == 5, n5)
+    proverka("в паузу верный прежний общий ключ, впервые с этого адреса, работает как раньше: обе страницы, запросы, сохранение",
+             rabotaet(PED, adr) == DA, rabotaet(PED, adr))
+    x.get(f"/pedagog?k=prezh-v-pauzu{secrets.token_hex(8)}")
+    with baza_vhodov() as b:
+        n6 = b.execute("SELECT COUNT(*) FROM popytki WHERE login=? AND adres=?", (pk.SCHET, adr)).fetchone()[0]
+    proverka("…неверный ключ в паузу тоже считается промахом (было: в паузу промахи не считались)", n6 == 6, n6)
+    proverka("…удача прежнего общего ключа в паузу промахи адреса не стирает (как у серого окна)", n6 == 6)
+    chasy(200)
+    try:
+        ok = rabotaet(PED, adr) == DA
+        with baza_vhodov() as b:
+            n0 = b.execute("SELECT COUNT(*) FROM popytki WHERE login=? AND adres=?", (pk.SCHET, adr)).fetchone()[0]
+    finally:
+        chasy(0)
+    proverka("после паузы удача прежнего общего ключа стирает промахи адреса — как было", ok and n0 == 0, (ok, n0))
+    # тревога: 50 разных неверных ключей с одного адреса за час — раньше пауза глушила счёт после пятого
+    soobshcheniya = []
+    bylo = m.vhod.soobshchit_borisu
+    m.vhod.soobshchit_borisu = lambda tekst, chto="": soobshcheniya.append((tekst, chto))
+    try:
+        y = kl("203.0.113.21")
+        for i in range(52):
+            y.get(f"/pedagog?k=trevoga{i}{secrets.token_hex(8)}")
+    finally:
+        m.vhod.soobshchit_borisu = bylo
+    proverka("52 разных неверных ключа с одного адреса за час → одно сообщение владельцу о неверных ключах педагогов",
+             len(soobshcheniya) == 1 and "неверных ключей педагогов" in soobshcheniya[0][0]
+             and not any(PED in t for t, _ in soobshcheniya), len(soobshcheniya))
+    proverka("…и всё это время верный прежний общий ключ с того же адреса работает",
+             rabotaet(PED, "203.0.113.21") == DA)
 
 
 def test_zamena_i_sad():
