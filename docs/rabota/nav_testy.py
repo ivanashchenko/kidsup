@@ -275,6 +275,9 @@ NOVYE_VECHER1 |= {"POST /api/otkazy/snyat", "POST /api/dolgi/obnovit"}
 # 13.11.2026, вечер (проверка «вечера 1»): кнопка «вернуть в стоп-лист» у снятой записи — сняли не
 # ту строку, а вернуть её со страницы было нельзя.
 NOVYE_VECHER1 |= {"POST /api/otkazy/vernut"}
+# 14.11.2026, Борис — Т1 и Т3 (ключи педагогов, app/pedklyuchi.py): действия блока «Ключи педагогов»
+# на /owner (только владелец через форму) и состояние ключей без секретов (владельцу и ключам рутин).
+NOVYE_PEDAGOGI = {"POST /owner/pedagogi", "GET /api/pedagogi/sostoyanie"}
 # То, что зовут рутины ассистента, автопилот, сайт и вебхуки, — названо поимённо,
 # чтобы пропажа была видна и без снимка «до».
 # 13.11.2026, Борис (уборка, вечер 1): из списка вышли GET и POST /api/bez-oplaty/status —
@@ -310,10 +313,11 @@ def test_marshruty(m, fajl_do):
              do - posle == PROPALI | UBRANY_VHOD | UBRANY_VECHER1,
              sorted((do - posle) ^ (PROPALI | UBRANY_VHOD | UBRANY_VECHER1)))
     vse_novye = (NOVYE | NOVYE_ZVONKI_1211 | NOVYE_PROVERKA_MK | NOVYE_VHOD | NOVYE_SHAPKA | NOVYE_PEREEZDY
-                 | NOVYE_VECHER1)
+                 | NOVYE_VECHER1 | NOVYE_PEDAGOGI)
     proverka("появились ровно три: «Архив» и признак «архив» у документов (и просмотр старых звонков 12.11, "
              "пять адресов страницы «Проверка МойКласса», адреса личных входов, счётчик бейджа шапки и лист "
-             "«Будущие направления» для бланков 13.11; два POST вместо записи через GET — вечер 1)",
+             "«Будущие направления» для бланков 13.11; два POST вместо записи через GET — вечер 1; "
+             "два адреса блока «Ключи педагогов» — 14.11)",
              posle - do == vse_novye, sorted((posle - do) ^ vse_novye))
     nuzhny = [x.strip() for x in NUZHNY.replace("\n", " · ").split(" · ") if x.strip()]
     net = [x for x in nuzhny if x not in posle]
@@ -1188,14 +1192,17 @@ def test_shapka_shag2(c, m, work):
     for adres in ("/english/karta", "/pedagog"):
         r = c.get(f"{adres}?k={kluch}")
         h = _koren(r.text)
-        proverka(f"{adres}: шапка педагога одна — «KidsUP · педагогам», один пункт",
+        # 14.11.2026 (Борис, Т2): пунктов два — «Карточка речи» и «После первого занятия» (было: один).
+        proverka(f"{adres}: шапка педагога одна — «KidsUP · педагогам», два пункта",
                  r.status_code == 200 and r.text.count('id="kidsup-nav"') == 1 and "педагогам" in h
-                 and "Карточка речи" in h and h.count("<a ") == 2, (r.status_code, h[:200]))
+                 and "Карточка речи" in h and "После первого занятия" in h and h.count("<a ") == 3,
+                 (r.status_code, h[:200]))
         proverka(f"{adres}: ни меню админов, ни поиска, ни бейджа, ни панели, ни скрипта шапки",
                  all(x not in r.text for x in ('id="nav-razdely"', 'id="gs-input"', 'id="wait-badge"', "kn-panel",
                                                "/static/nav.js", "Владельцу", 'href="/pult"', 'href="/liniya"')))
         proverka(f"{adres}: шапка не опрашивает /api/waiting", "/api/waiting" not in h and "data-schet" not in h)
-        proverka(f"{adres}: ключ — в ссылках шапки", h.count(f'href="/english/karta?k={kluch}"') == 2)
+        proverka(f"{adres}: ключ — в ссылках шапки",
+                 h.count(f'href="/english/karta?k={kluch}"') == 2 and h.count(f'href="/pedagog?k={kluch}"') == 1)
     r = c.get("/pedagog?k=chuzhoy-kluch")
     proverka("/pedagog с чужим ключом: шапки нет, ключ в ссылки не попал",
              'id="kidsup-nav"' not in r.text and "chuzhoy-kluch" not in r.text)
@@ -2412,9 +2419,11 @@ def test_vecher1(c, m, tree, baza):
              and "Гр13" in c.get(items[0]["url"], auth=ADMIN).text, items)
     js = open(os.path.join(tree, "app/static/nav.js"), encoding="utf-8").read()
     css = open(os.path.join(tree, "app/static/nav.css"), encoding="utf-8").read()
-    proverka("nav.js: «Раздел» — своей меткой, карточка МойКласса — в новой вкладке; версия ?v= поднята до 3",
+    # 14.11.2026: версия поднята до 4 — шапка педагога из двух пунктов (Т2, правило .kn-ped-punkty в nav.css)
+    proverka("nav.js: «Раздел» — своей меткой, карточка МойКласса — в новой вкладке; версия ?v= поднята (3, с 14.11 — 4)",
              "kn-gs-razdel" in js and "kn-gs-razdel" in css and 'target="_blank" rel="noopener"' in js
-             and nav.VERSIYA == "3" and f"nav.js?v={nav.VERSIYA}" in c.get("/liniya", auth=ADMIN).text)
+             and nav.VERSIYA == "4" and "kn-ped-punkty" in css
+             and f"nav.js?v={nav.VERSIYA}" in c.get("/liniya", auth=ADMIN).text)
     proverka("подсказка в поле поиска называет разделы", "Поиск: раздел, группа, ребёнок, телефон" in shapka(c, "/liniya", ADMIN))
 
     print("Л5. «Аномалии» ушли из меню: красные находки — разделом 13 на «Проверке МойКласса», по роли")

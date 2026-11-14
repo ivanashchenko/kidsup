@@ -142,12 +142,12 @@ async def _vhod_sloy(request, call_next):
         except Exception:  # noqa: BLE001
             logging.getLogger("kidsup.vhod").exception("слой входа после ответа")
     # 14.11.2026, ключи педагогов: «последний раз открывал» личным ключом (не чаще раза в 5
-    # минут) и счёт открытий общим ключом — после ответа, в потоке, короткой записью.
+    # минут) и счёт открытий общим ключом — фоновой задачей ответа: пишется, когда тело
+    # ответа уже ушло педагогу, так что запись в файл входов ответ не задерживает.
     if getattr(request.state, "pedagog", None):
         try:
-            from starlette.concurrency import run_in_threadpool
             from . import pedklyuchi
-            await run_in_threadpool(pedklyuchi.sloy_zapis, request, resp.status_code)
+            pedklyuchi.posle_otveta(resp, request)
         except Exception:  # noqa: BLE001
             logging.getLogger("kidsup.pedklyuchi").exception("слой ключей педагогов после ответа")
     return resp
@@ -3267,12 +3267,24 @@ def pedagog_page(request: Request, k: str = "",
 
 
 @app.post("/api/pedagog/save")
-def api_pedagog_save(request: Request, payload: dict = Body(...)):
+def api_pedagog_save(request: Request, payload: dict = Body(...),
+                     credentials: HTTPBasicCredentials | None = Depends(_security)):
+    """Заметка «После первого занятия». Ключ — в теле (поле k), общий или личный. С личным
+    ключом педагог — тот, кому выдан ключ (pedagog.save не читает имя из запроса).
+    14.11.2026: сохранил вошедший админ или владелец (открыл ссылку педагога) — он остаётся
+    собой, как на странице /pedagog: в журнале «кто что сделал» — он, «педагог открывал» не
+    отмечается. Педагогу без входа всё как раньше."""
     from . import pedagog, pedklyuchi
     payload = payload or {}
     ped = pedklyuchi.proverit(str(payload.get("k") or ""), request)
     if ped:
-        pedklyuchi.v_zapros(request, ped)
+        try:
+            admin = _voshedshiy_po_ssylke(request, credentials, strogo=False)
+        except Exception:  # noqa: BLE001 — сбой проверки входа сохранение педагога не ломает
+            admin = None
+        pedklyuchi.v_zapros(request, ped, admin=admin is not None)
+        if admin is not None:
+            request.state.kto = admin
         request.state.chto = "педагог: заметка после первого занятия"
     return pedagog.save(payload, ped or {})
 

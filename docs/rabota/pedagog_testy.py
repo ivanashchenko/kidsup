@@ -115,7 +115,7 @@ def pd(c, deystvie, moy=VLADELEC[1], hdr=None, **kw):
 
 def ssylki(r) -> list:
     """Ссылки со страницы ответа (показываются один раз). Значения не печатаем."""
-    return re.findall(r"class='ped-ssylka' readonly value='([^']+)'", r.text)
+    return re.findall(r"<textarea class='ped-ssylka' readonly[^>]*>([^<]+)</textarea>", r.text)
 
 
 def klyuch_iz(r) -> str:
@@ -156,6 +156,11 @@ def koren(html: str) -> str:
     """Шапка страницы: от id="kidsup-nav" до конца её блока."""
     i = html.find('id="kidsup-nav"')
     return html[i:html.find("</div></div>", i)] if i >= 0 else ""
+
+
+def punktov(h: str) -> int:
+    """Пунктов-ссылок в шапке педагога (обёртка span.kn-ped-punkty — не пункт)."""
+    return len(re.findall(r'<a class="kn-ped-punkt[ "]', h))
 
 
 def deti_stranicy(html: str) -> set:
@@ -323,8 +328,9 @@ def test_shapka():
         r = c.get(f"{adres}?k={PED}", headers=STR)
         h = koren(r.text)
         proverka(f"{adres}: шапка одна — «KidsUP · педагогам», два пункта",
-                 r.text.count('id="kidsup-nav"') == 1 and "педагогам" in h and h.count("kn-ped-punkt") == 2
-                 and "Карточка речи" in h and "После первого занятия" in h and h.count("<a ") == 3, h[:300])
+                 r.text.count('id="kidsup-nav"') == 1 and "педагогам" in h and punktov(h) == 2
+                 and "Карточка речи" in h and "После первого занятия" in h and h.count("<a ") == 3
+                 and '<span class="kn-ped-punkty">' in h, h[:300].replace(PED, "<ключ>"))
         proverka(f"{adres}: оба пункта ведут с ключом; логотип — на карточку",
                  f'href="/english/karta?k={PED}"' in h and f'href="/pedagog?k={PED}"' in h
                  and h.count(f"?k={PED}") == 3)
@@ -413,9 +419,13 @@ def test_kto_upravlyaet():
                  and stroki() == do, r.status_code)
     with osnovnaya() as o:
         zh = [tuple(x) for x in o.execute("SELECT imya, kod, chto FROM deystviya WHERE put='/owner/pedagogi' ORDER BY id")]
+    # отказ до обработчика (403 — не владелец через форму, 401 — общий admin, окно пароля) пишется
+    # без пометки «что»: до блока запрос не дошёл
     proverka("отказы записаны в журнал: кто, код, «ключи педагогов: … — отказ»",
-             len(zh) >= 8 and all(x[2].startswith("ключи педагогов: ") or x[1] == 403 for x in zh)
-             and any(x[0] == "Лена" and x[1] == 403 for x in zh), zh[:3])
+             len(zh) >= 8 and all(x[2].startswith("ключи педагогов: ") and x[2].endswith(" — отказ")
+                                  or (x[1] in (401, 403) and x[2] == "") for x in zh)
+             and any(x[0] == "Лена" and x[1] == 403 for x in zh)
+             and any(x[0] == "общий вход" and x[1] == 401 for x in zh), zh[:3])
 
 
 # --- Д. Выдача: ссылка один раз, ключ не утекает ---------------------------------------------------------
@@ -543,11 +553,11 @@ def test_svoi_deti(K: dict):
              deti_api(o_.get(f"/api/english/karta?k={ko}")) == set() and karta_zaprosy(o_, ko, SVOY) == OTKAZ)
     h = koren(r.text)
     proverka("…в её шапке один пункт — «После первого занятия»; «Карточки речи» нет",
-             h.count("kn-ped-punkt") == 1 and "После первого занятия" in h and "Карточка речи" not in h
-             and f'href="/pedagog?k={ko}"' in h, h[:300])
+             punktov(h) == 1 and "После первого занятия" in h and "Карточка речи" not in h
+             and f'href="/pedagog?k={ko}"' in h, re.sub(r"k=[A-Za-z0-9]+", "k=<ключ>", h[:300]))
     h = koren(a.get(f"/english/karta?k={ka}", headers=STR).text)
     proverka("у Анны в шапке оба пункта, оба с её ключом",
-             h.count("kn-ped-punkt") == 2 and f'href="/english/karta?k={ka}"' in h and f'href="/pedagog?k={ka}"' in h)
+             punktov(h) == 2 and f'href="/english/karta?k={ka}"' in h and f'href="/pedagog?k={ka}"' in h)
     r = a.post(f"/api/english/karta/note?k={ka}", json={"user_id": SVOY, "note": "чужой сайт"},
                headers={"sec-fetch-site": "cross-site", "sec-fetch-mode": "cors", "user-agent": UA})
     r2 = a.post(f"/api/english/karta/note?k={PED}", json={"user_id": SVOY, "note": "чужой сайт"},
@@ -595,7 +605,7 @@ def test_posle_zanyatiya(K: dict):
         proverka("…что в нём видно: имя ребёнка, телефон родителя (в данных страницы), группа, направление, дата и время",
                  set(lich["kids"][0]) == {"uid", "name", "phone", "group", "course", "date", "time", "visit", "done"})
         h = koren(t_l)
-        proverka("шапка Ольги на /pedagog: один пункт, он подсвечен", h.count("kn-ped-punkt") == 1 and h.count("kn-tut") == 1)
+        proverka("шапка Ольги на /pedagog: один пункт, он подсвечен", punktov(h) == 1 and h.count("kn-tut") == 1)
     finally:
         kr._kids = bylo
     c = kl("198.51.100.21")
@@ -652,11 +662,83 @@ def test_otkryval(K: dict):
              and lena.post(f"/api/english/karta/note?k={k_vera}", json={"user_id": CHUZHOY, "note": "админ"}, headers=FETCH).status_code == 200)
     c.get(f"/pedagog?k={k_vera}", headers=STR)
     proverka("…«педагог открывал» при этом не отмечается: у Веры по-прежнему «ещё не открывал»", posl("Садовая Вера") is None)
+    r = lena.post("/api/pedagog/save", json={"k": k_vera, "uid": 9001, "child": "Ева", "teacher": "Лена",
+                                             "visit": False, "can": "админ: умеет"}, headers=FETCH)
+    with osnovnaya() as o:
+        z = o.execute("SELECT teacher, can FROM karta_notes ORDER BY id DESC LIMIT 1").fetchone()
+        zh = o.execute("SELECT imya, sposob, kod, chto FROM deystviya WHERE put='/api/pedagog/save' "
+                       "ORDER BY id DESC LIMIT 1").fetchone()
+    proverka("Лена сохранила заметку по личной ссылке Веры: педагог в заметке — Вера (из ключа), "
+             "в журнале — Лена, «Вера открывала» не отмечено",
+             r.status_code == 200 and r.json().get("ok") is True and tuple(z) == ("Садовая Вера", "админ: умеет")
+             and zh is not None and tuple(zh) == ("Лена", "forma", 200, "педагог: заметка после первого занятия")
+             and posl("Садовая Вера") is None, (r.status_code, z and tuple(z), zh and tuple(zh)))
     r = kl("198.51.100.13").get(f"/pedagog?k={k_vera}", headers=STR)
     proverka("сама Вера открыла /pedagog — отметка появилась", r.status_code == 200 and bool(posl("Садовая Вера")))
     h = koren(kl("198.51.100.13").get(f"/pedagog?k={k_vera}", headers=STR).text)
     proverka("Вера — воспитатель сада, английский там ведёт Анна: «Карточки речи» в её шапке нет",
-             h.count("kn-ped-punkt") == 1 and "Карточка речи" not in h)
+             punktov(h) == 1 and "Карточка речи" not in h)
+
+
+def asgi_get(put: str, adres: str) -> tuple:
+    """GET прямо в приложение, без TestClient (тот ждёт и фоновые задачи ответа):
+    → (через сколько секунд ушёл конец тела ответа, через сколько вернулось приложение, код)."""
+    import asyncio
+    path, _, qs = put.partition("?")
+    scope = {"type": "http", "asgi": {"version": "3.0", "spec_version": "2.4"}, "http_version": "1.1",
+             "method": "GET", "scheme": "https", "path": path, "raw_path": path.encode(), "query_string": qs.encode(),
+             "root_path": "", "client": ("127.0.0.1", 50001), "server": ("app.kidsup.ru", 443),
+             "headers": [(b"host", b"app.kidsup.ru"), (b"x-forwarded-for", adres.encode()),
+                         (b"user-agent", UA.encode()), (b"accept", b"application/json")]}
+    out = {"kon": None, "kod": 0}
+
+    async def zapusk():
+        t0 = time.monotonic()
+        ushlo = asyncio.Event()
+        pervyy = [True]
+
+        async def receive():
+            if pervyy[0]:
+                pervyy[0] = False
+                return {"type": "http.request", "body": b"", "more_body": False}
+            await ushlo.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(msg):
+            if msg["type"] == "http.response.start":
+                out["kod"] = msg["status"]
+            elif msg["type"] == "http.response.body" and not msg.get("more_body"):
+                out["kon"] = time.monotonic() - t0
+                ushlo.set()
+
+        await m.app(scope, receive, send)
+        return time.monotonic() - t0
+
+    vsego = asyncio.run(zapusk())
+    return out["kon"], vsego, out["kod"]
+
+
+def test_ne_zhdat(K: dict):
+    print("З2. Отметка «открывал» пишется после ответа: занятый файл входов педагога не задерживает")
+    posl = lambda imya: stroki()[imya]["posl"]      # noqa: E731
+    do = posl("Проверкина Анна")
+    chasy(2000)                                      # отметка Анны «просрочена» — этот запрос её пишет
+    blok = sqlite3.connect(m.config.VHODY_DB, timeout=0, isolation_level=None)
+    blok.execute("BEGIN IMMEDIATE")                  # кто-то пишет в файл входов: читать можно, писать — ждать
+    try:
+        kon, vsego, kod = asgi_get(f"/api/english/karta?k={K['anna']}", "198.51.100.14")
+    finally:
+        blok.execute("ROLLBACK")
+        blok.close()
+    proverka("файл входов занят записью: ответ педагогу ушёл целиком, а запись отметки ждала (до полсекунды) уже после",
+             kod == 200 and kon is not None and vsego - kon >= 0.4, (kod, kon, vsego))
+    proverka("…отметка не записалась — и не потерялась: следующий запрос её пишет",
+             posl("Проверкина Анна") == do and asgi_get(f"/api/english/karta?k={K['anna']}", "198.51.100.14")[2] == 200
+             and posl("Проверкина Анна") > do, (do, posl("Проверкина Анна")))
+    kon, vsego, kod = asgi_get(f"/api/english/karta?k={K['anna']}", "198.51.100.14")
+    proverka("файл свободен, отметка свежая: запрос в файл входов не пишет и не ждёт",
+             kod == 200 and vsego - kon < 0.3, (kon, vsego))
+    chasy(0)
 
 
 # --- И. Выдать заново, отключить -------------------------------------------------------------------------
@@ -738,7 +820,8 @@ def test_obshchiy(K: dict) -> str:
     r = c.get("/owner", headers=STR)
     s = re.search(r"<p id='ped-sostoyanie'>(.*?)</p>", r.text, re.S).group(1)
     proverka("строка состояния: сколько педагогов открывали личным ключом и сколько открытий по общему за 7 дней",
-             "Личным ключом страницы уже открывали" in s and "По общему ключу за 7 дней" in s and "Счёт открытий идёт с" in s, s[:200])
+             "Личным ключом страницы уже открывали" in s and "По общему ключу за 7 дней" in s
+             and re.search(r"Открытия считаются с \d\d\.\d\d \d\d:\d\d\.", s) is not None, s[:300])
     sost = c.get("/api/pedagogi/sostoyanie", headers=FETCH).json()
     proverka("…числа честные: с действующим ключом 4 (Анна, Игорь, Ольга, Вера — отключённая Дарья не в счёт), открывали 4",
              (sost["s_klyuchom"], sost["otkryvali"]) == (4, 4) and "<b>4 из 4</b>" in s,
@@ -1003,6 +1086,7 @@ def main():
     test_svoi_deti(K)
     test_posle_zanyatiya(K)
     test_otkryval(K)
+    test_ne_zhdat(K)
     K["staryy_igor"] = K["igor"]
     test_zanovo_i_otklyuchit(K)
     obshchiy = test_obshchiy(K)

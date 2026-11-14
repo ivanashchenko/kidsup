@@ -380,8 +380,9 @@ def nayti_razdely(q: str, rol: str, skolko: int = 4) -> list:
 # вошедшего сервер уже знает.
 # ---------------------------------------------------------------------------
 
-VERSIYA = "3"          # ?v= у nav.css и nav.js: менять вместе с файлами (2 — правки после проверки 13.11;
-#                        3 — вечер 1, 13.11: поиск рисует «Раздел», карточка МойКласса — в новой вкладке)
+VERSIYA = "4"          # ?v= у nav.css и nav.js: менять вместе с файлами (2 — правки после проверки 13.11;
+#                        3 — вечер 1, 13.11: поиск рисует «Раздел», карточка МойКласса — в новой вкладке;
+#                        4 — 14.11: шапка педагога из двух пунктов, на телефоне пункты строкой под логотипом)
 KOREN = 'id="kidsup-nav"'
 
 # Нижняя панель на телефоне: три частые страницы и «☰ Разделы». У «Ответов» — число
@@ -431,7 +432,7 @@ def _shapka_pedagoga(path: str, k: str, karta: bool = True) -> str:
     return (f'<div {KOREN} class="kn kn-ped">{_css()}<div class="kn-verh">'
             f'<a class="kn-logo" href="{_e(punkty[0][1] + hvost)}"><img src="/static/logo.svg" alt="" width="30" height="30">'
             f'<span>KidsUP</span><span class="kn-ped-podpis">· педагогам</span></a>'
-            f'{ssylki}</div></div>')
+            f'<span class="kn-ped-punkty">{ssylki}</span></div></div>')
 
 
 def shapka(rol: str, path: str, k: str = "", kto_html: str = "",

@@ -226,7 +226,7 @@ def _nachalo() -> list:
 
 
 def sloy_zapis(request, kod: int) -> None:
-    """После ответа, в потоке (main._vhod_sloy). Личный ключ: «последний раз открывал» — не чаще
+    """После ответа, фоновой задачей (posle_otveta). Личный ключ: «последний раз открывал» — не чаще
     раза в 5 минут на ключ. Общий ключ: +1 к открытиям страниц за день (только GET страниц
     педагога, не запросы со страницы). Запись не удалась — счёт остаётся в памяти до следующей."""
     ped = getattr(request.state, "pedagog", None)
@@ -262,6 +262,23 @@ def sloy_zapis(request, kod: int) -> None:
             e[0], e[1] = e[0] + n, max(e[1], posl)
         if ped.get("vid") == LICHNYY:
             _POSL.pop(ped["id"], None)
+
+
+def _sloy_zapis_tiho(request, kod: int) -> None:
+    try:
+        sloy_zapis(request, kod)
+    except Exception:  # noqa: BLE001 — справочная отметка; ответ уже отправлен
+        log.exception("ключи педагогов: отметка после ответа не записана")
+
+
+def posle_otveta(resp, request) -> None:
+    """main._vhod_sloy: sloy_zapis — фоновой задачей самого ответа. Starlette выполняет её,
+    когда тело ответа уже отправлено, так что запись в файл входов (даже запертый — ждём до
+    полсекунды) педагога не задерживает: на пути запроса — только чтение таблицы ключей."""
+    from starlette.background import BackgroundTask, BackgroundTasks
+    zadacha = BackgroundTask(_sloy_zapis_tiho, request, resp.status_code)
+    bylo = getattr(resp, "background", None)
+    resp.background = zadacha if bylo is None else BackgroundTasks([bylo, zadacha])
 
 
 # --- управление (зовёт только обработчик владельца) -----------------------------------------------
@@ -527,7 +544,7 @@ SKRIPT = """
     if(m&&!m.value){e.preventDefault();m.focus();m.scrollIntoView({block:'center'});
       var t=document.getElementById('ped-nado');if(t)t.hidden=false}});
   var kop=document.querySelectorAll('button.ped-kop');
-  for(i=0;i<kop.length;i++)kop[i].onclick=function(){var b=this,k=b.parentNode.querySelector('input');k.select();
+  for(i=0;i<kop.length;i++)kop[i].onclick=function(){var b=this,k=b.closest('.ped-ss').querySelector('.ped-ssylka');k.select();
     function ok(){b.textContent='Скопировано'}
     if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(k.value).then(ok,function(){document.execCommand('copy');ok()});
     else{document.execCommand('copy');ok()}};
@@ -569,9 +586,13 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
     if itog.get("ssylki"):
         h.append("<div class='kl'><b>Ссылка показывается один раз</b>")
         for podpis, url in itog["ssylki"]:
-            h.append(f"<p style='margin:8px 0 2px'>{e(podpis)}</p><div class='ryad'>"
-                     f"<input type='text' class='ped-ssylka' readonly value='{e(url)}'>"
-                     "<button type='button' class='ped-kop'>Скопировать</button></div>")
+            # многострочное поле: ссылка (~85 знаков) видна целиком и на телефоне — владелец видит, что копирует
+            h.append(f"<div class='ped-ss'><p style='margin:8px 0 2px'>{e(podpis)}</p>"
+                     f"<textarea class='ped-ssylka' readonly rows='3' spellcheck='false' style='width:100%;"
+                     "box-sizing:border-box;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;"
+                     f"word-break:break-all;resize:none'>{e(url)}</textarea>"
+                     "<div class='vb' style='margin-top:4px'><button type='button' class='ped-kop'>Скопировать</button>"
+                     "</div></div>")
         h.append("<p>" + ("Отправьте её этому педагогу лично — не в общий чат: по ней видны его дети. "
                           if itog.get("komu") else "Её можно отправить в чат педагогов, как прежнюю. ")
                  + "После закрытия этой страницы ссылку не увидеть — только выдать новую.</p></div>")
@@ -599,8 +620,9 @@ def blok_vladelca(request, itog: dict | None = None) -> str:
     if ob["posl_otkrytie"]:
         stroka += f", последнее — {e(kogda(ob['posl_otkrytie']))}"
     stroka += "."
-    if ob["schet_s"]:
-        stroka += f" <span class='tih'>Счёт открытий идёт с {e(kogda(ob['schet_s']))}.</span>"
+    s_ = str(ob["schet_s"] or "")
+    if len(s_) >= 16:                    # «2026-11-14T15:13:53» → «14.11 15:13» (kogda дала бы «с только что»)
+        stroka += f" <span class='tih'>Открытия считаются с {e(s_[8:10] + '.' + s_[5:7] + ' ' + s_[11:16])}.</span>"
     h.append(f"<p id='ped-sostoyanie'>{stroka}</p>")
     if ob["rabotaet"]:
         h.append("<div class='vb'><button type='submit' name='deystvie' value='obshchiy_smenit' data-sprosit='Сменить общий "

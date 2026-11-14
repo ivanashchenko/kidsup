@@ -99,6 +99,9 @@
 #kidsup-nav .kn-ped-podpis { font-weight: 500; color: var(--kn-tih); font-size: 15px; }
 #kidsup-nav .kn-ped-punkt { padding: 8px 12px; border-radius: 8px; font-weight: 600; }
 #kidsup-nav .kn-ped-punkt.kn-tut { background: var(--kn-fon2); }
+/* 14.11.2026 (Т2): пунктов два — «Карточка речи» и «После первого занятия». На телефоне рядом с
+   логотипом оба не помещаются: логотип — первой строкой, пункты — второй, поровну (ниже, @media). */
+#kidsup-nav .kn-ped-punkty { display: flex; gap: 10px; }
 
 /* --- строка «Синхр.: … · Синхронизировать» под шапкой (base.html) ------- */
 .kn-sync { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding: 6px 16px 0; }
@@ -113,7 +116,10 @@
 /* --- телефон и узкое окно ------------------------------------------------ */
 @media (max-width: 919.98px) {
   #kidsup-nav .kn-verh { gap: 8px; padding: 6px 12px; height: 56px; min-height: 0; }
-  #kidsup-nav.kn-ped .kn-verh { height: auto; min-height: 56px; }
+  #kidsup-nav.kn-ped .kn-verh { height: auto; min-height: 56px; row-gap: 4px; padding-bottom: 8px; }
+  #kidsup-nav .kn-ped-punkty { flex: 1 0 100%; gap: 8px; }
+  #kidsup-nav .kn-ped-punkty .kn-ped-punkt { flex: 1 1 0; min-width: 0; text-align: center; padding: 10px 6px; }
+  #kidsup-nav .kn-ped-punkty .kn-ped-punkt:not(.kn-tut) { box-shadow: inset 0 0 0 1px var(--kn-linia); }
   /* «Вы: Лена · Выйти / сменить» на телефоне живёт в листе разделов (туда её переносит
      nav.js): верх — одна строка. Жёлтое предупреждение общего входа остаётся наверху. */
   #kidsup-nav > .kn-kto:not(.kn-kto-vazhno), #kidsup-nav .kn-verh > .kn-kto { display: none; }
