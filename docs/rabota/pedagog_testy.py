@@ -412,10 +412,85 @@ def test_zamena_i_sad():
         bez = karta.pedagogi_grupp(c)[GR6]
     with osnovnaya() as o:
         o.execute("DELETE FROM mk_udaleno WHERE istochnik='стенд'")
-    proverka("занятия, удалённые в МойКлассе, не считаются", len(ids) > 5 and bez == {ANNA}, (len(ids), bez))
+    # 14.11.2026, после проверки (R1 №2): было «остаётся Анна» — одно её занятие открывало группу. Теперь
+    # педагогу нужно не меньше двух занятий и больше четверти всех занятий окна: после «удаления» занятий
+    # Игоря одно занятие Анны группу не даёт никому — и Игоря среди педагогов нет (удалённые не считаются).
+    proverka("занятия, удалённые в МойКлассе, не считаются: Игоря нет, а одно занятие Анны группу не даёт",
+             len(ids) > 5 and bez == set(), (len(ids), bez))
     spisok = {p["mk_id"] for p in pk.pedagogi_spisok()}
     proverka("список педагогов: работающие с ролью «педагог»; уволенной и администратора нет",
              spisok == {ANNA, IGOR, OLGA, VERA, DARYA}, spisok)
+
+
+class _Zanyatiya:
+    """Занятия одной группы стенда на время проверки: прежние убираются, после — возвращаются."""
+
+    def __init__(self, klass: int, zan: list):
+        self.klass, self.zan, self.bylo = klass, zan, []
+
+    def __enter__(self):
+        with osnovnaya() as o:
+            cur = o.execute("SELECT * FROM lessons WHERE class_id=?", (self.klass,))
+            self.stolbcy = [d[0] for d in cur.description]
+            self.bylo = [tuple(r) for r in cur]
+            o.execute("DELETE FROM lessons WHERE class_id=?", (self.klass,))
+            o.executemany("INSERT INTO lessons (id, date, begin_time, class_id, raw) VALUES (?,?,?,?,?)",
+                          [(80000 + i, d, "16:00", self.klass,
+                            json.dumps({"id": 80000 + i, "classId": self.klass, "date": d, "teacherIds": t}))
+                           for i, (d, t) in enumerate(self.zan)])
+        return self
+
+    def __exit__(self, *a):
+        with osnovnaya() as o:
+            o.execute("DELETE FROM lessons WHERE class_id=?", (self.klass,))
+            o.executemany(f"INSERT INTO lessons ({','.join(self.stolbcy)}) VALUES ({','.join('?' * len(self.stolbcy))})", self.bylo)
+
+
+def _pedagogi(gruppa: str) -> set:
+    from app import karta
+    with m.db.get_conn() as c:
+        return karta.pedagogi_grupp(c)[gruppa]
+
+
+def test_dolya_i_sad():
+    print("Б2. Чьи группы после проверки: доля — от всех занятий, замена группу не даёт, в саду — сначала ведущие «АЯ»")
+    t = date.today()
+    dni = [(t + timedelta(days=s)).isoformat() for s in range(-24, 24, 3)][:16]      # 16 занятий в окне ±28 дней
+    # R1 №2: в Гр5 преподаватель не указан ни в одном занятии; одно занятие поставили Ольге
+    with _Zanyatiya(118, [(d, [OLGA] if i == 0 else []) for i, d in enumerate(dni)]):
+        p = _pedagogi(GR5)
+    proverka("одно занятие из 16 (в остальных преподавателя нет) — группу не даёт; группа по-прежнему «без педагога»",
+             p == set(), p)
+    # R2 №10: двухнедельная замена в группе дважды в неделю — 4 занятия из 16, ровно четверть
+    with _Zanyatiya(112, [(d, [IGOR] if 4 <= i < 8 else [ANNA]) for i, d in enumerate(dni)]):
+        p = _pedagogi(GR1)
+    proverka("замена на две недели (4 из 16) группу заменяющему не даёт; основной педагог — на месте", p == {ANNA}, p)
+    with _Zanyatiya(112, [(d, [IGOR] if i < 5 else [ANNA]) for i, d in enumerate(dni)]):
+        p = _pedagogi(GR1)
+    proverka("…а 5 из 16 (больше четверти) — уже два педагога группы", p == {ANNA, IGOR}, p)
+    with _Zanyatiya(112, [(d, [IGOR] if i < 1 else []) for i, d in enumerate(dni[:3])]):
+        p = _pedagogi(GR1)
+    proverka("…и одно занятие из трёх (треть, но меньше двух занятий) — тоже нет", p == set(), p)
+    # R2 №11: плохие значения в teacherIds пропускаются по одному, а не всё занятие
+    with _Zanyatiya(105, [(d, [None, IGOR] if i % 3 == 0 else (IGOR if i % 3 == 1 else ["x", str(IGOR)]))
+                          for i, d in enumerate(dni)]):
+        p = _pedagogi(GR6)
+    proverka("teacherIds с None, числом вместо списка и мусорной строкой: Игорь — педагог Гр6", p == {IGOR}, p)
+    # R2 №2: в окне у сада заведены только пн/ср, в каждом — воспитатель и педагог английского
+    pnsr = [(t + timedelta(days=s)).isoformat() for s in range(-27, 28) if (t + timedelta(days=s)).weekday() in (0, 2)]
+    with _Zanyatiya(106, [(d, [VERA, ANNA]) for d in pnsr]):
+        p = _pedagogi(SAD)
+    proverka("сад, в окне только пн/ср (воспитатель и педагог в каждом): педагог сада — тот, кто ведёт группы «АЯ»",
+             p == {ANNA}, p)
+    vse = [(t + timedelta(days=s)).isoformat() for s in range(-27, 28) if (t + timedelta(days=s)).weekday() < 5]
+    zan = []
+    for d in vse:
+        zan.append((d, [VERA]))
+        if date.fromisoformat(d).weekday() in (0, 2):
+            zan += [(d, [ANNA]), (d, [OLGA])]                 # английский и другой специалист пн/ср — отдельными занятиями
+    with _Zanyatiya(106, zan):
+        p = _pedagogi(SAD)
+    proverka("сад: другой специалист пн/ср (не ведёт «АЯ») в педагоги английского не попадает", p == {ANNA}, p)
 
 
 # --- В. Шапка (Т2) -----------------------------------------------------------------------------------
@@ -448,6 +523,50 @@ def test_shapka():
              r.status_code == 200 and 'id="nav-razdely"' in r.text and "chuzhoy-kluch" not in koren(r.text))
 
 
+def test_referer_log_css():
+    print("В2. Ключ в адресе: без Referer чужим сайтам, звёздочки в журнале доступа; шапка на 320 px")
+    c = kl("198.51.100.4")
+    for adres in (f"/pedagog?k={PED}", f"/english/karta?k={PED}", f"/english/metodika?k={PED}", "/pedagog?k=ne-tot"):
+        r = c.get(adres, headers=STR)
+        proverka(f"{adres.replace(PED, '<ключ>')}: Referrer-Policy: no-referrer",
+                 r.headers.get("referrer-policy") == "no-referrer", (r.status_code, r.headers.get("referrer-policy")))
+    t = c.get(f"/english/karta?k={PED}", headers=STR).text
+    proverka("карточка: запросы на свой сервер — с referrerPolicy 'same-origin' (иначе старый Safari шлёт «Origin: null»)",
+             t.count("referrerPolicy: 'same-origin'") == 3)
+    t = c.get(f"/pedagog?k={PED}", headers=STR).text
+    proverka("«После первого занятия»: сохранение — тоже с referrerPolicy 'same-origin'", "referrerPolicy:'same-origin'" in t)
+    # журнал доступа uvicorn: путь со строкой запроса — ключ звёздочками
+    zap = []
+
+    class _H(logging.Handler):
+        def emit(self, record):
+            zap.append(self.format(record))
+    h = _H()
+    h.setFormatter(logging.Formatter("%(message)s"))
+    lg = logging.getLogger("uvicorn.access")
+    lg.addHandler(h)
+    bylo = lg.level
+    lg.setLevel(logging.INFO)
+    try:
+        lg.info('%s - "%s %s HTTP/%s" %d', "127.0.0.1:50000", "GET", f"/english/karta?x=1&k={PED}&y=2", "1.1", 200)
+        lg.info('%s - "%s %s HTTP/%s" %d', "127.0.0.1:50000", "POST", f"/api/english/karta/note?k={PED}", "1.1", 200)
+    finally:
+        lg.removeHandler(h)
+        lg.setLevel(bylo)
+    proverka("журнал доступа uvicorn: значение k=… заменено звёздочками, остальной адрес на месте",
+             len(zap) == 2 and all(PED not in z for z in zap) and "/english/karta?x=1&k=***&y=2" in zap[0]
+             and "/api/english/karta/note?k=***" in zap[1], [z.replace(PED, "<КЛЮЧ>") for z in zap])
+    proverka("…описание модуля больше не обещает «ни в лог»", "ни в журнал, ни в лог" not in (pk.__doc__ or ""))
+    css = Path(KOREN, "app", "static", "nav.css").read_text(encoding="utf-8")
+    mob = css[css.index("@media (max-width: 919.98px)"):]
+    proverka("nav.css: на телефоне пункты шапки педагога — текст по центру кнопки (flex, align-items/justify-content center)",
+             re.search(r"\.kn-ped-punkty \.kn-ped-punkt \{[^}]*display: flex;[^}]*align-items: center;[^}]*justify-content: center",
+                       mob) is not None)
+    proverka("…на 320 px (max-width: 359px) шрифт пунктов мельче; версия файлов шапки — 4",
+             re.search(r"@media \(max-width: 359px\) \{[^@]*\.kn-ped-punkt \{[^}]*font-size: 14px", css) is not None
+             and m.nav.VERSIYA == "4")
+
+
 # --- Г. Блок владельца ---------------------------------------------------------------------------------
 
 def test_kto_upravlyaet():
@@ -470,9 +589,21 @@ def test_kto_upravlyaet():
     proverka("…предупреждение: у 1 группы английского не определён педагог (вт-чт 16:00)",
              "id='ped-bez'" in r.text and "У 1 группы английского не определён педагог" in r.text
              and "вт-чт 16:00" in r.text.split("id='ped-bez'")[1][:400])
-    proverka("…общий ключ: «работает прежний»; кнопки «Сменить» и «Выключить»",
-             "Работает прежний" in r.text and "value='obshchiy_smenit'" in r.text and "value='obshchiy_vykl'" in r.text)
+    # 14.11.2026, после проверки (R2 №8): было «кнопки „Сменить“ и „Выключить“». Пока не выдано ни одной
+    # личной ссылки, «Выключить» оставила бы всех педагогов без страниц — кнопки нет, сервер отказывает.
+    proverka("…общий ключ: «работает прежний»; кнопка «Сменить»; «Выключить» нет — личных ключей ещё ни одного",
+             "Работает прежний" in r.text and "value='obshchiy_smenit'" in r.text and "value='obshchiy_vykl'" not in r.text
+             and "сейчас ни одной действующей нет" in r.text)
     proverka("…на странице нет ни общего ключа, ни хешей", PED not in r.text and "sha256$" not in r.text)
+    proverka("…одна фраза о том, что видно по личной ссылке на «После первого занятия»: дети первых занятий, без телефонов",
+             "по личной ссылке видны дети на первых занятиях всего центра" in r.text and "без телефонов родителей" in r.text)
+    r = pd(c, "obshchiy_vykl")
+    proverka("«Выключить общий ключ» при 0 личных ключей → отказ с объяснением; общий ключ работает",
+             r.status_code == 400 and "ни одной действующей личной ссылки не выдано" in r.text and stroki() == do
+             and rabotaet(PED) == DA, r.status_code)
+    r = c.get("/owner/pedagogi", headers=STR)
+    proverka("GET /owner/pedagogi (обновили страницу ответа без повторной формы) → 303 на /owner#pedagogi, не 405",
+             r.status_code == 303 and r.headers.get("location") == "/owner#pedagogi", r.status_code)
 
     r = pd(c, f"vydat:{ANNA}", moy=None)
     proverka("без moy_parol → отказ словами, ничего не меняется",
@@ -578,7 +709,18 @@ def test_vydacha() -> dict:
     proverka("журнал: «ключи педагогов: выдан ключ — Проверкина Анна», кто — Борис",
              zh is not None and tuple(zh) == ("Борис", "forma", 200, "ключи педагогов: выдан ключ — Проверкина Анна"),
              zh and tuple(zh))
-    ki = vydat(c, IGOR)
+    # R2 №7: одноразовая метка формы — обновили страницу ответа, браузер отправил форму ещё раз
+    metka = re.search(r"<input type='hidden' name='metka' value='([^']+)'>", c.get("/owner", headers=STR).text)
+    proverka("в форме блока — одноразовая метка действия", metka is not None)
+    forma = {"deystvie": f"vydat:{IGOR}", "moy_parol": VLADELEC[1], "metka": metka.group(1) if metka else ""}
+    r = c.post("/owner/pedagogi", data=forma, headers=SVOI)
+    ki = klyuch_iz(r)
+    hesh_igorya = (stroki().get("Образцов Игорь") or {}).get("hesh")
+    r2 = c.post("/owner/pedagogi", data=forma, headers=SVOI)
+    proverka("повтор той же формы (та же метка): действие не повторено — «уже сделано», ссылки нет, ключ Игоря прежний",
+             r.status_code == 200 and ki and r2.status_code == 200 and "Уже сделано" in r2.text and not ssylki(r2)
+             and (stroki().get("Образцов Игорь") or {}).get("hesh") == hesh_igorya == m.vhod.hesh_klyucha(ki),
+             (r2.status_code, len(ssylki(r2))))
     r = pd(c, f"vydat:{OLGA}")
     ko = klyuch_iz(r)
     proverka("Ольге (групп английского нет) ссылка ведёт на /pedagog", ssylki(r) == [f"{B}/pedagog?k={ko}"])
@@ -635,6 +777,15 @@ def test_svoi_deti(K: dict):
     with osnovnaya() as o:
         avtor = o.execute("SELECT author FROM speech_cards WHERE user_id=? AND tochka='t2'", (SVOY,)).fetchone()[0]
     proverka("…чужое имя в запросе сервер не принимает", r.status_code == 200 and avtor == "Проверкина Анна", avtor)
+    # R1 №9: черновик отчёта и отметка «отчёт отправлен» (karta.save без отметок) автора не стирают
+    r = a.post(f"/api/english/karta?k={ka}", json={"user_id": SVOY, "tochka": "t1", "marks": {"komanda": "да", "fraza": "да", "sam": "почти"}})
+    r2 = a.post(f"/api/english/karta/chernovik?k={ka}", json={"user_id": SVOY, "tochka": "t1", "vvod": {"umeet": "стенд"}})
+    from app import karta as _karta
+    _karta.save(SVOY, "t1", None, report_date=date.today().isoformat())      # как после «Отправить» отчёт
+    with osnovnaya() as o:
+        avtor1 = o.execute("SELECT author FROM speech_cards WHERE user_id=? AND tochka='t1'", (SVOY,)).fetchone()[0]
+    proverka("черновик отчёта и отметка «отчёт отправлен» автора отметок не стирают — Анна",
+             r.status_code == 200 and r2.status_code == 200 and avtor1 == "Проверкина Анна", (r.status_code, r2.status_code, avtor1))
 
     i = kl("198.51.100.11")
     proverka("Игорь: видит только свою Гр6 (2 ребёнка); ребёнок Анны — 403, свой — принимается",
@@ -680,33 +831,32 @@ def test_svoi_deti(K: dict):
 
 def test_posle_zanyatiya(K: dict):
     print("Ж. «После первого занятия» с личным ключом: имя подставлено, список детей — тот же")
-    from app import karta_razvitiya as kr
-    bylo = kr._kids
-    pervye = [{"uid": 9001, "name": "Тестова Ева", "phone": lt.SEMYA, "group": "ПШ_вт-пт_17:00", "course": "Подготовка к школе",
-               "date": date.today().isoformat(), "time": "17:00", "visit": False},
-              {"uid": 9003, "name": "Пробная Алиса", "phone": lt.KLIENT, "group": "АЯ_пн-ср_16:00", "course": "Английский язык",
-               "date": date.today().isoformat(), "time": "16:00", "visit": False}]
-    kr._kids = lambda days=2: {"kids": [dict(x) for x in pervye], "teachers": sorted(n for _, n, r_, w in SOTRUDNIKI if 63600 in r_ and w)}
-    try:
-        def cfg(k):
-            t = kl("198.51.100.20").get(f"/pedagog?k={k}", headers=STR).text
-            return json.loads(re.search(r"const CFG=(\{.*?\}); const \$", t, re.S).group(1)), t
-        obshch, t_ob = cfg(PED)
-        lich, t_l = cfg(K["olga"])
-        proverka("общий ключ: в списке «Я — педагог» пять педагогов, имя не подставлено",
-                 len(obshch["teachers"]) == 5 and "ya" not in obshch)
-        proverka("личный ключ Ольги: имя подставлено, в списке только она",
-                 lich.get("ya") == "Примерова Ольга" and lich["teachers"] == ["Примерова Ольга"], lich.get("teachers"))
-        proverka("…страница запирает выбор педагога (select disabled по CFG.ya)", "CFG.ya" in t_l and ".disabled=true" in t_l)
-        bez_done = lambda kids: [{k_: v for k_, v in x.items() if k_ != "done"} for x in kids]   # noqa: E731
-        proverka("список детей по личному ключу — тот же, что по общему (первые занятия сегодня и вчера по всему центру)",
-                 bez_done(lich["kids"]) == bez_done(obshch["kids"]) == pervye)
-        proverka("…что в нём видно: имя ребёнка, телефон родителя (в данных страницы), группа, направление, дата и время",
-                 set(lich["kids"][0]) == {"uid", "name", "phone", "group", "course", "date", "time", "visit", "done"})
-        h = koren(t_l)
-        proverka("шапка Ольги на /pedagog: один пункт, он подсвечен", punktov(h) == 1 and h.count("kn-tut") == 1)
-    finally:
-        kr._kids = bylo
+    # список первых занятий стенда — PERVYE (main подставляет его вместо МойКласса)
+
+    def cfg(k):
+        t = kl("198.51.100.20").get(f"/pedagog?k={k}", headers=STR).text
+        return cfg_stranicy(t), t
+    obshch, t_ob = cfg(PED)
+    lich, t_l = cfg(K["olga"])
+    proverka("общий ключ: в списке «Я — педагог» пять педагогов, имя не подставлено",
+             len(obshch["teachers"]) == 5 and "ya" not in obshch)
+    proverka("личный ключ Ольги: имя подставлено, в списке только она",
+             lich.get("ya") == "Примерова Ольга" and lich["teachers"] == ["Примерова Ольга"], lich.get("teachers"))
+    proverka("…страница запирает выбор педагога (select disabled по CFG.ya)", "CFG.ya" in t_l and ".disabled=true" in t_l)
+    bez_done = lambda kids: [{k_: v for k_, v in x.items() if k_ != "done"} for x in kids]   # noqa: E731
+    bez_tel = [{k_: v for k_, v in x.items() if k_ != "phone"} for x in PERVYE]
+    proverka("список детей по личному ключу — тот же, что по общему (первые занятия сегодня и вчера по всему центру)",
+             bez_done(lich["kids"]) == bez_done(obshch["kids"]) == bez_tel)
+    # 14.11.2026, после проверки (R1 №1): было «…телефон родителя (в данных страницы)» — телефона больше нет
+    proverka("…что в нём видно: имя ребёнка, группа, направление, дата и время — без телефона родителя",
+             set(lich["kids"][0]) == {"uid", "name", "group", "course", "date", "time", "visit", "done"}
+             and lt.SEMYA not in t_l and lt.KLIENT not in t_l)
+    h = koren(t_l)
+    proverka("шапка Ольги на /pedagog: один пункт, он подсвечен", punktov(h) == 1 and h.count("kn-tut") == 1)
+    r = kl("198.51.100.21").post("/api/pedagog/save", json={"k": K["olga"], "uid": 555777, "child": "Чужой", "visit": True,
+                                                            "can": "x", "next_group": "y", "phone": CHUZHOY_NOMER})
+    proverka("личный ключ Ольги, ребёнок не из списка первых занятий → отказ (по ссылке не написать в карточку любого клиента)",
+             r.json().get("ok") is False and "нет в списке первых занятий" in r.json().get("error", ""), r.text[:100])
     c = kl("198.51.100.21")
     r = c.post("/api/pedagog/save", json={"k": K["olga"], "uid": 9001, "child": "Ева", "teacher": "Образцов Игорь",
                                           "visit": True, "can": "личный: умеет", "next_group": "личный: группа"})
@@ -759,19 +909,49 @@ def test_otkryval(K: dict):
     proverka("Лена (через форму) с личной ссылкой педагога — Лена: меню админа, запросы карточки без ограничений",
              r.status_code == 200 and 'id="nav-razdely"' in r.text and "Владельцу" not in r.text
              and lena.post(f"/api/english/karta/note?k={k_vera}", json={"user_id": CHUZHOY, "note": "админ"}, headers=FETCH).status_code == 200)
-    c.get(f"/pedagog?k={k_vera}", headers=STR)
+    r = c.get(f"/pedagog?k={k_vera}", headers=STR)
     proverka("…«педагог открывал» при этом не отмечается: у Веры по-прежнему «ещё не открывал»", posl("Садовая Вера") is None)
+    # R1 №8, R2 №3: вошедший владелец по личной ссылке на /pedagog — имя педагога не подставлено и не заперто
+    cf = cfg_stranicy(r.text)
+    proverka("владелец открыл личную ссылку Веры на /pedagog: имя не подставлено, выбор из всего списка педагогов",
+             "ya" not in cf and len(cf["teachers"]) == 5, (cf.get("ya"), len(cf["teachers"])))
     r = lena.post("/api/pedagog/save", json={"k": k_vera, "uid": 9001, "child": "Ева", "teacher": "Лена",
                                              "visit": False, "can": "админ: умеет"}, headers=FETCH)
     with osnovnaya() as o:
         z = o.execute("SELECT teacher, can FROM karta_notes ORDER BY id DESC LIMIT 1").fetchone()
         zh = o.execute("SELECT imya, sposob, kod, chto FROM deystviya WHERE put='/api/pedagog/save' "
                        "ORDER BY id DESC LIMIT 1").fetchone()
-    proverka("Лена сохранила заметку по личной ссылке Веры: педагог в заметке — Вера (из ключа), "
+    # было: «педагог в заметке — Вера (из ключа)». После проверки (R1 №8): вошедший остаётся собой и в
+    # заметке — педагог тот, кого он выбрал в списке; подпись в МойКлассе и пункт дежурной — от него же
+    proverka("Лена сохранила заметку по личной ссылке Веры: педагог в заметке — выбранный в списке (не Вера), "
              "в журнале — Лена, «Вера открывала» не отмечено",
-             r.status_code == 200 and r.json().get("ok") is True and tuple(z) == ("Садовая Вера", "админ: умеет")
+             r.status_code == 200 and r.json().get("ok") is True and tuple(z) == ("Лена", "админ: умеет")
              and zh is not None and tuple(zh) == ("Лена", "forma", 200, "педагог: заметка после первого занятия")
              and posl("Садовая Вера") is None, (r.status_code, z and tuple(z), zh and tuple(zh)))
+    # R1 №7, R2 №1: роботы предпросмотра ссылок — не «педагог открывал»
+    for ua in ("TelegramBot (like TwitterBot)", "WhatsApp/2.23.20.0 A", "facebookexternalhit/1.1",
+               "Mozilla/5.0 (compatible; vkShare; +http://vk.com/dev/Share)", "Viber", ""):
+        r = kl("149.154.161.1").get(f"/pedagog?k={k_vera}", headers={"user-agent": ua, "accept": "*/*"})
+        kl("149.154.161.1").get(f"/english/karta?k={k_vera}", headers={"user-agent": ua, "accept": "*/*"})
+    proverka("превью ссылки в мессенджере (TelegramBot, WhatsApp, facebookexternalhit, vkShare, Viber, без User-Agent) — "
+             "«ещё не открывал»", r.status_code == 200 and posl("Садовая Вера") is None, posl("Садовая Вера"))
+    stary = {"user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_8 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1",
+             "accept": "text/html,application/xhtml+xml"}
+    r = kl("198.51.100.13").get(f"/pedagog?k={k_vera}", headers=stary)
+    proverka("браузер без Sec-Fetch-* (Safari до 16.4): по самому заходу отметки нет, страница несёт маяк «открыли»",
+             r.status_code == 200 and posl("Садовая Вера") is None and pk.MAYAK in r.text)
+    proverka("…роботу маяк не нужен (скрипт он не выполняет)",
+             pk.MAYAK not in kl("149.154.161.1").get(f"/pedagog?k={k_vera}", headers={"user-agent": "TelegramBot"}).text)
+    r = kl("198.51.100.13").post(pk.MAYAK, json={"k": k_vera, "put": "/pedagog"}, headers={**FETCH, "user-agent": stary["user-agent"]})
+    with osnovnaya() as o:
+        zh_m = o.execute("SELECT COUNT(*) FROM deystviya WHERE put=?", (pk.MAYAK,)).fetchone()[0]
+    proverka("маяк со страницы → «последний раз открывал» записан; в журнал «кто что сделал» маяк не пишется",
+             r.status_code == 200 and r.json() == {"ok": True} and bool(posl("Садовая Вера")) and zh_m == 0,
+             (r.status_code, r.text[:60], zh_m))
+    proverka("…маяк с неверным ключом → {ok: false}",
+             kl("198.51.100.13").post(pk.MAYAK, json={"k": "ne-tot", "put": "/pedagog"}).json() == {"ok": False})
+    proverka("…браузеру с Sec-Fetch-* маяк не нужен: переход виден по заголовкам",
+             pk.MAYAK not in kl("198.51.100.13").get(f"/pedagog?k={k_vera}", headers=STR).text)
     r = kl("198.51.100.13").get(f"/pedagog?k={k_vera}", headers=STR)
     proverka("сама Вера открыла /pedagog — отметка появилась", r.status_code == 200 and bool(posl("Садовая Вера")))
     h = koren(kl("198.51.100.13").get(f"/pedagog?k={k_vera}", headers=STR).text)
@@ -866,6 +1046,16 @@ def test_zanovo_i_otklyuchit(K: dict):
     proverka("прежний ключ Игоря не работает нигде: карточка 401, /pedagog «Ссылка недействительна», сохранение — отказ",
              rabotaet(staryy) == NET_, rabotaet(staryy))
     proverka("…в заголовке X-Pedagog-Key — тоже", kl().get("/api/english/karta", headers={"X-Pedagog-Key": staryy}).status_code == 401)
+    # R2 №4: педагог открыл старую ссылку в браузере — не окно пароля, а понятная страница
+    r = kl("198.51.100.31").get(f"/english/karta?k={staryy}", headers=STR)
+    proverka("прежняя ссылка Игоря в браузере: «Карточка речи» → «Ссылка недействительна. Попросите новую…», без окна пароля",
+             r.status_code == 403 and "Ссылка недействительна. Попросите новую у администратора" in r.text
+             and "www-authenticate" not in r.headers and r.headers.get("referrer-policy") == "no-referrer", r.status_code)
+    r = kl("198.51.100.31").get("/english/karta?k=ne-tot-" + secrets.token_hex(4), headers=STR)
+    proverka("…а просто неверный ключ — как раньше (401 с окном: не «устаревшая ссылка»)", r.status_code == 401, r.status_code)
+    r = kl().get(f"/english/karta?k={staryy}", auth=OBSHCHIY_ADMIN, headers=STR)
+    proverka("…админ с прежней ссылкой педагога — админ, страница открывается", r.status_code == 200 and 'id="nav-razdely"' in r.text,
+             r.status_code)
     proverka("новый работает и видит ту же Гр6", rabotaet(novyy) == DA
              and deti_api(kl("198.51.100.30").get(f"/api/english/karta?k={novyy}")) == set(DETI[GR6]))
     z = stroki()["Образцов Игорь"]
@@ -899,16 +1089,44 @@ def test_zanovo_i_otklyuchit(K: dict):
             o.execute("UPDATE managers SET raw=? WHERE id=?", (json.dumps({"id": DARYA, "name": "Нулёвкина Дарья", "roles": [63600],
                                                                            "isWork": True}, ensure_ascii=False), DARYA))
     k_darya = vydat(c, DARYA)
-    with osnovnaya() as o:
-        o.execute("UPDATE managers SET raw=? WHERE id=?", (json.dumps({"id": DARYA, "name": "Нулёвкина Дарья", "roles": [63600],
-                                                                       "isWork": False}, ensure_ascii=False), DARYA))
+    proverka("ключ Дарьи (работает в МойКлассе) работает", rabotaet(k_darya) == DA)
+
+    def rabota_darya(raw):
+        with osnovnaya() as o:
+            if raw is None:
+                o.execute("DELETE FROM managers WHERE id=?", (DARYA,))
+            else:
+                o.execute("INSERT OR REPLACE INTO managers (id, name, raw) VALUES (?,?,?)",
+                          (DARYA, "Нулёвкина Дарья", json.dumps(raw, ensure_ascii=False)))
+    rabota_darya({"id": DARYA, "name": "Нулёвкина Дарья", "roles": [63600], "isWork": False})
     r = c.get("/owner", headers=STR)
     kid_d = stroki()["Нулёвкина Дарья"]["id"]
+    # 14.11.2026, после проверки (R1 №3): было «ключ уволенной пока работает (до „Отключить“)» и серая
+    # приписка «нет в списке». Теперь ключ сотрудника, которого МойКласс отмечает «не работает», не
+    # принимается сразу, а владелец видит красную строку наверху блока.
     proverka("педагог с ключом уволен: остаётся в блоке с пометкой, «Выдать заново» нет, «Отключить» есть",
-             "нет в списке педагогов МойКласса" in r.text and f"value='vydat:{DARYA}'" not in r.text
+             "в МойКлассе «не работает» — ключ не принимается" in r.text and f"value='vydat:{DARYA}'" not in r.text
              and f"value='otklyuchit:{kid_d}'" in r.text)
-    proverka("…ключ уволенной пока работает (до «Отключить») — и отключается кнопкой",
-             rabotaet(k_darya) == DA and pd(c, f"otklyuchit:{kid_d}").status_code == 200 and rabotaet(k_darya) == NET_)
+    blok = r.text[r.text.index("id='pedagogi'"):]
+    proverka("…красная строка наверху блока (до «Общий ключ»): «Ключ выдан уволенному сотруднику: Нулёвкина Дарья»",
+             "id='ped-uvoleny'" in blok and blok.index("id='ped-uvoleny'") < blok.index("<h3>Общий ключ</h3>")
+             and "Нулёвкина Дарья" in blok[blok.index("id='ped-uvoleny'"):blok.index("<h3>Общий ключ</h3>")])
+    proverka("…ключ уволенной не принимается сразу, до «Отключить»: обе страницы, запросы и сохранение — отказ",
+             rabotaet(k_darya) == NET_, rabotaet(k_darya))
+    r_ = kl("198.51.100.32").get(f"/english/karta?k={k_darya}", headers=STR)
+    proverka("…её ссылка в браузере — «Ссылка недействительна», не окно пароля", r_.status_code == 403
+             and "Ссылка недействительна" in r_.text, r_.status_code)
+    s_ = pk.sostoyanie()
+    proverka("…в счёт «с ключом» уволенная не входит", "Нулёвкина Дарья" in s_["uvoleny_s_klyuchom"]
+             and not any(p["imya"] == "Нулёвкина Дарья" for p in s_["pedagogi"] if p["klyuch"] and not p["uvolen"]))
+    rabota_darya(None)
+    proverka("данных о сотруднике в выгрузке нет — ключ не отключаем: работает", rabotaet(k_darya) == DA, rabotaet(k_darya))
+    rabota_darya({"id": DARYA, "name": "Нулёвкина Дарья", "roles": [63600]})
+    proverka("…нет поля isWork — тоже работает", rabotaet(k_darya) == DA)
+    rabota_darya({"id": DARYA, "name": "Нулёвкина Дарья", "roles": [63600], "isWork": False})
+    proverka("снова «не работает» — не принимается; «Отключить» отключает совсем",
+             rabotaet(k_darya) == NET_ and pd(c, f"otklyuchit:{kid_d}").status_code == 200
+             and not stroki()["Нулёвкина Дарья"]["vkl"] and "id='ped-uvoleny'" not in c.get("/owner", headers=STR).text)
 
 
 # --- К. Общий ключ: сменить, выключить, включить снова (Т1) ----------------------------------------------
@@ -940,6 +1158,22 @@ def test_obshchiy(K: dict) -> str:
     with baza_vhodov() as b:
         dni = b.execute("SELECT COALESCE(SUM(n), 0) FROM pedagog_vhody WHERE vid='obshchiy'").fetchone()[0]
     proverka("…счёт записан в файл входов (таблица pedagog_vhody)", dni == n_do + 2, dni)
+    # R2 №1: общую ссылку вставили в чат — превью мессенджера открытием не считается
+    for ua in ("TelegramBot (like TwitterBot)", "WhatsApp/2.23.20.0 A", "facebookexternalhit/1.1", "Mozilla/5.0 (compatible; Discordbot/2.0)"):
+        kl("149.154.161.2").get(f"/pedagog?k={PED}", headers={"user-agent": ua, "accept": "*/*"})
+        kl("149.154.161.2").get(f"/english/karta?k={PED}", headers={"user-agent": ua, "accept": "*/*"})
+    stary = {"user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_8 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1",
+             "accept": "text/html,application/xhtml+xml"}
+    t_k = p.get(f"/english/karta?k={PED}", headers=stary).text            # Safari без Sec-Fetch-*: по заходу не видно
+    n_bot = c.get("/api/pedagogi/sostoyanie", headers=FETCH).json()["obshchiy"]["otkrytiy_za_7_dney"]
+    proverka("превью мессенджеров (Telegram, WhatsApp, Facebook, Discord) и заход без Sec-Fetch-* в счёт не идут",
+             n_bot == n_do + 2, (n_do, n_bot))
+    proverka("…страница карточки старому браузеру несёт маяк «открыли»", pk.MAYAK in t_k)
+    p.post(pk.MAYAK, json={"k": PED, "put": "/english/karta"}, headers={**FETCH, "user-agent": stary["user-agent"]})
+    p.post(pk.MAYAK, json={"k": PED, "put": "/chto-to-drugoe"}, headers={**FETCH, "user-agent": stary["user-agent"]})
+    n_m = c.get("/api/pedagogi/sostoyanie", headers=FETCH).json()["obshchiy"]["otkrytiy_za_7_dney"]
+    proverka("маяк страницы по общему ключу → +1 открытие (маяк с чужим адресом страницы — нет)", n_m == n_do + 3, (n_do, n_m))
+    n_do += 1
 
     # сменить
     r = pd(c, "obshchiy_smenit")
@@ -959,8 +1193,15 @@ def test_obshchiy(K: dict) -> str:
     r2 = c.get("/owner", headers=STR)
     proverka("в блоке: «Сменён …», ссылки уже нет", "работает новый общий ключ" in r2.text and novyy not in r2.text)
     r3 = kl().post("/api/settings", json={"key": "pedagog_key", "value": PED}, auth=VLADELEC)
-    proverka("прежний ключ через /api/settings обратно не вернуть: настройка после смены ни на что не влияет",
-             r3.status_code == 200 and rabotaet(PED) == NET_ and rabotaet(novyy) == DA, r3.status_code)
+    # 14.11.2026, после проверки (R2 №9): было «200 и молча ни на что не влияет». Теперь запись отклоняется
+    # с объяснением, где теперь меняется общий ключ.
+    proverka("прежний ключ через /api/settings обратно не вернуть: 400 «общий ключ теперь меняется на /owner…»",
+             r3.status_code == 400 and "общий ключ теперь меняется на /owner, блок «Ключи педагогов»" in r3.text
+             and m.db.get_setting("pedagog_key") == "" and rabotaet(PED) == NET_ and rabotaet(novyy) == DA, r3.status_code)
+    r = kl("198.51.100.41").get(f"/english/karta?k={PED}", headers=STR)
+    proverka("прежняя общая ссылка из чата в браузере: «Ссылка недействительна», не окно пароля",
+             r.status_code == 403 and "Ссылка недействительна" in r.text and "www-authenticate" not in r.headers, r.status_code)
+    proverka("…запросы /api по прежней ссылке — как раньше (401)", kl().get(f"/api/english/karta?k={PED}").status_code == 401)
     m.db.set_setting("pedagog_key", "")
     with osnovnaya() as o:
         vazh = [x[0] for x in o.execute("SELECT chto FROM deystviya WHERE vazhnoe=1")]
@@ -1048,7 +1289,7 @@ def test_do_smeny_sboy():
 # --- Н. Перебор ------------------------------------------------------------------------------------------
 
 def test_perebor(K: dict, obshchiy: str):
-    print("Н. Перебор ключей ограничен: пять разных неверных с адреса — пауза")
+    print("Н. Перебор ключей: промахи считаются; ключам из таблицы пауза не отказывает и их удача промахи не стирает")
     adr, drugoy = "203.0.113.5", "203.0.113.6"
     zn = kl(adr)
     proverka("Анна с этого адреса уже ходила своим ключом", zn.get(f"/api/english/karta?k={K['anna']}").status_code == 200)
@@ -1062,20 +1303,35 @@ def test_perebor(K: dict, obshchiy: str):
     with baza_vhodov() as b:
         n = b.execute("SELECT COUNT(*) FROM popytki WHERE login=? AND adres=?", (pk.SCHET, adr)).fetchone()[0]
     proverka("промахи записаны в общий счётчик перебора (popytki, свой счёт «okno:pedagog»)", n == 5, n)
+    # 14.11.2026, после проверки (R1 №6): было «в паузу верный ключ, которого сервер с этого адреса не видел,
+    # получает тот же ответ, что и неверный». После перезапуска сервера (память «знакомых» пуста) пять чужих
+    # неверных ключей с Wi-Fi центра запирали честных педагогов. Ключ из таблицы — 40 случайных знаков,
+    # подобрать его нельзя: пауза ему не отказывает.
     r = x.get(f"/pedagog?k={K['olga']}")
     r_k = x.get(f"/english/karta?k={K['olga']}")
-    proverka("пауза: верный ключ, которого сервер с этого адреса не видел, получает тот же ответ, что и неверный",
-             r.status_code == 200 and "Ссылка недействительна" in r.text and r_k.status_code == 401, (r.status_code, r_k.status_code))
+    proverka("в паузу личный ключ, которого сервер с этого адреса не видел, работает: /pedagog и карточка",
+             r.status_code == 200 and "Ссылка недействительна" not in r.text and r_k.status_code == 200, (r.status_code, r_k.status_code))
     r = x.post("/api/pedagog/save", json={"k": K["olga"], "uid": 9001, "visit": False})
-    proverka("…и в сохранении — «ключ не подходит»", r.json() == {"ok": False, "error": "ключ не подходит"})
-    proverka("…общий ключ, впервые пришедший с этого адреса в паузу, — тоже отказ", rabotaet(obshchiy, adr) == NET_)
-    proverka("знакомый ключ (Анна ходила с этого адреса) паузу не замечает",
+    proverka("…и сохранение принимается", r.json().get("ok") is True, r.text[:100])
+    proverka("…новый общий ключ (тоже из таблицы), впервые с этого адреса в паузу, — работает", rabotaet(obshchiy, adr) == DA,
+             rabotaet(obshchiy, adr))
+    with baza_vhodov() as b:
+        n = b.execute("SELECT COUNT(*) FROM popytki WHERE login=? AND adres=?", (pk.SCHET, adr)).fetchone()[0]
+    proverka("…удачи ключами из таблицы промахи адреса не стёрли", n == 5, n)
+    proverka("знакомый ключ (Анна ходила с этого адреса) работает",
              zn.get(f"/api/english/karta?k={K['anna']}").status_code == 200)
     proverka("с другого адреса тот же ключ Ольги работает", "Ссылка недействительна" not in kl(drugoy).get(f"/pedagog?k={K['olga']}").text)
-    chasy(90)
-    proverka("через полторы минуты пауза кончилась: ключ Ольги с того же адреса работает",
-             "Ссылка недействительна" not in x.get(f"/pedagog?k={K['olga']}").text)
-    chasy(0)
+    # R1 №5: «4 случайных + свой верный» вне паузы — раньше удача стирала промахи, перебор не копился
+    adr3 = "203.0.113.8"
+    z = kl(adr3)
+    for cikl in range(3):
+        for i in range(4):
+            z.get(f"/pedagog?k=cikl{cikl}x{i}{secrets.token_hex(8)}")
+        z.get(f"/api/english/karta?k={K['anna']}")
+    with baza_vhodov() as b:
+        n3 = b.execute("SELECT COUNT(*) FROM popytki WHERE login=? AND adres=?", (pk.SCHET, adr3)).fetchone()[0]
+    proverka("три круга «4 неверных + свой личный ключ»: все 12 промахов на счету (удача личным ключом их не стирает)",
+             n3 == 12, n3)
     # устаревшие ссылки — не перебор
     adr2 = "203.0.113.7"
     y = kl(adr2)
@@ -1098,6 +1354,19 @@ def test_perebor(K: dict, obshchiy: str):
     with baza_vhodov() as b:
         forma = b.execute("SELECT COUNT(*) FROM popytki WHERE login NOT LIKE 'okno:%' AND adres IN (?,?)", (adr, adr2)).fetchone()[0]
     proverka("в счёт формы входа /vhod промахи ключей педагогов не идут", forma == 0, forma)
+
+
+# --- Н2. Документы ---------------------------------------------------------------------------------------
+
+def test_dokumenty():
+    print("Н2. Документы: памятка педагогу и порядок восстановления")
+    pam = Path(KOREN, "docs", "pamyatka_pedagoga.html").read_text(encoding="utf-8")
+    proverka("памятка педагогу больше не говорит «ключ хранится в настройках сервера (pedagog_key)»; общий ключ — на /owner",
+             "Ключ хранится в настройках сервера (pedagog_key)" not in pam and "блок «Ключи педагогов»" in pam)
+    vos = Path(KOREN, "docs", "rabota", "vosstanovlenie.md").read_text(encoding="utf-8")
+    proverka("восстановление: прежний общий ключ не оживает, только если копия снята после смены; иначе — «Сменить общий ключ»",
+             "снята после смены ключа" in vos and "«Сменить общий ключ» на /owner" in vos
+             and "из копии при этом не оживает (отметка" not in vos)
 
 
 # --- О. Следы ----------------------------------------------------------------------------------------------
@@ -1167,8 +1436,9 @@ def main():
     m.config.BEZ_VHODA = False
     m.db.set_setting("owner_password", VLADELEC[1])
     m.db.set_setting("pedagog_key", PED)
-    from app import pedklyuchi
+    from app import pedklyuchi, karta_razvitiya
     pk = pedklyuchi
+    karta_razvitiya._kids = pervye_stenda       # список первых занятий стенда вместо МойКласса (см. PERVYE)
     _lovushki_na_vse()
     _zh = _LogVZahvat()
     _zh.setFormatter(logging.Formatter("%(name)s %(levelname)s %(message)s"))
@@ -1177,8 +1447,12 @@ def main():
 
     test_do_smeny_sboy()
     test_kak_ranshe()
+    test_spisok_pervyh()
+    test_perebor_prezhniy()
     test_zamena_i_sad()
+    test_dolya_i_sad()
     test_shapka()
+    test_referer_log_css()
     proverka("личный пароль админа задан (для проверки «админ не может»)", m.vhod.zadat_parol("lena", LENA) == "")
     test_kto_upravlyaet()
     K = test_vydacha()
@@ -1195,6 +1469,7 @@ def main():
     K["otkl"] = vydat(c, VERA)
     pd(c, f"otklyuchit:{stroki()['Садовая Вера']['id']}")
     test_perebor(K, obshchiy)
+    test_dokumenty()
     test_sledy_v_konce()
     proverka("ни одной отправки", not lt.LOVUSHKI, lt.LOVUSHKI)
     chuzhie = [x for x in lt.SET if any("pedklyuchi" in f or "vhod" in f for f in x[1])]

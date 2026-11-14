@@ -3321,7 +3321,10 @@ def api_pedagog_save(request: Request, payload: dict = Body(...),
         if admin is not None:
             request.state.kto = admin
         request.state.chto = "педагог: заметка после первого занятия"
-    return pedagog.save(payload, ped or {}, imya_iz_klyucha=admin is None)
+    itog = pedagog.save(payload, ped or {}, imya_iz_klyucha=admin is None)
+    if ped and not itog.get("ok"):
+        request.state.chto = "педагог: заметка после первого занятия — отказ"
+    return itog
 
 
 @app.post("/api/pedagog/otkryl")
