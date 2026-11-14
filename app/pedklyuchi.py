@@ -57,6 +57,7 @@ DLINA = 40                                 # знаков в ключе (не к
 ALFAVIT = string.ascii_letters + string.digits
 SCHET = vhod.OKNO + "pedagog"              # счётчик неверных ключей — отдельно от формы и окна
 SNYAT = "pedagog_obshchiy_snyat"           # настройка основной базы: прежний общий ключ снят (когда)
+PREZHNIH = 5                               # сколько прежних отпечатков помнит строка (старые ссылки — не перебор)
 SHAG_POSL = 300                            # «последний раз открывал» пишется не чаще раза в 5 минут
 STRANICY = ("/pedagog", "/english/karta")  # открытие этих страниц общим ключом идёт в счёт «за 7 дней»
 TREVOGA = ("app.kidsup.ru: за час {n} неверных ключей педагогов с разных адресов. Страницы педагогов не "
@@ -84,6 +85,15 @@ def novyy_klyuch() -> str:
     return "".join(secrets.choice(ALFAVIT) for _ in range(DLINA))
 
 
+def _prezhnie(r, eshche: str = "") -> str | None:
+    """Поле hesh_prezhniy после замены ключа: отпечатки прежних ключей строки через пробел,
+    свежий первым, не больше PREZHNIH. Войти ими нельзя — по ним сервер только узнаёт старую
+    ссылку и не считает её перебором."""
+    starye = [x for x in [eshche, r["hesh"] if r is not None else ""] if x]
+    starye += (r["hesh_prezhniy"] or "").split() if r is not None else []
+    return " ".join(list(dict.fromkeys(starye))[:PREZHNIH]) or None
+
+
 # --- кто пришёл ----------------------------------------------------------------------------------
 
 def _nayti(k: str) -> tuple[dict | None, bool]:
@@ -99,7 +109,7 @@ def _nayti(k: str) -> tuple[dict | None, bool]:
         sovpal = bool(r["hesh"]) and vhod._ravny(r["hesh"], h)
         if sovpal and r["vkl"]:
             naydeno = r
-        elif sovpal or (bool(r["hesh_prezhniy"]) and vhod._ravny(r["hesh_prezhniy"], h)):
+        elif sovpal or any(vhod._ravny(x, h) for x in (r["hesh_prezhniy"] or "").split()):
             ustarel = True
     if naydeno is not None:
         return {"vid": naydeno["vid"], "id": naydeno["id"], "imya": naydeno["imya"] or "",
@@ -298,7 +308,7 @@ def vydat(mk_id, imya: str) -> str:
                       (LICHNYY, imya, int(mk_id) if mk_id is not None else None, vhod.hesh_klyucha(klyuch), vhod._iso()))
         else:
             c.execute("UPDATE pedagog_klyuchi SET imya=?, hesh=?, hesh_prezhniy=?, vydan=?, posl=NULL, vkl=1 WHERE id=?",
-                      (imya, vhod.hesh_klyucha(klyuch), r["hesh"] or r["hesh_prezhniy"], vhod._iso(), r["id"]))
+                      (imya, vhod.hesh_klyucha(klyuch), _prezhnie(r), vhod._iso(), r["id"]))
             with _ZAMOK:
                 _POSL.pop(r["id"], None)
     vhod._obnovit_kopiyu()
@@ -326,8 +336,7 @@ def _obshchiy_zapisat(novyy: str | None) -> None:
         db.set_setting(SNYAT, ts)
     with vhod._baza() as c:
         r = c.execute("SELECT * FROM pedagog_klyuchi WHERE vid=?", (OBSHCHIY,)).fetchone()
-        staryy_hesh = (r["hesh"] or r["hesh_prezhniy"]) if r is not None else (
-            vhod.hesh_klyucha(prezhniy) if prezhniy else None)
+        staryy_hesh = _prezhnie(r, vhod.hesh_klyucha(prezhniy) if prezhniy else "")
         if r is None:
             c.execute("INSERT INTO pedagog_klyuchi (vid, imya, hesh, hesh_prezhniy, vydan, vkl) VALUES (?,?,?,?,?,?)",
                       (OBSHCHIY, "", vhod.hesh_klyucha(novyy) if novyy else "", staryy_hesh, ts, 1 if novyy else 0))
